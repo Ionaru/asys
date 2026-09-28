@@ -1,0 +1,10 @@
+# The core owns data and rules; add-ons and front-ends go through its public interface
+
+The core owns the database, the domain nouns and rules, one durable job scheduler and Reminders, and exposes them through a versioned API (`/v1`, additive changes only) of resources, explicit commands and a documented change stream. Add-ons (Google Calendar, Google Tasks, Web Push delivery, Todoist and Trello importers) run in the same process but only use the core's commands, queries and events, plus two extension points the core provides: registering scheduled jobs and registering webhook routes. Each keeps its own state in its own schema of the same database, so the core and its add-ons share one migration run and one transaction boundary. The API is not required to return derived values such as Urgency, Latest start or the Picker ranking, but it must expose every piece of data and every setting needed to derive them, so any front-end can be fully functional by deriving them itself; the shared TypeScript domain package gives the ASYS PWA those rules out of the box, and the server uses the same package for its own jobs.
+
+Every change the core makes is written, in the same transaction, to a change log numbered per owner. The change stream resumes from that number (the log is kept for 30 days, after which a client reloads its working set), and add-ons consume the same log, so nothing is announced that did not happen and nothing is lost in a crash. Because the API does not return derived values, the rules behind them are versioned: the domain package is published with semantic versions, the API advertises the current rules version and every setting needed to derive values, and any rule change is at least a minor version with a changelog.
+
+## Considered Options
+
+- **Add-ons as separate services talking HTTP**: rejected for now; more to deploy and operate for a personal system, and the in-process rule gives the same boundary.
+- **Derived values computed only on the server and returned by the API**: rejected; it would make the PWA depend on the network for its core screens and add API surface without adding information.
