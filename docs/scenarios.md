@@ -14,7 +14,7 @@ People, company names and email addresses in the examples are invented.
 - Playbook 'Monthly 1:1 phone call', Role 'Employee'.
 - Series: Fixed recurrence, monthly, first Tuesday of the month; Role 'Employee' filled by Person Sanne de Vries (email address set). The Series remembers this, so every Occurrence fills the Role without re-picking her.
 - October Occurrence: Occasion 'Monthly 1:1: Sanne de Vries', a day, 2026-10-06, Area People Ops (Active hours weekdays 8 to 18, default Privacy Private).
-- Activity 'Phone call: Sanne de Vries', Anchor the Occasion, Offset 'on the start day at 10:00, 30 min', giving 2026-10-06 10:00-10:30. Busy, not Workable, Privacy Private, Guest: Sanne de Vries (the Person filling Role 'Employee'); ASYS is the organiser and sends her the Invite.
+- Activity 'Phone call: Sanne de Vries', Anchor the Occasion, Offset 'on the start day at 10:00, 30 min', giving 2026-10-06 10:00-10:30. Busy, not Workable, needs Voice Closed door, Privacy Private, Guest: Sanne de Vries (the Person filling Role 'Employee'); ASYS is the organiser and sends her the Invite.
 - Prep Task 'Prepare talking points', Anchor the call Activity (chained to the Occasion), Offset 'Available from 1 Working day before its start at 09:00, Due end of that day', giving Available from 2026-10-05 09:00, Due 2026-10-05. Estimate 10 min, Importance Important, Privacy Private (mirrored to Google Tasks, title only).
 - One Series per employee: only Tasks can be copied per member of a Group, so each employee's call has its own Series.
 - Notes on the Activity hold what was discussed; anything agreed on the call becomes a Follow-up Task added by hand.
@@ -27,6 +27,7 @@ People, company names and email addresses in the examples are invented.
 4. Because the call has a Guest, its Privacy can be set to Visible or Private but never to Hidden.
 5. Each call is written to Google Calendar as its own event, never as a Google recurring event, on a rolling 8-week horizon: on 28 September 2026 the 6 October and 3 November calls exist in Google and the 1 December call does not yet.
 6. Sanne de Vries's Person page lists 'Monthly 1:1 phone call' among the recurring Series bound to her; deleting or Anonymising her while that Series is active raises a Review item.
+7. With a Series 'Train to Utrecht' (weekdays 07:52-08:44, Workable, Voice Silent), dragging the 1 December call to 08:00 shows an inline Voice clash warning and still moves it; if an Occurrence created by the Series overlapped the ride instead, ASYS would raise one Review item for that pair and move nothing.
 
 ## S2. Team lunch session
 
@@ -74,7 +75,7 @@ People, company names and email addresses in the examples are invented.
 - Activity 'Picture moment', Offset 'on the start day at 13:00, 15 min', giving 13:00-13:15. Busy, not Workable, Privacy Private, Guest Fatima de Groot.
 - Activity 'Administrative tools walkthrough', Offset 'on the start day at 14:00, 1 h', giving 14:00-15:00. Busy, not Workable, Privacy Private, Guest Fatima de Groot.
 - Task 'Publish LinkedIn welcome post', Anchor the Occasion, Offset 'on the start day', Due 2026-09-01. Estimate 15 min, Importance not Important.
-- Activities 'Call with Fatima after 1 week', 'after 1 month' and 'after 3 months', Anchor the Occasion, Offsets '7 days after the start at 10:00, 15 min', '1 month after the start at 10:00, 15 min' and '3 months after the start at 10:00, 30 min', giving 2026-09-08, 2026-10-01 and 2026-12-01. Busy, not Workable, Privacy Private, Guest Fatima de Groot. Three separate Offsets rather than a Series, because the intervals differ.
+- Activities 'Call with Fatima after 1 week', 'after 1 month' and 'after 3 months', Anchor the Occasion, Offsets '7 days after the start at 10:00, 15 min', '1 month after the start at 10:00, 15 min' and '3 months after the start at 10:00, 30 min', giving 2026-09-08, 2026-10-01 and 2026-12-01. Busy, not Workable, needs Voice Closed door, Privacy Private, Guest Fatima de Groot. Three separate Offsets rather than a Series, because the intervals differ.
 
 **Acceptance criteria:**
 1. Moving the Occasion from 1 to 8 September moves every open item anchored to it, directly or through the walkthrough, each recalculated from its own Offset (laptop Due 25 August, IT accounts Due 3 September, calls on 15 September, 8 October and 8 December); a Task already Done keeps its date.
@@ -85,6 +86,7 @@ People, company names and email addresses in the examples are invented.
 6. If that Check-in closes with Not yet on Monday 17 August, the next Check-in defaults to Tuesday 18 August, the next Working day.
 7. If 'Set up IT accounts for Fatima' is still Open when the walkthrough is about to start, ASYS gives the Reminder for an Activity about to start with open Prep.
 8. Once 1 September has passed and none of the Occasion's Tasks is Open, the Occasion is Past, even though the October and December calls still lie ahead.
+9. Moving the Occasion so that one of the three calls overlaps a Silent Workable Activity, such as a train ride, raises one Review item for that pair and moves nothing else.
 
 **Manual by design:**
 - Ordering the laptop and equipment: done by Marieke outside ASYS; ASYS tracks only the Delegated Task and its Check-in.
@@ -149,11 +151,12 @@ People, company names and email addresses in the examples are invented.
 6. 'OK to billing team' is Blocked before the copies are made on 30 October at 09:00 and while any of them is Open or Delegated, and is no longer Blocked once none is (for example all Done, or a leaver's copy Dropped).
 7. If a Check-in closes with Not yet on Friday 30 October, that employee's next Check-in defaults to Monday 2 November, the next Working day; 'OK to billing team' becomes Overdue after 17:30 on 30 October while it is still Blocked.
 8. Moving the October Occasion from 30 to 29 October moves 'Post hours reminder' to 26 October, 'Register your hours' (and any open copy already made) to Available from 29 October 09:00 and Due 16:00, and 'OK to billing team' to Due 29 October 17:30; a copy already Done keeps its date.
+9. Closing a Check-in with Not yet asks whether the next one is by message or by phone: choosing by phone makes Monday's Check-in need Out loud, so on a Silent train ride on 2 November the Picker leaves it out and lists it under Not here, above the ranking because it is urgent; by message it needs no Voice and is suggested on the train.
 
 **Manual by design:**
 - Posting the Slack reminder: a manual Task with the draft text in its Notes.
 - Closing each Check-in: the User checks the hours system by hand, since reading hours data is out of scope.
-- Chasing a straggler by Slack or phone after Not yet: done outside ASYS, with any draft text in the Check-in's Notes.
+- Chasing a straggler by Slack or phone after Not yet: done outside ASYS, with any draft text in the Check-in's Notes; ASYS only records whether the next Check-in is by message or by phone, which sets its Voice.
 - Sending the OK to billing: a manual Task; the message itself goes out outside ASYS.
 
 ## S6. Candidate interview
@@ -227,7 +230,7 @@ People, company names and email addresses in the examples are invented.
 **How ASYS models it** (one example run with concrete 2026 dates and times):
 - Task 'Review leave balances for year-end', no Anchor, Series with Fixed recurrence yearly, Available from 1 November, Due 8 November (2026-11-01 and 2026-11-08). Area Work (Active hours weekdays 8 to 18), Importance Important, Estimate 30 min, Privacy Private; Notes hold a link to the leave system. Done on 2026-11-05, flagging Anna de Vries and Bram Jansen.
 - Task 'Anna de Vries: book remaining leave days before year end', created by hand, no Anchor, Area Work, Importance Important, Estimate 10 min, Due 2026-12-18, Privacy Hidden, linked to Anna de Vries and Delegated to her.
-- Its Check-in is due at the default one day before the Task's Due, 2026-12-17, Privacy Hidden. On 17 December it closes with Not yet; the next Check-in is 2026-12-18, where it closes with Done.
+- Its Check-in is due at the default one day before the Task's Due, 2026-12-17, Privacy Hidden, and needs Voice Closed door, set by hand because leave balances are a private topic. On 17 December it closes with Not yet; the next Check-in is 2026-12-18, where it closes with Done.
 - Task 'Bram Jansen: book remaining leave days before year end', same shape, Due 2026-12-15, first Check-in 2026-12-14. He is Not yet on 14, 15 and 16 December and still Not yet on 31 December.
 
 **Acceptance criteria:**
@@ -239,6 +242,7 @@ People, company names and email addresses in the examples are invented.
 6. Closing a Check-in with Done marks its Task Done and ends the Delegation; closing it with Take back returns the Task to the User as Open.
 7. After 15 December Bram's Task is Overdue while still Delegated, and it returns to the User's working lists only once a Check-in closes with Done or Take back.
 8. On 31 December the User Drops Bram's Delegated Task directly; its open Check-in is Dropped with it, and no Take back is needed.
+9. Anna's Check-in, needing Closed door, is listed under Not here at an Out loud Place such as an open-plan office; closing it with Not yet by phone gives the next Check-in Closed door again, not Out loud.
 
 **Manual by design:**
 - Finding who has too much leave open: a manual Task with a link to the leave system in its Notes, since reading leave data is out of scope.
@@ -292,7 +296,7 @@ People, company names and email addresses in the examples are invented.
 2. Because the session has a Guest, its Privacy can be Visible or Private but never Hidden.
 3. Moving the Occasion from Thursday 12 to Friday 13 November moves the session to 13 November 18:00, 'Gauge headcount for food' to 10 November and 'Check snacks and drinks stock' to Due 13 November 15:00, and Google sends its normal update to all@company.com; a Prep already Done keeps its date.
 4. 'Check snacks and drinks stock' is Blocked while 'Gauge headcount for food' is Open or Delegated.
-5. Because 'Check snacks and drinks stock' has Place Office, the Picker leaves it out while the User is elsewhere.
+5. Because 'Check snacks and drinks stock' has Place Office, the Picker leaves it out while the User is elsewhere and lists it under Not here ('Only at Office'); when the User's position is unknown it is not left out.
 6. If stock is short, 'Buy more snacks and drinks' is a Task the User adds by hand; completing the stock check creates no Task.
 
 **Manual by design:**
@@ -313,8 +317,8 @@ People, company names and email addresses in the examples are invented.
 - Prep Task 'Order card', Anchor the Occasion, Offset '7 Working days before the start, Due 17:00', giving Due 2026-10-22 17:00. Estimate 15 min, Importance Important, blocked by 'Design card image'.
 - Playbook Task 'Get signature: <colleague>', marked per member for Role 'Card signers' and leaving out the Person who fills Role 'Consultant', Anchor the Occasion, Offset '4 Working days before the start, Due 17:00', giving Due 2026-10-27 17:00, Estimate 5 min, blocked by 'Order card'; one copy per matched member, linked to that colleague.
 - Prep Task 'Send card', Anchor the Occasion, Offset '2 Working days before the start, Due 17:00', giving Due 2026-10-29 17:00. Estimate 10 min, blocked by every 'Get signature' copy.
-- Follow-up 'Call Bram after his first day', Anchor the Occasion, Offset '1 Working day after the start', Due 2026-11-03.
-- Follow-up 'Call Bram after his first week', Anchor the Occasion, Offset '1 week after the start', Due 2026-11-09.
+- Follow-up 'Call Bram after his first day', Anchor the Occasion, Offset '1 Working day after the start', Due 2026-11-03, needs Voice Closed door.
+- Follow-up 'Call Bram after his first week', Anchor the Occasion, Offset '1 week after the start', Due 2026-11-09, needs Voice Closed door.
 
 **Acceptance criteria:**
 1. Once 'Order card' is Done and the signature Task becomes Available, each member of team@company.com who matches a Person gets one 'Get signature' copy, Bram Jansen gets none because he fills Role 'Consultant', and a member without a Person raises a Review item; ASYS never creates a Person.
@@ -325,6 +329,7 @@ People, company names and email addresses in the examples are invented.
 6. If that Check-in closes with Not yet on Monday 19 October, the next Check-in defaults to Tuesday 20 October.
 7. 'Design card image''s Effective due is the earlier of its own Due and 'Order card''s Latest start: if the User sets 'Order card''s Due to 19 October 12:00, 'Design card image''s Effective due becomes 19 October 11:45.
 8. Moving the Occasion from 2 to 4 November moves every open item two Working days later ('Design card image' Due 21 October, 'Order card' 26 October, 'Get signature' and any copies 29 October, 'Send card' 2 November, Follow-ups 5 and 11 November); a Task already Done keeps its date.
+9. On Tuesday 3 November at 08:05, on a Silent train ride, the Picker leaves 'Call Bram after his first day' out and shows it above the ranking under Not here ('needs Closed door; Train to Utrecht is Silent until 08:44'); at an Out loud Office it stays under Not here, and after the User picks Closed door in Now it is ranked until the next Activity starts or ends, for at most 2 hours.
 
 **Manual by design:**
 - The card image file: kept outside ASYS, with a link in 'Design card image''s Notes.
