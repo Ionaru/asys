@@ -6,3 +6,7 @@ Jobs such as Reminders, the Morning briefing, Google polling and push-channel re
 
 - **`effect/cluster`**: rejected for now because it is marked unstable, creates and migrates its own tables at startup (which the app role of ADR 0007 cannot own), does not separate storage per owner, and runs cron once per cluster rather than per owner. The Jobs interface is kept narrow so it can be swapped in later.
 - **pg-boss**: stable, but rejected because it has no Effect adapter, so creating a job inside a Drizzle transaction would need a hand-made bridge.
+
+## Consequences
+
+The claim function reads across owners, so like every pre-owner lookup in ADR 0007 it cannot belong to the table-owning role, which FORCE ROW LEVEL SECURITY binds too. It belongs to the lookup role (or a sibling role set up the same way) with only the column privileges it needs: SELECT on the due and owner columns and UPDATE on the claim columns. The worker then runs each claimed job in a transaction that sets that job's owner.
