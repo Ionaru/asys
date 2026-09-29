@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "singleQuote": true,
+  "ignorePatterns": [
+    "/CONTEXT.md",
+    "/docs/",
+    "/pnpm-lock.yaml",
+    "/.angular/",
+    "/apps/server/drizzle/"
+  ]
+}

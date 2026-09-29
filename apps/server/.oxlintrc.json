@@ -1,0 +1,19 @@
+{
+  "extends": ["../../.oxlintrc.json"],
+  "plugins": ["vitest"],
+  "rules": {
+    "vitest/expect-expect": [
+      "error",
+      {
+        "assertFunctionNames": [
+          "expect",
+          "expectTypeOf",
+          "assert",
+          "assertType",
+          "errorTypeOf",
+          "sqlErrorIn"
+        ]
+      }
+    ]
+  }
+}

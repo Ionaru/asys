@@ -1,0 +1,60 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc"],
+  "jsPlugins": ["@nx/oxlint/boundaries-plugin"],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "typescript/ban-ts-comment": "error",
+    "no-empty-function": "error",
+    "typescript/no-inferrable-types": "error",
+    "typescript/no-empty-object-type": "error",
+    "typescript/adjacent-overload-signatures": "error",
+    "typescript/no-namespace": "error",
+    "typescript/no-unsafe-function-type": "error",
+    "no-empty": "error",
+    "no-fallthrough": "error",
+    "no-case-declarations": "error",
+    "no-prototype-builtins": "error",
+    "prefer-const": "error",
+    "no-var": "error",
+    "no-redeclare": "error",
+    "no-regex-spaces": "error",
+    "prefer-rest-params": "error",
+    "prefer-spread": "error",
+    "no-array-constructor": "error",
+    "typescript/no-explicit-any": "warn",
+    "typescript/no-non-null-assertion": "warn",
+    "@nx/enforce-module-boundaries": [
+      "error",
+      {
+        "enforceBuildableLibDependency": true,
+        "depConstraints": [
+          {
+            "sourceTag": "scope:domain",
+            "onlyDependOnLibsWithTags": ["scope:domain"],
+            "bannedExternalImports": [
+              "effect",
+              "effect/*",
+              "drizzle-orm",
+              "drizzle-orm/*",
+              "@angular/*"
+            ]
+          },
+          {
+            "sourceTag": "scope:server",
+            "onlyDependOnLibsWithTags": ["scope:domain", "scope:server"]
+          },
+          {
+            "sourceTag": "scope:pwa",
+            "onlyDependOnLibsWithTags": ["scope:domain", "scope:pwa"]
+          }
+        ]
+      }
+    ]
+  },
+  "env": {
+    "builtin": true
+  }
+}

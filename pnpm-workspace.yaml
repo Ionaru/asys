@@ -1,0 +1,12 @@
+autoInstallPeers: true
+allowBuilds:
+  nx: true
+  esbuild: true
+  '@parcel/watcher': true
+  unrs-resolver: true
+  lmdb: true
+  msgpackr-extract: true
+overrides:
+  typescript: 6.0.3
+  effect: 4.0.0-rc.117
+  '@effect/platform-node-shared': 4.0.0-rc.117

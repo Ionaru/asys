@@ -1,0 +1,1 @@
+ALTER POLICY "trial_items_owner" ON "trial_items" TO public USING ("trial_items"."owner_id" = nullif(current_setting('app.owner_id', true), '')::uuid) WITH CHECK ("trial_items"."owner_id" = nullif(current_setting('app.owner_id', true), '')::uuid);
