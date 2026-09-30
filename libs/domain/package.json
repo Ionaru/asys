@@ -2,10 +2,12 @@
   "name": "@asys/domain",
   "version": "0.0.1",
   "private": true,
+  "license": "MPL-2.0",
   "type": "commonjs",
   "main": "./src/index.js",
   "types": "./src/index.d.ts",
   "dependencies": {
+    "temporal-polyfill": "1.0.5",
     "tslib": "^2.3.0"
   }
 }

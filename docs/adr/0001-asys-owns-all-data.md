@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
 # ASYS owns all data; Google Calendar and Google Tasks are mirrors
 
 ASYS keeps its own store as the source of truth for Tasks, Activities, Occasions and everything attached to them. Google Tasks cannot hold most of the model (no Available from, no time of day on a due date, no recurrence through the API, no field for Importance, duration, Place or any custom data, and no change notifications), so it only serves as a place to capture Tasks and to see and tick off open ones. Google Calendar receives ASYS's Activities so colleagues can see when the user is busy, and supplies the accepted, tentative and self-organised events on the primary calendar as Activities; nothing ASYS needs depends on being stored in Google.

@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
 # Slice 1 build plan
 
 This plan cuts [Slice 1 of the MVP plan](mvp-plan.md#slice-1-foundations-and-the-task-loop) into seven pieces. Each piece ends green and is committed on its own. It was drawn up on 2026-09-30.
@@ -132,6 +133,7 @@ Every per-owner write transaction takes the owner's `change_counters` row `FOR U
   - Newly generated migrations get the header right after generation.
 - **Exempt:** JSON, lockfiles, `LICENSE*`, `.gitkeep` and binary assets.
 - **Licence by location:** `EUPL-1.2` everywhere, and `MPL-2.0` under `libs/domain` and `libs/contract`.
+- **REUSE.** Added 2026-10-01: the repository follows REUSE 3.3. The header stays the identifier line alone. A root `REUSE.toml` supplies every file's copyright notice and the licence of the exempt files, the licence texts are also kept in `LICENSES/`, and `reuse lint` runs in CI next to `scripts/check-spdx.mts`.
 
 ## The pieces
 
@@ -168,7 +170,7 @@ Every per-owner write transaction takes the owner's `change_counters` row `FOR U
 
 **SPDX**
 - Add headers to every existing file, per decision 10.
-- Add `scripts/check-spdx.sh`, run over `git ls-files`.
+- Add `scripts/check-spdx.mts`, run over `git ls-files`.
 
 **Scaffold and TypeScript**
 - Delete `apps/pwa/src/app/nx-welcome.ts` and its use. This also ends the budget warning.
@@ -183,18 +185,15 @@ Every per-owner write transaction takes the owner's `change_counters` row `FOR U
 - Add exact pins: `fast-check@4.10.2` as a devDependency and `temporal-polyfill@1.0.5`.
 
 **CI**
-- `scripts/ci.sh` runs, in order:
-  1. `pnpm install --frozen-lockfile`
-  2. write `.env` if missing, with random passwords and both `DATABASE_URL_*` values
-  3. `docker compose up -d --wait`
-  4. `pnpm exec drizzle-kit migrate --config apps/server/drizzle.config.ts`
-  5. the ADR 0009 smoke import: `node --input-type=module -e "await import('drizzle-orm/effect-postgres')"`
-  6. `nx run-many -t lint typecheck build test --skip-nx-cache`
-  7. `nx format:check --all`
-  8. `scripts/check-spdx.sh`
-  9. the licence allowlist
-- `.github/workflows/ci.yml` runs that script on push and on pull requests, on `ubuntu-latest` with Node 24.
-  - Check the current versions of `actions/checkout`, `pnpm/action-setup` and `actions/setup-node` before writing it.
+- `.github/workflows/cd.yaml` (named CD, it will deploy later too) runs on push and on pull requests, with independent jobs that run in parallel on `ubuntu-24.04` with Node 24. There is no CI shell script and no Nx Cloud.
+  - `lint`: `nx run-many -t lint`.
+  - `typecheck`: `nx run-many -t typecheck` and `tsc -p scripts/tsconfig.json`.
+  - `build`: `nx run-many -t build`.
+  - `test`: write `.env` with random passwords and both `DATABASE_URL_*` values, `docker compose up -d --wait`, apply the migrations with `drizzle-kit migrate`, run the ADR 0009 smoke import `node --input-type=module -e "await import('drizzle-orm/effect-postgres')"`, then `nx run-many -t test --skip-nx-cache`.
+  - `format`: `nx format:check --all`.
+  - `licences`: `node scripts/check-spdx.mts`, `reuse lint` and `node scripts/check-licenses.mts` (the dependency licence allowlist).
+  - The checkout and pnpm setup steps are shared through YAML anchors; the pnpm setup installs with a frozen lockfile.
+  - Check the current versions of `actions/checkout` and `pnpm/setup` before writing it.
 
 ### Domain layout
 
@@ -214,15 +213,15 @@ rules-version.ts   RULES_VERSION = '0.1.0', with libs/domain/CHANGELOG.md
 | Field | Type |
 |---|---|
 | `id` | id |
-| `kind` | `'task' \| 'check_in' \| 'member_template'` |
-| `status` | `'open' \| 'done' \| 'dropped' \| 'delegated' \| 'skipped'` |
+| `kind` | `TaskKind`: `task`, `check_in` or `member_template` |
+| `status` | `TaskStatus`: `open`, `done`, `dropped`, `delegated` or `skipped` |
 | `title`, `notes`, `captureText` | text |
 | `areaId` | id or null |
 | `availableFrom`, `due` | `DateSpec` or null |
 | `estimateMinutes` | number or null |
 | `important` | boolean or null |
-| `voice` | `'out_loud' \| 'closed_door' \| null` |
-| `privacy` | `'visible' \| 'private' \| 'hidden' \| null` |
+| `voice` | `Voice` (`out_loud` or `closed_door`) or null |
+| `privacy` | `Privacy` (`visible`, `private` or `hidden`) or null |
 | `dueMoveCount`, `version` | number |
 | `createdAt` | `Instant` |
 | `closedAt` | `Instant` or null |
@@ -295,8 +294,8 @@ Each is a pure function of `(state, command, now)`.
 ### Verification
 
 - **Full checks.**
-  - `pnpm exec nx run-many -t lint typecheck build test --skip-nx-cache`, `nx format:check --all`, `scripts/check-spdx.sh` and the licence check are green.
-  - `scripts/ci.sh` passes locally.
+  - `pnpm exec nx run-many -t lint typecheck build test --skip-nx-cache`, `nx format:check --all`, `node scripts/check-spdx.mts` and the licence check are green.
+  - Each `cd.yaml` job's commands pass locally.
 - **Boundary red check.** Adding `import 'effect'` to `libs/domain/src/index.ts` turns `nx lint domain` red; the import is then removed.
 - **Proof the tests can fail.**
   - Changing `now > dueInstant` to `>=` must fail S2.7's 10:00:00 case.
@@ -323,11 +322,13 @@ Each is a pure function of `(state, command, now)`.
   - A `.test-d.ts` type test checks that each `Schema.Type` equals its domain type.
   - It needs vitest's `typecheck.enabled` with a `typecheck.tsconfig` that includes the file; otherwise it checks nothing (ADR 0009).
   - Seeing it red once is part of the unit.
-- **`Command`** is a `Schema.TaggedUnion` of the slice 1 commands. Each has:
+  - Ids are UUID strings in the contract, and text fields reject NUL; both only narrow values, so `Schema.Type` stays `string`.
+- **`Command`** is a `Schema.TaggedUnion` of the slice 1 commands, mirroring the domain's `Command`. Each has:
   - `idempotencyKey`, a UUID;
-  - an optional `expect: { status?, version? }`;
+  - an optional `expect`, only where the domain has one (settled in piece 1): `{ status?, version? }` on Triage, edit, log progress, complete and drop, and `{ version? }` on updating an Area;
   - a static `commandMeta[tag].offline` flag, true for capture, Triage, edit, log progress, complete and drop.
 - **`CommandResult`** is either `Applied{ seq }` or `NotApplicable{ reason, reviewItemId }`. `Rejected{ reason }` is returned as a 422 error.
+  - `Applied.seq` is the counter's `last_seq` after the command. A command that changes nothing leaves it unchanged.
 - **The rest:**
   - `ChangeEntry`: `{ seq, entity, id, op, after? }`
   - `Snapshot`: `{ seq, tasks, blockers, areas, reviewItems, settings }`
@@ -351,7 +352,7 @@ Each is a pure function of `(state, command, now)`.
 | `users` | `owner_id` (primary key), `name`, `created_at` |
 | `settings` | `owner_id` (primary key), `time_zone`, `urgency_window_days` |
 | `areas` | |
-| `tasks` | enums `task_kind`, `task_status`, `voice` and `privacy`; separate `*_date` and `*_time` columns, with checks that a time needs a date and that `estimate_minutes > 0`; `due_move_count`, `capture_text`, `version` |
+| `tasks` | enums `task_kind`, `task_status`, `voice` and `privacy`; separate `*_date` and `*_time` columns, with checks that a time needs a date and that `estimate_minutes > 0` (a `*_time` column holds `'HH:MM'` text, or the mapper formats it to that, since the domain rejects `'HH:MM:SS'`); `due_move_count`, `capture_text`, `version` |
 | `task_blockers` | `id`, `task_id`, `blocker_id`; unique `(owner_id, task_id, blocker_id)`; check `task_id <> blocker_id` |
 | `review_items` | a unique index on `(owner_id, dedupe_key)` where `resolved_at is null` |
 | `change_log` | `owner_id`, `seq`, `entity`, `entity_id`, `op`, `data jsonb`, `created_at`; primary key `(owner_id, seq)` |
@@ -519,7 +520,7 @@ Inserting an existing dedupe key moves `run_at` and resets `finished_at`, `faile
 
 **Libraries and CLI**
 - `@simplewebauthn/server` and `@simplewebauthn/browser` 14.x (MIT), pinned exactly.
-- The CLI uses `effect/unstable/cli`: `asys signup-link [--expires-in-days 7]` prints `${ASYS_PUBLIC_ORIGIN}/signup#token=…`.
+- The CLI uses `effect/cli`: `asys signup-link [--expires-in-days 7]` prints `${ASYS_PUBLIC_ORIGIN}/signup#token=…`.
 
 **Tests**
 - HTTP tests run through `HttpRouter.toWebHandler`, with the WebAuthn verifier behind a service that tests stub.
@@ -576,7 +577,7 @@ Components stay thin, and the logic stays in `libs/domain`.
 
 ## Facts checked on 2026-09-30
 
-These were checked against the installed packages (Effect 4.0.0-rc.117, drizzle-orm 1.0.0-rc.5-5935859, Nx 23.2.1) and the npm registry. Recheck anything that has had a version change since.
+These were checked against the installed packages (Effect 4.0.0-rc.117, drizzle-orm 1.0.0-rc.5-5935859, Nx 23.2.1) and the npm registry. Effect was moved to rc.118 on 2026-10-01: its new module paths (`effect/http-api`, `effect/http`, `effect/cli`) were checked then, the API details below were not. Closed sets in the domain are string enums with these values (piece 1). Recheck anything that has had a version change since.
 
 ### Versions and licences
 
@@ -588,11 +589,11 @@ These were checked against the installed packages (Effect 4.0.0-rc.117, drizzle-
 | `@js-temporal/polyfill` | ISC | |
 | `fast-check` | 4.10.2, MIT | |
 | `@fast-check/vitest` | 0.5.0 | accepts vitest 5 |
-| `effect` | 4.0.0-rc.118 is current | renamed `effect/unstable/*`; drizzle rc5 still imports the old paths, so stay on rc.117 |
+| `effect` | 4.0.0-rc.118 | used, with a tsconfig paths entry for drizzle's type import of `effect/unstable/sql/SqlError` (ADR 0009) |
 | `tslib` | 0BSD | |
 | `split2` | ISC | |
 
-### HttpApi (`effect/unstable/httpapi`)
+### HttpApi (`effect/http-api`)
 
 - **Definition.** `HttpApi.make(id).add(group).prefix('/v1')`. `.prefix()` and `.middleware()` apply only to groups and endpoints added before them.
 - **Endpoints.** `HttpApiEndpoint.get/post(name, path, { params, query, payload, success, error })`. Query values are coerced, so `Schema.Int` works for `?after=5`.
@@ -611,7 +612,7 @@ These were checked against the installed packages (Effect 4.0.0-rc.117, drizzle-
 
 ### Static files, Schema and core modules
 
-- **Static files.** `HttpStaticServer.layer({ root, spa: true })` from `effect/unstable/http` handles GET only. It gives ETag and 304. Its SPA fallback covers extensionless paths when `Accept` includes `text/html`.
+- **Static files.** `HttpStaticServer.layer({ root, spa: true })` from `effect/http` handles GET only. It gives ETag and 304. Its SPA fallback covers extensionless paths when `Accept` includes `text/html`.
 - **Schema v4 API:**
   - `Schema.Union([…])`, `Literals([…])`, `TaggedStruct`, `TaggedUnion`, `optionalKey` or `optional`, `NullOr`;
   - `decodeUnknownEffect/Sync`.
@@ -622,7 +623,7 @@ These were checked against the installed packages (Effect 4.0.0-rc.117, drizzle-
   - Services: `Context.Service` replaces `Context.Tag`.
 - **Cron.** `Cron.parse(expr, tz)` and `Cron.next(cron, now)` handle DST.
 - **Schedule.** `Schedule.exponential`, `jittered`, `min`, `spaced` and `upTo`. Jitter before `min`, or the cap is overshot by up to 20%.
-- **CLI.** `effect/unstable/cli`: `Command.make`, `Flag.String` and `Flag.Int`, `Command.run`, with `NodeServices.layer`.
+- **CLI.** `effect/cli`: `Command.make`, `Flag.String` and `Flag.Int`, `Command.run`, with `NodeServices.layer`.
 
 ### Drizzle
 

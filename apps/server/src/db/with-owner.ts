@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: EUPL-1.2
 import { sql } from 'drizzle-orm';
 import { Effect } from 'effect';
 import { Db } from './database';

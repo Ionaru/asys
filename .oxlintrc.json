@@ -18,6 +18,7 @@
     "no-case-declarations": "error",
     "no-prototype-builtins": "error",
     "prefer-const": "error",
+    "func-style": ["error", "expression"],
     "no-var": "error",
     "no-redeclare": "error",
     "no-regex-spaces": "error",

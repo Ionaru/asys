@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: EUPL-1.2
 CREATE TABLE "trial_items" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 	"owner_id" uuid NOT NULL,

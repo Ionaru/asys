@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
 # Ideas from existing tools
 
 On 2026-09-28 fourteen task and calendar tools were scored against fifteen weighted criteria taken from [CONTEXT.md](../../CONTEXT.md), the [ADRs](../adr/) and [scenarios.md](../scenarios.md), each criterion from 0 (not possible) to 3 (fully covered), with two hard constraints: an Android app or good web app, and Google Calendar integration. The best tool, Amazing Marvin, reached 54.3 out of 100, ahead of ClickUp (48.7) and TickTick (47.7), and both judging passes concluded that building ASYS still makes sense.

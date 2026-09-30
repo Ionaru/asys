@@ -12,7 +12,17 @@
         "outputPath": "dist/libs/domain",
         "main": "libs/domain/src/index.ts",
         "tsConfig": "libs/domain/tsconfig.lib.json",
-        "assets": ["libs/domain/*.md"]
+        "assets": ["libs/domain/*.md", "libs/domain/LICENSE"]
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["default", "^default", "{workspaceRoot}/tsconfig.base.json"],
+      "options": {
+        "cwd": "libs/domain",
+        "parallel": false,
+        "commands": ["tsc --noEmit -p tsconfig.lib.json", "tsc --noEmit -p tsconfig.spec.json"]
       }
     }
   }

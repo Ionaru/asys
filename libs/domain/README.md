@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: MPL-2.0 -->
+
 # domain
 
 This library was generated with [Nx](https://nx.dev).

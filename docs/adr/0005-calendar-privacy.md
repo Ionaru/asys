@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
 # Privacy toward Google is a core rule, and Hidden details never reach Google
 
 Every Activity ASYS writes to Google Calendar has a Privacy level: Private by default (Google's private visibility, so colleagues only see that the user is busy), Visible when opted in, or Hidden, where ASYS writes only a placeholder title and no description or location. The core reduces the data before the Google Calendar add-on receives it, so Hidden details never reach the employer's Workspace; the defaults are set per Area (Personal is Hidden). Reminder notifications follow the same level: a Visible item's notification shows its title, while a Private or Hidden item's shows only a generic line such as "Meeting in 5 min, 2 Prep open", and one setting can make every notification generic.

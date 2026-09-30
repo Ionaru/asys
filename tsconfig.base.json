@@ -8,14 +8,15 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "importHelpers": true,
-    "target": "es2015",
+    "target": "es2022",
     "module": "esnext",
-    "lib": ["es2020", "dom"],
+    "lib": ["es2023", "dom"],
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
     "strict": false,
     "paths": {
-      "@asys/domain": ["./libs/domain/src/index.ts"]
+      "@asys/domain": ["./libs/domain/src/index.ts"],
+      "effect/unstable/sql/SqlError": ["./node_modules/effect/dist/sql/SqlError.d.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

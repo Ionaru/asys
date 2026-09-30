@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
 # Scenarios
 
 Twelve real situations from the user's work as a manager, written as acceptance examples in the language of [CONTEXT.md](../CONTEXT.md) and consistent with the ADRs in [docs/adr](adr/). Each scenario quotes the original description, shows one example run with concrete 2026 dates, lists testable acceptance criteria, and names the steps that deliberately stay outside ASYS.

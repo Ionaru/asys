@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: EUPL-1.2
 import { Effect } from 'effect';
 import { expectTypeOf, test } from 'vitest';
 import { Db } from './database';

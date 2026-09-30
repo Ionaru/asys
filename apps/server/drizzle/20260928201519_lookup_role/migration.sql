@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: EUPL-1.2
 -- Custom SQL migration file, put your code below! --
 -- FORCE ROW LEVEL SECURITY binds the table owner too, so a SECURITY DEFINER
 -- function owned by asys_owner sees no rows. The lookup functions belong to

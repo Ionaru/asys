@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: EUPL-1.2
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { defineConfig } from 'vitest/config';

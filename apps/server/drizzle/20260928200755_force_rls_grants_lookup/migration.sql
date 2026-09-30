@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: EUPL-1.2
 -- Custom SQL migration file, put your code below! --
 -- drizzle-kit cannot emit FORCE ROW LEVEL SECURITY: without it the table owner bypasses the policy.
 ALTER TABLE "trial_items" FORCE ROW LEVEL SECURITY;

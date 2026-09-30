@@ -1,9 +1,10 @@
+// SPDX-License-Identifier: EUPL-1.2
 import { randomUUID } from 'node:crypto';
 import { PgClient } from '@effect/sql-pg';
 import { assert, layer } from '@effect/vitest';
 import { eq } from 'drizzle-orm';
 import { Cause, Duration, Effect, Exit } from 'effect';
-import { isSqlError, type SqlError } from 'effect/unstable/sql/SqlError';
+import { isSqlError, type SqlError } from 'effect/sql/SqlError';
 import { appDatabase, Db, ownerDatabase } from './database';
 import { trialItems } from './schema';
 import { withOwner } from './with-owner';

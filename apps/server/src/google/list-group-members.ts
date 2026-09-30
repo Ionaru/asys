@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: EUPL-1.2
 /**
  * Trial CLI (ADR 0001): lists the direct members of one Google Group through the
  * Cloud Identity Groups API, after an OAuth installed-app sign-in on a loopback
@@ -12,10 +13,10 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { runMain } from '@effect/platform-node/NodeRuntime';
 import { Config, Console, Data, Effect, Redacted, Schema } from 'effect';
-import * as FetchHttpClient from 'effect/unstable/http/FetchHttpClient';
-import * as HttpClient from 'effect/unstable/http/HttpClient';
-import * as HttpClientRequest from 'effect/unstable/http/HttpClientRequest';
-import type * as HttpClientResponse from 'effect/unstable/http/HttpClientResponse';
+import * as FetchHttpClient from 'effect/http/FetchHttpClient';
+import * as HttpClient from 'effect/http/HttpClient';
+import * as HttpClientRequest from 'effect/http/HttpClientRequest';
+import type * as HttpClientResponse from 'effect/http/HttpClientResponse';
 
 // The narrowest scope that covers groups:lookup and memberships.list.
 const scope = 'https://www.googleapis.com/auth/cloud-identity.groups.readonly';

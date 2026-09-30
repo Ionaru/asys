@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
 # One shared server, with an owner key on every record and Postgres row-level security
 
 ASYS starts with a single User but is built as one server that can host several Users, each owning their data: every record carries its owner, and Postgres row-level security enforces the separation so a forgotten filter cannot leak one User's data to another. Retrofitting owner keys later would touch every table and query, and the long-term vision of collaboration within an organisation needs a shared server.

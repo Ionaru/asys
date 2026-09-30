@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
 # ASYS
 
 ASYS (Assisting System) helps its user decide what to do next, by holding the work that can be done at any time, the things fixed in time, and the dated moments that need preparation and follow-up.

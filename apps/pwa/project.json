@@ -66,6 +66,16 @@
         "staticFilePath": "dist/apps/pwa/browser",
         "spa": true
       }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["default", "^default", "{workspaceRoot}/tsconfig.base.json"],
+      "options": {
+        "cwd": "apps/pwa",
+        "parallel": false,
+        "commands": ["tsc --noEmit -p tsconfig.app.json"]
+      }
     }
   }
 }

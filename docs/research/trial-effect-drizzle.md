@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
 # Trial: the pinned Effect v4 + Drizzle 1.0 stack (ADR 0009)
 
 On 2026-09-28 the trial named in [ADR 0009](../adr/0009-effect-v4-and-drizzle-1-pinned.md) was run end to end. The stack works, but not as pinned. **drizzle-orm 1.0.0-rc.4 crashes on import under effect 4.0.0-rc.117**, so Drizzle now runs on the unofficial build `1.0.0-rc.5-5935859`. **ADR 0007 as written cannot work**: FORCE ROW LEVEL SECURITY also binds a SECURITY DEFINER function owned by the table owner. **The briefed policy expression raises an error on reused connections.** With those three corrected, every check is green, and each test was seen red for the right reason first. The Nx classic layout, module boundaries, pinned versions, row-level security with a per-transaction owner, and reading a Google Group's members from the work Workspace were all proven against a real PostgreSQL 18 and the real Google APIs.

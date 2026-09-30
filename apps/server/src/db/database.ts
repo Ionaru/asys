@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: EUPL-1.2
 import { PgClient } from '@effect/sql-pg';
 import { makeWithDefaults } from 'drizzle-orm/effect-postgres';
 import { Config, Context, Duration, Effect, Layer } from 'effect';

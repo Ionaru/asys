@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: EUPL-1.2
 import { defineConfig } from 'drizzle-kit';
 
 // drizzle-kit runs from the workspace root and connects as the table owner.

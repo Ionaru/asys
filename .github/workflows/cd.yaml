@@ -1,0 +1,93 @@
+# SPDX-License-Identifier: EUPL-1.2
+name: CD
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - &checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - &setup
+        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
+        with:
+          runtime: node@24
+          cache: true
+          require-lockfile: true
+      - name: Lint
+        run: pnpm exec nx run-many -t lint
+  typecheck:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - *checkout
+      - *setup
+      - name: Typecheck projects
+        run: pnpm exec nx run-many -t typecheck
+      - name: Typecheck scripts
+        run: pnpm exec tsc -p scripts/tsconfig.json
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - *checkout
+      - *setup
+      - name: Build
+        run: pnpm exec nx run-many -t build
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - *checkout
+      - *setup
+      - name: Write .env
+        run: |
+          owner_pw="$(openssl rand -hex 24)"
+          app_pw="$(openssl rand -hex 24)"
+          (
+            umask 077
+            {
+              echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)"
+              echo "ASYS_OWNER_PASSWORD=${owner_pw}"
+              echo "ASYS_APP_PASSWORD=${app_pw}"
+              echo "DATABASE_URL_OWNER=postgresql://asys_owner:${owner_pw}@127.0.0.1:5432/asys"
+              echo "DATABASE_URL_APP=postgresql://asys_app:${app_pw}@127.0.0.1:5432/asys"
+            } > .env
+          )
+      - name: Start the database
+        run: docker compose up -d --wait
+      - name: Apply migrations
+        run: pnpm exec drizzle-kit migrate --config apps/server/drizzle.config.ts
+      - name: Smoke import drizzle-orm/effect-postgres (ADR 0009)
+        run: node --input-type=module -e "await import('drizzle-orm/effect-postgres')"
+      - name: Test
+        run: pnpm exec nx run-many -t test --skip-nx-cache
+  format:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - *checkout
+      - *setup
+      - name: Format check
+        run: pnpm exec nx format:check --all
+  licences:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - *checkout
+      - *setup
+      - name: Licence identifiers
+        run: node scripts/check-spdx.mts
+      - name: REUSE
+        run: pipx run reuse==6.2.0 lint
+      - name: Dependency licences
+        run: node scripts/check-licenses.mts

@@ -1,12 +1,14 @@
+# SPDX-License-Identifier: EUPL-1.2
 autoInstallPeers: true
+# Listed to record they were reviewed and denied (prebuilt binaries come from optional platform packages).
 allowBuilds:
-  nx: true
-  esbuild: true
-  '@parcel/watcher': true
-  unrs-resolver: true
-  lmdb: true
-  msgpackr-extract: true
+  nx: false
+  esbuild: false
+  '@parcel/watcher': false
+  unrs-resolver: false
+  lmdb: false
+  msgpackr-extract: false
 overrides:
   typescript: 6.0.3
-  effect: 4.0.0-rc.117
-  '@effect/platform-node-shared': 4.0.0-rc.117
+  effect: 4.0.0-rc.118
+  '@effect/platform-node-shared': 4.0.0-rc.118

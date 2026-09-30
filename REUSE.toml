@@ -1,0 +1,11 @@
+version = 1
+
+[[annotations]]
+path = "**"
+SPDX-FileCopyrightText = "2026 Jeroen Akkerman"
+SPDX-License-Identifier = "EUPL-1.2"
+
+[[annotations]]
+path = ["libs/domain/**", "libs/contract/**"]
+SPDX-FileCopyrightText = "2026 Jeroen Akkerman"
+SPDX-License-Identifier = "MPL-2.0"

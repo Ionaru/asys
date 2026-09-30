@@ -1,0 +1,13 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "extends": ["../../.oxlintrc.json"],
+  "plugins": ["vitest"],
+  "overrides": [
+    {
+      "files": ["src/scenarios/**/*.spec.ts"],
+      "rules": {
+        "vitest/warn-todo": "off"
+      }
+    }
+  ]
+}

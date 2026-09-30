@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: EUPL-1.2
 import { sql } from 'drizzle-orm';
 import { pgPolicy, pgTable, text, uuid } from 'drizzle-orm/pg-core';
 
