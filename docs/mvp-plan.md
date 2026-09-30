@@ -14,24 +14,23 @@ ASYS writes nothing to Google in the MVP. That keeps Privacy, Guests and sent In
 
 ## What the MVP contains
 
-The MVP is built in four slices, each usable on its own.
+The MVP is built in four slices, each usable on its own. Slice 1 is built in seven pieces, each verified and committed on its own; [slice-1-plan.md](slice-1-plan.md) holds their order, the rule defaults they settle and the facts checked for them.
 
 ### Slice 1: foundations and the Task loop
 
 **Server foundations** (ADR 0003, 0007, 0011, 0012).
 - Every table, including the change log, jobs, idempotency keys and add-on schemas, carries `owner_id`, the one `nullif(current_setting('app.owner_id', true), '')::uuid` policy and ENABLE plus FORCE ROW LEVEL SECURITY in custom SQL. A CI test connected as the app role lists every table and fails if one lacks any of these, so the guard does not depend on remembering it per table.
 - Pre-owner lookups are narrow `SECURITY DEFINER` functions owned by `asys_lookup`: passkey credential, session cookie, recovery code, Sign-up link and job claim. The Sign-up link CLI pre-allocates the future owner id on the link row, so that table follows the same RLS rule as every other.
-- A per-owner change log, written in the same transaction as each change. Sequence numbers come from a per-owner counter row updated in that transaction, so they commit in order; this is tested with concurrent writers. Entries are after-images in the contract shape. The MVP serves ADR 0003's change stream by polling: one endpoint for a snapshot of the working set with its current number, one for `changes?after=n`, answering 410 once a number is older than the 30-day retention, which a pruning job enforces. A pushed stream (SSE) is the one deferred part of ADR 0003 (Stage 7), and whether HttpApi can stream is still to be checked.
+- A per-owner change log, written in the same transaction as each change. Sequence numbers come from a per-owner counter row updated in that transaction, so they commit in order; this is tested with concurrent writers. Entries are after-images in the contract shape. The MVP serves ADR 0003's change stream by polling: one endpoint for a snapshot of the working set with its current number, one for `changes?after=n`, answering 410 once a number is older than the 30-day retention, which a pruning job enforces. A pushed stream (SSE) is the one deferred part of ADR 0003 (Stage 7); HttpApi can stream it (`HttpApiSchema.StreamSse` on rc.117), though without a heartbeat of its own.
 - The jobs table: one worker, a claim function using `FOR UPDATE SKIP LOCKED`, Effect Schedule backoff, per-owner Cron rows, a unique per-owner `dedupe_key` (so a Reminder is moved rather than duplicated when its Anchor moves later), and the age of the oldest due job on `/health`.
 - `libs/contract` in Effect Schema and a `/v1` command API. Every mutation is a named command with a client idempotency key, an offline-capable flag and an optional expected status or version. A command whose expectation no longer holds returns a defined "not applicable" result and creates a Review item in the same transaction (ADR 0004); the Done-then-Drop replay is the first test. `/v1/meta` returns the rules version and every setting needed to derive values. OpenAPI is generated but not published. The session cookie is the only credential.
 - EUPL-1.2 and MPL-2.0 licence files and SPDX headers from the first commit. The ADR 0009 type test and runtime smoke import stay in CI, and database tests run with `--skip-nx-cache`.
 
-**Domain rules** in `libs/domain`: plain TypeScript with no Effect, Drizzle or Angular import, enforced by the module-boundary rule (ADR 0010), written test-first before any screen.
+**Domain rules** in `libs/domain`: plain TypeScript with no Effect, Drizzle or Angular import, enforced by the module-boundary rule (ADR 0010), written test-first before any screen. Rules that only later slices use are written with those slices, still test-first before their screens (decided 2026-09-30).
 - The time model. Available from and Due are a local date with an optional local time, resolved against the Current time zone (start of day, end of day); Activities are an instant plus a duration.
-- The Offset value type and its resolver, with Working day arithmetic: days, Working days, weeks and months, before or after, from the start or the end, with an optional time of day and, for Activities, a duration. The MVP needs it for Series dates and Check-in dates; Stage 1 builds the Anchor engine on top of it.
-- Derived state: Inbox, Available, Blocked (as a tagged union of reasons, so later reasons can be added), Overdue, Effective due, Latest start, Urgency, Quadrant, Gap and Current voice.
-- The Picker ranking. **Proposed**, since the glossary only says "ranked by Urgency and Importance, each with a reason": Overdue first, then Quadrant order Do, Plan, Delegate, Drop, then earliest Latest start, then how well the Estimate fits the Gap. A recurring Task is never labelled Drop. Quadrant is a label and part of the reason; nothing acts on the Delegate and Drop suggestions yet.
-- Command transitions as pure functions (state and clock in, changes out): complete, drop (including its cascade to an open Check-in), delegate, close a Check-in with an Outcome, and the next Occurrence of a Series. The server, the PWA and the offline outbox all apply the same functions, and the scenario criteria run against them.
+- Derived state: Inbox, Available, Blocked (as a tagged union of reasons, so later reasons can be added), Overdue, Effective due, Latest start, Urgency and Quadrant.
+- The Picker ranking. **Proposed**, since the glossary only says "ranked by Urgency and Importance, each with a reason": Overdue first, then Quadrant order Do, Plan, Delegate, Drop, then earliest Latest start, then, from Slice 2, how well the Estimate fits the Gap. A recurring Task is never labelled Drop. Quadrant is a label and part of the reason; nothing acts on the Delegate and Drop suggestions yet.
+- Command transitions for the Task loop as pure functions (state and clock in, changes out): capture, Triage, edit, log progress, complete, drop, and adding and removing blockers. The server, the PWA and the offline outbox all apply the same functions, and the scenario criteria run against them.
 - `RULES_VERSION` with a changelog from the start; nothing is published to npm yet.
 
 **Sign-in** (ADR 0006): several passkeys, hashed one-time recovery codes and a session cookie. The first User comes from a Sign-up link printed by a server CLI; there is no admin screen and no open sign-up. Sign-in identities are stored as (provider, subject) rows apart from Connections, so Sign in with Google can be added later without a schema change. The public hostname is fixed before the first passkey is enrolled, because passkeys, Web Push and the Google redirect are all bound to it.
@@ -57,6 +56,8 @@ The MVP is built in four slices, each usable on its own.
 - A job polls the primary calendar every few minutes with a sync token and expands recurring events to instances. It imports only events the User accepted or marked tentative, and events the User organised, as ADR 0001 says; declined and unanswered invitations are skipped. Busy or Free comes from Google's transparency flag, and an event cancelled or deleted in Google becomes a Cancelled Activity.
 - Each imported Activity keeps a stable identity (event id plus instance start), its organiser and attendee emails, and a change-log entry whenever the organiser moves or cancels it; Stage 1 anchors Prep to exactly these. Workable, its allowed Voice and Notes are ASYS-only fields kept apart from the Google fields; marking a recurring event Workable applies to all its instances. An `origin` column (google, asys) and a nullable needed Voice exist for Stage 2. Imported Activities are otherwise read-only, so S6.1 holds by construction.
 
+**Domain rules**, moved here from Slice 1 and written test-first before the screens: Gap, Current voice, and how well an Estimate fits a Gap.
+
 **Today**: a read-only timeline of the day's Activities and Gaps, with the Tasks and Check-ins Due today above it and the time Google was last read. Tapping a Gap opens Now for that Gap.
 
 **Gap-aware Now.** A Gap is time with no Activity or only Workable ones, so a Free, non-Workable Activity also ends a Gap. A Task fits when its Estimate is no longer than the Gap. While a non-Workable Activity is under way, Now shows it and previews the next Gap.
@@ -64,6 +65,10 @@ The MVP is built in four slices, each usable on its own.
 **Voice**, as a filter only (decided 2026-09-29): Silent, Out loud and Closed door on Tasks (needed) and on Workable Activities (allowed, asked for when marking one Workable). Current voice is the one picked in Now, kept on that phone only until the next Activity starts or ends and for at most 2 hours; otherwise the least-allowing Workable Activity under way; otherwise unknown, and nothing is left out. The Place step is Stage 4, so the function already takes an optional Place voice and the MVP passes none. Now gains the Voice filter and the Not here list, with urgent Tasks above the ranking.
 
 ### Slice 3: people, delegation and repetition
+
+**Domain rules**, moved here from Slice 1 and written test-first before the screens.
+- The Offset value type and its resolver, with Working day arithmetic: days, Working days, weeks and months, before or after, from the start or the end, with an optional time of day and, for Activities, a duration. The MVP needs it for Series dates and Check-in dates; Stage 1 builds the Anchor engine on top of it.
+- Command transitions as pure functions: delegate, close a Check-in with an Outcome, drop's cascade to an open Check-in, and the next Occurrence of a Series.
 
 **Persons**: name, email (lowercase and unique per owner, since it is the matching key for Roles and Groups later) and Notes, with Tasks linked to Persons. Foreign keys to a Person never cascade on delete, so dates and states survive a manual Anonymise later.
 
