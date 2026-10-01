@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: EUPL-1.2
+name: pnpm job
+on:
+  workflow_call:
+    inputs:
+      run:
+        description: Commands to run after checkout and pnpm setup, one per line.
+        type: string
+        required: true
+      database:
+        description: Write .env, start the compose database and apply migrations first.
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
+        with:
+          runtime: node@24
+          cache: true
+          require-lockfile: true
+      - name: Write .env
+        if: inputs.database
+        run: |
+          owner_pw="$(openssl rand -hex 24)"
+          app_pw="$(openssl rand -hex 24)"
+          (
+            umask 077
+            {
+              echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)"
+              echo "ASYS_OWNER_PASSWORD=${owner_pw}"
+              echo "ASYS_APP_PASSWORD=${app_pw}"
+              echo "DATABASE_URL_OWNER=postgresql://asys_owner:${owner_pw}@127.0.0.1:5432/asys"
+              echo "DATABASE_URL_APP=postgresql://asys_app:${app_pw}@127.0.0.1:5432/asys"
+            } > .env
+          )
+      - name: Start the database
+        if: inputs.database
+        run: docker compose up -d --wait
+      - name: Apply migrations
+        if: inputs.database
+        run: pnpm exec drizzle-kit migrate --config apps/server/drizzle.config.ts
+      - name: Run
+        env:
+          COMMANDS: ${{ inputs.run }}
+        run: bash -euo pipefail -c "$COMMANDS"

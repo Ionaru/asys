@@ -52,7 +52,7 @@ You can use `npx nx list` to get a list of installed plugins. Then, run `npx nx 
 
 ## CI
 
-CI is `.github/workflows/cd.yaml`: the jobs `lint`, `typecheck`, `build`, `test`, `format` and `licences` run in parallel on every push and pull request, without Nx Cloud. Each job's commands can be run locally in the same way; the `test` job needs the database from `compose.yaml` (`docker compose up -d --wait`) and a `.env` with its passwords.
+CI is `.github/workflows/cd.yaml`: on every push and pull request an `audit` job (`pnpm audit --prod`) runs first, then the jobs `lint`, `typecheck`, `build`, `test`, `format` and `licences` run in parallel, without Nx Cloud. Each job calls the reusable workflow `.github/workflows/pnpm-job.yaml`, which checks out, sets up pnpm and, for `test`, starts the database. Each job's commands can be run locally in the same way; the `test` job needs the database from `compose.yaml` (`docker compose up -d --wait`) and a `.env` with its passwords.
 
 ## Install Nx Console
 
