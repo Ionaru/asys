@@ -1,23 +1,29 @@
 # SPDX-License-Identifier: EUPL-1.2
 name: CD
+
 on:
   push:
   pull_request:
+
 permissions:
   contents: read
+
 concurrency:
   group: cd-${{ github.ref }}
   cancel-in-progress: true
+
 jobs:
   audit:
     uses: $/.github/workflows/pnpm-job.yaml
     with:
       run: pnpm audit --prod
+
   lint:
     needs: audit
     uses: $/.github/workflows/pnpm-job.yaml
     with:
       run: pnpm exec nx run-many -t lint
+
   typecheck:
     needs: audit
     uses: $/.github/workflows/pnpm-job.yaml
@@ -25,11 +31,13 @@ jobs:
       run: |
         pnpm exec nx run-many -t typecheck
         pnpm exec tsc -p scripts/tsconfig.json
+
   build:
     needs: audit
     uses: $/.github/workflows/pnpm-job.yaml
     with:
       run: pnpm exec nx run-many -t build
+
   test:
     needs: audit
     uses: $/.github/workflows/pnpm-job.yaml
@@ -39,11 +47,13 @@ jobs:
         # Smoke import drizzle-orm/effect-postgres (ADR 0009)
         node --input-type=module -e "await import('drizzle-orm/effect-postgres')"
         pnpm exec nx run-many -t test --skip-nx-cache
+
   format:
     needs: audit
     uses: $/.github/workflows/pnpm-job.yaml
     with:
       run: pnpm exec nx format:check --all
+      
   licences:
     needs: audit
     uses: $/.github/workflows/pnpm-job.yaml
