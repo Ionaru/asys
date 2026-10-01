@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
 # Scenarios
 
-Twelve real situations from the user's work as a manager, written as acceptance examples in the language of [CONTEXT.md](../CONTEXT.md) and consistent with the ADRs in [docs/adr](adr/). Each scenario quotes the original description, shows one example run with concrete 2026 dates, lists testable acceptance criteria, and names the steps that deliberately stay outside ASYS.
+Thirteen real situations from the user's work as a manager, written as acceptance examples in the language of [CONTEXT.md](../CONTEXT.md) and consistent with the ADRs in [docs/adr](adr/). Each scenario quotes the original description, shows one example run with concrete 2026 dates, lists testable acceptance criteria, and names the steps that deliberately stay outside ASYS.
 
 People, company names and email addresses in the examples are invented.
 
@@ -360,3 +360,27 @@ People, company names and email addresses in the examples are invented.
 
 **Manual by design:**
 - Arranging the intake meeting with the client: left to Youssef; ASYS sends the client nothing.
+
+## S13. Calls on the drive home
+
+> When I am driving I cannot do most tasks, but I can do phone calls. Things like check-ins with colleagues or (sub)tasks that are phone calls I can do.
+
+**Shape:** The drive home is a recurring Google Calendar event marked Workable and Voice only once for all its instances, so that during it the Picker suggests only Tasks that need a Voice, such as calls and Check-ins by phone; on a drive that is not in the calendar, Voice only is picked by hand in Now.
+
+**How ASYS models it** (one example run with concrete 2026 dates and times):
+- Activity 'Drive home', a recurring event imported from Google Calendar, weekdays 17:15-17:45, marked Workable with Voice Closed door and Voice only, which applies to all its instances.
+- Task 'Call Bram after his first day' (the Follow-up from S11), Area People Ops (Active hours weekdays 8 to 18), Due 2026-11-03, Estimate 15 min, Importance Important, needs Voice Closed door.
+- Task 'Ask Iris for the caterer's quote', Area Work (Active hours weekdays 8 to 18), Due 2026-11-04, Estimate 10 min, Delegated by hand to Iris de Boer on 2026-11-02. Asked whether its first Check-in is by message or by phone, the User picks by phone, so that Check-in, due at the default one day before the Task's Due (2026-11-03), needs Out loud.
+- Task 'Approve expense claims', Area Work, Due 2026-11-03 18:00, Estimate 10 min, Importance Important, needs no Voice.
+- Task 'Plan the team offsite', Area Work, with the Subtasks 'Phone the venue' (Estimate 10 min, Importance Important, needs Out loud, set on the Subtask itself, since Subtasks do not inherit a Voice) and 'Update the offsite budget sheet' (Estimate 15 min, Importance not Important, needs no Voice).
+- The drive lies inside both Areas' Active hours; a later drive needs those hours extended to cover it, since outside them the Picker leaves an Area's Tasks out.
+
+**Acceptance criteria:**
+1. On Tuesday 3 November at 17:20 the Picker ranks 'Call Bram after his first day' and the Check-in for 'Ask Iris for the caterer's quote', and no Task that needs no Voice; 'Approve expense claims', although urgent, is listed under Not here ('needs no Voice; Drive home is Voice only until 17:45') and is not shown above the ranking, and from 17:45 it is ranked again.
+2. Had the User picked by message when delegating, the Check-in would need no Voice and would be listed under Not here during the drive.
+3. On a day the drive is not in the calendar, picking Voice only in Now ranks the same Tasks, until the next Activity starts or ends and for at most 2 hours.
+4. On Tuesday 3 November at 17:20, the Subtask 'Phone the venue' is ranked and 'Update the offsite budget sheet' is listed under Not here.
+
+**Manual by design:**
+- Making the calls: hands-free from the car, outside ASYS, with the numbers from the phone's own contacts; the Tasks only track that each call happened.
+- Reading Now: done as the drive starts, or before setting off after picking Voice only by hand; ASYS has no spoken or hands-free interface, and Voice only keeps anything that cannot be done while driving off the top of the screen.

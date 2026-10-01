@@ -83,7 +83,7 @@ An Activity during which others cannot book you.
 An Activity during which others can still book you.
 
 **Workable**:
-An Activity during which you can do Tasks, such as a train ride; it can give a Voice, which ASYS asks for when you mark it Workable.
+An Activity during which you can do Tasks, such as a train ride; it can give a Voice, which ASYS asks for when you mark it Workable, and when that Voice is Out loud or Closed door it can be Voice only, such as a drive.
 
 **Gap**:
 A stretch of time with no Activity in it, or only Workable ones; the time in which Tasks can be done.
@@ -171,7 +171,7 @@ A Task that still needs doing.
 A Task handed to a Person to do; it leaves your working lists until a Check-in ends the delegation with the Outcome Done or Take back. It can also be Dropped directly, which drops its open Check-in too.
 
 **Check-in**:
-A Task to ask the Person a Delegated Task was handed to whether it is done, due one day before that Task's Due unless you change it; it closes with the Outcome Done, Not yet (which creates the next Check-in, by default on the next Working day, and asks whether it is by message, needing no Voice, or by phone, needing Out loud, or Closed door when the closed Check-in needed that) or Take back. A Check-in timed by its Playbook moves when its Task's Due moves; one you dated by hand stays. A Playbook item can set its Check-ins' Voice next to their timing.
+A Task to ask the Person a Delegated Task was handed to whether it is done, due one day before that Task's Due unless you change it; it closes with the Outcome Done, Not yet (which creates the next Check-in, by default on the next Working day, and asks whether it is by message, needing no Voice, or by phone, needing Out loud, or Closed door when the closed Check-in needed that) or Take back. A Check-in timed by its Playbook moves when its Task's Due moves; one you dated by hand stays. A Playbook item can set its Check-ins' Voice next to their timing, and delegating a Task by hand asks whether its first Check-in is by message or by phone (Out loud), by message unless you pick by phone.
 _Avoid_: Follow-up
 
 **Take back**:
@@ -207,7 +207,7 @@ An Inbox entry ASYS creates when something needs your decision, such as a cancel
 Giving an Inbox Task its Importance and Estimate, which moves it out of the Inbox.
 
 **Picker**:
-The answer to "what should I do now?": the Available Tasks that fit the current Gap, Place, Current voice and Active hours, ranked by Urgency and Importance, each with a reason. Tasks left out only because of their Place or Voice are listed under **Not here** with the reason, and the urgent ones among them are shown above the ranking. It can be filtered to the Tasks that need a given Voice. Shown as **Now** in the app.
+The answer to "what should I do now?": the Available Tasks that fit the current Gap, Place, Current voice and Active hours, ranked by Urgency and Importance, each with a reason; while Voice only holds, only Tasks that need a Voice are ranked. Tasks left out only because of their Place, their Voice or Voice only are listed under **Not here** with the reason, and the urgent ones among them are shown above the ranking, except while Voice only holds. It can be filtered to the Tasks that need exactly a given Voice. Shown as **Now** in the app.
 
 **Reminder**:
 A moment ASYS tells you about something, such as an Activity about to start with open Prep.
@@ -228,11 +228,15 @@ A named, specific location with a position and a radius, such as the office; a T
 _Avoid_: Location, context
 
 **Voice**:
-How freely you can talk, in three steps that each allow everything the step before allows: **Silent** (talking would bother others, such as on a train), **Out loud** (you can talk but others hear you, such as at an open-plan desk) and **Closed door** (nobody overhears you, such as at home). A Task or an Activity can need Out loud or Closed door, and one that needs no Voice can be done anywhere; a Voice is copied from Playbook items and Series like Estimate and Importance, including onto per-member copies, has no Area default, and is not inherited by Subtasks. Voice never changes Available, Urgency or Quadrant, never reaches Google, and ASYS never moves anything because of it.
+How freely you can talk, in three steps that each allow everything the step before allows: **Silent** (talking would bother others, such as on a train), **Out loud** (you can talk but others hear you, such as at an open-plan desk) and **Closed door** (nobody overhears you, such as at home). A Task or an Activity can need Out loud or Closed door, and one that needs no Voice can be done anywhere, though a Task that needs no Voice is left out while Voice only holds; a Voice is copied from Playbook items and Series like Estimate and Importance, including onto per-member copies, has no Area default, and is not inherited by Subtasks. Voice never changes Available, Urgency or Quadrant, never reaches Google, and ASYS never moves anything because of it.
 _Avoid_: Setting, surroundings, context, private or confidential (Privacy is what Google sees)
 
 **Current voice**:
 The Voice ASYS takes you to have now: the one you picked in Now (kept on that phone only, until the next Activity starts or ends and for at most 2 hours), otherwise the Voice that allows least among the Workable Activities under way, otherwise the Voice of the Place you are at; otherwise it is unknown, and the Picker leaves out no Task for its Voice.
+
+**Voice only**:
+A state in which you can talk but cannot use your hands or eyes, such as while driving, so only Tasks that need a Voice can be done, such as calls and Check-ins by phone. It holds while a Workable Activity marked Voice only is under way, unless you pick a Voice in Now, or once you pick Voice only in Now. In Now it is one more choice next to the three Voices: picking it replaces a picked Voice and is kept the same way, and Current voice then comes from the Workable Activities and the Place. Like Voice, it never changes Available, Urgency or Quadrant, never reaches Google, and ASYS never moves anything because of it.
+_Avoid_: Driving mode, hands-free, calls only, context
 
 **Voice clash**:
 An Activity or Time block that needs a Voice overlapping a Workable Activity whose Voice does not allow it, such as a phone call during a Silent train ride; ASYS warns inline when you cause it and raises one Review item per pair when it arises by itself (a new Occurrence, an Anchor move, an organiser's change), and never moves anything.
