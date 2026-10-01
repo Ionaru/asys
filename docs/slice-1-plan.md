@@ -185,14 +185,14 @@ Every per-owner write transaction takes the owner's `change_counters` row `FOR U
 - Add exact pins: `fast-check@4.10.2` as a devDependency and `temporal-polyfill@1.0.5`.
 
 **CI**
-- `.github/workflows/cd.yaml` (named CD, it will deploy later too) runs on push and on pull requests, with independent jobs that run in parallel on `ubuntu-24.04` with Node 24, after an `audit` job (`pnpm audit --prod`) that gates them all. There is no CI shell script and no Nx Cloud.
+- `.github/workflows/cd.yaml` (named CD, it will deploy later too) runs on push and on pull requests, with independent jobs that run in parallel on `ubuntu-24.04` with Node 24, after an `audit` job (`pnpm audit --prod`, with pnpm only and nothing installed) that gates them all. There is no CI shell script and no Nx Cloud.
   - `lint`: `nx run-many -t lint`.
   - `typecheck`: `nx run-many -t typecheck` and `tsc -p scripts/tsconfig.json`.
   - `build`: `nx run-many -t build`.
   - `test`: write `.env` with random passwords and both `DATABASE_URL_*` values, `docker compose up -d --wait`, apply the migrations with `drizzle-kit migrate`, run the ADR 0009 smoke import `node --input-type=module -e "await import('drizzle-orm/effect-postgres')"`, then `nx run-many -t test --skip-nx-cache`.
   - `format`: `nx format:check --all`.
   - `licences`: `node scripts/check-spdx.mts`, `reuse lint` and `node scripts/check-licenses.mts` (the dependency licence allowlist).
-  - Each job calls the reusable workflow `.github/workflows/pnpm-job.yaml` (`on: workflow_call`), which holds the checkout, the pnpm setup and, behind a `database` input, the `.env`, compose and migration steps; the pnpm setup installs with a frozen lockfile.
+  - Each job lists its own steps in `cd.yaml`. Every job except `audit` starts with the composite action `.github/actions/setup`, which runs the composite action `.github/actions/checkout` (`actions/checkout` without persisted credentials) and then `pnpm/setup` with Node 24, a cached store and a frozen-lockfile install. `audit` runs the checkout action and `pnpm/setup` with `install: false`, so it audits the lockfile only. Neither action takes inputs, and the `.env`, compose and migration steps live in the `test` job.
   - Check the current versions of `actions/checkout` and `pnpm/setup` before writing it.
 
 ### Domain layout

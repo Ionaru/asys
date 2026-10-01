@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: EUPL-1.2
+name: Set up
+description: Check out the repository, set up pnpm and Node 24, and install the dependencies from the frozen lockfile with a cached pnpm store.
+
+runs:
+  using: composite
+  steps:
+    - name: Check out
+      uses: $/.github/actions/checkout
+    - name: Set up pnpm and Node 24 and install dependencies
+      uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
+      with:
+        runtime: node@24
+        cache: true
+        require-lockfile: true

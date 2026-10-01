@@ -12,53 +12,106 @@ concurrency:
   group: cd-${{ github.ref }}
   cancel-in-progress: true
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   audit:
-    uses: $/.github/workflows/pnpm-job.yaml
-    with:
-      run: pnpm audit --prod
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: $/.github/actions/checkout
+      - name: Set up pnpm without installing dependencies
+        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
+        with:
+          install: false
+      - name: Audit the lockfile
+        run: pnpm audit --prod
 
   lint:
     needs: audit
-    uses: $/.github/workflows/pnpm-job.yaml
-    with:
-      run: pnpm exec nx run-many -t lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Set up
+        uses: $/.github/actions/setup
+      - name: Lint
+        run: pnpm exec nx run-many -t lint
 
   typecheck:
     needs: audit
-    uses: $/.github/workflows/pnpm-job.yaml
-    with:
-      run: |
-        pnpm exec nx run-many -t typecheck
-        pnpm exec tsc -p scripts/tsconfig.json
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Set up
+        uses: $/.github/actions/setup
+      - name: Typecheck the projects
+        run: pnpm exec nx run-many -t typecheck
+      - name: Typecheck the scripts
+        run: pnpm exec tsc -p scripts/tsconfig.json
 
   build:
     needs: audit
-    uses: $/.github/workflows/pnpm-job.yaml
-    with:
-      run: pnpm exec nx run-many -t build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Set up
+        uses: $/.github/actions/setup
+      - name: Build
+        run: pnpm exec nx run-many -t build
 
   test:
     needs: audit
-    uses: $/.github/workflows/pnpm-job.yaml
-    with:
-      database: true
-      run: |
-        # Smoke import drizzle-orm/effect-postgres (ADR 0009)
-        node --input-type=module -e "await import('drizzle-orm/effect-postgres')"
-        pnpm exec nx run-many -t test --skip-nx-cache
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Set up
+        uses: $/.github/actions/setup
+      - name: Write .env
+        run: |
+          owner_pw="$(openssl rand -hex 24)"
+          app_pw="$(openssl rand -hex 24)"
+          (
+            umask 077
+            {
+              echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)"
+              echo "ASYS_OWNER_PASSWORD=${owner_pw}"
+              echo "ASYS_APP_PASSWORD=${app_pw}"
+              echo "DATABASE_URL_OWNER=postgresql://asys_owner:${owner_pw}@127.0.0.1:5432/asys"
+              echo "DATABASE_URL_APP=postgresql://asys_app:${app_pw}@127.0.0.1:5432/asys"
+            } > .env
+          )
+      - name: Start the database
+        run: docker compose up -d --wait
+      - name: Apply migrations
+        run: pnpm exec drizzle-kit migrate --config apps/server/drizzle.config.ts
+      - name: Smoke import drizzle-orm/effect-postgres (ADR 0009)
+        run: node --input-type=module -e "await import('drizzle-orm/effect-postgres')"
+      - name: Test
+        run: pnpm exec nx run-many -t test --skip-nx-cache
 
   format:
     needs: audit
-    uses: $/.github/workflows/pnpm-job.yaml
-    with:
-      run: pnpm exec nx format:check --all
-      
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Set up
+        uses: $/.github/actions/setup
+      - name: Check formatting
+        run: pnpm exec nx format:check --all
+
   licences:
     needs: audit
-    uses: $/.github/workflows/pnpm-job.yaml
-    with:
-      run: |
-        node scripts/check-spdx.mts
-        pipx run reuse==6.2.0 lint
-        node scripts/check-licenses.mts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Set up
+        uses: $/.github/actions/setup
+      - name: Check SPDX headers
+        run: node scripts/check-spdx.mts
+      - name: Lint REUSE compliance
+        run: pipx run reuse==6.2.0 lint
+      - name: Check dependency licences
+        run: node scripts/check-licenses.mts
