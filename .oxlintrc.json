@@ -49,7 +49,11 @@
           },
           {
             "sourceTag": "scope:pwa",
-            "onlyDependOnLibsWithTags": ["scope:domain", "scope:pwa"]
+            "onlyDependOnLibsWithTags": ["scope:domain", "scope:design", "scope:pwa"]
+          },
+          {
+            "sourceTag": "scope:design",
+            "onlyDependOnLibsWithTags": ["scope:design"]
           }
         ]
       }

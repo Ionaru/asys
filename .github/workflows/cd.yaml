@@ -115,3 +115,13 @@ jobs:
         run: pipx run reuse==6.2.0 lint
       - name: Check dependency licences
         run: node scripts/check-licenses.mts
+
+  palettes:
+    needs: audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Set up
+        uses: $/.github/actions/setup
+      - name: Check the curated palettes
+        run: node scripts/palettes.mts --check
