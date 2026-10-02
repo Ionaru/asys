@@ -1,0 +1,377 @@
+{
+  "$description": "The ASYS tokens that are the same in every theme and palette: font families, type styles, spacing, radii, the type scale and sizes. Copied from the ASYS design system artifact, which stays the source of truth.",
+  "font-family": {
+    "$type": "fontFamily",
+    "font-sans": {
+      "$value": ["Atkinson Hyperlegible Next", "system-ui", "sans-serif"],
+      "$extensions": {
+        "io.github.ionaru.asys": {
+          "fonts": [
+            {
+              "file": "fonts/AtkinsonHyperlegibleNext-Variable.woff2",
+              "weight": "200 800",
+              "style": "normal"
+            },
+            {
+              "file": "fonts/AtkinsonHyperlegibleNext-Italic-Variable.woff2",
+              "weight": "200 800",
+              "style": "italic"
+            }
+          ]
+        }
+      }
+    },
+    "font-mono": {
+      "$value": ["Atkinson Hyperlegible Mono", "ui-monospace", "monospace"],
+      "$extensions": {
+        "io.github.ionaru.asys": {
+          "fonts": [
+            {
+              "file": "fonts/AtkinsonHyperlegibleMono-Variable.woff2",
+              "weight": "200 800",
+              "style": "normal"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "typography": {
+    "$description": "The type styles, in the design system groups Display, Text and Numbers. They are kept in $extensions, not as DTCG typography tokens, because those need a unitless line height and a px or rem letter spacing: ours are rem line heights that the Line spacing setting rewrites, and em letter spacings that follow the font size. Sizes and line heights refer to the type-scale tokens, which components read. The design system's components set weight and letter spacing in their own CSS, so those fields record the styles' values for a tool that emits type-style classes. DTCG tools leave the {…} references as plain text: whatever reads them must resolve them itself and fail on one that does not resolve.",
+    "$extensions": {
+      "io.github.ionaru.asys": {
+        "groups": [
+          {
+            "name": "Display",
+            "family": "{font-family.font-sans}",
+            "styles": [
+              {
+                "name": "display",
+                "fontSize": "{type-scale.font-size-display}",
+                "lineHeight": "{type-scale.line-height-display}",
+                "fontWeight": 700,
+                "letterSpacing": "-0.01em",
+                "sample": "Call Marit back",
+                "usage": "The single top pick in Now, and the Task title in Voice only. One per screen."
+              },
+              {
+                "name": "title",
+                "fontSize": "{type-scale.font-size-title}",
+                "lineHeight": "{type-scale.line-height-title}",
+                "fontWeight": 700,
+                "sample": "Inbox",
+                "usage": "Screen titles: Now, Today, Inbox, Weekly review."
+              },
+              {
+                "name": "heading",
+                "fontSize": "{type-scale.font-size-heading}",
+                "lineHeight": "{type-scale.line-height-heading}",
+                "fontWeight": 700,
+                "sample": "Not here",
+                "usage": "Section headings inside a screen: Waiting, Not here, Overdue."
+              }
+            ]
+          },
+          {
+            "name": "Text",
+            "family": "{font-family.font-sans}",
+            "styles": [
+              {
+                "name": "body-strong",
+                "fontSize": "{type-scale.font-size-body-strong}",
+                "lineHeight": "{type-scale.line-height-body-strong}",
+                "fontWeight": 600,
+                "sample": "Write feedback for Sanne",
+                "usage": "Task and Activity titles in lists."
+              },
+              {
+                "name": "body",
+                "fontSize": "{type-scale.font-size-body}",
+                "lineHeight": "{type-scale.line-height-body}",
+                "fontWeight": 400,
+                "sample": "Notes stay on the Task until you clear them.",
+                "usage": "Running text: Notes, dialogs, the README."
+              },
+              {
+                "name": "reason",
+                "fontSize": "{type-scale.font-size-reason}",
+                "lineHeight": "{type-scale.line-height-reason}",
+                "fontWeight": 400,
+                "sample": "Latest start 14:30 · important",
+                "usage": "The one-line reason under a Picker row, and metadata. Always ink-muted."
+              },
+              {
+                "name": "label",
+                "fontSize": "{type-scale.font-size-label}",
+                "lineHeight": "{type-scale.line-height-label}",
+                "fontWeight": 700,
+                "letterSpacing": "0.02em",
+                "sample": "Plan",
+                "usage": "Chips, badges, segment labels and button text at small size."
+              }
+            ]
+          },
+          {
+            "name": "Numbers",
+            "family": "{font-family.font-mono}",
+            "styles": [
+              {
+                "name": "time",
+                "fontSize": "{type-scale.font-size-time}",
+                "lineHeight": "{type-scale.line-height-time}",
+                "fontWeight": 500,
+                "sample": "09:30–10:15",
+                "usage": "Clock times, Estimates and durations in Today and on rows, so columns line up."
+              },
+              {
+                "name": "time-large",
+                "fontSize": "{type-scale.font-size-time-large}",
+                "lineHeight": "{type-scale.line-height-time-large}",
+                "fontWeight": 600,
+                "sample": "1 h 25",
+                "usage": "The length of the current Gap at the top of Now."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "spacing": {
+    "$type": "dimension",
+    "space-1": {
+      "$value": {
+        "value": 4,
+        "unit": "px"
+      },
+      "$description": "Gap between an icon and its label; between Voice meter bars."
+    },
+    "space-2": {
+      "$value": {
+        "value": 8,
+        "unit": "px"
+      },
+      "$description": "Gap between chips; between a title and its reason line."
+    },
+    "space-3": {
+      "$value": {
+        "value": 12,
+        "unit": "px"
+      },
+      "$description": "Vertical padding of a list row."
+    },
+    "space-4": {
+      "$value": {
+        "value": 16,
+        "unit": "px"
+      },
+      "$description": "Screen side gutter and card padding on a phone."
+    },
+    "space-5": {
+      "$value": {
+        "value": 24,
+        "unit": "px"
+      },
+      "$description": "Gap between sections in a screen."
+    },
+    "space-6": {
+      "$value": {
+        "value": 32,
+        "unit": "px"
+      },
+      "$description": "Space above a screen title; padding in Voice only rows."
+    },
+    "space-7": {
+      "$value": {
+        "value": 48,
+        "unit": "px"
+      },
+      "$description": "Separation between the top pick and the ranked list in Now."
+    }
+  },
+  "radius": {
+    "$type": "dimension",
+    "radius-sm": {
+      "$value": {
+        "value": 6,
+        "unit": "px"
+      },
+      "$description": "Chips, badges, the Voice meter bars."
+    },
+    "radius-md": {
+      "$value": {
+        "value": 10,
+        "unit": "px"
+      },
+      "$description": "Buttons, inputs, segments."
+    },
+    "radius-lg": {
+      "$value": {
+        "value": 16,
+        "unit": "px"
+      },
+      "$description": "Cards, sheets, the top pick in Now."
+    },
+    "radius-pill": {
+      "$value": {
+        "value": 999,
+        "unit": "px"
+      },
+      "$description": "The quick-add field and the floating capture button."
+    }
+  },
+  "type-scale": {
+    "$type": "dimension",
+    "$description": "One size and one line height per type style, in rem so the Android font size applies. Components read these, never literal sizes, so the Text size and Line spacing settings can rewrite them.",
+    "font-size-display": {
+      "$value": {
+        "value": 2.5,
+        "unit": "rem"
+      },
+      "$description": "Font size of the display style: The single top pick in Now, and the Task title in Voice only. One per screen."
+    },
+    "line-height-display": {
+      "$value": {
+        "value": 2.75,
+        "unit": "rem"
+      },
+      "$description": "Line height of the display style."
+    },
+    "font-size-title": {
+      "$value": {
+        "value": 1.5,
+        "unit": "rem"
+      },
+      "$description": "Font size of the title style: Screen titles: Now, Today, Inbox, Weekly review."
+    },
+    "line-height-title": {
+      "$value": {
+        "value": 1.875,
+        "unit": "rem"
+      },
+      "$description": "Line height of the title style."
+    },
+    "font-size-heading": {
+      "$value": {
+        "value": 1.125,
+        "unit": "rem"
+      },
+      "$description": "Font size of the heading style: Section headings inside a screen: Waiting, Not here, Overdue."
+    },
+    "line-height-heading": {
+      "$value": {
+        "value": 1.5,
+        "unit": "rem"
+      },
+      "$description": "Line height of the heading style."
+    },
+    "font-size-body-strong": {
+      "$value": {
+        "value": 1.0625,
+        "unit": "rem"
+      },
+      "$description": "Font size of the body-strong style: Task and Activity titles in lists."
+    },
+    "line-height-body-strong": {
+      "$value": {
+        "value": 1.5,
+        "unit": "rem"
+      },
+      "$description": "Line height of the body-strong style."
+    },
+    "font-size-body": {
+      "$value": {
+        "value": 1,
+        "unit": "rem"
+      },
+      "$description": "Font size of the body style: Running text: Notes, dialogs, the README."
+    },
+    "line-height-body": {
+      "$value": {
+        "value": 1.5,
+        "unit": "rem"
+      },
+      "$description": "Line height of the body style."
+    },
+    "font-size-reason": {
+      "$value": {
+        "value": 0.875,
+        "unit": "rem"
+      },
+      "$description": "Font size of the reason style: The one-line reason under a Picker row, and metadata. Always ink-muted."
+    },
+    "line-height-reason": {
+      "$value": {
+        "value": 1.25,
+        "unit": "rem"
+      },
+      "$description": "Line height of the reason style."
+    },
+    "font-size-label": {
+      "$value": {
+        "value": 0.8125,
+        "unit": "rem"
+      },
+      "$description": "Font size of the label style: Chips, badges, segment labels and button text at small size."
+    },
+    "line-height-label": {
+      "$value": {
+        "value": 1,
+        "unit": "rem"
+      },
+      "$description": "Line height of the label style."
+    },
+    "font-size-time": {
+      "$value": {
+        "value": 0.9375,
+        "unit": "rem"
+      },
+      "$description": "Font size of the time style: Clock times, Estimates and durations in Today and on rows, so columns line up."
+    },
+    "line-height-time": {
+      "$value": {
+        "value": 1.25,
+        "unit": "rem"
+      },
+      "$description": "Line height of the time style."
+    },
+    "font-size-time-large": {
+      "$value": {
+        "value": 1.75,
+        "unit": "rem"
+      },
+      "$description": "Font size of the time-large style: The length of the current Gap at the top of Now."
+    },
+    "line-height-time-large": {
+      "$value": {
+        "value": 2,
+        "unit": "rem"
+      },
+      "$description": "Line height of the time-large style."
+    }
+  },
+  "size": {
+    "$type": "dimension",
+    "tap-target": {
+      "$value": {
+        "value": 48,
+        "unit": "px"
+      },
+      "$description": "Minimum height and width of anything tappable. Fixed: no setting lowers it."
+    },
+    "tap-target-drive": {
+      "$value": {
+        "value": 88,
+        "unit": "px"
+      },
+      "$description": "Minimum height of anything tappable in the Voice only theme."
+    },
+    "row-min": {
+      "$value": {
+        "value": 64,
+        "unit": "px"
+      },
+      "$description": "Minimum height of a Task row in a list. Fixed: rows grow with larger text, never shrink below this."
+    }
+  }
+}

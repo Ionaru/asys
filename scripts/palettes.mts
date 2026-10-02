@@ -1,17 +1,25 @@
 // SPDX-License-Identifier: EUPL-1.2
 
 // Builds the curated palettes for the Palette setting and checks every promised contrast pair.
-// `node scripts/palettes.mts` rewrites libs/design-tokens/src/palettes.json from tokens.json and the palette inputs below;
-// `node scripts/palettes.mts --check` fails when a palette breaks a rule or the committed file is stale.
-// The rules are the design system's Personalisation section: Evergreen is tokens.json exactly, the others are derived.
-import { readFileSync, writeFileSync } from 'node:fs';
+// It reads the Evergreen colours from libs/design-tokens/src/themes/*.tokens.json and derives the other palettes from the inputs below.
+// `node scripts/palettes.mts` rewrites palettes/<palette>-<theme>.tokens.json and asys.resolver.json under libs/design-tokens/src;
+// `node scripts/palettes.mts --check` fails when a palette breaks a rule or a generated file is stale.
+// The rules are the design system's Personalisation section: Evergreen is the themes exactly, the others are derived.
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const designDir = resolve(import.meta.dirname, '../libs/design-tokens/src');
 
-const tokensPath = resolve(designDir, 'tokens.json');
+const themesDir = resolve(designDir, 'themes');
 
-const palettesPath = resolve(designDir, 'palettes.json');
+const palettesDir = resolve(designDir, 'palettes');
+
+const resolverPath = resolve(designDir, 'asys.resolver.json');
+
+const TOKENS_SUFFIX = '.tokens.json';
+
+// One reverse-domain key for everything the standard has no place for.
+const EXTENSION = 'io.github.ionaru.asys';
 
 // Closed sets as const objects: enums are not erasable syntax, and these scripts run through Node's type stripping.
 const Mode = { Light: 'light', Dark: 'dark', Drive: 'drive' } as const;
@@ -32,6 +40,12 @@ type TokenMap = Record<string, string>;
 
 type ModeMaps = Record<ModeValue, TokenMap>;
 
+const THEME_NAMES: Record<ModeValue, string> = {
+  light: 'Light',
+  dark: 'Dark',
+  drive: 'Voice only',
+};
+
 interface PaletteInput {
   readonly name: string;
   readonly accent: string;
@@ -39,13 +53,16 @@ interface PaletteInput {
   readonly ground: GroundValue;
 }
 
-interface ColorToken {
-  readonly name: string;
-  readonly value: Record<ModeValue, string>;
+interface ColorValue {
+  colorSpace: 'srgb';
+  components: [number, number, number];
+  hex: string;
 }
 
-interface Tokens {
-  readonly color: { readonly tokens: readonly ColorToken[] };
+interface ThemeFile {
+  $description: string;
+  color: Record<string, unknown>;
+  shadow: unknown;
 }
 
 // The curated palettes. Adding one: add its inputs here, run the script, review it in all three themes.
@@ -397,60 +414,186 @@ const failures = (id: string, maps: ModeMaps): string[] => {
   return found;
 };
 
-const tokens = JSON.parse(readFileSync(tokensPath, 'utf8')) as Tokens;
+// Components are the channel over 255, rounded to four places; Math.round(component * 255) gives the hex channel back.
+const toColorValue = (hex: string): ColorValue => ({
+  colorSpace: 'srgb',
+  components: hexToRgb(hex).map((v) => Math.round(v * 10_000) / 10_000) as ColorValue['components'],
+  hex,
+});
 
-const tokenNames = tokens.color.tokens.map((token) => token.name);
+// JSON.stringify, with short arrays of primitives on one line the way oxfmt keeps them: its 100 columns include a trailing comma.
+const serialize = (value: unknown): string =>
+  JSON.stringify(value, null, 2).replace(
+    /^( *)(".*": )?\[\n((?: *(?:-?[\d.]+|true|false|".*"),?\n)+) *\](,?)$/gm,
+    (whole, indent: string, key: string | undefined, items: string, comma: string) => {
+      const line = `${indent}${key ?? ''}[${items
+        .trim()
+        .split(/,?\n\s*/)
+        .join(', ')}]${comma}`;
+      return line.length <= 100 ? line : whole;
+    },
+  ) + '\n';
 
-const shipped = Object.fromEntries(
-  MODES.map((mode) => [
-    mode,
-    Object.fromEntries(tokens.color.tokens.map((token) => [token.name, token.value[mode]])),
-  ]),
-) as ModeMaps;
+const readTheme = (mode: ModeValue): ThemeFile =>
+  JSON.parse(readFileSync(resolve(themesDir, `${mode}${TOKENS_SUFFIX}`), 'utf8')) as ThemeFile;
+
+const colorNames = (theme: ThemeFile): string[] =>
+  Object.keys(theme.color).filter((key) => !key.startsWith('$'));
+
+const themes = Object.fromEntries(MODES.map((mode) => [mode, readTheme(mode)])) as Record<
+  ModeValue,
+  ThemeFile
+>;
+
+const tokenNames = colorNames(themes[Mode.Light]);
 
 const problems: string[] = [];
 
-const palettes: Record<string, { name: string; ground: GroundValue } & ModeMaps> = {};
+for (const mode of MODES) {
+  const file = `themes/${mode}${TOKENS_SUFFIX}`;
+  const names = colorNames(themes[mode]);
+  if (names.join() !== tokenNames.join()) {
+    problems.push(`${file}: colour names differ from themes/light${TOKENS_SUFFIX}`);
+    continue;
+  }
+  for (const name of names) {
+    const value = (themes[mode].color[name] as { $value?: Partial<ColorValue> } | undefined)
+      ?.$value;
+    const hex = value?.hex;
+    const components = value?.components;
+    const matches =
+      value?.colorSpace === 'srgb' &&
+      typeof hex === 'string' &&
+      /^#[0-9a-f]{6}$/.test(hex) &&
+      Array.isArray(components) &&
+      components.length === 3 &&
+      components.every(
+        (c, i) => Math.round(c * 255) === parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16),
+      );
+    if (!matches) problems.push(`${file}: ${name} components do not match its hex ${String(hex)}`);
+  }
+}
+
+// Stop here: the colours below are read from themes that passed these checks.
+if (problems.length > 0) {
+  console.log(problems.join('\n'));
+  process.exit(1);
+}
+
+// Evergreen is the shipped colours: the hex of every theme colour.
+const shipped = Object.fromEntries(
+  MODES.map((mode) => [
+    mode,
+    Object.fromEntries(
+      tokenNames.map((name) => [
+        name,
+        (themes[mode].color[name] as { $value: ColorValue }).$value.hex,
+      ]),
+    ),
+  ]),
+) as ModeMaps;
+
+// Generated files by path, in write order. Palette files carry a theme's file with the palette's colours.
+const generated = new Map<string, string>();
+
+const schemeContexts: Record<string, { $ref: string }[]> = {};
 
 for (const [id, input] of Object.entries(PALETTES)) {
   const maps = id === 'evergreen' ? shipped : derive(input);
   problems.push(...failures(id, maps));
-  const ordered = (mode: ModeValue): TokenMap =>
-    Object.fromEntries(tokenNames.map((name) => [name, maps[mode][name] ?? '']));
-  palettes[id] = {
-    name: input.name,
-    ground: input.ground,
-    light: ordered(Mode.Light),
-    dark: ordered(Mode.Dark),
-    drive: ordered(Mode.Drive),
-  };
+  for (const mode of MODES) {
+    if (id === 'evergreen') {
+      schemeContexts[`${id}-${mode}`] = [{ $ref: `themes/${mode}${TOKENS_SUFFIX}` }];
+      continue;
+    }
+    const file = `${id}-${mode}${TOKENS_SUFFIX}`;
+    const palette = structuredClone(themes[mode]);
+    palette.$description = `Generated by scripts/palettes.mts from themes/${mode}${TOKENS_SUFFIX}; do not edit. The ${input.name} palette in the ${THEME_NAMES[mode]} theme.`;
+    for (const name of tokenNames) {
+      // A colour the themes gained but derive() does not know would otherwise be written empty.
+      const hex = maps[mode][name];
+      if (hex === undefined) {
+        problems.push(`${id} ${mode}: no derived colour for ${name}`);
+        continue;
+      }
+      (palette.color[name] as { $value: ColorValue }).$value = toColorValue(hex);
+    }
+    generated.set(resolve(palettesDir, file), serialize(palette));
+    schemeContexts[`${id}-${mode}`] = [{ $ref: `palettes/${file}` }];
+  }
 }
 
-const output =
-  JSON.stringify(
-    {
-      note: 'Generated by scripts/palettes.mts from tokens.json; do not edit. Curated palettes for the Palette setting: each is a complete colour-token map per theme, checked against every pair in the design system Personalisation section. Evergreen is tokens.json.',
-      palettes,
+const resolver = {
+  version: '2025.10',
+  name: 'ASYS',
+  description:
+    'Generated by scripts/palettes.mts; do not edit. The ASYS design tokens: the base set, then one scheme context. Evergreen contexts use the hand-authored themes, the other palettes the generated palette files.',
+  sets: {
+    base: {
+      description: 'The tokens that are the same in every scheme.',
+      sources: [{ $ref: `base${TOKENS_SUFFIX}` }],
     },
-    null,
-    2,
-  ) + '\n';
+  },
+  modifiers: {
+    scheme: {
+      description:
+        'A palette in a theme, named <palette>-<theme>. One modifier, because a palette carries a full colour map per theme: palette and theme are not independent choices.',
+      contexts: schemeContexts,
+      default: 'evergreen-light',
+      $extensions: {
+        [EXTENSION]: {
+          themes: Object.fromEntries(MODES.map((mode) => [mode, { name: THEME_NAMES[mode] }])),
+          palettes: Object.fromEntries(
+            Object.entries(PALETTES).map(([id, { name, ground }]) => [id, { name, ground }]),
+          ),
+        },
+      },
+    },
+  },
+  resolutionOrder: [{ $ref: '#/sets/base' }, { $ref: '#/modifiers/scheme' }],
+};
+
+generated.set(resolverPath, serialize(resolver));
 
 if (problems.length > 0) {
   console.log(problems.join('\n'));
   process.exit(1);
 }
 
+// Anything else in palettes/ is a leftover, for example from a palette that was removed from PALETTES.
+const leftovers = (): string[] =>
+  readdirSync(palettesDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(TOKENS_SUFFIX))
+    .map((entry) => resolve(palettesDir, entry.name))
+    .filter((path) => !generated.has(path));
+
+const paletteFileCount = generated.size - 1;
+
 if (process.argv.includes('--check')) {
-  const committed = readFileSync(palettesPath, 'utf8');
-  if (committed !== output) {
-    console.log(`${palettesPath} is stale: run node scripts/palettes.mts`);
+  const found: string[] = [];
+  for (const [path, text] of generated) {
+    if (!existsSync(path) || readFileSync(path, 'utf8') !== text)
+      found.push(`${path} is stale: run node scripts/palettes.mts`);
+  }
+  if (existsSync(palettesDir)) {
+    for (const path of leftovers())
+      found.push(`${path} is not a generated palette file: run node scripts/palettes.mts`);
+  }
+  if (found.length > 0) {
+    console.log(found.join('\n'));
     process.exit(1);
   }
   console.log(
-    `OK: ${Object.keys(palettes).length} palettes pass every pair and palettes.json is current`,
+    `OK: ${Object.keys(PALETTES).length} palettes pass every pair and the palette files and asys.resolver.json are current`,
   );
 } else {
-  writeFileSync(palettesPath, output);
-  console.log(`Wrote ${Object.keys(palettes).length} palettes to ${palettesPath}`);
+  mkdirSync(palettesDir, { recursive: true });
+  for (const path of leftovers()) {
+    rmSync(path);
+    console.log(`Deleted ${path}`);
+  }
+  for (const [path, text] of generated) writeFileSync(path, text);
+  console.log(
+    `Wrote ${paletteFileCount} palette files and asys.resolver.json for ${Object.keys(PALETTES).length} palettes`,
+  );
 }
