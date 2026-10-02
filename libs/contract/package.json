@@ -1,0 +1,13 @@
+{
+  "name": "@asys/contract",
+  "version": "0.0.1",
+  "private": true,
+  "license": "MPL-2.0",
+  "type": "commonjs",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "dependencies": {
+    "effect": "4.0.0-rc.118",
+    "tslib": "^2.3.0"
+  }
+}

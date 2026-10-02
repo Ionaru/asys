@@ -318,84 +318,115 @@ Each is a pure function of `(state, command, now)`.
   - `scope:contract` is added to the server and pwa lists.
 
 **Schemas**
+- **Names.** Schema values end in `Schema` (`TaskSchema`, `CommandSchema`), because the server imports them next to the same-named domain types. The contract-only types are `CommandRequest`, `CommandResult`, `ChangeEntry`, `Changes`, `Snapshot` and `Meta`.
 - **Entity schemas** mirror the domain types.
-  - A `.test-d.ts` type test checks that each `Schema.Type` equals its domain type.
+  - A `.test-d.ts` type test checks that each `Schema.Type` equals its domain type. Task and `ChangeEntry` need `expectTypeOf(...).branded`, because bare `Schema.Enum` fields defeat plain equality even on a correct schema.
   - It needs vitest's `typecheck.enabled` with a `typecheck.tsconfig` that includes the file; otherwise it checks nothing (ADR 0009).
   - Seeing it red once is part of the unit.
-  - Ids are UUID strings in the contract, and text fields reject NUL; both only narrow values, so `Schema.Type` stays `string`.
-- **`Command`** is a `Schema.TaggedUnion` of the slice 1 commands, mirroring the domain's `Command`. Each has:
+  - Every check only narrows a value, so `Schema.Type` stays a plain `string` or `number`:
+    - ids are lowercase UUIDs only, so an id string always equals its PostgreSQL text form (PostgreSQL lowercases uuids, while the domain compares ids with `===`);
+    - text rejects NUL and unpaired UTF-16 surrogates, which PostgreSQL text and jsonb reject and which would otherwise turn client input into a 500;
+    - Active hours are a `Struct` keyed by the seven `IsoWeekday` values, since `Schema.Record(Schema.Enum(...))` throws.
+  - A Review item's `kind` and subject `id` are text, not UUIDs, so later kinds can reference other ids.
+- **Numbers.** Numbers the domain validates itself are `Schema.Finite` in commands (Estimate, remaining minutes, Urgency-window days, Active-hours minutes), so a fraction reaches the domain and gets its specific Rejected reason. Server-produced numbers are `Schema.Int`: seq, version, instants and counters.
+- **`Command`** is a `Schema.TaggedUnion` of the slice 1 commands, keyed by the domain's `CommandTag`, mirroring the domain's `Command`. Each has:
   - `idempotencyKey`, a UUID;
   - an optional `expect`, only where the domain has one (settled in piece 1): `{ status?, version? }` on Triage, edit, log progress, complete and drop, and `{ version? }` on updating an Area;
   - a static `commandMeta[tag].offline` flag, true for capture, Triage, edit, log progress, complete and drop.
+  - `toDomainCommand` drops the `idempotencyKey`.
 - **`CommandResult`** is either `Applied{ seq }` or `NotApplicable{ reason, reviewItemId }`. `Rejected{ reason }` is returned as a 422 error.
   - `Applied.seq` is the counter's `last_seq` after the command. A command that changes nothing leaves it unchanged.
+- **Errors.** `CommandRejected { reason }`, `IdempotencyKeyReused {}` and `ChangesExpired { after }` are `Schema.TaggedError` classes. They carry no HTTP status yet; piece 4 adds `httpApiStatus` when it declares the endpoints.
 - **The rest:**
-  - `ChangeEntry`: `{ seq, entity, id, op, after? }`
+  - `ChangeEntry`: the domain `Change` plus `seq`, as a union of its six shapes. A Settings entry has no `id`, and a Blocker remove has no `after`.
+  - `Changes`: `{ seq, entries }`, the `since` response with its head.
   - `Snapshot`: `{ seq, tasks, blockers, areas, reviewItems, settings }`
-  - `Meta`: `{ rulesVersion, apiVersion, settings }`
+  - `Meta`: `{ rulesVersion, apiVersion, settings }`, with `API_VERSION = 1`.
+  - The Review item kind `command_not_applicable`, with its payload `{ command, reason }`.
 
 ### 2b. Tables, migrations, RLS tests and `createOwner`
 
 **The owned-table helper.** Every owned table is built with:
 - `pgTable.withRLS()`, since `.enableRLS()` is deprecated;
 - `owner_id uuid not null`;
-- the one `pgPolicy`, `nullif(current_setting('app.owner_id', true), '')::uuid`.
+- the one `pgPolicy`, `nullif(current_setting('app.owner_id', true), '')::uuid`, written literally in the `sql` template, since drizzle does not inline parameters into policy SQL.
+
+**Enums.** `schema.ts` states each enum's values as a string tuple and types its columns with `.$type<DomainEnum>()` through `import type`. drizzle-kit loads `schema.ts` with jiti, which cannot resolve the `@asys/domain` alias; a type-only import is erased before resolution. A test pins each tuple to its domain enum.
 
 **Migrations**
 - Each generated migration is followed by a `--custom` one holding `FORCE ROW LEVEL SECURITY` and the grants to `asys_app`. The pattern is `apps/server/drizzle/20260928200755_force_rls_grants_lookup/migration.sql`.
 - Composite foreign keys, `(owner_id, x_id)` referencing `(owner_id, id)`, keep links within one owner, because foreign-key checks bypass row-level security.
+- **Least-privilege grants** to `asys_app`:
+  - SELECT, INSERT and UPDATE on `users`, `settings`, `areas`, `tasks`, `review_items` and `change_counters`;
+  - SELECT, INSERT and DELETE on `task_blockers`, the only table it deletes from;
+  - SELECT and INSERT on `change_log` and `idempotency_keys`. DELETE on those two waits for piece 3's prune job.
+  - Tests clean up as `asys_owner`, which FORCE still binds.
 
 **The tables**
+
+Instants are `timestamptz(3)`, counters `bigint` (read as numbers), dates `date` (read as strings). Only `created_at` on `users`, `change_log` and `idempotency_keys`, and the two counters, have defaults; the mappers write every other column.
 
 | Table | Columns and constraints |
 |---|---|
 | `users` | `owner_id` (primary key), `name`, `created_at` |
-| `settings` | `owner_id` (primary key), `time_zone`, `urgency_window_days` |
-| `areas` | |
-| `tasks` | enums `task_kind`, `task_status`, `voice` and `privacy`; separate `*_date` and `*_time` columns, with checks that a time needs a date and that `estimate_minutes > 0` (a `*_time` column holds `'HH:MM'` text, or the mapper formats it to that, since the domain rejects `'HH:MM:SS'`); `due_move_count`, `capture_text`, `version` |
-| `task_blockers` | `id`, `task_id`, `blocker_id`; unique `(owner_id, task_id, blocker_id)`; check `task_id <> blocker_id` |
-| `review_items` | a unique index on `(owner_id, dedupe_key)` where `resolved_at is null` |
-| `change_log` | `owner_id`, `seq`, `entity`, `entity_id`, `op`, `data jsonb`, `created_at`; primary key `(owner_id, seq)` |
-| `change_counters` | `owner_id` (primary key), `last_seq`, `pruned_through` |
+| `settings` | `owner_id` (primary key), `time_zone`, `urgency_window_days` (check `> 0`) |
+| `areas` | primary key `(owner_id, id)`; `name`, `active_hours jsonb`, `default_privacy`, `version` |
+| `tasks` | primary key `(owner_id, id)`; enums `task_kind`, `task_status`, `voice` and `privacy`; `area_id` with a composite foreign key to `areas`; separate `*_date` and `*_time` columns, with checks that a time needs a date and matches `HH:MM`, and that `estimate_minutes > 0`; `due_move_count`, `capture_text`, `version`, `created_at`, `closed_at` |
+| `task_blockers` | primary key `(owner_id, id)`; `task_id` and `blocker_id`, each with a composite foreign key to `tasks`; unique `(owner_id, task_id, blocker_id)`; check `task_id <> blocker_id` |
+| `review_items` | primary key `(owner_id, id)`; `kind`, `subjects jsonb`, `payload jsonb`, `dedupe_key`, `created_at`, `resolved_at`; a unique index on `(owner_id, dedupe_key)` where `resolved_at is null` |
+| `change_log` | `owner_id`, `seq`, `entity`, `entity_id`, `op`, `data jsonb`, `created_at`; primary key `(owner_id, seq)`; `entity_id` is null exactly for settings rows, and `data` exactly for removals |
+| `change_counters` | `owner_id` (primary key), `last_seq`, `pruned_through`; check `0 <= pruned_through <= last_seq` |
 | `idempotency_keys` | `owner_id`, `key`, `command`, `request_hash`, `result jsonb`, `created_at`; primary key `(owner_id, key)` |
 
-**`createOwner(ownerId, name, timeZone)`** creates the user, the settings, the seeded Areas and the counter row.
+**Primary keys are `(owner_id, id)`** on `areas`, `tasks`, `task_blockers` and `review_items`. The composite foreign keys need a unique `(owner_id, id)` anyway, and a client-made id can then never collide with, or probe for, another owner's row.
+
+**`createOwner({ ownerId, name, timeZone })`** creates, in one `withOwner` transaction, the user (inserted first with `onConflictDoNothing`), the settings with the default Urgency window, the seeded Areas and the counter row `(0, 0)`. It fails with `CreateOwnerRejected` (`invalid_name` for an empty or NUL name, `invalid_time_zone`, or `owner_exists`), and then writes nothing.
+
+**Row mappers** in `apps/server/src/db/mappers.ts` turn each domain value into its row and back. A null `*_time` maps back to a `DateSpec` without a `time` key, and an Instant of `0` stays `0`.
 
 **Tests**
 - **The table-enumerating test** connects as `asys_app`.
-  - It reads `pg_class` (relkind `r` and `p`), `pg_attribute` and `pg_policy`. It avoids `information_schema`, which hides tables the role has no grant on.
+  - It reads `pg_class` (relkind `r` and `p`, not temporary), `pg_attribute` and `pg_policy`. It avoids `information_schema`, which hides tables the role has no grant on.
   - It excludes `pg_catalog`, `information_schema`, `pg_toast` and `drizzle`.
   - For each table it asserts:
     - `owner_id uuid not null`;
     - `relrowsecurity` and `relforcerowsecurity`;
     - exactly one policy: permissive, command ALL, roles `{public}`;
-    - both `USING` and `WITH CHECK` normalise to the one expression.
-- **Isolation tests.** a, b, c, d and f are ported from `with-owner.spec.ts` to `tasks`, with two owners. Its `findSqlError` and `assertRejectedByRls` move to `apps/server/src/test/`.
-- **Composite foreign keys.** A link to another owner's Task is rejected.
+    - both `USING` and `WITH CHECK` equal the one expression as PostgreSQL prints it.
+  - It asserts that the ten known tables are in the list, so it cannot pass vacuously, and that no view, materialised view or foreign table exists.
+- **The grants test** asserts the grant matrix above with `has_table_privilege`.
+- **Isolation tests.** a, b, c, d and f are ported from `with-owner.spec.ts` to `tasks`, with two owners. `findSqlError` moves to production code (`apps/server/src/db/sql-error.ts`), and `assertRejectedByRls` to `apps/server/src/test/`. `with-owner.spec.ts` keeps only test e, the trial lookup.
+- **Composite foreign keys.** A link to another owner's Task, and a Task in another owner's Area, fail with 23503 on the named constraint.
 - **Red checks through `psql`,** each restored afterwards:
   - `NO FORCE`;
   - a changed policy expression;
-  - a table without `owner_id`.
+  - a table without `owner_id`, and a view;
+  - each composite foreign key dropped, then re-added with its recorded definition.
 
 ### 2c. Change log and command executor
 
-**`ChangeLog.append`** takes its seq from the locked counter row. Entries are after-images in the contract shape.
+**`lockCounter`** selects the owner's `change_counters` row `FOR UPDATE`, inside `withOwner`; a missing row is a defect. It is the first statement of every per-owner write transaction (decision 8).
 
-**`CommandExecutor.run(ownerId, command)`** runs in one `withOwner` transaction:
+**`appendChanges(ownerId, lastSeq, changes)`** numbers the entries from the locked counter row, stores each after-image encoded by the contract schema, sets `last_seq` and returns it. It takes the `ownerId` for the rows it writes, like the mappers do.
+
+**`runCommand(ownerId, request)`** runs in one `withOwner` transaction at read committed:
 1. Lock the counter row.
-2. Look up the idempotency key. A repeat returns the stored result; the same key with a different request hash is rejected.
+2. Look up the idempotency key. A repeat returns the stored result; the same key with a different request hash (SHA-256 of the canonical JSON of the encoded request) fails with `IdempotencyKeyReused`.
 3. Load the state the transition needs.
 4. Run the domain transition.
-5. Persist the changes and their log entries.
+5. Persist the changes and their log entries. A put inserts when the loaded state had no row with that id and updates otherwise; there is no upsert.
 6. On `notApplicable`, create a Review item of kind `command_not_applicable`. It holds the command and gets its own change-log entry.
+7. Store the key with its request hash and result.
 
-A client id that collides (a UniqueViolation) becomes Rejected, not a 500.
+- **A Rejected command stores nothing,** not even its idempotency key: the transaction rolls back, and a retry with that key is evaluated afresh. Only Applied and NotApplicable results are stored and replayed.
+- **Colliding ids.** With `(owner_id, id)` primary keys, a same-owner duplicate id is already rejected by the domain (`duplicate_id`), so a colliding client id can no longer reach the database through a command. A UniqueViolation on one of the four entity primary keys is still mapped to `CommandRejected(duplicate_id)`; any other UniqueViolation, which would mean a missing lock, propagates as an error.
 
 **Tests**
 - **The Done-then-Drop replay:**
   1. Completing gives Applied.
   2. Dropping with `expect.status = 'open'` gives NotApplicable, with its Review item and log entry in the same transaction.
   3. Replaying either key returns the identical stored result and no second Review item.
+- **Every command once**, with its log entry and its effect on the snapshot; a command that changes nothing; a Rejected command; key reuse; a stale Area version; two owners using the same ids.
 - **Concurrency:**
   - 50 parallel commands, with a concurrent poller, see seqs 1 to n with no gap and none missed.
   - Two concurrent requests with one idempotency key give one result and no error.
@@ -407,17 +438,19 @@ A client id that collides (a UniqueViolation) becomes Rejected, not a 500.
 ### 2d. Snapshot and `since`
 
 - `withOwner` gains an optional `isolationLevel`.
-- `Snapshot.read` runs at repeatable read. It returns:
+- `readSnapshot(ownerId)` runs at repeatable read. It returns:
   - the Open and Delegated Tasks;
   - the links whose blocked Task is in the working set;
   - the Areas;
   - the open Review items;
   - the settings;
   - the counter's `last_seq`.
-- `ChangeLog.since(after)` returns the entries after `after`. It fails with `Expired` when `after < pruned_through`.
+- `changesSince(ownerId, after)` runs at repeatable read and returns `{ seq, entries }`: the entries after `after`, and the head read in the same transaction. A client can tell when it is caught up, so a page limit can be added later without breaking `/v1`.
+  - It fails with `ChangesExpired` when `after < pruned_through`, or when `after > last_seq`, which only happens after a database restore; the client must reload.
 - **Tests:**
   - A snapshot taken during concurrent writes is consistent with its seq.
-  - `since` returns exactly the entries after it.
+  - `since` returns exactly the entries after it, and expires outside `[pruned_through, last_seq]`.
+  - A second `FOR UPDATE NOWAIT` on a locked counter fails.
 
 ## Piece 3: jobs
 
@@ -506,6 +539,7 @@ Inserting an existing dedupe key moves `run_at` and resets `finished_at`, `faile
 
 - The auth endpoints are not domain commands, so they are exempt from the one-mutation-route rule.
 - OpenAPI is written by a build target through `OpenApi.fromApi`. It is not served.
+- **Database errors** become an opaque 500. They are logged with only the reason tag, SQLSTATE and constraint, never the message, which carries the query parameters (noted in piece 2).
 
 **Tables**
 - `passkeys`.
@@ -632,7 +666,7 @@ These were checked against the installed packages (Effect 4.0.0-rc.117, drizzle-
   - A nested `tx.transaction` becomes a savepoint.
   - Statements through `db` or `PgClient` inside the callback join the transaction.
 - **Row locks.** `.for('update', { skipLocked: true })` exists.
-- **Errors.** A query error is `EffectDrizzleQueryError`, with the `SqlError` as its `cause`. The reasons include `UniqueViolation` and `AuthorizationError`.
+- **Errors.** A query error is `EffectDrizzleQueryError`. Its `cause` is a `Cause` that holds the `SqlError` (corrected in piece 2), and its message carries the query's parameters. The reasons include `UniqueViolation` (with the violated `constraint`), `ConstraintError`, `LockTimeoutError` and `AuthorizationError`; a reason's own `cause` is the PostgreSQL error with its `code` and `constraint`.
 - **drizzle-kit.**
   - It emits `ENABLE ROW LEVEL SECURITY`, never `FORCE`.
   - `generate --custom --name <name>` makes a custom migration.

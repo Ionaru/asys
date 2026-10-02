@@ -44,12 +44,28 @@
             ]
           },
           {
+            "sourceTag": "scope:contract",
+            "onlyDependOnLibsWithTags": ["scope:domain", "scope:contract"],
+            "bannedExternalImports": [
+              "drizzle-orm",
+              "drizzle-orm/*",
+              "@effect/sql-pg",
+              "@effect/platform-node*",
+              "@angular/*"
+            ]
+          },
+          {
             "sourceTag": "scope:server",
-            "onlyDependOnLibsWithTags": ["scope:domain", "scope:server"]
+            "onlyDependOnLibsWithTags": ["scope:domain", "scope:contract", "scope:server"]
           },
           {
             "sourceTag": "scope:pwa",
-            "onlyDependOnLibsWithTags": ["scope:domain", "scope:design", "scope:pwa"]
+            "onlyDependOnLibsWithTags": [
+              "scope:domain",
+              "scope:contract",
+              "scope:design",
+              "scope:pwa"
+            ]
           },
           {
             "sourceTag": "scope:design",
