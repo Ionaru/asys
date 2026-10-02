@@ -611,7 +611,7 @@ Components stay thin, and the logic stays in `libs/domain`.
 
 ## Facts checked on 2026-09-30
 
-These were checked against the installed packages (Effect 4.0.0-rc.117, drizzle-orm 1.0.0-rc.5-5935859, Nx 23.2.1) and the npm registry. Effect was moved to rc.118 on 2026-10-01: its new module paths (`effect/http-api`, `effect/http`, `effect/cli`) were checked then, the API details below were not. Closed sets in the domain are string enums with these values (piece 1). Recheck anything that has had a version change since.
+These were checked against the installed packages (Effect 4.0.0-rc.117, drizzle-orm 1.0.0-rc.5-5935859, Nx 23.2.1) and the npm registry. Effect was moved to rc.118 on 2026-10-01: its new module paths (`effect/http-api`, `effect/http`, `effect/cli`) were checked then, the API details below were not. It was moved to the stable 4.0.0 on 2026-10-02 with no code change: every check passed, and the ADR 0009 type test still fails without its `paths` entry. Closed sets in the domain are string enums with these values (piece 1). Recheck anything that has had a version change since.
 
 ### Versions and licences
 
@@ -623,7 +623,7 @@ These were checked against the installed packages (Effect 4.0.0-rc.117, drizzle-
 | `@js-temporal/polyfill` | ISC | |
 | `fast-check` | 4.10.2, MIT | |
 | `@fast-check/vitest` | 0.5.0 | accepts vitest 5 |
-| `effect` | 4.0.0-rc.118 | used, with a tsconfig paths entry for drizzle's type import of `effect/unstable/sql/SqlError` (ADR 0009) |
+| `effect` | 4.0.0 | used, with a tsconfig paths entry for drizzle's type import of `effect/unstable/sql/SqlError` (ADR 0009) |
 | `tslib` | 0BSD | |
 | `split2` | ISC | |
 
