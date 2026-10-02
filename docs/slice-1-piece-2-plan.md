@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
 # Slice 1, piece 2: contract and database core
 
 ## Context
