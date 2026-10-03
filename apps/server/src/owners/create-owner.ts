@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { randomUUID } from 'node:crypto';
 import { DEFAULT_URGENCY_WINDOW_DAYS, isValidTimeZone, seedAreas } from '@asys/domain';
-import { Data, Effect } from 'effect';
+import { Clock, Data, Effect } from 'effect';
 import { Db } from '../db/database';
 import { areaToRow, settingsToRow } from '../db/mappers';
 import { areas, changeCounters, settings, users } from '../db/schema';
 import { withOwner } from '../db/with-owner';
+import { pruneJob } from '../jobs/prune';
+import { scheduleJob } from '../jobs/schedule-job';
 
 export enum CreateOwnerRejectedReason {
   InvalidName = 'invalid_name',
@@ -23,7 +25,7 @@ export interface CreateOwnerInput {
   readonly timeZone: string;
 }
 
-/** Sets up a new User: the user row, settings, the two seeded Areas and the change counter. */
+/** Sets up a new User: the user row, settings, the two seeded Areas, the change counter and the daily prune job. */
 export const createOwner = (input: CreateOwnerInput) =>
   Effect.gen(function* () {
     const name = input.name.trim();
@@ -63,6 +65,9 @@ export const createOwner = (input: CreateOwnerInput) =>
             ),
           );
         yield* db.insert(changeCounters).values({ ownerId, lastSeq: 0, prunedThrough: 0 });
+
+        const now = yield* Clock.currentTimeMillis;
+        yield* scheduleJob(ownerId, pruneJob(input.timeZone, now));
       }),
     );
   });

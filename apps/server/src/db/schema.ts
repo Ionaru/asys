@@ -6,6 +6,7 @@ import {
   check,
   date,
   foreignKey,
+  index,
   integer,
   jsonb,
   pgEnum,
@@ -31,26 +32,6 @@ import type {
   TaskStatus,
   Voice,
 } from '@asys/domain';
-
-export const trialItems = pgTable(
-  'trial_items',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    ownerId: uuid('owner_id').notNull(),
-    title: text('title').notNull(),
-  },
-  (t) => [
-    // nullif: after a transaction-local set_config the setting reads '' (not
-    // NULL) on the same connection, and ''::uuid would raise an error.
-    pgPolicy('trial_items_owner', {
-      as: 'permissive',
-      for: 'all',
-      to: 'public',
-      using: sql`${t.ownerId} = nullif(current_setting('app.owner_id', true), '')::uuid`,
-      withCheck: sql`${t.ownerId} = nullif(current_setting('app.owner_id', true), '')::uuid`,
-    }),
-  ],
-);
 
 const ownerId = () => uuid('owner_id').notNull();
 
@@ -273,5 +254,34 @@ export const idempotencyKeys = pgTable.withRLS(
   (t) => [
     primaryKey({ name: 'idempotency_keys_pkey', columns: [t.ownerId, t.key] }),
     ownerPolicy('idempotency_keys', t.ownerId),
+  ],
+);
+
+export const jobs = pgTable.withRLS(
+  'jobs',
+  {
+    ownerId: ownerId(),
+    id: uuid('id').notNull(),
+    kind: text('kind').notNull(),
+    payload: jsonb('payload').$type<unknown>().notNull(),
+    runAt: instant('run_at').notNull(),
+    cron: text('cron'),
+    dedupeKey: text('dedupe_key'),
+    attempts: integer('attempts').notNull().default(0),
+    claimedUntil: instant('claimed_until'),
+    lastError: text('last_error'),
+    finishedAt: instant('finished_at'),
+    failed: boolean('failed').notNull().default(false),
+  },
+  (t) => [
+    primaryKey({ name: 'jobs_pkey', columns: [t.ownerId, t.id] }),
+    unique('jobs_dedupe_key').on(t.ownerId, t.dedupeKey),
+    check('jobs_attempts_check', sql`${t.attempts} >= 0`),
+    check('jobs_failed_check', sql`not ${t.failed} or ${t.finishedAt} is not null`),
+    check('jobs_cron_check', sql`${t.cron} is null or ${t.finishedAt} is null`),
+    index('jobs_due_idx')
+      .on(t.runAt)
+      .where(sql`${t.finishedAt} is null`),
+    ownerPolicy('jobs', t.ownerId),
   ],
 );

@@ -7,11 +7,11 @@ import {
   changeCounters,
   changeLog,
   idempotencyKeys,
+  jobs,
   reviewItems,
   settings,
   taskBlockers,
   tasks,
-  trialItems,
   users,
 } from '../db/schema';
 import { withOwner } from '../db/with-owner';
@@ -27,6 +27,13 @@ export const newOwner = () =>
     yield* createOwner({ ownerId, name: 'Test owner', timeZone: 'Europe/Amsterdam' });
     return ownerId;
   });
+
+/**
+ * A fresh owner that is removed again when the test's scope closes, so a
+ * failing test still cleans up. Needs a `Scope` (`it.effect` provides one).
+ */
+export const scopedOwner = () =>
+  Effect.acquireRelease(newOwner(), (ownerId) => removeOwner(ownerId).pipe(Effect.orDie));
 
 /**
  * Deletes every row of `ownerId`, children first. It connects as `asys_owner`
@@ -47,6 +54,6 @@ export const removeOwner = (ownerId: string) =>
       yield* db.delete(changeCounters);
       yield* db.delete(settings);
       yield* db.delete(users);
-      yield* db.delete(trialItems);
+      yield* db.delete(jobs);
     }),
   ).pipe(Effect.provide(ownerDatabase()));

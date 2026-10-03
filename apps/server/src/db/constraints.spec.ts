@@ -5,7 +5,15 @@ import { assert, layer } from '@effect/vitest';
 import { Cause, Effect, Exit } from 'effect';
 import { removeOwner } from '../test/owners';
 import { appDatabase, Db } from './database';
-import { changeCounters, changeLog, reviewItems, settings, taskBlockers, tasks } from './schema';
+import {
+  changeCounters,
+  changeLog,
+  jobs,
+  reviewItems,
+  settings,
+  taskBlockers,
+  tasks,
+} from './schema';
 import { findSqlError } from './sql-error';
 import { withOwner } from './with-owner';
 
@@ -56,6 +64,21 @@ const changeRow = (ownerId: string, overrides: Partial<typeof changeLog.$inferIn
   data: {},
   ...overrides,
 });
+
+const jobRow = (ownerId: string, overrides: Partial<typeof jobs.$inferInsert> = {}) => ({
+  ownerId,
+  id: randomUUID(),
+  kind: 'a kind',
+  payload: {},
+  runAt: createdAt,
+  ...overrides,
+});
+
+const insertJob = (ownerId: string, overrides: Partial<typeof jobs.$inferInsert> = {}) =>
+  Effect.gen(function* () {
+    const db = yield* Db;
+    yield* db.insert(jobs).values(jobRow(ownerId, overrides));
+  });
 
 const assertCheckViolation = (exit: Exit.Exit<unknown, unknown>, constraint: string) => {
   if (Exit.isSuccess(exit)) {
@@ -184,6 +207,21 @@ const checkCases: ReadonlyArray<CheckCase> = [
         yield* db.insert(changeCounters).values({ ownerId: o, lastSeq: 1, prunedThrough: 2 });
       }),
   },
+  {
+    name: 'a negative attempt count',
+    constraint: 'jobs_attempts_check',
+    violate: (o) => insertJob(o, { attempts: -1 }),
+  },
+  {
+    name: 'a failed job that is not finished',
+    constraint: 'jobs_failed_check',
+    violate: (o) => insertJob(o, { failed: true, finishedAt: null }),
+  },
+  {
+    name: 'a finished cron job',
+    constraint: 'jobs_cron_check',
+    violate: (o) => insertJob(o, { cron: '0 3 * * *', finishedAt: createdAt }),
+  },
 ];
 
 layer(appDatabase())('check and unique constraints', (it) => {
@@ -259,6 +297,24 @@ layer(appDatabase())('check and unique constraints', (it) => {
 
       yield* removeOwner(o);
       assert.isTrue(Exit.isSuccess(exit), 'a resolved item must not count as open');
+    }),
+  );
+
+  it.effect('jobs_dedupe_key rejects two jobs of one owner with one dedupe key', () =>
+    Effect.gen(function* () {
+      const o = randomUUID();
+      const exit = yield* Effect.exit(
+        withOwner(
+          o,
+          Effect.gen(function* () {
+            yield* insertJob(o, { dedupeKey: 'k' });
+            yield* insertJob(o, { dedupeKey: 'k' });
+          }),
+        ),
+      );
+
+      yield* removeOwner(o);
+      assertUniqueViolation(exit, 'jobs_dedupe_key');
     }),
   );
 });

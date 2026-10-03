@@ -20,7 +20,7 @@ const EXPECTED_TABLES = [
   'change_log',
   'change_counters',
   'idempotency_keys',
-  'trial_items',
+  'jobs',
 ];
 
 const tableGuards = Effect.gen(function* () {
@@ -134,12 +134,13 @@ const GRANTS: Record<
   review_items: { select: true, insert: true, update: true, delete: false },
   change_counters: { select: true, insert: true, update: true, delete: false },
   task_blockers: { select: true, insert: true, update: false, delete: true },
-  change_log: { select: true, insert: true, update: false, delete: false },
-  idempotency_keys: { select: true, insert: true, update: false, delete: false },
+  change_log: { select: true, insert: true, update: false, delete: true },
+  idempotency_keys: { select: true, insert: true, update: false, delete: true },
+  jobs: { select: true, insert: true, update: true, delete: false },
 };
 
 layer(appDatabase())('asys_app grants', (it) => {
-  it.effect('asys_app has exactly the stated privileges on the nine new tables', () =>
+  it.effect('asys_app has exactly the stated privileges on every table', () =>
     Effect.gen(function* () {
       const pg = yield* PgClient.PgClient;
       for (const [table, expected] of Object.entries(GRANTS)) {
@@ -159,27 +160,25 @@ layer(appDatabase())('asys_app grants', (it) => {
   );
 
   // TRUNCATE bypasses row-level security, so asys_app must never hold it.
-  it.effect(
-    'asys_app has no TRUNCATE, REFERENCES or TRIGGER privilege on the nine new tables',
-    () =>
-      Effect.gen(function* () {
-        const pg = yield* PgClient.PgClient;
-        for (const table of Object.keys(GRANTS)) {
-          const [actual] = yield* pg<{
-            readonly truncate: boolean;
-            readonly references: boolean;
-            readonly trigger: boolean;
-          }>`
+  it.effect('asys_app has no TRUNCATE, REFERENCES or TRIGGER privilege on every table', () =>
+    Effect.gen(function* () {
+      const pg = yield* PgClient.PgClient;
+      for (const table of Object.keys(GRANTS)) {
+        const [actual] = yield* pg<{
+          readonly truncate: boolean;
+          readonly references: boolean;
+          readonly trigger: boolean;
+        }>`
           select has_table_privilege('asys_app'::text, ${table}::text, 'TRUNCATE') as "truncate",
             has_table_privilege('asys_app'::text, ${table}::text, 'REFERENCES') as "references",
             has_table_privilege('asys_app'::text, ${table}::text, 'TRIGGER') as "trigger"`;
-          assert.deepStrictEqual(
-            { ...actual },
-            { truncate: false, references: false, trigger: false },
-            `${table}: privileges`,
-          );
-        }
-      }),
+        assert.deepStrictEqual(
+          { ...actual },
+          { truncate: false, references: false, trigger: false },
+          `${table}: privileges`,
+        );
+      }
+    }),
   );
 
   // A column-level grant does not show in has_table_privilege.
@@ -207,6 +206,149 @@ layer(appDatabase())('asys_app grants', (it) => {
           },
           `${table}: column privileges`,
         );
+      }
+    }),
+  );
+});
+
+// asys_lookup (NOLOGIN, BYPASSRLS) backs the SECURITY DEFINER functions. It
+// may only touch the job columns that claim_jobs and oldest_due_job_age need.
+
+const JOBS_COLUMNS = [
+  'id',
+  'owner_id',
+  'kind',
+  'payload',
+  'run_at',
+  'cron',
+  'dedupe_key',
+  'attempts',
+  'claimed_until',
+  'last_error',
+  'finished_at',
+  'failed',
+];
+
+const LOOKUP_SELECT_COLUMNS = [
+  'id',
+  'owner_id',
+  'run_at',
+  'claimed_until',
+  'finished_at',
+  'attempts',
+];
+
+const LOOKUP_UPDATE_COLUMNS = ['claimed_until', 'attempts'];
+
+const TABLE_PRIVILEGES = [
+  'SELECT',
+  'INSERT',
+  'UPDATE',
+  'DELETE',
+  'TRUNCATE',
+  'REFERENCES',
+  'TRIGGER',
+];
+
+// has_any_column_privilege rejects DELETE and TRUNCATE.
+const COLUMN_PRIVILEGES = ['SELECT', 'INSERT', 'UPDATE', 'REFERENCES'];
+
+layer(appDatabase())('asys_lookup grants', (it) => {
+  it.effect('asys_lookup has no table-level privilege on jobs', () =>
+    Effect.gen(function* () {
+      const pg = yield* PgClient.PgClient;
+      for (const privilege of TABLE_PRIVILEGES) {
+        const [actual] = yield* pg<{ readonly granted: boolean }>`
+          select has_table_privilege('asys_lookup'::text, 'jobs'::text, ${privilege}::text) as granted`;
+        assert.strictEqual(actual.granted, false, `jobs: ${privilege}`);
+      }
+    }),
+  );
+
+  it.effect('asys_lookup has column privileges on exactly the job columns the functions use', () =>
+    Effect.gen(function* () {
+      const pg = yield* PgClient.PgClient;
+      const expected: Record<string, ReadonlyArray<string>> = {
+        SELECT: LOOKUP_SELECT_COLUMNS,
+        UPDATE: LOOKUP_UPDATE_COLUMNS,
+        INSERT: [],
+      };
+      for (const [privilege, columns] of Object.entries(expected)) {
+        for (const column of JOBS_COLUMNS) {
+          const [actual] = yield* pg<{ readonly granted: boolean }>`
+            select has_column_privilege('asys_lookup'::text, 'jobs'::text, ${column}::text, ${privilege}::text) as granted`;
+          assert.strictEqual(
+            actual.granted,
+            columns.includes(column),
+            `jobs.${column}: ${privilege}`,
+          );
+        }
+      }
+    }),
+  );
+
+  it.effect('asys_lookup has no privilege at all on the other nine tables', () =>
+    Effect.gen(function* () {
+      const pg = yield* PgClient.PgClient;
+      for (const table of EXPECTED_TABLES.filter((name) => name !== 'jobs')) {
+        for (const privilege of TABLE_PRIVILEGES) {
+          const [actual] = yield* pg<{ readonly granted: boolean }>`
+            select has_table_privilege('asys_lookup'::text, ${table}::text, ${privilege}::text) as granted`;
+          assert.strictEqual(actual.granted, false, `${table}: ${privilege}`);
+        }
+        for (const privilege of COLUMN_PRIVILEGES) {
+          const [actual] = yield* pg<{ readonly granted: boolean }>`
+            select has_any_column_privilege('asys_lookup'::text, ${table}::text, ${privilege}::text) as granted`;
+          assert.strictEqual(actual.granted, false, `${table}: any column ${privilege}`);
+        }
+      }
+    }),
+  );
+});
+
+layer(appDatabase())('SECURITY DEFINER functions', (it) => {
+  it.effect('only claim_jobs and oldest_due_job_age exist, hardened and callable by asys_app', () =>
+    Effect.gen(function* () {
+      const pg = yield* PgClient.PgClient;
+      const functions = yield* pg<{
+        readonly signature: string;
+        readonly owner: string;
+        readonly config: ReadonlyArray<string> | null;
+        readonly volatility: string;
+        readonly publicExecute: boolean;
+        readonly appExecute: boolean;
+      }>`
+        select p.oid::regprocedure::text as signature,
+          r.rolname as owner,
+          p.proconfig as config,
+          p.provolatile::text as volatility,
+          has_function_privilege('public', p.oid, 'EXECUTE') as "publicExecute",
+          has_function_privilege('asys_app', p.oid, 'EXECUTE') as "appExecute"
+        from pg_proc p
+        join pg_namespace n on n.oid = p.pronamespace
+        join pg_roles r on r.oid = p.proowner
+        where p.prosecdef
+          and n.nspname not in ('pg_catalog', 'information_schema')
+        order by 1`;
+
+      assert.deepStrictEqual(functions.map((f) => f.signature).sort(), [
+        'claim_jobs(interval,integer)',
+        'oldest_due_job_age()',
+      ]);
+      const volatilities: Record<string, string> = {
+        'claim_jobs(interval,integer)': 'v',
+        'oldest_due_job_age()': 's',
+      };
+      for (const f of functions) {
+        assert.strictEqual(f.owner, 'asys_lookup', `${f.signature}: owner`);
+        assert.deepStrictEqual(
+          f.config === null ? null : [...f.config],
+          ['search_path=pg_catalog, pg_temp'],
+          `${f.signature}: search_path`,
+        );
+        assert.strictEqual(f.publicExecute, false, `${f.signature}: PUBLIC execute`);
+        assert.strictEqual(f.appExecute, true, `${f.signature}: asys_app execute`);
+        assert.strictEqual(f.volatility, volatilities[f.signature], `${f.signature}: volatility`);
       }
     }),
   );

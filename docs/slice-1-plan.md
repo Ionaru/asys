@@ -456,65 +456,96 @@ Instants are `timestamptz(3)`, counters `bigint` (read as numbers), dates `date`
 
 ### 3a. Table, claim and dedupe
 
-**The `jobs` table** is owned.
+**The `jobs` table** is owned, with primary key `(owner_id, id)`.
 
 | Column | Notes |
 |---|---|
 | `id`, `kind`, `payload jsonb`, `run_at` | |
-| `cron text null` | evaluated in the owner's Current time zone |
-| `dedupe_key text null` | unique on `(owner_id, dedupe_key)` |
-| `attempts`, `claimed_until`, `last_error`, `finished_at`, `failed` | |
+| `cron text null` | evaluated in the owner's Current time zone; a cron row is never finished |
+| `dedupe_key text null` | unique on `(owner_id, dedupe_key)`; nulls stay distinct |
+| `attempts` | counted by the claim, default 0 |
+| `claimed_until`, `last_error`, `finished_at`, `failed` | `failed` needs `finished_at` |
 
-Inserting an existing dedupe key moves `run_at` and resets `finished_at`, `failed` and `attempts`.
+- A partial index on `run_at` where `finished_at is null` serves the claim and the age.
+- `asys_app` may SELECT, INSERT and UPDATE `jobs`, and now also DELETE `change_log` and `idempotency_keys` for prune. Finished one-off jobs are kept until Reminders decide their retention, so it gets no DELETE on `jobs`.
 
-**`claim_jobs(lease interval, max int) returns table(id uuid, owner_id uuid)`**
-- Declared `VOLATILE` and `SECURITY DEFINER`, using `FOR UPDATE SKIP LOCKED`.
-- Owned by `asys_lookup`. Its privileges:
+**`scheduleJob`** inserts a job inside the caller's owner transaction, after the counter lock.
+- An existing dedupe key moves its row instead. It replaces `run_at`, `payload` and `cron`, resets `attempts`, `finished_at`, `failed` and `last_error`, and keeps `kind` and `claimed_until`. A moved Reminder carries its new payload, and a re-timed Morning briefing its new cron.
+- A cron expression that parses but never fires (`0 0 31 2 *`) is refused, since `Cron.next` would throw on it.
+
+**`claim_jobs(lease interval, max_jobs integer) returns table(id uuid, owner_id uuid)`**
+- Declared `VOLATILE` and `SECURITY DEFINER`. Its body is a `materialized` CTE that selects the due, unfinished, unleased rows in `run_at` order with `limit max_jobs for update skip locked`, followed by an `UPDATE … FROM` it.
+  - The simpler `UPDATE … FROM (subquery … for update skip locked)` plans the subquery as a rescanned inner loop, and can claim more than `max_jobs` rows.
+  - The parameter is not called `max`, which would shadow the aggregate.
+- Each claimed row gets `claimed_until = now() + lease` and `attempts + 1`, so a crash during a job still counts. The result is an unordered set.
+- Owned by `asys_lookup`. Its privileges on `jobs`:
   - SELECT on `(id, owner_id, run_at, claimed_until, finished_at, attempts)`;
   - UPDATE on `(claimed_until, attempts)`.
 - The handover follows the trial's `lookup_role` migration: `GRANT CREATE` only for the duration of the handover.
 - Any `SET ROLE` in a migration is followed by `RESET ROLE` in the same file, because drizzle runs every pending migration in one transaction.
 
-**`oldest_due_job_age() returns interval`** ignores finished and failed rows. ADR 0012 gets the note from decision 9.
+**`oldest_due_job_age() returns interval`** ignores finished rows, and failed rows always have `finished_at`. Claimed rows still count, so a stuck job shows. The server reads it only as `extract(epoch …)::float8`, because `@effect/sql-pg` cannot decode an interval. ADR 0012 has the note from decision 9.
 
 **Tests**
+- Every SECURITY DEFINER function is listed, owned by `asys_lookup`, has a pinned `search_path`, and is not executable by PUBLIC. `asys_lookup`'s column privileges are checked one column at a time.
 - A claim across two owners while no owner is set. This replaces trial test e.
-- Two concurrent claimers never claim the same job.
-- A dedupe move.
-- The age query.
+- Two concurrent claimers never claim the same job: one holds its claim open while the other claims under a 2-second lock timeout.
+- A dedupe move, and a cron that never fires.
+- The age query, relative to a baseline.
 
 ### 3b. Worker, backoff, cron and prune
 
-**`JobRegistry.register(kind, handler)`** is the extension point for add-ons.
+**`JobRegistry.register(kind, handler)`** is the extension point for add-ons. A kind registered twice is a defect.
 
-**The worker** is a polling fiber that claims a batch and runs each job in `withOwner(job.owner)`. That transaction takes the counter lock first (decision 8), and finishes the row only `where run_at = <claimed run_at>`.
+**The worker.** `jobWorkerLayer` forks a polling loop (every 5 seconds) that claims a batch of up to 10 with a 5-minute lease. It runs each job with `runJob` in one `withOwner(job.owner)` transaction:
+1. A local `lock_timeout` of 30 seconds, so one stuck owner cannot stall the batch.
+2. The counter lock (decision 8), then the owner's time zone.
+3. The job row `FOR UPDATE`, rechecked against the database clock. A job moved or finished since the claim is skipped. The claim's lease is cleared, guarded only by the id.
+4. The handler in a savepoint, so its failure rolls back only its own writes.
+5. The finish, guarded by `run_at = <run_at read under the lock>`, so a handler that re-schedules its own job keeps its move.
+
+The handler holds its owner's counter lock while it runs.
+
 - **On success:**
-  - A cron row gets its next `run_at` from `Cron.next`, counted from now, so a run missed during downtime executes once. Its `attempts` resets.
+  - A cron row gets its next `run_at` from `Cron.next`, counted from `max(now, run_at)`, so a run missed during downtime executes once. Its `attempts` resets.
   - Any other row gets `finished_at`.
 - **On failure:**
-  - `run_at` moves by the delay of an Effect `Schedule`: `exponential('1 second')`, jittered, capped by `min` with `spaced('1 hour')`.
-  - The schedule is stepped `attempts` times, with a seedable `Random` for the tests.
-  - After 8 attempts the row is marked `failed` and gets `finished_at`.
+  - `run_at` moves by the delay of an Effect `Schedule`: `exponential('1 second')`, jittered, then capped by `min` with `spaced('1 hour')`. The schedule is stepped `attempts` times through `Schedule.toStep`, and `Random.withSeed` makes it repeatable in tests.
+  - A dedupe move between the claim and the lock leaves `attempts` 0, so the failure counts as attempt 1.
+  - After 8 attempts a one-off row is marked `failed` and gets `finished_at`. A cron row instead moves to its next run with `attempts` 0, so one bad night does not stop it for good. Its failure then shows only in logs and `last_error`.
+  - `last_error` holds tags, never a message: `Fail: ` or `Die: ` plus the error's `_tag` or name, or for an SQL error its reason tag, SQLSTATE and constraint. Drizzle's messages carry query parameters.
+- **Aborted:** a job whose transaction fails outside the savepoint (a lock timeout, a missing counter, a bug) is logged and left as the claim made it. It is retried after its lease without limit, and shows on `/health` as a growing age.
 
-**The `prune` job** is a daily per-owner cron row, added to `createOwner` here. It:
-- deletes `change_log` rows older than 30 days and sets `pruned_through`;
+**The `prune` job** is a daily per-owner cron row at `0 3 * * *` with dedupe key `prune`, scheduled by `createOwner`. It:
+- finds the highest `seq` older than 30 days and deletes the change log up to it, as a contiguous prefix. `created_at` is the transaction start, so seq and `created_at` order can differ by a lock wait;
+- sets `pruned_through = greatest(pruned_through, that seq)`;
 - deletes `idempotency_keys` older than 30 days.
 
 **Tests**
-- The backoff progression.
-- A missed cron run runs once.
+- The backoff progression and its cap, and cron times across both DST changes.
+- A missed cron run runs once, in the owner's time zone.
 - A success resets `attempts`.
-- Prune, then `since()`, gives `Expired`.
-- The worker racing a command that moves the same job does not deadlock.
+- Failure, the last attempt, an unknown kind, a defect in a batch, a skipped job, an aborted job and a stuck owner.
+- Prune, then `since()`, gives `Expired`. Also the prefix rule and the 30-day boundary in both directions.
+- The worker racing a command that moves the same job does not deadlock, whichever takes the counter first.
+
+**Test isolation.** The claim and the age see every owner in the shared dev database.
+- Job tests remove their owners in finalizers.
+- They put their due jobs in a band from 1900, so the jobs sort first.
+- They assert only on their own rows.
 
 **Dropping the trial**
-- One migration drops `trial_items` and `trial_item_owner`: `SET ROLE asys_lookup; DROP FUNCTION …; RESET ROLE;`.
+- One migration drops `trial_items` and `trial_item_owner`: `SET ROLE asys_lookup; DROP FUNCTION …; RESET ROLE;`, then drizzle-kit's `DROP POLICY` and `DROP TABLE`.
 
 ## Piece 4: HTTP API and sign-in (outline)
 
 **Server**
 - The bundled ESM build of decision 6, with `@types/node` ^24.
-- `main.ts` composes `HttpApiBuilder.layer(Api)`, `HttpRouter.serve`, `NodeHttpServer.layer` and the job worker.
+- `main.ts` composes `HttpApiBuilder.layer(Api)`, `HttpRouter.serve`, `NodeHttpServer.layer` and the job worker (`jobWorkerLayer` with `coreJobsLayer` and `JobRegistry.layer`, from piece 3).
+- **Notes from piece 3.**
+  - A job handler holds its owner's counter lock while it runs. A job kind that waits on the network must split its work instead.
+  - Decide how `/health` surfaces a cron job that keeps failing. It moves to its next run, so its age never grows, and it shows only in logs and `last_error`.
+  - Decide whether tests move to a dedicated database. Once the dev server runs a worker, it would claim the tests' due jobs.
 - It reads `Config`: `PORT`, `DATABASE_URL_APP`, `ASYS_PUBLIC_ORIGIN`, `ASYS_RP_ID`, and optionally `ASYS_STATIC_ROOT`.
 
 **The `Auth` middleware**
@@ -655,8 +686,17 @@ These were checked against the installed packages (Effect 4.0.0-rc.117, drizzle-
   - Effect: `catchAll` is now `Effect.catch`.
   - Config: `Config.String`, `Port` and `Redacted`.
   - Services: `Context.Service` replaces `Context.Tag`.
-- **Cron.** `Cron.parse(expr, tz)` and `Cron.next(cron, now)` handle DST.
-- **Schedule.** `Schedule.exponential`, `jittered`, `min`, `spaced` and `upTo`. Jitter before `min`, or the cap is overshot by up to 20%.
+- **Cron** (checked on 2026-10-02 for piece 3).
+  - `Cron.parse(expr, tz)` returns a `Result`, and `Cron.parseUnsafe` throws.
+  - `Cron.next(cron, now)` returns a `Date` strictly after `now`. It throws for an expression that parses but never fires (`0 0 31 2 *`).
+  - A time in the spring gap moves forward, and only the first time of the autumn overlap fires.
+  - Given as a string, a zone that starts with `GMT` (`GMT`, `GMT0`, `GMT+0`) is read as a malformed offset and rejected, although Temporal accepts it. `nextCronRun` passes `DateTime.zoneMakeNamedUnsafe(zone)` instead.
+- **Schedule** (checked on 2026-10-02).
+  - `Schedule.exponential`, `jittered`, `spaced` and `upTo` exist, and `Schedule.min` takes an array.
+  - Jitter before `min`, or the cap is overshot by up to about 19%.
+  - `Schedule.toStep` steps a schedule without sleeping, and returns a `Pull` whose error channel holds `Cause.Done`.
+  - Jitter is 0.8 to 1.2 from the `Random` reference, so `Random.withSeed` makes it repeatable.
+- **Test clock.** Jumping the TestClock far ahead, to a 2026 instant, fires every pending timer of the database pool at once and hangs it. Tests that need a fixed date for code that reads `Clock` provide a fixed `Clock` around that code only.
 - **CLI.** `effect/cli`: `Command.make`, `Flag.String` and `Flag.Int`, `Command.run`, with `NodeServices.layer`.
 
 ### Drizzle
@@ -666,6 +706,11 @@ These were checked against the installed packages (Effect 4.0.0-rc.117, drizzle-
   - A nested `tx.transaction` becomes a savepoint.
   - Statements through `db` or `PgClient` inside the callback join the transaction.
 - **Row locks.** `.for('update', { skipLocked: true })` exists.
+- **Raw queries** (checked on 2026-10-02).
+  - `db.execute(sql)` returns `{ command, rowCount, rows, … }`, and `db.execute(sql, 'objects')` the bare rows.
+  - `@effect/sql-pg` cannot decode an `interval` result column. Read `extract(epoch from …)::float8` instead, which arrives as a number. A raw `bigint` arrives as a JS bigint.
+  - `SET LOCAL` takes no bind parameter; use `set_config(name, value, true)`.
+- **Claim queries.** `UPDATE … FROM (select … limit n for update skip locked)` is planned as a rescanned inner loop and can lock more than `n` rows. A `materialized` CTE does not.
 - **Errors.** A query error is `EffectDrizzleQueryError`. Its `cause` is a `Cause` that holds the `SqlError` (corrected in piece 2), and its message carries the query's parameters. The reasons include `UniqueViolation` (with the violated `constraint`), `ConstraintError`, `LockTimeoutError` and `AuthorizationError`; a reason's own `cause` is the PostgreSQL error with its `code` and `constraint`.
 - **drizzle-kit.**
   - It emits `ENABLE ROW LEVEL SECURITY`, never `FORCE`.

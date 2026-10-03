@@ -10,4 +10,4 @@ Jobs such as Reminders, the Morning briefing, Google polling and push-channel re
 
 ## Consequences
 
-The claim function reads across owners, so like every pre-owner lookup in ADR 0007 it cannot belong to the table-owning role, which FORCE ROW LEVEL SECURITY binds too. It belongs to the lookup role (or a sibling role set up the same way) with only the column privileges it needs: SELECT on the due and owner columns and UPDATE on the claim columns. The worker then runs each claimed job in a transaction that sets that job's owner.
+The claim function reads across owners, so like every pre-owner lookup in ADR 0007 it cannot belong to the table-owning role, which FORCE ROW LEVEL SECURITY binds too. It belongs to the lookup role (or a sibling role set up the same way) with only the column privileges it needs: SELECT on the due and owner columns and UPDATE on the claim columns. The worker then runs each claimed job in a transaction that sets that job's owner. The health endpoint's age of the oldest due job reads across owners too, through a second function owned by the lookup role that returns only an interval, never an owner or a row.
