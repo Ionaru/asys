@@ -1,0 +1,39 @@
+{
+  "name": "effect-passkeys",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/effect-passkeys/src",
+  "projectType": "library",
+  "tags": ["scope:passkeys"],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/effect-passkeys",
+        "main": "libs/effect-passkeys/src/api.ts",
+        "additionalEntryPoints": [
+          "libs/effect-passkeys/src/api.ts",
+          "libs/effect-passkeys/src/server.ts",
+          "libs/effect-passkeys/src/testing.ts"
+        ],
+        "generateExportsField": true,
+        "tsConfig": "libs/effect-passkeys/tsconfig.lib.json",
+        "assets": ["libs/effect-passkeys/*.md", "libs/effect-passkeys/LICENSE"]
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["default", "^default", "{workspaceRoot}/tsconfig.base.json"],
+      "options": {
+        "cwd": "libs/effect-passkeys",
+        "parallel": false,
+        "commands": [
+          "tsc --noEmit -p tsconfig.lib.json",
+          "tsc --noEmit -p tsconfig.spec.json",
+          "tsc --noEmit -p tsconfig.typecheck.json"
+        ]
+      }
+    }
+  }
+}

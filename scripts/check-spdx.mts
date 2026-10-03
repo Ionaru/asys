@@ -30,8 +30,15 @@ const isExempt = (file: string): boolean => {
   return EXEMPT_NAMES.has(name) || name.startsWith('LICENSE.');
 };
 
+// Licence by location; the first matching prefix wins, anything else is EUPL-1.2.
+const LICENCE_BY_PREFIX: ReadonlyArray<readonly [string, string]> = [
+  ['libs/domain/', 'MPL-2.0'],
+  ['libs/contract/', 'MPL-2.0'],
+  ['libs/effect-passkeys/', 'MIT'],
+];
+
 const expectedLicence = (file: string): string =>
-  file.startsWith('libs/domain/') || file.startsWith('libs/contract/') ? 'MPL-2.0' : 'EUPL-1.2';
+  LICENCE_BY_PREFIX.find(([prefix]) => file.startsWith(prefix))?.[1] ?? 'EUPL-1.2';
 
 // REUSE-IgnoreStart
 const TAG_PATTERN = /SPDX-License-Identifier:(.*)/;

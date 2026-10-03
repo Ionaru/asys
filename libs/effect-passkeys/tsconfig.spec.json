@@ -2,11 +2,10 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "../../dist/out-tsc",
-    "module": "esnext",
-    "types": ["node"]
+    "types": ["vitest/globals", "vitest/importMeta", "vite/client", "node", "vitest"],
+    "module": "esnext"
   },
-  "include": ["src/**/*.ts"],
-  "exclude": [
+  "include": [
     "vite.config.ts",
     "vite.config.mts",
     "vitest.config.ts",
@@ -19,7 +18,7 @@
     "src/**/*.spec.js",
     "src/**/*.test.jsx",
     "src/**/*.spec.jsx",
-    "src/**/*.test-d.ts",
-    "src/test/**"
+    "src/**/*.d.ts",
+    "src/**/*.fixture.ts"
   ]
 }

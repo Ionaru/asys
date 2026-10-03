@@ -1,0 +1,47 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "extends": ["../../.oxlintrc.json"],
+  "plugins": ["vitest"],
+  "rules": {
+    "vitest/expect-expect": [
+      "error",
+      {
+        "assertFunctionNames": ["expect", "expectTypeOf", "assert", "assertType"]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["src/api/**", "src/api.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "./server",
+                  "./server/*",
+                  "../server",
+                  "../server/*",
+                  "./testing",
+                  "./testing/*",
+                  "../testing",
+                  "../testing/*",
+                  "@simplewebauthn/**",
+                  "node:*",
+                  "crypto",
+                  "buffer",
+                  "fs",
+                  "path",
+                  "stream"
+                ],
+                "message": "The api entry is shared with browsers: no server, testing or Node imports."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

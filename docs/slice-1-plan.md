@@ -132,8 +132,15 @@ Every per-owner write transaction takes the owner's `change_counters` row `FOR U
   - This is safe because the migrator selects migrations by name, not by hash.
   - Newly generated migrations get the header right after generation.
 - **Exempt:** JSON, lockfiles, `LICENSE*`, `.gitkeep` and binary assets.
-- **Licence by location:** `EUPL-1.2` everywhere, and `MPL-2.0` under `libs/domain` and `libs/contract`.
+- **Licence by location:** `EUPL-1.2` everywhere, `MPL-2.0` under `libs/domain` and `libs/contract`, and `MIT` under `libs/effect-passkeys` (added 2026-10-03, ADR 0011).
 - **REUSE.** Added 2026-10-01: the repository follows REUSE 3.3. The header stays the identifier line alone. A root `REUSE.toml` supplies every file's copyright notice and the licence of the exempt files, the licence texts are also kept in `LICENSES/`, and `reuse lint` runs in CI next to `scripts/check-spdx.mts`.
+
+### 11. Dependencies come from JSR when they are published there
+
+Decided 2026-10-03.
+- **How.** `pnpm add jsr:@scope/name@x.y.z` writes `"@scope/name": "jsr:x.y.z"`; the package installs under its own name from `npm.jsr.io`.
+- **Today.** Only `@simplewebauthn/server` (and in piece 5 `@simplewebauthn/browser`) comes from JSR. `effect`, `@effect/*`, `drizzle-orm`, `drizzle-kit`, `temporal-polyfill` and `fast-check` are not on JSR (checked 2026-10-03).
+- **Costs.** A JSR build is ESM only and has no `license` field; `pnpm licenses list` reads the licence from its LICENSE file, so the allowlist check still works. `pnpm audit` looks a JSR package up under its `@jsr/` name and cannot see its advisories. That gap is accepted and listed under the known limits of piece 4.
 
 ## The pieces
 

@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../../dist/out-tsc",
+    "noEmit": true,
+    "types": ["node", "vitest"],
+    "module": "esnext"
+  },
+  "include": ["src/**/*.test-d.ts"]
+}

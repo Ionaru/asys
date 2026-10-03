@@ -17,7 +17,10 @@
     "paths": {
       "@asys/domain": ["./libs/domain/src/index.ts"],
       "effect/unstable/sql/SqlError": ["./node_modules/effect/dist/sql/SqlError.d.ts"],
-      "@asys/contract": ["./libs/contract/src/index.ts"]
+      "@asys/contract": ["./libs/contract/src/index.ts"],
+      "@ionaru/effect-passkeys/api": ["./libs/effect-passkeys/src/api.ts"],
+      "@ionaru/effect-passkeys/server": ["./libs/effect-passkeys/src/server.ts"],
+      "@ionaru/effect-passkeys/testing": ["./libs/effect-passkeys/src/testing.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

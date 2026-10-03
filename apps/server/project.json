@@ -12,27 +12,21 @@
       "options": {
         "platform": "node",
         "outputPath": "dist/apps/server",
-        "format": ["cjs"],
-        "bundle": false,
+        "format": ["esm"],
+        "bundle": true,
         "main": "apps/server/src/main.ts",
         "tsConfig": "apps/server/tsconfig.app.json",
         "assets": ["apps/server/src/assets"],
         "generatePackageJson": true,
         "esbuildOptions": {
-          "sourcemap": true,
-          "outExtension": {
-            ".js": ".js"
-          }
+          "sourcemap": true
         }
       },
       "configurations": {
         "development": {},
         "production": {
           "esbuildOptions": {
-            "sourcemap": false,
-            "outExtension": {
-              ".js": ".js"
-            }
+            "sourcemap": false
           }
         }
       }
@@ -81,7 +75,8 @@
       "dependsOn": ["build"],
       "options": {
         "buildTarget": "server:build",
-        "runBuildTargetDependencies": false
+        "runBuildTargetDependencies": false,
+        "args": ["serve"]
       },
       "configurations": {
         "development": {

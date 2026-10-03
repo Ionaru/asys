@@ -6,10 +6,11 @@ import { lockCounter } from '../changes/change-log';
 import { Db } from '../db/database';
 import { jobs, settings } from '../db/schema';
 import { withOwner } from '../db/with-owner';
+import { describeError } from '../logging/describe-error';
 import { MAX_ATTEMPTS, retryDelay } from './backoff';
 import { claimJobs, type ClaimedJob } from './claim';
 import { nextCronRun } from './cron';
-import { describeJobError, UnknownJobKind } from './job-error';
+import { UnknownJobKind } from './job-error';
 import { JobRegistry } from './registry';
 
 /** What happened to a claimed job in one run. */
@@ -103,7 +104,7 @@ const body = (claimed: ClaimedJob, lockTimeout: Duration.Input) =>
       return JobOutcome.Succeeded;
     }
 
-    const lastError = describeJobError(exit.cause);
+    const lastError = describeError(exit.cause);
     const attempts = Math.max(row.attempts, 1);
     if (attempts < MAX_ATTEMPTS) {
       const delay = yield* retryDelay(attempts);
@@ -132,7 +133,7 @@ const body = (claimed: ClaimedJob, lockTimeout: Duration.Input) =>
  * then finishes a one-off job or reschedules a cron job on success, and on failure
  * retries with backoff until `MAX_ATTEMPTS`. Every update is guarded by the `run_at`
  * read under the lock, so a handler that moved its own job keeps its move. The error is
- * stored as `describeJobError` gives it, never as a message. A lock wait longer than
+ * stored as `describeError` gives it, never as a message. A lock wait longer than
  * `lockTimeout` (30 seconds by default) is a defect.
  */
 export const runJob = (claimed: ClaimedJob, options?: { readonly lockTimeout?: Duration.Input }) =>
@@ -158,7 +159,7 @@ export const runDueJobs = (options?: {
     for (const job of claimed) {
       const outcome = yield* runJob(job, { lockTimeout: options?.lockTimeout }).pipe(
         Effect.catchCause((cause) =>
-          Effect.logWarning(`Job ${job.id} aborted: ${describeJobError(cause)}`).pipe(
+          Effect.logWarning(`Job ${job.id} aborted: ${describeError(cause)}`).pipe(
             Effect.as(JobOutcome.Aborted),
           ),
         ),
@@ -181,9 +182,7 @@ export const jobWorkerLayer = (options?: {
   Layer.effectDiscard(
     Effect.forkScoped(
       runDueJobs(options).pipe(
-        Effect.catchCause((cause) =>
-          Effect.logWarning(`Job poll failed: ${describeJobError(cause)}`),
-        ),
+        Effect.catchCause((cause) => Effect.logWarning(`Job poll failed: ${describeError(cause)}`)),
         Effect.repeat(Schedule.spaced(options?.interval ?? '5 seconds')),
       ),
     ),

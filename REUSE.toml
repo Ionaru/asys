@@ -9,3 +9,8 @@ SPDX-License-Identifier = "EUPL-1.2"
 path = ["libs/domain/**", "libs/contract/**"]
 SPDX-FileCopyrightText = "2026 Jeroen Akkerman"
 SPDX-License-Identifier = "MPL-2.0"
+
+[[annotations]]
+path = "libs/effect-passkeys/**"
+SPDX-FileCopyrightText = "2026 Jeroen Akkerman"
+SPDX-License-Identifier = "MIT"

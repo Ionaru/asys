@@ -16,5 +16,23 @@
         ]
       }
     ]
-  }
+  },
+  "overrides": [
+    {
+      "files": ["src/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@ionaru/effect-passkeys/server", "@ionaru/effect-passkeys/testing"],
+                "message": "The contract reaches browsers: import only the api entry of @ionaru/effect-passkeys."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }

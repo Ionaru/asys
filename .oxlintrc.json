@@ -44,8 +44,19 @@
             ]
           },
           {
+            "sourceTag": "scope:passkeys",
+            "onlyDependOnLibsWithTags": ["scope:passkeys"],
+            "bannedExternalImports": [
+              "drizzle-orm",
+              "drizzle-orm/*",
+              "@effect/sql-pg",
+              "@effect/platform-node*",
+              "@angular/*"
+            ]
+          },
+          {
             "sourceTag": "scope:contract",
-            "onlyDependOnLibsWithTags": ["scope:domain", "scope:contract"],
+            "onlyDependOnLibsWithTags": ["scope:domain", "scope:contract", "scope:passkeys"],
             "bannedExternalImports": [
               "drizzle-orm",
               "drizzle-orm/*",
@@ -56,13 +67,19 @@
           },
           {
             "sourceTag": "scope:server",
-            "onlyDependOnLibsWithTags": ["scope:domain", "scope:contract", "scope:server"]
+            "onlyDependOnLibsWithTags": [
+              "scope:domain",
+              "scope:contract",
+              "scope:passkeys",
+              "scope:server"
+            ]
           },
           {
             "sourceTag": "scope:pwa",
             "onlyDependOnLibsWithTags": [
               "scope:domain",
               "scope:contract",
+              "scope:passkeys",
               "scope:design",
               "scope:pwa"
             ]
@@ -75,6 +92,24 @@
       }
     ]
   },
+  "overrides": [
+    {
+      "files": ["apps/pwa/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@ionaru/effect-passkeys/server", "@ionaru/effect-passkeys/testing"],
+                "message": "Only the api entry of @ionaru/effect-passkeys may reach a browser bundle."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
   "env": {
     "builtin": true
   }

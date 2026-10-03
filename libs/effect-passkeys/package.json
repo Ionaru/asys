@@ -1,0 +1,14 @@
+{
+  "name": "@ionaru/effect-passkeys",
+  "version": "0.0.1",
+  "private": true,
+  "license": "MIT",
+  "type": "commonjs",
+  "main": "./src/api.js",
+  "types": "./src/api.d.ts",
+  "dependencies": {
+    "@simplewebauthn/server": "jsr:14.0.3",
+    "effect": "4.0.0",
+    "tslib": "^2.3.0"
+  }
+}
