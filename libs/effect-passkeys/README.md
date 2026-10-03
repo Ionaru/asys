@@ -4,17 +4,26 @@
 
 Passkey (WebAuthn) sign-in for [Effect](https://effect.website) `HttpApi` servers, modelled on [fresh-passkeys](https://github.com/Ionaru/fresh-passkeys). The library owns the parts that must be exactly right: the WebAuthn ceremonies, the challenges, the signature counters and the passkey endpoints. The host owns everything specific to it: users, sessions, storage and the shape of its responses. The two meet through a storage port, a unit of work and a few hooks.
 
-WebAuthn itself is done by [SimpleWebAuthn](https://simplewebauthn.dev) (`@simplewebauthn/server`, installed from JSR).
+WebAuthn itself is done by [SimpleWebAuthn](https://simplewebauthn.dev): `@simplewebauthn/server` for the server entries and `@simplewebauthn/browser` for `/client`, both installed from JSR.
 
 ## Entries
 
-| Import                            | Contents                                                                                                            | Runs in                                          |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| `@ionaru/effect-passkeys/api`     | the errors, the schemas and `makePasskeyGroup`, which builds the passkey `HttpApiGroup`                             | servers and browsers (only `effect` is imported) |
-| `@ionaru/effect-passkeys/server`  | the services the host provides or implements, the ceremony Effects, `makePasskeyHandlers` and `passkeyRouterConfig` | servers                                          |
-| `@ionaru/effect-passkeys/testing` | a software authenticator that produces real, verifiable responses, an in-memory store and a recording unit of work  | tests (uses `node:crypto`)                       |
+| Import                            | Contents                                                                                                                           | Runs in                                               |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `@ionaru/effect-passkeys/api`     | the errors, the schemas and `makePasskeyGroup`, which builds the passkey `HttpApiGroup`                                            | servers and browsers (only `effect` is imported)      |
+| `@ionaru/effect-passkeys/server`  | the services the host provides or implements, the ceremony Effects, `makePasskeyHandlers` and `passkeyRouterConfig`                | servers                                               |
+| `@ionaru/effect-passkeys/client`  | `createPasskey`, `usePasskey`, `passkeysSupported`, `toPasskeyFailure`, `PasskeyFailure`, `CeremonyResult` and `CeremonyResultTag` | browsers (only `@simplewebauthn/browser` is imported) |
+| `@ionaru/effect-passkeys/testing` | a software authenticator that produces real, verifiable responses, an in-memory store and a recording unit of work                 | tests (uses `node:crypto`)                            |
 
-A browser client entry (`/client`) follows when the ASYS PWA needs it.
+The `/client` entry wraps `@simplewebauthn/browser` for the WebAuthn ceremonies in the browser. `createPasskey` and `usePasskey` never reject: they resolve a `CeremonyResult`, either `Ok` with the `response` or `Failed` with a `PasskeyFailure` and the original `cause`. The entry is transport-agnostic: the host does the HTTP itself, hands the `options` of a begin answer to the ceremony and sends its `response` back with the `challengeId`. A `PasskeyFailure` is one of:
+
+- `cancelled`: the person dismissed the prompt, or the ceremony timed out or was aborted.
+- `already_registered`: the authenticator already holds a credential for this account.
+- `unsupported`: the browser or authenticator lacks a required capability.
+- `misconfigured`: the options are wrong, such as an invalid relying party id or user id.
+- `failed`: anything else.
+
+The entry is typechecked and tested but not emitted by `build` until the library is published.
 
 ## The endpoints
 

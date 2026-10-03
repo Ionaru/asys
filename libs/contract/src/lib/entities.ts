@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MPL-2.0
 
-import { IsoWeekday, Privacy, TaskKind, TaskStatus, Voice } from '@asys/domain';
+import { IsoWeekday } from '@asys/domain';
 import { Schema } from 'effect';
+import { PrivacySchema, TaskKindSchema, TaskStatusSchema, VoiceSchema } from './enums';
 import { DateSpecSchema, InstantSchema, TextSchema, UuidSchema } from './primitives';
 
-export const MinuteIntervalSchema = Schema.Tuple([Schema.Finite, Schema.Finite]);
+export const MinuteIntervalSchema = Schema.Tuple([Schema.Finite, Schema.Finite]).annotate({
+  identifier: 'MinuteInterval',
+});
 
 /**
  * A Struct with the seven numeric weekday keys: Schema.Record over an Enum throws at module load.
@@ -18,12 +21,12 @@ export const ActiveHoursSchema = Schema.Struct({
   [IsoWeekday.Friday]: Schema.Array(MinuteIntervalSchema),
   [IsoWeekday.Saturday]: Schema.Array(MinuteIntervalSchema),
   [IsoWeekday.Sunday]: Schema.Array(MinuteIntervalSchema),
-});
+}).annotate({ identifier: 'ActiveHours' });
 
 export const TaskSchema = Schema.Struct({
   id: UuidSchema,
-  kind: Schema.Enum(TaskKind),
-  status: Schema.Enum(TaskStatus),
+  kind: TaskKindSchema,
+  status: TaskStatusSchema,
   title: TextSchema,
   notes: TextSchema,
   captureText: TextSchema,
@@ -32,33 +35,33 @@ export const TaskSchema = Schema.Struct({
   due: Schema.NullOr(DateSpecSchema),
   estimateMinutes: Schema.NullOr(Schema.Int),
   important: Schema.NullOr(Schema.Boolean),
-  voice: Schema.NullOr(Schema.Enum(Voice)),
-  privacy: Schema.NullOr(Schema.Enum(Privacy)),
+  voice: Schema.NullOr(VoiceSchema),
+  privacy: Schema.NullOr(PrivacySchema),
   dueMoveCount: Schema.Int,
   version: Schema.Int,
   createdAt: InstantSchema,
   closedAt: Schema.NullOr(InstantSchema),
-});
+}).annotate({ identifier: 'Task' });
 
 export const BlockerLinkSchema = Schema.Struct({
   id: UuidSchema,
   taskId: UuidSchema,
   blockerId: UuidSchema,
-});
+}).annotate({ identifier: 'BlockerLink' });
 
 export const AreaSchema = Schema.Struct({
   id: UuidSchema,
   name: TextSchema,
   activeHours: ActiveHoursSchema,
-  defaultPrivacy: Schema.NullOr(Schema.Enum(Privacy)),
+  defaultPrivacy: Schema.NullOr(PrivacySchema),
   version: Schema.Int,
-});
+}).annotate({ identifier: 'Area' });
 
 /** The subject id is Text, not UUID, so later Review item kinds can reference other ids. */
 export const ReviewSubjectSchema = Schema.Struct({
   type: TextSchema,
   id: TextSchema,
-});
+}).annotate({ identifier: 'ReviewSubject' });
 
 export const ReviewItemSchema = Schema.Struct({
   id: UuidSchema,
@@ -68,9 +71,9 @@ export const ReviewItemSchema = Schema.Struct({
   dedupeKey: Schema.NullOr(TextSchema),
   createdAt: InstantSchema,
   resolvedAt: Schema.NullOr(InstantSchema),
-});
+}).annotate({ identifier: 'ReviewItem' });
 
 export const SettingsSchema = Schema.Struct({
   timeZone: TextSchema,
   urgencyWindowDays: Schema.Int,
-});
+}).annotate({ identifier: 'Settings' });

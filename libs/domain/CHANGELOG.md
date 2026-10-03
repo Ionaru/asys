@@ -4,6 +4,27 @@
 
 `RULES_VERSION` in `src/lib/rules-version.ts` names the rules a front-end derives its values with. Any change to a rule is at least a minor version (ADR 0003).
 
+## 0.2.0 (2026-10-03)
+
+The working set and how change-log entries apply to it, and the Inbox count.
+
+### The working set
+
+- The working set is what the snapshot returns: the Open and Delegated Tasks, the blocker links of those Tasks, all Areas, the unresolved Review items and the Settings.
+- Change entries apply in list order, and each sees the result of the previous one.
+- A Task put with status Open or Delegated is appended, or replaces the Task with the same id in place.
+- A Task put with status Done, Dropped or Skipped removes the Task and the blocker links it owns. Links that name it as their blocker stay.
+- A blocker put is kept only while its Task is Open or Delegated in the working set at that point, and is upserted by id. Otherwise it is ignored. The blocker Task need not be in the set.
+- A blocker remove drops the link with that id, if any.
+- An Area put is upserted by id.
+- A Review item put is upserted by id while unresolved, and removes the item once it is resolved.
+- A Settings put replaces the Settings unless the time zone and urgency window are unchanged.
+- A list of entries that changes nothing returns the same state, and any part of the state that no entry changed keeps its identity.
+
+### Inbox count
+
+- The **Inbox count** is the number of Tasks in the Inbox plus the number of unresolved Review items.
+
 ## 0.1.0 (2026-10-01)
 
 The first rules: the time model, Areas and Active hours, the derived state of a Task, the Picker, and the Task-loop commands of Slice 1.

@@ -20,7 +20,11 @@
             "input": "apps/pwa/public"
           }
         ],
-        "styles": ["apps/pwa/src/styles.css"]
+        "styles": [
+          "libs/design-tokens/css/fonts.css",
+          "dist/libs/design-tokens/css/tokens.css",
+          "apps/pwa/src/styles.css"
+        ]
       },
       "configurations": {
         "production": {
@@ -36,14 +40,34 @@
               "maximumError": "8kb"
             }
           ],
-          "outputHashing": "all"
+          "optimization": {
+            "scripts": true,
+            "styles": {
+              "minify": true,
+              "inlineCritical": false
+            },
+            "fonts": true
+          },
+          "outputHashing": "all",
+          "serviceWorker": "apps/pwa/ngsw-config.json"
         },
         "development": {
           "optimization": false,
           "extractLicenses": false,
           "sourceMap": true
         }
-      }
+      },
+      "dependsOn": ["^build", "api-client", "design-tokens:css"],
+      "inputs": [
+        "production",
+        "^production",
+        {
+          "dependentTasksOutputFiles": "**/*.ts"
+        },
+        {
+          "dependentTasksOutputFiles": "**/*.css"
+        }
+      ]
     },
     "serve": {
       "continuous": true,
@@ -56,26 +80,77 @@
         "development": {
           "buildTarget": "pwa:build:development"
         }
-      }
-    },
-    "serve-static": {
-      "continuous": true,
-      "executor": "@nx/web:file-server",
+      },
+      "dependsOn": ["api-client", "design-tokens:css"],
       "options": {
-        "buildTarget": "pwa:build",
-        "staticFilePath": "dist/apps/pwa/browser",
-        "spa": true
+        "proxyConfig": "apps/pwa/proxy.conf.json"
       }
     },
     "typecheck": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["default", "^default", "{workspaceRoot}/tsconfig.base.json"],
+      "inputs": [
+        "default",
+        "^default",
+        "{workspaceRoot}/tsconfig.base.json",
+        {
+          "dependentTasksOutputFiles": "**/*.ts"
+        }
+      ],
       "options": {
         "cwd": "apps/pwa",
         "parallel": false,
-        "commands": ["tsc --noEmit -p tsconfig.app.json"]
+        "commands": ["tsc --noEmit -p tsconfig.app.json", "tsc --noEmit -p tsconfig.spec.json"]
+      },
+      "dependsOn": ["api-client"]
+    },
+    "api-client": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["server:openapi"],
+      "inputs": [
+        "{projectRoot}/ng-openapi-gen.json",
+        {
+          "dependentTasksOutputFiles": "**/openapi.json"
+        },
+        {
+          "externalDependencies": ["ng-openapi-gen"]
+        }
+      ],
+      "outputs": ["{projectRoot}/src/generated/api"],
+      "options": {
+        "command": "ng-openapi-gen -c apps/pwa/ng-openapi-gen.json"
+      }
+    },
+    "serve-sw": {
+      "executor": "nx:run-commands",
+      "continuous": true,
+      "dependsOn": ["build"],
+      "options": {
+        "command": "node scripts/serve-pwa.mts"
+      }
+    },
+    "test": {
+      "executor": "@angular/build:unit-test",
+      "cache": true,
+      "dependsOn": ["api-client", "design-tokens:css"],
+      "inputs": [
+        "default",
+        "^production",
+        {
+          "dependentTasksOutputFiles": "**/*.ts"
+        },
+        {
+          "dependentTasksOutputFiles": "**/*.css"
+        }
+      ],
+      "options": {
+        "buildTarget": "pwa:build:development",
+        "runner": "vitest",
+        "watch": false,
+        "tsConfig": "apps/pwa/tsconfig.spec.json"
       }
     }
-  }
+  },
+  "implicitDependencies": ["design-tokens"]
 }

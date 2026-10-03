@@ -57,7 +57,7 @@ Decided 2026-09-30. Each rule is still written test-first in `libs/domain` befor
 
 ### 4. Rule defaults the scenarios leave open
 
-These are logged in `libs/domain/CHANGELOG.md` under `RULES_VERSION` 0.1.0.
+These are logged in `libs/domain/CHANGELOG.md` under `RULES_VERSION` 0.1.0; later versions add to them there.
 
 **Dates and deadlines**
 - **Due instant.** A timed Due resolves to its time. A date-only Due resolves to the last millisecond of its day, which is the next local day's 00:00 minus 1 ms.
@@ -213,7 +213,7 @@ area/        active-hours.ts (ActiveHours: per ISO weekday, a list of [startMinu
 task/        task.ts (types), inbox.ts, blocked.ts (BlockedReason union), available.ts, deadlines.ts (isOverdue, effectiveDue, latestStart), priority.ts (isUrgent, quadrant)
 picker/      picker.ts (pick returns { ranked, waiting }; Reason; an open ExclusionReason union), reason-text.ts
 commands/    command.ts (TransitionResult: applied{changes}, notApplicable{reason} or rejected{reason}; Change: {entity, op: 'put' or 'remove', after}), task-, blocker-, area-, settings- and review-commands.ts
-rules-version.ts   RULES_VERSION = '0.1.0', with libs/domain/CHANGELOG.md
+rules-version.ts   RULES_VERSION (0.1.0 in piece 1), with libs/domain/CHANGELOG.md
 ```
 
 **`Task`**
@@ -674,38 +674,56 @@ Re-planned and built on 2026-10-03, in two commits: the passkey library (4a), th
 
 **Later work.** Publishing `@ionaru/effect-passkeys` on JSR needs a `jsr.json`, `npm:` import mappings, and a check of extensionless imports and slow types (`--allow-slow-types` is likely).
 
-## Piece 5: PWA shell and data client (outline)
+## Piece 5: PWA shell and data client
 
-**Service worker and manifest**
-- `@angular/service-worker` 22.1.x, added with `@schematics/angular:service-worker`. Running it through `nx g` is unverified; the fallback is to set it up by hand.
-- `ngsw-config.json` excludes `/v1/**` from `navigationUrls`.
-- A hand-written `manifest.webmanifest` with icons and a GET `share_target` to `/capture?title&text&url`.
+Re-planned and built on 2026-10-03. Ten probes ran first, and their facts are listed under "Facts checked on 2026-10-03 (piece 5)"; an adversarial review of the unit contracts followed, and its confirmed findings are folded in.
 
-**Dev setup**
-- `proxy.conf.json` sends `/v1` to the server.
-- In development the RP ID is `localhost` and the origin `http://localhost:4200`.
+**The API client**
+- **ng-openapi-gen 1.1.0** generates the Angular client from `dist/apps/server/openapi.json` into `apps/pwa/src/generated/api`, which is gitignored and rebuilt by the cached `pwa:api-client` target (`dependsOn: server:openapi`). Its config is `apps/pwa/ng-openapi-gen.json`, run from the workspace root.
+- **Why not Effect in the browser.** Bundled with esbuild, minified and gzipped:
 
-**The data client** is one signal store. It:
-- loads the snapshot;
-- polls `changes` on an interval and on focus;
-- reloads on 410;
-- sends commands with `crypto.randomUUID()` keys;
-- derives Now through `@asys/domain`.
+  | What is bundled | Minified | Gzipped |
+  |---|---|---|
+  | `pick` and `temporal-polyfill` (needed anyway) | 63 kB | 22 kB |
+  | Adding the contract schemas | +190 kB | +55 kB |
+  | Adding Effect `HttpApiClient` instead | +390 kB | +120 kB |
 
-**Screens**
-- Sign-up: name, then a passkey, then the recovery codes, shown once.
-- Sign-in.
-- Recovery sign-in, followed by a prompt to add a passkey.
+  So the PWA never imports `@asys/contract`, `@ionaru/effect-passkeys/api` or `effect` at runtime; oxlint forbids it in `apps/pwa`. Server responses are trusted, because the server encodes them with the contract schemas. ADR 0004 wants queued commands validated against those schemas in Slice 4: that needs a lazy-loaded chunk or an ADR change then.
+- **Named models.** The contract's schemas carry Effect `identifier` annotations (`Task`, `Snapshot`, `Command` and its 13 `<Tag>Command` members, `CommandResult`, the six `ChangeEntry` members, the enums, and the passkey library's `RegistrationResponse`, `AuthenticationResponse` and `PasskeyChallenge`), so they become OpenAPI components. Each enum is one shared schema in `libs/contract/src/lib/enums.ts`, and `UuidSchema` checks lower case with a plain filter, because `Schema.isLowercased()` adds an `allOf` that the generator turns into `any`.
+- **One boundary.** `apps/pwa/src/app/core/api` is the only place that imports the generated code: functions by their own file (a barrel import would bundle every operation), models type-only. `wire.ts` holds a compile-time guard: `Wire<T>` maps enums to their literal values, drops `readonly` and maps `any` to `unknown`, and `SHAPES` requires `Equals<Wire<Generated>, Wire<Domain>>` for the Task, the Snapshot parts, every ChangeEntry and Command member, the command result and Me, so contract drift fails `pwa:typecheck`. `ReviewItem.payload` is unchecked by design.
+- **Services.** `DataApi` (snapshot, changes, runCommand) and `AuthApi` (one method per auth operation) return promises that never reject. Command outcomes are `Applied`, `NotApplicable`, `Rejected`, `KeyReused`, `SignedOut` or `Failed { status }`; auth errors map on the body's `_tag`, never on the status alone.
 
-**Time zone.** The PWA reports the device time zone when it differs from the server's.
+**The 401 rule.** A 401 means signed out only when its body is `{ "_tag": "Unauthorized" }`, or when it is the body-less 401 of a passkey add or remove whose session was revoked. `SignInFailed` and `PasskeyVerificationFailed` are 401s that mean no such thing. An HTTP interceptor applies the rule and passes every error on unchanged.
 
-**Notes from piece 4**
-- The passkey library gains its `/client` entry, with `@simplewebauthn/browser` 14.0.0 from JSR.
-- Try a real passkey in a browser, and try the `__Host-` cookie over `http://localhost` in Chrome.
-- The dev origin is `http://localhost:4200`, and the proxy must keep the `Origin` header, or the Origin guard answers 403.
-- After a recovery sign-in, prompt the User to add a passkey and remove the lost ones.
+**Session and routes.** `Session` asks `GET /v1/auth/me` at startup without blocking it, with a 10 s timeout: SignedIn, SignedOut, or Unreachable (a late answer still applies). `signedInGuard` admits SignedIn and Unreachable and sends SignedOut visitors to `/signin?returnUrl=…`; `signedOutGuard` sends SignedIn visitors to `/now`, except on `/signup`. `safeReturnUrl` accepts only same-origin paths that are not sign-in screens.
 
-**Testing.** There are no PWA unit tests (ADR 0010). It is checked end to end in a browser.
+**The data store.** One `DataStore` with plain signals loads the snapshot, polls `changes` every 15 s while the app is visible and at once on focus, visibility, `online`, `refresh()` and every applied command, with one request in flight at a time and exactly one follow-up. A 410 `ChangesExpired` reloads the snapshot; other failures leave the data and show it as Stale. `stop()` bumps a generation, and every late response of an older generation is dropped. Now is `pick` over the working set and a minute clock; the Inbox count is `inboxCount`. Only the shell starts and stops the store: start on SignedIn, stop on SignedOut, nothing on Unreachable.
+
+**Working-set rules in the domain.** `applyChanges` and `inboxCount` are in `libs/domain/src/lib/working-set`, for Slice 4's offline store too, and `RULES_VERSION` is 0.2.0.
+
+**Time zone.** At sign-up the device zone is sent when it is at most 64 characters and `Intl.supportedValuesOf('timeZone')` contains it, otherwise `UTC`. Afterwards `zoneToReport(device, server, last)` decides whether to send `SetTimeZone`: it reports a device zone that differs from the server's unless this device already reported that zone, so two devices in different zones do not flip it back and forth. The last reported zone is kept in `localStorage["asys.timeZone.lastReported"]` and cleared on every sign-in and sign-out.
+
+**Passkeys in the browser.** `@ionaru/effect-passkeys/client` wraps `@simplewebauthn/browser` 14.0.0 (from JSR): `createPasskey` and `usePasskey` never reject and map errors to `PasskeyFailure` (`Cancelled`, `AlreadyRegistered`, `Unsupported`, `Misconfigured`, `Failed`). The entry is typechecked (`tsconfig.client.json`) and tested but not emitted by `build` until the library is published. The PWA does the HTTP itself.
+
+**Screens.** Sign-up (name, then a separate "Create passkey" tap, then the recovery codes once; the token is read once from the fragment and replaced out of the address bar), sign-in with a passkey, recovery sign-in, the "add a passkey now" page after it, the account screen (passkeys, recovery codes, sign out), and a minimal Now (ranked titles with their reasons, and Waiting). Today, Inbox and `/capture` (which shows what was shared) are placeholders for piece 6. Passkey begin options are refetched after every failed attempt, at 4 minutes old, and on visibility or `online` once that old, because the server takes each challenge once and keeps it 5 minutes.
+
+**Design system.** The design tokens become `dist/libs/design-tokens/css/tokens.css` through Terrazzo (ADR 0013), and the fonts are bundled (ADR 0011). Button, TextField (a Signal Forms control), BottomNav and SectionHeader are ported from the design system's `bundle.css` with their `asys-` classes and token-only CSS. BottomNav takes its current item from the router (`routerLinkActive` with `ariaCurrentWhenActive`), not from the README's `current` input and `(navigate)` output. `data-theme` is always set on `<html>` and `asys-root` sits on `<body>`; only Evergreen and the System theme exist until the appearance settings. Motion is 150 ms and switched off under `prefers-reduced-motion` and in Voice only.
+
+**Service worker and manifest.** `@angular/service-worker` in production, registered when stable (30 s at most). `ngsw-config.json` lists the default navigation URLs plus `!/v1/**` and `!/health`, and has no data groups, so the API is never cached. A new version shows "A new version of ASYS is ready." with Reload, held back while recovery codes are on screen. The manifest starts at `/now` and has a GET share target to `/capture`; the icon is a marked placeholder until the final artwork.
+
+**Tests.** `pwa:test` runs `@angular/build:unit-test` on Vitest 5 with jsdom (ADR 0010's consequence is amended). The builder refuses `vi.mock` of relative imports, so every seam (`PasskeyCeremony`, `DeviceStorage`, `DeviceZone`, `Clock`, `PageReload`) is a service that TestBed overrides.
+
+**Dev setup.** See the README: `nx serve pwa` with a proxy that keeps `Origin` and the cookie, `pwa:serve-sw` for a real service-worker run on port 4200, and `http://localhost:4200` only.
+
+**Known limits**
+- A cached old PWA can talk to a newer server until Slice 4's rules-version check; the update prompt narrows this.
+- `animate.enter` and `animate.leave` do nothing in jsdom, so the unit tests cannot show that `animation: none` removes an element at once; that is checked in a browser.
+- `pwa:typecheck` is plain `tsc` and does not check templates; `pwa:build` and `pwa:test` do.
+- Validating all 12 token contexts and the typography references in the token build stays open (ADR 0013).
+- The reason line ("start by 2026-10-03 14:30") differs from the design system's reason style; piece 6 settles it.
+- Safari cannot keep the `__Host-` cookie on `http://localhost` (development only), and its passkey activation timing is untested.
+- `pnpm audit` cannot see advisories for `@simplewebauthn/browser` from JSR, as for the server package.
+- The variable fonts are 126 kB together, larger than a Latin subset would be.
 
 ## Piece 6: PWA Task screens (outline)
 
@@ -857,3 +875,56 @@ Checked against effect 4.0.0, @effect/platform-node 4.0.0, drizzle-orm 1.0.0-rc.
   - The lockfile aliases a JSR package to `@jsr/<scope>__<name>`.
   - Nx treats it as an npm alias: `@nx/esbuild` keeps it external, and `generatePackageJson` writes `npm:@jsr/…`, which a frozen install resolves.
   - `pnpm audit` queries the `@jsr/` name, under which no advisories are filed.
+
+## Facts checked on 2026-10-03 (piece 5)
+
+Checked against Angular 22.2.1, Nx 23.2.1, Effect 4.0.0, ng-openapi-gen 1.1.0, Terrazzo 2.7.1, Vitest 5.0.2 with jsdom 30.1.1, oxlint 1.85.0 and SimpleWebAuthn browser 14.0.0 from JSR, by running probes in throwaway worktrees.
+
+- **OpenAPI names from Effect.**
+  - The `identifier` annotation names a component; a schema without one is inlined. Structs, tuples, unions and enums keep the bare name; error classes are named `<Name>Encoded`.
+  - Two schema instances with the same identifier become `X` and `X_1`, and so does re-annotating a named schema: `HttpApiSchema.status(201)` re-annotates, which is why the passkey list item stays unnamed.
+  - `Schema.TaggedUnion` cannot name its members; a `Schema.Union` of annotated `TaggedStruct`s with `Schema.toTaggedUnion('_tag')` can.
+  - `Schema.Enum` is emitted as an `anyOf` with a title per value, so ng-openapi-gen's `enumStyle: "upper"` has no effect and the generated enums are string-literal unions.
+- **ng-openapi-gen 1.1.0.**
+  - `input` and `output` resolve against the working directory. Dotted operation ids become `fn/<group>/<group>-<op>.ts` functions such as `dataSnapshot`.
+  - Every function module has a top-level `fn.PATH = …` side effect, so importing through the barrel bundles every operation; importing each function from its own file tree-shakes.
+  - A query `Schema.Int` is generated as a string parameter. `{}` (an open schema) becomes `any`, `prefixItems` a tuple, `{type: 'null'}` a nullable union.
+  - The two operations without a success body use `responseType: 'text'`, so their error bodies reach the caller as JSON strings.
+- **Nx caching.** A `dependentTasksOutputFiles` input matches only the outputs of DIRECT dependencies unless `transitive: true`: `pwa:typecheck` hashes the generated client with `**/*.ts` (`**/openapi.json` there matched nothing and gave a stale cached green after a contract change). A required new contract field fails `server:build` before the PWA guard sees it; an optional one reaches the guard.
+- **Angular 22.2.1.**
+  - Zoneless and OnPush are the defaults; fetch is the default HTTP backend (`withFetch` is deprecated).
+  - `@Service()` means `providedIn: 'root'` by default, and TestBed overrides it like any provider.
+  - Signal Forms are stable in `@angular/forms/signals`. A `FormValueControl` gets `errors` before any touch and reports a touch through a `touch` output. `FormRoot` always prevents the default submit and calls `submit()` only when the form has a `submission` option.
+  - `resource()` takes `params` and `loader`; reading `value()` in the error state throws.
+  - `provideAppInitializer` blocks startup only when its function returns a promise or an observable.
+  - `debounced` is experimental and `withRouterResources` a developer preview; `injectAsync` is stable; selectorless components are not usable.
+  - `SwUpdate` has no `providedIn`; only `provideServiceWorker` provides it.
+  - The service-worker generator works through `nx g @schematics/angular:service-worker`, but `navigationUrls` replaces the defaults, so they are listed explicitly; `ngsw.json` always has a `dataGroups` key.
+- **The unit-test builder.**
+  - It picks jsdom when happy-dom is absent and refuses `vi.mock` of relative imports; `vi.mock` of a package works.
+  - Under fake timers `fixture.whenStable()` hangs, because the zoneless scheduler's timers are faked; `vi.advanceTimersByTimeAsync(0)` runs both promise continuations and change detection.
+  - `animate.enter` and `animate.leave` do nothing in jsdom (it has no `getAnimations`).
+  - jsdom has no `matchMedia` and no `navigator.clipboard`, and its `Intl.supportedValuesOf('timeZone')` does not list `UTC`.
+  - A `resource()` reload after a params change starts on the next `TestBed.tick()`.
+  - The development build type-checks every component template, reached by a route or not; plain `tsc` checks none.
+- **Terrazzo 2.7.1.**
+  - The `.mts` config is loaded through vite-node, and `tokens` and `outDir` resolve against the working directory.
+  - plugin-css `permutations` select resolver contexts per block; `prepare` must indent the first declaration itself.
+  - `variableName` sets the leaf names; `legacyHex` gives hex (the default is `rgb()` percentages); a `transform` that returns `undefined` falls back to the default.
+  - Only the default context is linted. Contexts that a permutation names are alias-resolved, and the others are not touched unless a plugin applies them.
+  - Every token's description is printed as a comment, and declarations are always sorted.
+- **oxlint 1.85.**
+  - An override replaces a rule's options rather than merging them.
+  - `no-restricted-imports` supports `allowTypeImports` per pattern and negated `group` entries. A `regex` lookahead silently matches nothing, and `**/generated/**` does not match the bare folder.
+  - `.gitignore` alone makes oxlint's directory walk, `nx format:check` (oxfmt) and `check-spdx.mts` skip the generated client.
+- **SimpleWebAuthn browser 14.0.0.**
+  - A cancelled prompt rejects with a `WebAuthnError` whose code is `ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY`, whose name is the cause's `NotAllowedError`, and whose cause is the DOMException.
+  - A DOMException passed through raw has a numeric legacy `code`.
+  - Without WebAuthn the library throws a plain Error.
+  - The JSON responses are assignable to the generated request bodies without casts.
+- **Dev serving.**
+  - Nx loads the root `.env` into every task, and the Angular dev server takes `PORT` from the environment even over an explicit `port` option; a project's `.env.<target>` file wins over the root `.env`.
+  - The Vite proxy keeps `Origin` and `Set-Cookie`.
+  - The Claude desktop app's browser pane cannot fetch service-worker scripts, so the service worker is checked in Chrome.
+  - `@nx/web:file-server` implements `spa` as a proxy to itself, so a `proxyUrl` to the API breaks deep links; `scripts/serve-pwa.mts` replaces it.
+  - Node's `listen(…, 'localhost')` bound only `::1` here.

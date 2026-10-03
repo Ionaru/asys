@@ -11,12 +11,29 @@ The ASYS design tokens, shared by the PWA and the site, in the Design Tokens Com
 
 Every extension uses the key `io.github.ionaru.asys`:
 
-- on the `font-sans` and `font-mono` tokens, `fonts`: the font files (`file`, `weight`, `style`). The paths are relative to the design system's project folder. The fonts are not in this repository yet, and need an OFL-1.1 entry in `REUSE.toml` when they are;
+- on the `font-sans` and `font-mono` tokens, `fonts`: the font files (`file`, `weight`, `style`). The paths are relative to the design system's project folder. The fonts are in `fonts/` (see Fonts below);
 - on the `typography` group, `groups`: the type styles (family, size, line height, weight, letter spacing, sample, usage). Family, size and line height are `{…}` references to tokens, which DTCG tools leave as plain text: whatever reads them must resolve them itself and fail on one that does not resolve;
 - on drive's `shadow-sheet`, `none: true`: DTCG has no none value, so the token is a transparent zero shadow and this marks it as none for CSS;
 - on the `scheme` modifier in the resolver, `themes` and `palettes`: their display names, and each palette's ground.
 
 The type styles are not DTCG typography tokens, because the line heights are rem values that the Line spacing setting rewrites and the letter spacings are em values that scale with Text size. The design system's components (its `bundle.css`) read the `font-size-*` and `line-height-*` tokens of `type-scale` and set weight and letter spacing in their own rules, so those two fields record the styles' values for a tool that emits type-style classes.
+
+## CSS
+
+`nx run design-tokens:css` (cached) runs `tz build -c libs/design-tokens/terrazzo.config.mts` from the workspace root and writes `dist/libs/design-tokens/css/tokens.css`. It has four blocks:
+
+- `:root, [data-theme="light"]`: the base tokens and Evergreen Light;
+- `@media (prefers-color-scheme: dark)` for `:root:not([data-theme])`: Evergreen Dark;
+- `[data-theme="dark"]`: Evergreen Dark;
+- `[data-theme="drive"]`: Evergreen Voice, with `--shadow-sheet: none` taken from the extension.
+
+The variables are the leaf names. Colours are hex (`legacyHex`) and alpha shadows are hex-8. Each token's description is printed as a comment above it. Only Evergreen is emitted until the appearance settings exist.
+
+The build resolves aliases in all 12 contexts but lints only the default one, so colour values in the other contexts are checked by `scripts/palettes.mts` only. The build does not check the references in the typography extension.
+
+## Fonts
+
+`fonts/` holds the three variable fonts the `font-sans` and `font-mono` extension names: `AtkinsonHyperlegibleNext-Variable.woff2`, `AtkinsonHyperlegibleNext-Italic-Variable.woff2` and `AtkinsonHyperlegibleMono-Variable.woff2`. They come from `github.com/googlefonts/atkinson-hyperlegible-next` at commit `7925f50f649b3813257faf2f4c0b381011f434f1` and `github.com/googlefonts/atkinson-hyperlegible-next-mono` at `154d50362016cc3e873eb21d242cd0772384c8f9` (`fonts/webfonts/*[wght].woff2`), renamed to the names the extension uses. They are under OFL-1.1, recorded in `REUSE.toml`. `css/fonts.css` declares them with `@font-face`.
 
 To add a palette, add its inputs to `PALETTES` in `scripts/palettes.mts` and run `node scripts/palettes.mts`. It refuses a palette that breaks a contrast pair, writes the palette's three files, and adds its contexts, name and ground to the resolver. Review the palette in all three themes, then add it to the design system's Personalisation table and copy the palette files and the resolver into the artifact.
 

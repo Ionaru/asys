@@ -42,6 +42,28 @@
           }
         ]
       }
+    },
+    {
+      "files": ["src/client.ts", "src/client/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**", "!@simplewebauthn/browser", "!./**"],
+                "message": "The client entry runs in browsers: import only @simplewebauthn/browser and files below ./."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/client/**/*.spec.ts"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
     }
   ]
 }

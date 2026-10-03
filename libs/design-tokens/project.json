@@ -4,5 +4,37 @@
   "sourceRoot": "libs/design-tokens/src",
   "projectType": "library",
   "tags": ["scope:design"],
-  "targets": {}
+  "targets": {
+    "css": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/src/**/*.json",
+        "{projectRoot}/terrazzo.config.mts",
+        {
+          "externalDependencies": ["@terrazzo/cli", "@terrazzo/plugin-css"]
+        }
+      ],
+      "outputs": ["{workspaceRoot}/dist/libs/design-tokens/css"],
+      "options": {
+        "command": "tz build -c libs/design-tokens/terrazzo.config.mts"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/terrazzo.config.mts",
+        "{projectRoot}/tsconfig.json",
+        "{workspaceRoot}/tsconfig.base.json",
+        {
+          "externalDependencies": ["@terrazzo/cli", "@terrazzo/plugin-css", "typescript"]
+        }
+      ],
+      "options": {
+        "cwd": "libs/design-tokens",
+        "command": "tsc --noEmit -p tsconfig.json"
+      }
+    }
+  }
 }

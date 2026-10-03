@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 export * from './lib/primitives';
+export * from './lib/enums';
 export * from './lib/entities';
 export * from './lib/commands';
 export * from './lib/results';

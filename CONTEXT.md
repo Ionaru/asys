@@ -251,6 +251,14 @@ _Avoid_: Account, member
 A one-time link that lets someone become a User; there is no open sign-up.
 _Avoid_: Invite (reserved for calendar invitations)
 
+**Passkey**:
+A key kept on a device or in a password manager that signs a User in to ASYS without a password; a User has one or more, and cannot remove the last one. Written in lower case in running text, like other industry terms.
+_Avoid_: Password, login, security key
+
+**Recovery code**:
+One of ten single-use codes ASYS shows once, at sign-up or when the User makes new ones, that signs the User in when no passkey is at hand; signing in with one, or making new ones, signs the User out on their other devices. Written in lower case in running text.
+_Avoid_: Backup code, reset code
+
 **Connection**:
 A link from a User's ASYS to an outside account, such as their work Google account; it is separate from how the User signs in.
 _Avoid_: Integration, login

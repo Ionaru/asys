@@ -67,6 +67,19 @@ The server is one CLI, `asys`, built into `dist/apps/server/main.js`.
 
 Logs go to stderr and never contain error messages or query parameters. Stop `nx serve server` before running the server tests: they share the dev database, and its worker would claim their due jobs.
 
+## Running the PWA
+
+The PWA is the Angular app in `apps/pwa`. Its API client is generated from the server's OpenAPI document by ng-openapi-gen into `apps/pwa/src/generated/api` (gitignored, target `pwa:api-client`), and its token CSS comes from `design-tokens:css`; the build, serve and test targets run both first, and typecheck runs `pwa:api-client`.
+
+1. `pnpm exec nx serve pwa` serves it on `http://localhost:4200` and proxies `/v1` and `/health` to the server on port 3000, passing `Origin` and the session cookie through unchanged. Start it before `nx serve server`: generating the client runs `server:openapi`, which rebuilds the server bundle that a running server uses. With the server already running, use `pnpm exec nx serve pwa --exclude-task-dependencies` (the generated client and the token CSS must exist then).
+   Nx loads the root `.env` into every task, and the Angular dev server prefers its `PORT` (the API's port) over its own port option, so `apps/pwa/.env.serve` sets `PORT=4200` for the serve target.
+2. Open it at `http://localhost:4200` exactly. On `http://127.0.0.1:4200` the Origin guard answers 403 and passkeys do not match the relying party id `localhost`.
+3. The `__Host-` session cookie works over `http://localhost` in Chrome and Firefox, not in Safari.
+4. `nx serve` runs no service worker. `pnpm exec nx run pwa:serve-sw` builds for production and serves `dist/apps/pwa/browser` with `scripts/serve-pwa.mts` on port 4200 (it fails if the port is busy), with the same proxy and a fallback to `index.html` for paths without a file extension, so the service worker, the manifest and the update prompt can be tried.
+5. `pnpm exec nx test pwa` runs the unit tests (`@angular/build:unit-test`, Vitest and jsdom).
+
+A Sign-up link from `node --env-file=.env dist/apps/server/main.js signup-link` opens the sign-up screen; a passkey needs a browser with an authenticator (Chrome 138 or later on this setup).
+
 ## CI
 
 CI is `.github/workflows/cd.yaml`: on every push and pull request an `audit` job (`pnpm audit --prod`, against the lockfile without installing dependencies) runs first, then the jobs `lint`, `typecheck`, `build`, `test`, `format`, `licences` and `palettes` run in parallel, without Nx Cloud. Each job's steps live in `cd.yaml`. The `build` job also writes the server's OpenAPI document (`nx run server:openapi`), which proves that the server bundle loads without a `.env`. Every job except `audit` starts with the composite action `.github/actions/setup`, which runs `.github/actions/checkout` and then sets up pnpm with Node 24 and installs from the frozen lockfile. Each job's commands can be run locally in the same way; the `test` job needs the database from `compose.yaml` (`docker compose up -d --wait`) and a `.env` with its passwords.

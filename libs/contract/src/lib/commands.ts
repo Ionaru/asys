@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MPL-2.0
 
-import { CommandTag, Privacy, TaskStatus, type Command } from '@asys/domain';
+import { CommandTag, type Command } from '@asys/domain';
 import { Schema } from 'effect';
 import { ActiveHoursSchema } from './entities';
+import { PrivacySchema, TaskStatusSchema } from './enums';
 import { DateSpecSchema, TextSchema, UuidSchema } from './primitives';
 
 /*
@@ -11,13 +12,13 @@ import { DateSpecSchema, TextSchema, UuidSchema } from './primitives';
  */
 
 export const ExpectationSchema = Schema.Struct({
-  status: Schema.optionalKey(Schema.Enum(TaskStatus)),
+  status: Schema.optionalKey(TaskStatusSchema),
   version: Schema.optionalKey(Schema.Int),
-});
+}).annotate({ identifier: 'Expectation' });
 
 export const AreaExpectationSchema = Schema.Struct({
   version: Schema.optionalKey(Schema.Int),
-});
+}).annotate({ identifier: 'AreaExpectation' });
 
 export const TaskPatchSchema = Schema.Struct({
   title: Schema.optionalKey(TextSchema),
@@ -27,88 +28,96 @@ export const TaskPatchSchema = Schema.Struct({
   due: Schema.optionalKey(Schema.NullOr(DateSpecSchema)),
   estimateMinutes: Schema.optionalKey(Schema.NullOr(Schema.Finite)),
   important: Schema.optionalKey(Schema.NullOr(Schema.Boolean)),
-});
+}).annotate({ identifier: 'TaskPatch' });
 
 export const AreaPatchSchema = Schema.Struct({
   name: Schema.optionalKey(TextSchema),
   activeHours: Schema.optionalKey(ActiveHoursSchema),
-  defaultPrivacy: Schema.optionalKey(Schema.NullOr(Schema.Enum(Privacy))),
-});
+  defaultPrivacy: Schema.optionalKey(Schema.NullOr(PrivacySchema)),
+}).annotate({ identifier: 'AreaPatch' });
 
-export const CommandSchema = Schema.TaggedUnion({
-  [CommandTag.CaptureTask]: {
+/** A Command member, named `<Tag>Command` in the OpenAPI document. */
+const command = <const Tag extends CommandTag, const Fields extends Schema.Struct.Fields>(
+  tag: Tag,
+  fields: Fields,
+) => Schema.TaggedStruct(tag, fields).annotate({ identifier: `${tag}Command` });
+
+export const CommandSchema = Schema.Union([
+  command(CommandTag.CaptureTask, {
     idempotencyKey: UuidSchema,
     taskId: UuidSchema,
     title: TextSchema,
     captureText: TextSchema,
     areaId: Schema.optionalKey(Schema.NullOr(UuidSchema)),
-  },
-  [CommandTag.TriageTask]: {
+  }),
+  command(CommandTag.TriageTask, {
     idempotencyKey: UuidSchema,
     taskId: UuidSchema,
     important: Schema.Boolean,
     estimateMinutes: Schema.Finite,
     areaId: Schema.optionalKey(Schema.NullOr(UuidSchema)),
     expect: Schema.optionalKey(ExpectationSchema),
-  },
-  [CommandTag.EditTask]: {
+  }),
+  command(CommandTag.EditTask, {
     idempotencyKey: UuidSchema,
     taskId: UuidSchema,
     patch: TaskPatchSchema,
     expect: Schema.optionalKey(ExpectationSchema),
-  },
-  [CommandTag.LogProgress]: {
+  }),
+  command(CommandTag.LogProgress, {
     idempotencyKey: UuidSchema,
     taskId: UuidSchema,
     remainingMinutes: Schema.Finite,
     expect: Schema.optionalKey(ExpectationSchema),
-  },
-  [CommandTag.CompleteTask]: {
+  }),
+  command(CommandTag.CompleteTask, {
     idempotencyKey: UuidSchema,
     taskId: UuidSchema,
     expect: Schema.optionalKey(ExpectationSchema),
-  },
-  [CommandTag.DropTask]: {
+  }),
+  command(CommandTag.DropTask, {
     idempotencyKey: UuidSchema,
     taskId: UuidSchema,
     expect: Schema.optionalKey(ExpectationSchema),
-  },
-  [CommandTag.AddBlocker]: {
+  }),
+  command(CommandTag.AddBlocker, {
     idempotencyKey: UuidSchema,
     linkId: UuidSchema,
     taskId: UuidSchema,
     blockerId: UuidSchema,
-  },
-  [CommandTag.RemoveBlocker]: {
+  }),
+  command(CommandTag.RemoveBlocker, {
     idempotencyKey: UuidSchema,
     linkId: UuidSchema,
-  },
-  [CommandTag.CreateArea]: {
+  }),
+  command(CommandTag.CreateArea, {
     idempotencyKey: UuidSchema,
     areaId: UuidSchema,
     name: TextSchema,
     activeHours: ActiveHoursSchema,
-    defaultPrivacy: Schema.NullOr(Schema.Enum(Privacy)),
-  },
-  [CommandTag.UpdateArea]: {
+    defaultPrivacy: Schema.NullOr(PrivacySchema),
+  }),
+  command(CommandTag.UpdateArea, {
     idempotencyKey: UuidSchema,
     areaId: UuidSchema,
     patch: AreaPatchSchema,
     expect: Schema.optionalKey(AreaExpectationSchema),
-  },
-  [CommandTag.SetTimeZone]: {
+  }),
+  command(CommandTag.SetTimeZone, {
     idempotencyKey: UuidSchema,
     timeZone: TextSchema,
-  },
-  [CommandTag.SetUrgencyWindow]: {
+  }),
+  command(CommandTag.SetUrgencyWindow, {
     idempotencyKey: UuidSchema,
     days: Schema.Finite,
-  },
-  [CommandTag.ResolveReviewItem]: {
+  }),
+  command(CommandTag.ResolveReviewItem, {
     idempotencyKey: UuidSchema,
     reviewItemId: UuidSchema,
-  },
-});
+  }),
+])
+  .annotate({ identifier: 'Command' })
+  .pipe(Schema.toTaggedUnion('_tag'));
 
 export type CommandRequest = typeof CommandSchema.Type;
 

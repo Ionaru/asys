@@ -51,3 +51,6 @@ vitest.config.*.timestamp*
 
 # local secrets
 .env
+
+# generated API client
+/apps/pwa/src/generated/

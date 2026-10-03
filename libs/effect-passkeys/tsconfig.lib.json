@@ -8,6 +8,8 @@
   },
   "include": ["src/**/*.ts"],
   "exclude": [
+    "src/client.ts",
+    "src/client/**",
     "vite.config.ts",
     "vite.config.mts",
     "vitest.config.ts",

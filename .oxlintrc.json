@@ -102,7 +102,42 @@
             "patterns": [
               {
                 "group": ["@ionaru/effect-passkeys/server", "@ionaru/effect-passkeys/testing"],
-                "message": "Only the api entry of @ionaru/effect-passkeys may reach a browser bundle."
+                "message": "Only the client entry of @ionaru/effect-passkeys may reach a browser bundle."
+              },
+              {
+                "group": ["@asys/contract", "@ionaru/effect-passkeys/api", "effect", "effect/*"],
+                "message": "The PWA never imports the contract, the api entry or Effect at runtime: use the generated client types.",
+                "allowTypeImports": true
+              },
+              {
+                "group": ["**/generated", "**/generated/**"],
+                "message": "Import the generated client only through app/core/api."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["apps/pwa/src/app/core/api/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@ionaru/effect-passkeys/server", "@ionaru/effect-passkeys/testing"],
+                "message": "Only the client entry of @ionaru/effect-passkeys may reach a browser bundle."
+              },
+              {
+                "group": ["@asys/contract", "@ionaru/effect-passkeys/api", "effect", "effect/*"],
+                "message": "The PWA never imports the contract, the api entry or Effect at runtime: use the generated client types.",
+                "allowTypeImports": true
+              },
+              {
+                "group": ["**/generated/api", "**/generated/api/index"],
+                "allowTypeImports": true,
+                "message": "Import generated functions from their own file (generated/api/fn/...) so unused ones are tree-shaken; import models type-only."
               }
             ]
           }
@@ -112,5 +147,6 @@
   ],
   "env": {
     "builtin": true
-  }
+  },
+  "ignorePatterns": ["apps/pwa/src/generated"]
 }

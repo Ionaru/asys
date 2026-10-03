@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MPL-2.0
 
-import { RejectedReason } from '@asys/domain';
 import { Schema } from 'effect';
+import { RejectedReasonSchema } from './enums';
 
 export class CommandRejected extends Schema.TaggedError<CommandRejected>()(
   'CommandRejected',
   {
-    reason: Schema.Enum(RejectedReason),
+    reason: RejectedReasonSchema,
   },
   { httpApiStatus: 422 },
 ) {}

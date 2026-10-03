@@ -1,0 +1,393 @@
+// SPDX-License-Identifier: EUPL-1.2
+import { TestBed } from '@angular/core/testing';
+
+import { AuthApi, AuthError, AuthResultTag, type AuthResult, type Me } from '../api/auth-api';
+import { DeviceStorage } from '../platform/device-storage';
+import { LAST_REPORTED_ZONE_KEY, SESSION_CHECK_TIMEOUT_MS, Session, SessionState } from './session';
+
+const ada: Me = { name: 'Ada', recoveryCodesLeft: 4 };
+
+const grace: Me = { name: 'Grace', recoveryCodesLeft: 2 };
+
+const ok = (value: Me): AuthResult<Me> => ({ _tag: AuthResultTag.Ok, value });
+
+const failed = (error: AuthError): AuthResult<Me> => ({ _tag: AuthResultTag.Failed, error });
+
+interface Deferred {
+  readonly promise: Promise<AuthResult<Me>>;
+  readonly resolve: (result: AuthResult<Me>) => void;
+}
+
+const defer = (): Deferred => {
+  let resolve: (result: AuthResult<Me>) => void = () => undefined;
+  const promise = new Promise<AuthResult<Me>>((r) => {
+    resolve = r;
+  });
+
+  return { promise, resolve };
+};
+
+describe('Session', () => {
+  let me: ReturnType<typeof vi.fn<() => Promise<AuthResult<Me>>>>;
+  let remove: ReturnType<typeof vi.fn<(key: string) => void>>;
+  let get: ReturnType<typeof vi.fn<(key: string) => string | null>>;
+  let set: ReturnType<typeof vi.fn<(key: string, value: string) => void>>;
+  let session: Session;
+
+  beforeEach(() => {
+    me = vi.fn<() => Promise<AuthResult<Me>>>();
+    remove = vi.fn<(key: string) => void>();
+    get = vi.fn<(key: string) => string | null>();
+    set = vi.fn<(key: string, value: string) => void>();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: AuthApi, useValue: { me } },
+        { provide: DeviceStorage, useValue: { get, set, remove } },
+      ],
+    });
+    session = TestBed.inject(Session);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    localStorage.clear();
+  });
+
+  it('starts Unknown with no Me', () => {
+    expect(session.state()).toBe(SessionState.Unknown);
+    expect(session.me()).toBeNull();
+  });
+
+  it('exposes the documented constants', () => {
+    expect(LAST_REPORTED_ZONE_KEY).toBe('asys.timeZone.lastReported');
+    expect(SESSION_CHECK_TIMEOUT_MS).toBe(10_000);
+  });
+
+  describe('check', () => {
+    it('Ok becomes SignedIn with the Me', async () => {
+      me.mockResolvedValue(ok(ada));
+
+      await session.check();
+
+      expect(session.state()).toBe(SessionState.SignedIn);
+      expect(session.me()).toEqual(ada);
+    });
+
+    it('Unauthorized becomes SignedOut and clears the Me', async () => {
+      me.mockResolvedValueOnce(ok(ada));
+      await session.check();
+      me.mockResolvedValueOnce(failed(AuthError.Unauthorized));
+
+      await session.check();
+
+      expect(session.state()).toBe(SessionState.SignedOut);
+      expect(session.me()).toBeNull();
+    });
+
+    it.each([AuthError.Network, AuthError.Unexpected, AuthError.SignInFailed])(
+      '%s becomes Unreachable',
+      async (error) => {
+        me.mockResolvedValue(failed(error));
+
+        await session.check();
+
+        expect(session.state()).toBe(SessionState.Unreachable);
+      },
+    );
+
+    it('Unreachable leaves the Me unchanged', async () => {
+      me.mockResolvedValueOnce(ok(ada));
+      await session.check();
+      me.mockResolvedValueOnce(failed(AuthError.Network));
+
+      await session.check();
+
+      expect(session.state()).toBe(SessionState.Unreachable);
+      expect(session.me()).toEqual(ada);
+    });
+
+    it('does not touch storage', async () => {
+      me.mockResolvedValue(ok(ada));
+      await session.check();
+      me.mockResolvedValue(failed(AuthError.Unauthorized));
+      await session.check();
+
+      expect(get).not.toHaveBeenCalled();
+      expect(set).not.toHaveBeenCalled();
+      expect(remove).not.toHaveBeenCalled();
+    });
+
+    it('is single-flight: a second call returns the same promise and makes one request', async () => {
+      const pending = defer();
+      me.mockReturnValue(pending.promise);
+
+      const first = session.check();
+      const second = session.check();
+
+      expect(second).toBe(first);
+      expect(me).toHaveBeenCalledTimes(1);
+
+      pending.resolve(ok(ada));
+      await first;
+
+      expect(session.state()).toBe(SessionState.SignedIn);
+    });
+
+    it('asks again after the first check settled', async () => {
+      me.mockResolvedValue(ok(ada));
+
+      await session.check();
+      await session.check();
+
+      expect(me).toHaveBeenCalledTimes(2);
+    });
+
+    describe('timeout', () => {
+      beforeEach(() => {
+        vi.useFakeTimers();
+      });
+
+      it('resolves as Unreachable after 10 000 ms without an answer', async () => {
+        me.mockReturnValue(defer().promise);
+        let settled = false;
+
+        const done = session.check().then(() => {
+          settled = true;
+        });
+        await vi.advanceTimersByTimeAsync(SESSION_CHECK_TIMEOUT_MS - 1);
+
+        expect(settled).toBe(false);
+        expect(session.state()).toBe(SessionState.Unknown);
+
+        await vi.advanceTimersByTimeAsync(1);
+        await done;
+
+        expect(settled).toBe(true);
+        expect(session.state()).toBe(SessionState.Unreachable);
+      });
+
+      it('still applies a late Ok answer', async () => {
+        const pending = defer();
+        me.mockReturnValue(pending.promise);
+
+        const done = session.check();
+        await vi.advanceTimersByTimeAsync(SESSION_CHECK_TIMEOUT_MS);
+        await done;
+        expect(session.state()).toBe(SessionState.Unreachable);
+
+        pending.resolve(ok(ada));
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(session.state()).toBe(SessionState.SignedIn);
+        expect(session.me()).toEqual(ada);
+      });
+
+      it('still applies a late Unauthorized answer', async () => {
+        const pending = defer();
+        me.mockReturnValue(pending.promise);
+
+        const done = session.check();
+        await vi.advanceTimersByTimeAsync(SESSION_CHECK_TIMEOUT_MS);
+        await done;
+
+        pending.resolve(failed(AuthError.Unauthorized));
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(session.state()).toBe(SessionState.SignedOut);
+        expect(session.me()).toBeNull();
+      });
+
+      it('an answer before the timeout wins', async () => {
+        const pending = defer();
+        me.mockReturnValue(pending.promise);
+
+        const done = session.check();
+        pending.resolve(ok(ada));
+        await vi.advanceTimersByTimeAsync(0);
+        await done;
+        await vi.advanceTimersByTimeAsync(SESSION_CHECK_TIMEOUT_MS);
+
+        expect(session.state()).toBe(SessionState.SignedIn);
+      });
+    });
+  });
+
+  describe('stale answers', () => {
+    it('a check answering 200 after signedOut() leaves the state SignedOut and still resolves', async () => {
+      const pending = defer();
+      me.mockReturnValue(pending.promise);
+
+      const done = session.check();
+      session.signedOut();
+      pending.resolve(ok(ada));
+      await done;
+
+      expect(session.state()).toBe(SessionState.SignedOut);
+      expect(session.me()).toBeNull();
+    });
+
+    it('a check answering 401 after signedIn(me) leaves the state SignedIn', async () => {
+      const pending = defer();
+      me.mockReturnValue(pending.promise);
+
+      const done = session.check();
+      await session.signedIn(grace);
+      pending.resolve(failed(AuthError.Unauthorized));
+      await done;
+
+      expect(session.state()).toBe(SessionState.SignedIn);
+      expect(session.me()).toEqual(grace);
+    });
+
+    it('signedIn() without a Me sends a new request instead of joining a check in flight', async () => {
+      me.mockReturnValueOnce(defer().promise);
+      me.mockReturnValueOnce(defer().promise);
+
+      void session.check();
+      void session.signedIn();
+      await Promise.resolve();
+
+      expect(me).toHaveBeenCalledTimes(2);
+    });
+
+    it.each([
+      ['the stale 401 arrives first', true],
+      ['the fresh 200 arrives first', false],
+    ])(
+      'is SignedIn when the check answers 401 and signedIn() answers 200 (%s)',
+      async (_name, staleFirst) => {
+        const stale = defer();
+        const fresh = defer();
+        me.mockReturnValueOnce(stale.promise);
+        me.mockReturnValueOnce(fresh.promise);
+
+        const check = session.check();
+        const signIn = session.signedIn();
+        await Promise.resolve();
+
+        if (staleFirst) {
+          stale.resolve(failed(AuthError.Unauthorized));
+          await check;
+          fresh.resolve(ok(ada));
+        } else {
+          fresh.resolve(ok(ada));
+          await signIn;
+          stale.resolve(failed(AuthError.Unauthorized));
+        }
+
+        await Promise.all([check, signIn]);
+
+        expect(session.state()).toBe(SessionState.SignedIn);
+        expect(session.me()).toEqual(ada);
+      },
+    );
+
+    describe('timeout', () => {
+      beforeEach(() => {
+        vi.useFakeTimers();
+      });
+
+      it('a timeout after signedOut() leaves the state SignedOut and the check still resolves', async () => {
+        me.mockReturnValue(defer().promise);
+        let settled = false;
+
+        const done = session.check().then(() => {
+          settled = true;
+        });
+        session.signedOut();
+        await vi.advanceTimersByTimeAsync(SESSION_CHECK_TIMEOUT_MS);
+        await done;
+
+        expect(settled).toBe(true);
+        expect(session.state()).toBe(SessionState.SignedOut);
+      });
+
+      it('a timeout after signedIn(me) leaves the state SignedIn', async () => {
+        me.mockReturnValue(defer().promise);
+
+        const done = session.check();
+        await session.signedIn(grace);
+        await vi.advanceTimersByTimeAsync(SESSION_CHECK_TIMEOUT_MS);
+        await done;
+
+        expect(session.state()).toBe(SessionState.SignedIn);
+        expect(session.me()).toEqual(grace);
+      });
+
+      it('a late 200 after a timeout still signs in when nothing happened in between', async () => {
+        const pending = defer();
+        me.mockReturnValue(pending.promise);
+
+        const done = session.check();
+        await vi.advanceTimersByTimeAsync(SESSION_CHECK_TIMEOUT_MS);
+        await done;
+        pending.resolve(ok(ada));
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(session.state()).toBe(SessionState.SignedIn);
+      });
+    });
+  });
+
+  describe('signedIn', () => {
+    it('with a Me removes the zone key, sets SignedIn and the Me, and makes no request', async () => {
+      await session.signedIn(grace);
+
+      expect(remove).toHaveBeenCalledWith(LAST_REPORTED_ZONE_KEY);
+      expect(session.state()).toBe(SessionState.SignedIn);
+      expect(session.me()).toEqual(grace);
+      expect(me).not.toHaveBeenCalled();
+    });
+
+    it('without a Me removes the zone key and runs check, resolving when it settles', async () => {
+      const pending = defer();
+      me.mockReturnValue(pending.promise);
+      let settled = false;
+
+      const done = session.signedIn().then(() => {
+        settled = true;
+      });
+      await Promise.resolve();
+
+      expect(remove).toHaveBeenCalledWith(LAST_REPORTED_ZONE_KEY);
+      expect(me).toHaveBeenCalledTimes(1);
+      expect(settled).toBe(false);
+
+      pending.resolve(ok(ada));
+      await done;
+
+      expect(settled).toBe(true);
+      expect(session.state()).toBe(SessionState.SignedIn);
+      expect(session.me()).toEqual(ada);
+    });
+
+    it('without a Me and an unreachable server ends Unreachable', async () => {
+      me.mockResolvedValue(failed(AuthError.Network));
+
+      await session.signedIn();
+
+      expect(session.state()).toBe(SessionState.Unreachable);
+    });
+  });
+
+  describe('signedOut', () => {
+    it('sets SignedOut, clears the Me and removes the zone key', async () => {
+      await session.signedIn(ada);
+      remove.mockClear();
+
+      session.signedOut();
+
+      expect(session.state()).toBe(SessionState.SignedOut);
+      expect(session.me()).toBeNull();
+      expect(remove).toHaveBeenCalledWith(LAST_REPORTED_ZONE_KEY);
+    });
+
+    it('is harmless when called twice', () => {
+      session.signedOut();
+
+      expect(() => session.signedOut()).not.toThrow();
+      expect(session.state()).toBe(SessionState.SignedOut);
+      expect(session.me()).toBeNull();
+    });
+  });
+});

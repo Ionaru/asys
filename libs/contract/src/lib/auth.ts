@@ -47,17 +47,23 @@ export const RecoveryCodeInputSchema = TextSchema.check(
 );
 
 /** The signed-in Owner as the client sees them. */
-export const MeSchema = Schema.Struct({ name: TextSchema, recoveryCodesLeft: Schema.Int });
+export const MeSchema = Schema.Struct({ name: TextSchema, recoveryCodesLeft: Schema.Int }).annotate(
+  { identifier: 'Me' },
+);
 
 export type Me = typeof MeSchema.Type;
 
 /** A freshly generated set of recovery codes, shown once. */
-export const RecoveryCodesSchema = Schema.Struct({ recoveryCodes: Schema.Array(Schema.String) });
+export const RecoveryCodesSchema = Schema.Struct({
+  recoveryCodes: Schema.Array(Schema.String),
+}).annotate({ identifier: 'RecoveryCodes' });
 
 export type RecoveryCodes = typeof RecoveryCodesSchema.Type;
 
 /** The answer to a successful recovery sign-in. */
-export const RecoverResultSchema = Schema.Struct({ recoveryCodesLeft: Schema.Int });
+export const RecoverResultSchema = Schema.Struct({ recoveryCodesLeft: Schema.Int }).annotate({
+  identifier: 'RecoverResult',
+});
 
 export type RecoverResult = typeof RecoverResultSchema.Type;
 
@@ -66,6 +72,6 @@ export const HealthSchema = Schema.Struct({
   status: Schema.Literal('ok'),
   oldestDueJobAgeSeconds: Schema.Finite,
   failingJobs: Schema.Int,
-});
+}).annotate({ identifier: 'Health' });
 
 export type Health = typeof HealthSchema.Type;

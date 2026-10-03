@@ -90,6 +90,8 @@
     "openapi": {
       "executor": "nx:run-commands",
       "dependsOn": ["build"],
+      "cache": true,
+      "inputs": ["production", "^production"],
       "outputs": ["{workspaceRoot}/dist/apps/server/openapi.json"],
       "options": {
         "command": "node dist/apps/server/main.js openapi > dist/apps/server/openapi.json"

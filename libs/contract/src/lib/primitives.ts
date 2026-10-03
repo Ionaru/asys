@@ -3,7 +3,14 @@
 import { isLocalDate, isLocalTime } from '@asys/domain';
 import { Schema } from 'effect';
 
-export const UuidSchema = Schema.String.check(Schema.isUUID(), Schema.isLowercased());
+/**
+ * A lowercase UUID. The lowercase rule is a plain filter, not `Schema.isLowercased()`: a second `pattern`
+ * check is emitted as an `allOf` member, which ng-openapi-gen renders as `any` instead of `string`.
+ */
+export const UuidSchema = Schema.String.check(
+  Schema.isUUID(),
+  Schema.makeFilter((value: string) => value === value.toLowerCase()),
+);
 
 const UNPAIRED_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 
@@ -21,6 +28,6 @@ export const LocalTimeSchema = Schema.String.check(Schema.makeFilter(isLocalTime
 export const DateSpecSchema = Schema.Struct({
   date: LocalDateSchema,
   time: Schema.optionalKey(LocalTimeSchema),
-});
+}).annotate({ identifier: 'DateSpec' });
 
 export const InstantSchema = Schema.Int;

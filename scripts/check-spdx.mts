@@ -9,6 +9,7 @@ const root = resolve(import.meta.dirname, '..');
 
 const EXEMPT_EXTENSIONS = [
   '.json',
+  '.webmanifest',
   '.ico',
   '.png',
   '.jpg',

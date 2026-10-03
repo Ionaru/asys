@@ -29,7 +29,7 @@ export const RegistrationResponseSchema = Schema.Struct({
     ),
   }),
   authenticatorAttachment: Schema.optionalKey(Schema.Literals(['platform', 'cross-platform'])),
-});
+}).annotate({ identifier: 'RegistrationResponse' });
 
 export type RegistrationResponse = typeof RegistrationResponseSchema.Type;
 
@@ -45,7 +45,7 @@ export const AuthenticationResponseSchema = Schema.Struct({
     userHandle: Schema.optionalKey(Base64UrlSchema(128)),
   }),
   authenticatorAttachment: Schema.optionalKey(Schema.Literals(['platform', 'cross-platform'])),
-});
+}).annotate({ identifier: 'AuthenticationResponse' });
 
 export type AuthenticationResponse = typeof AuthenticationResponseSchema.Type;
 
@@ -63,7 +63,7 @@ export const PasskeyOptionsSchema: Schema.Codec<PasskeyOptions> = Schema.Any as 
 export const PasskeyChallengeSchema = Schema.Struct({
   challengeId: Base64UrlSchema(512),
   options: PasskeyOptionsSchema,
-});
+}).annotate({ identifier: 'PasskeyChallenge' });
 
 export type PasskeyChallenge = typeof PasskeyChallengeSchema.Type;
 
@@ -78,7 +78,10 @@ export const PasskeyNameSchema = Schema.String.check(
   ),
 );
 
-/** A stored passkey as listed to its owner. Instants are epoch milliseconds. */
+/**
+ * A stored passkey as listed to its owner. Instants are epoch milliseconds. Deliberately unnamed: the 201 status
+ * annotation would re-annotate a named schema and duplicate it as `Passkey_1`.
+ */
 export const PasskeySchema = Schema.Struct({
   credentialId: Base64UrlSchema(1366),
   name: PasskeyNameSchema,
