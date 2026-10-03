@@ -8,8 +8,13 @@ import {
   changeLog,
   idempotencyKeys,
   jobs,
+  passkeys,
+  recoveryCodes,
   reviewItems,
+  sessions,
   settings,
+  signInIdentities,
+  signUpLinks,
   taskBlockers,
   tasks,
   users,
@@ -55,5 +60,10 @@ export const removeOwner = (ownerId: string) =>
       yield* db.delete(settings);
       yield* db.delete(users);
       yield* db.delete(jobs);
+      yield* db.delete(signUpLinks);
+      yield* db.delete(passkeys);
+      yield* db.delete(recoveryCodes);
+      yield* db.delete(sessions);
+      yield* db.delete(signInIdentities);
     }),
   ).pipe(Effect.provide(ownerDatabase()));

@@ -6,3 +6,5 @@ export * from './lib/commands';
 export * from './lib/results';
 export * from './lib/changes';
 export * from './lib/errors';
+export * from './lib/auth';
+export * from './lib/api';

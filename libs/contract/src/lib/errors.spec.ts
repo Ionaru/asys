@@ -2,7 +2,13 @@
 
 import { RejectedReason } from '@asys/domain';
 import { describe, expect, it } from 'vitest';
-import { ChangesExpired, CommandRejected, IdempotencyKeyReused } from './errors';
+import {
+  ChangesExpired,
+  CommandRejected,
+  IdempotencyKeyReused,
+  SignInFailed,
+  SignUpLinkInvalid,
+} from './errors';
 
 describe('errors', () => {
   it('CommandRejected carries its tag and reason', () => {
@@ -21,5 +27,13 @@ describe('errors', () => {
 
     expect(error._tag).toBe('ChangesExpired');
     expect(error.after).toBe(4);
+  });
+
+  it('SignUpLinkInvalid carries its tag', () => {
+    expect(new SignUpLinkInvalid()._tag).toBe('SignUpLinkInvalid');
+  });
+
+  it('SignInFailed carries its tag', () => {
+    expect(new SignInFailed()._tag).toBe('SignInFailed');
   });
 });

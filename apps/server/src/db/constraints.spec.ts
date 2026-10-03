@@ -1,16 +1,21 @@
 // SPDX-License-Identifier: EUPL-1.2
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { ChangeEntity, ChangeOp, TaskKind, TaskStatus } from '@asys/domain';
 import { assert, layer } from '@effect/vitest';
 import { Cause, Effect, Exit } from 'effect';
 import { removeOwner } from '../test/owners';
-import { appDatabase, Db } from './database';
+import { appDatabase, Db, ownerDatabase } from './database';
 import {
   changeCounters,
   changeLog,
   jobs,
+  passkeys,
+  recoveryCodes,
   reviewItems,
+  sessions,
   settings,
+  signInIdentities,
+  signUpLinks,
   taskBlockers,
   tasks,
 } from './schema';
@@ -79,6 +84,97 @@ const insertJob = (ownerId: string, overrides: Partial<typeof jobs.$inferInsert>
     const db = yield* Db;
     yield* db.insert(jobs).values(jobRow(ownerId, overrides));
   });
+
+const HOUR_MS = 60 * 60 * 1000;
+
+const validHash = () => randomBytes(32).toString('hex');
+
+const signUpLinkRow = (
+  ownerId: string,
+  overrides: Partial<typeof signUpLinks.$inferInsert> = {},
+) => ({
+  ownerId,
+  id: randomUUID(),
+  tokenHash: validHash(),
+  createdAt,
+  expiresAt: new Date(createdAt.getTime() + HOUR_MS),
+  ...overrides,
+});
+
+const sessionRow = (ownerId: string, overrides: Partial<typeof sessions.$inferInsert> = {}) => ({
+  ownerId,
+  id: randomUUID(),
+  tokenHash: validHash(),
+  createdAt,
+  expiresAt: new Date(createdAt.getTime() + HOUR_MS),
+  ...overrides,
+});
+
+const passkeyRow = (ownerId: string, overrides: Partial<typeof passkeys.$inferInsert> = {}) => ({
+  ownerId,
+  id: randomUUID(),
+  credentialId: randomBytes(32).toString('base64url'),
+  publicKey: 'a public key',
+  counter: 0,
+  transports: [],
+  backedUp: false,
+  name: 'a passkey',
+  createdAt,
+  ...overrides,
+});
+
+const recoveryCodeRow = (
+  ownerId: string,
+  overrides: Partial<typeof recoveryCodes.$inferInsert> = {},
+) => ({
+  ownerId,
+  id: randomUUID(),
+  codeHash: validHash(),
+  createdAt,
+  ...overrides,
+});
+
+const insertSignUpLink = (
+  ownerId: string,
+  overrides: Partial<typeof signUpLinks.$inferInsert> = {},
+) =>
+  Effect.gen(function* () {
+    const db = yield* Db;
+    yield* db.insert(signUpLinks).values(signUpLinkRow(ownerId, overrides));
+  });
+
+const insertSession = (ownerId: string, overrides: Partial<typeof sessions.$inferInsert> = {}) =>
+  Effect.gen(function* () {
+    const db = yield* Db;
+    yield* db.insert(sessions).values(sessionRow(ownerId, overrides));
+  });
+
+const insertPasskey = (ownerId: string, overrides: Partial<typeof passkeys.$inferInsert> = {}) =>
+  Effect.gen(function* () {
+    const db = yield* Db;
+    yield* db.insert(passkeys).values(passkeyRow(ownerId, overrides));
+  });
+
+const insertRecoveryCode = (
+  ownerId: string,
+  overrides: Partial<typeof recoveryCodes.$inferInsert> = {},
+) =>
+  Effect.gen(function* () {
+    const db = yield* Db;
+    yield* db.insert(recoveryCodes).values(recoveryCodeRow(ownerId, overrides));
+  });
+
+// asys_app has no grant on sign_in_identities, so rows go in as asys_owner.
+const insertSignInIdentity = (ownerId: string, provider: string, subject: string) =>
+  withOwner(
+    ownerId,
+    Effect.gen(function* () {
+      const db = yield* Db;
+      yield* db
+        .insert(signInIdentities)
+        .values({ ownerId, id: randomUUID(), provider, subject, createdAt });
+    }),
+  ).pipe(Effect.provide(ownerDatabase()));
 
 const assertCheckViolation = (exit: Exit.Exit<unknown, unknown>, constraint: string) => {
   if (Exit.isSuccess(exit)) {
@@ -222,6 +318,46 @@ const checkCases: ReadonlyArray<CheckCase> = [
     constraint: 'jobs_cron_check',
     violate: (o) => insertJob(o, { cron: '0 3 * * *', finishedAt: createdAt }),
   },
+  {
+    name: 'an uppercase token hash',
+    constraint: 'sign_up_links_token_hash_check',
+    violate: (o) => insertSignUpLink(o, { tokenHash: 'ABC' }),
+  },
+  {
+    name: 'an expiry equal to the creation time',
+    constraint: 'sign_up_links_expiry_check',
+    violate: (o) => insertSignUpLink(o, { expiresAt: createdAt }),
+  },
+  {
+    name: 'an uppercase session token hash',
+    constraint: 'sessions_token_hash_check',
+    violate: (o) => insertSession(o, { tokenHash: 'ABC' }),
+  },
+  {
+    name: 'a session expiry equal to the creation time',
+    constraint: 'sessions_expiry_check',
+    violate: (o) => insertSession(o, { expiresAt: createdAt }),
+  },
+  {
+    name: 'an uppercase recovery code hash',
+    constraint: 'recovery_codes_code_hash_check',
+    violate: (o) => insertRecoveryCode(o, { codeHash: 'ABC' }),
+  },
+  {
+    name: 'a negative counter',
+    constraint: 'passkeys_counter_check',
+    violate: (o) => insertPasskey(o, { counter: -1 }),
+  },
+  {
+    name: 'a credential id with a character outside base64url',
+    constraint: 'passkeys_credential_id_check',
+    violate: (o) => insertPasskey(o, { credentialId: 'a+b' }),
+  },
+  {
+    name: 'a credential id of 1367 characters',
+    constraint: 'passkeys_credential_id_check',
+    violate: (o) => insertPasskey(o, { credentialId: 'a'.repeat(1367) }),
+  },
 ];
 
 layer(appDatabase())('check and unique constraints', (it) => {
@@ -315,6 +451,75 @@ layer(appDatabase())('check and unique constraints', (it) => {
 
       yield* removeOwner(o);
       assertUniqueViolation(exit, 'jobs_dedupe_key');
+    }),
+  );
+
+  it.effect('passkeys_credential_id_check accepts a credential id of 1366 characters', () =>
+    Effect.gen(function* () {
+      const o = randomUUID();
+      const exit = yield* Effect.exit(
+        withOwner(o, insertPasskey(o, { credentialId: 'a'.repeat(1366) })),
+      );
+
+      yield* removeOwner(o);
+      assert.isTrue(Exit.isSuccess(exit), 'the longest allowed id must insert');
+    }),
+  );
+
+  const globalKeyCases: ReadonlyArray<{
+    readonly constraint: string;
+    readonly insert: (ownerId: string, key: string) => Effect.Effect<unknown, unknown, Db>;
+    readonly key: () => string;
+  }> = [
+    {
+      constraint: 'sessions_token_hash_key',
+      insert: (o, key) => insertSession(o, { tokenHash: key }),
+      key: validHash,
+    },
+    {
+      constraint: 'passkeys_credential_id_key',
+      insert: (o, key) => insertPasskey(o, { credentialId: key }),
+      key: () => randomBytes(32).toString('base64url'),
+    },
+    {
+      constraint: 'recovery_codes_code_hash_key',
+      insert: (o, key) => insertRecoveryCode(o, { codeHash: key }),
+      key: validHash,
+    },
+    {
+      constraint: 'sign_up_links_token_hash_key',
+      insert: (o, key) => insertSignUpLink(o, { tokenHash: key }),
+      key: validHash,
+    },
+  ];
+
+  for (const { constraint, insert, key } of globalKeyCases) {
+    it.effect(`${constraint} rejects the same key under two owners`, () =>
+      Effect.gen(function* () {
+        const a = randomUUID();
+        const b = randomUUID();
+        const shared = key();
+        yield* withOwner(a, insert(a, shared));
+        const exit = yield* Effect.exit(withOwner(b, insert(b, shared)));
+
+        yield* removeOwner(a);
+        yield* removeOwner(b);
+        assertUniqueViolation(exit, constraint);
+      }),
+    );
+  }
+
+  it.effect('sign_in_identities_subject_key rejects the same provider and subject twice', () =>
+    Effect.gen(function* () {
+      const a = randomUUID();
+      const b = randomUUID();
+      const subject = randomUUID();
+      yield* insertSignInIdentity(a, 'oidc', subject);
+      const exit = yield* Effect.exit(insertSignInIdentity(b, 'oidc', subject));
+
+      yield* removeOwner(a);
+      yield* removeOwner(b);
+      assertUniqueViolation(exit, 'sign_in_identities_subject_key');
     }),
   );
 });

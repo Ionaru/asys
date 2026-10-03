@@ -61,6 +61,8 @@ jobs:
         uses: $/.github/actions/setup
       - name: Build
         run: pnpm exec nx run-many -t build
+      - name: OpenAPI document
+        run: pnpm exec nx run server:openapi
 
   test:
     needs: audit

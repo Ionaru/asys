@@ -3,11 +3,11 @@ import { randomUUID } from 'node:crypto';
 import { assert, layer } from '@effect/vitest';
 import { eq, inArray } from 'drizzle-orm';
 import { Cause, Effect, Exit } from 'effect';
-import { appDatabase, Db } from '../db/database';
+import { appDatabase, Db, ownerDatabase } from '../db/database';
 import { jobs } from '../db/schema';
 import { withOwner } from '../db/with-owner';
 import { scopedOwner } from '../test/owners';
-import { claimJobs, oldestDueJobAgeSeconds } from './claim';
+import { claimJobs, failingJobCount, oldestDueJobAgeSeconds } from './claim';
 
 // These tests run against the real database (docker compose), on the real
 // clock: claim_jobs and the age use the database clock and see every owner.
@@ -174,6 +174,38 @@ layer(appDatabase(), { excludeTestServices: true })('oldestDueJobAgeSeconds', (i
       assert.isAtLeast(ignored, baseline);
       assert.isAtMost(ignored, baseline + 5);
       assert.isAtLeast(counted, 100_000 * 86_400);
+    }),
+  );
+});
+
+layer(appDatabase(), { excludeTestServices: true })('failingJobCount', (it) => {
+  it.effect('counts only unfinished jobs that have a last error', () =>
+    Effect.gen(function* () {
+      const owner = yield* scopedOwner();
+      const baseline = yield* failingJobCount;
+
+      yield* insertJob(owner, { runAt: bandAt(0), lastError: 'x' }).pipe(
+        Effect.andThen(
+          insertJob(owner, {
+            runAt: bandAt(1),
+            lastError: 'x',
+            failed: true,
+            finishedAt: new Date(),
+          }),
+        ),
+        Effect.andThen(insertJob(owner, { runAt: bandAt(2) })),
+        Effect.andThen(failingJobCount),
+        Effect.tap((count) => Effect.sync(() => assert.strictEqual(count, baseline + 1))),
+        Effect.ensuring(
+          withOwner(
+            owner,
+            Effect.gen(function* () {
+              const db = yield* Db;
+              yield* db.delete(jobs);
+            }),
+          ).pipe(Effect.provide(ownerDatabase()), Effect.orDie),
+        ),
+      );
     }),
   );
 });

@@ -6,7 +6,7 @@ This plan cuts [Slice 1 of the MVP plan](mvp-plan.md#slice-1-foundations-and-the
 - The installed packages were checked the same day.
 - An adversarial review then checked it, and its confirmed findings are folded in.
 
-Pieces 1 to 3 are specified in full. Pieces 4 to 7 are outlined only as far as they constrain the earlier pieces, and each gets a short re-plan before it starts.
+Pieces 1 to 4 are specified in full. Pieces 5 to 7 are outlined only as far as they constrain the earlier pieces, and each gets a short re-plan before it starts.
 
 ## Working agreements
 
@@ -109,7 +109,7 @@ These are logged in `libs/domain/CHANGELOG.md` under `RULES_VERSION` 0.1.0.
 
 ### 7. WebAuthn challenges stay in memory
 
-The one server process keeps them, with a 5-minute TTL. They are keyed by the challenge inside `clientDataJSON`.
+The one server process keeps them, with a 5-minute TTL. Each is keyed by its own value, which the client echoes back as `challengeId` and which `clientDataJSON` carries, and is taken once (piece 4).
 
 ### 8. One lock orders each owner's writes
 
@@ -120,11 +120,12 @@ Every per-owner write transaction takes the owner's `change_counters` row `FOR U
 
 ### 9. Pre-owner lookup functions keep exactly ADR 0007's shape
 
-- **Shape.** Each takes the exact key and returns only `(owner_id, id)`. The lookup role reads only the key and owner columns.
+- **Shape.** Each takes the exact key and returns only `(owner_id, id)`. The lookup role reads only the key and owner columns, and for the job functions only the job columns they use.
 - **Expiry and one-time use** are checked afterwards, under `withOwner`.
-- **The two functions that read across owners:**
+- **The three functions that read across owners:**
   - `claim_jobs`, which ADR 0012 allows;
-  - `oldest_due_job_age()`, which returns only an interval. Piece 3 adds a one-line note on it to ADR 0012.
+  - `oldest_due_job_age()`, which returns only an interval. Piece 3 adds a one-line note on it to ADR 0012;
+  - `failing_job_count()`, which returns only a count (piece 4, also noted in ADR 0012).
 
 ### 10. SPDX headers
 
@@ -544,59 +545,134 @@ The handler holds its owner's counter lock while it runs.
 **Dropping the trial**
 - One migration drops `trial_items` and `trial_item_owner`: `SET ROLE asys_lookup; DROP FUNCTION …; RESET ROLE;`, then drizzle-kit's `DROP POLICY` and `DROP TABLE`.
 
-## Piece 4: HTTP API and sign-in (outline)
+## Piece 4: HTTP API and sign-in
 
-**Server**
-- The bundled ESM build of decision 6, with `@types/node` ^24.
-- `main.ts` composes `HttpApiBuilder.layer(Api)`, `HttpRouter.serve`, `NodeHttpServer.layer` and the job worker (`jobWorkerLayer` with `coreJobsLayer` and `JobRegistry.layer`, from piece 3).
-- **Notes from piece 3.**
-  - A job handler holds its owner's counter lock while it runs. A job kind that waits on the network must split its work instead.
-  - Decide how `/health` surfaces a cron job that keeps failing. It moves to its next run, so its age never grows, and it shows only in logs and `last_error`.
-  - Decide whether tests move to a dedicated database. Once the dev server runs a worker, it would claim the tests' due jobs.
-- It reads `Config`: `PORT`, `DATABASE_URL_APP`, `ASYS_PUBLIC_ORIGIN`, `ASYS_RP_ID`, and optionally `ASYS_STATIC_ROOT`.
+Re-planned and built on 2026-10-03, in two commits: the passkey library (4a), then the server (4b).
 
-**The `Auth` middleware**
-- `HttpApiSecurity.apiKey({ key: 'asys_session', in: 'cookie' })`.
-- It rejects an empty credential and provides `CurrentOwner`.
-- The cookie is set with `path: '/'`, HttpOnly, Secure and SameSite=Lax.
+**Notes from piece 3, decided**
+- **`/health`** reports `failingJobs` next to `oldestDueJobAgeSeconds`, so a cron job that keeps failing shows even though its age never grows.
+- **Tests stay on the shared dev database.** Stop `nx serve server` before running them, because its worker would claim their due jobs.
 
-**Endpoints**
+### 4a. The passkey library
 
-| Method and path | Notes |
-|---|---|
-| `POST /v1/commands` | the only mutation route for domain data |
-| `GET /v1/snapshot` | |
-| `GET /v1/changes?after=n` | 410 `Expired` for a pruned number |
-| `GET /v1/meta` | |
-| `signup/options`, `signup/verify` | token from the link's `#fragment`, plus the device time zone |
-| `signin/options`, `signin/verify` | discoverable credentials |
-| `recover`, `signout`, `me` | |
-| passkeys: list, add, remove | |
-| recovery codes: regenerate | |
-| `GET /health` | reports `oldestDueJobAgeSeconds` |
+**`@ionaru/effect-passkeys`** is an MIT library in `libs/effect-passkeys` (Nx project `effect-passkeys`, tag `scope:passkeys`), modelled on fresh-passkeys.
+- **Split of work.** The library owns the WebAuthn ceremonies, the challenges, the counter updates and the passkey endpoints. ASYS supplies a storage port, a unit of work, hooks and its session middleware. The library's README describes each of them.
+- **Entries.**
+  - `/api`: the errors, the schemas and the `makePasskeyGroup` factory.
+  - `/server`: the config, the `PasskeyStore` port, the challenges, the unit of work, the ceremonies, `makePasskeyHandlers` and `passkeyRouterConfig`.
+  - `/testing`: a software authenticator, a memory store and a recording unit of work.
+  - `/client` comes in piece 5.
+- **Imports.** Only `effect` and `@simplewebauthn/server` (from JSR, decision 11), never `@asys/*`, so it can later be published on its own.
+  - The library imports itself relatively, because importing its own alias is a circular dependency.
+  - oxlint keeps the api entry free of `/server`, `/testing`, `@simplewebauthn/*` and `node:*`.
+  - `libs/contract` may import only `/api`.
 
+**WebAuthn settings**
+- **Registration:** `residentKey` and `userVerification` `required`, attestation `none`.
+- **Sign-in:** `userVerification` `required`, no `allowCredentials`.
+- **Algorithms:** `[-8, -7, -257]`, passed to both the options and the verification. Without it the verification also accepts ML-DSA (-48) and prints a warning on Node 24.
+- **Timeouts:** 300 s.
+- **User handle:** the UTF-8 bytes of the host's user id, at most 64 bytes.
+- **Sign-in checks.**
+  - `rawId` must equal `id`, and the passkey is looked up by `id` across users.
+  - A `userHandle`, when present, must match the stored user. SimpleWebAuthn checks neither.
+  - `verified` must be true.
+  - The counter is updated by compare-and-set inside the unit of work, together with the host's `onAuthenticated` hook.
+
+**Challenges stay in memory** (decision 7), in `PasskeyChallenges.memory`.
+- Each is keyed by its own value, the `challengeId` the client echoes back, and bound to a purpose and, where it applies, a user.
+- It lives 5 minutes and is taken once.
+- At most 1,000 are kept per purpose, the oldest evicted first, so anonymous sign-in options never evict a registration.
+
+**Errors:** `PasskeyChallengeInvalid` 400, `PasskeyVerificationFailed` 401, `PasskeyUnknownCredential` 404, `PasskeyAlreadyRegistered` 409 and `PasskeyLastCredential` 409.
+
+**The router.** Effect's router skips a path parameter longer than 100 characters, which makes `DELETE /passkeys/:credentialId` a 404 for a long credential id. A host passes `passkeyRouterConfig` (`maxParamLength: 1366`) as `routerConfig` to `HttpRouter.serve` and `HttpRouter.toWebHandler`.
+
+### 4b. The server
+
+**Build and CLI**
+- **The build** is the bundled ESM of decision 6, with `@types/node` ^24.19.1. `dist/apps/server/main.js` is the `asys` CLI:
+  - `serve` runs the HTTP server and the job worker;
+  - `signup-link [--expires-in-days 7]` (1 to 30) prints `${ASYS_PUBLIC_ORIGIN}/signup#token=…` and the expiry;
+  - `openapi` prints `OpenApi.fromApi(Api)`.
+- **OpenAPI** is written, not served. The `server:openapi` target writes `dist/apps/server/openapi.json`. CI runs it, which also proves that the bundle loads without a `.env`.
+- **Config** (`ServerConfig`):
+  - `PORT`, default 3000;
+  - `ASYS_PUBLIC_ORIGIN`, an exact origin: https, or http on localhost;
+  - `ASYS_RP_ID`, the origin's host or a parent domain of it;
+  - the database URLs.
+- **Logging.** Every line goes through one redacting logger on stderr.
+  - It prints message strings and primitive annotations as given, and every Cause as `describeError`: tags, SQLSTATE and constraint only. A ConfigError shows the names of its variables, never a value.
+  - It covers the default request logger (which strips the query), the worker, startup and the CLI. The CLI runs with `disableErrorReporting`, so `runMain` prints nothing of its own.
+
+**The API** (`libs/contract`, decision 5)
+
+| Group | Prefix, middleware | Endpoints |
+|---|---|---|
+| `data` | `/v1`, `Authentication` | `POST /commands`, `GET /snapshot`, `GET /changes?after=n` (410 `ChangesExpired`), `GET /meta` |
+| `passkeys` | `/v1/auth`, `Authentication` on the last four | from the library's factory: `POST /register/options`, `POST /register`, `POST /authenticate/options`, `POST /authenticate`, `POST /passkeys/options`, `POST /passkeys`, `GET /passkeys`, `DELETE /passkeys/:credentialId` |
+| `auth` | `/v1/auth`, none | `POST /recover` |
+| `account` | `/v1/auth`, `Authentication` | `POST /signout`, `GET /me`, `POST /recovery-codes` |
+| `health` | none | `GET /health`: `{ status, oldestDueJobAgeSeconds, failingJobs }`, or 503 |
+
+- **Statuses.**
+  - `CommandRejected` 422, `IdempotencyKeyReused` 409, `ChangesExpired` 410.
+  - `SignUpLinkInvalid` 410 (unknown, expired or used), `SignInFailed` 401 (recovery codes), `Unauthorized` 401 from the middleware.
+  - A schema failure is a 400 with an empty body, and a database failure an empty 500.
 - The auth endpoints are not domain commands, so they are exempt from the one-mutation-route rule.
-- OpenAPI is written by a build target through `OpenApi.fromApi`. It is not served.
-- **Database errors** become an opaque 500. They are logged with only the reason tag, SQLSTATE and constraint, never the message, which carries the query parameters (noted in piece 2).
 
-**Tables**
-- `passkeys`.
-- `recovery_codes`: SHA-256 of 80-bit codes, 10 per set.
-- `sessions`: SHA-256 of a 32-byte token, valid for 30 days.
-- `sign_up_links`: carries the pre-allocated `owner_id`.
-- `sign_in_identities (provider, subject)`: stays empty until Stage 7.
+**Cookies and the Origin guard**
+- **The session cookie** is `__Host-asys_session`, with HttpOnly, Secure, SameSite=Lax, Path=/ and Max-Age 30 days.
+  - The prefix blocks cookie tossing from sibling subdomains.
+  - In development only Chrome and Firefox accept a Secure cookie over `http://localhost`; Safari does not.
+- **The Origin guard** covers every method except GET, HEAD and OPTIONS. `Origin` must equal `ASYS_PUBLIC_ORIGIN` exactly, or the answer is an empty 403.
+  - It is the API's CSRF defence, because Effect has none built in.
+  - It also caps request bodies at 1 MiB.
 
-**Lookup functions**
-- `lookup_passkey`, `lookup_session`, `lookup_recovery_code` and `lookup_sign_up_link`, all in the shape of decision 9.
-- Expiry and one-time use are checked afterwards under `withOwner`.
+**Sessions**
+- **Creation.** A 32-byte token, sent as base64url and stored as its SHA-256 hex, valid for 30 days.
+- **Sliding.** A request with less than 29 days left renews the session to 30 days from now and re-sends the cookie, so at most once a day. There is no absolute cap.
+- **Revocation.** Removing a passkey, regenerating the recovery codes, or signing in with a recovery code signs out every other session. Sign-out deletes the current one, and prune deletes expired ones.
+- **Re-check under the lock.** The middleware checks a session before the handler runs, so a credential change re-checks it after taking the counter lock, the lock every revocation takes. A revoked request then answers 401: regenerating the codes fails with `Unauthorized`, and adding or removing a passkey dies with it, because the library's unit of work cannot carry the error; it still answers itself as an empty 401. Domain commands carry no credential power and are not re-checked.
 
-**Libraries and CLI**
-- `@simplewebauthn/server` and `@simplewebauthn/browser` 14.x (MIT), pinned exactly.
-- The CLI uses `effect/cli`: `asys signup-link [--expires-in-days 7]` prints `${ASYS_PUBLIC_ORIGIN}/signup#token=…`.
+**Sign-up and recovery**
+- **The Sign-up link.** `signup-link` pre-allocates the owner id and stores the token's hash under it. The library's register endpoints carry the token.
+  - On begin, ASYS checks the link.
+  - On finish, ASYS locks the link row first, because the owner has no counter yet. It then marks the link used and creates the owner rows, the passkey, 10 recovery codes and a session, in one transaction.
+- **Recovery codes.** A set is 10 codes of 80 random bits in Crockford base32, written `XXXX-XXXX-XXXX-XXXX`, stored hashed and used once. Input is upper-cased, hyphens and spaces are dropped, and `O`, `I` and `L` read as `0`, `1` and `1`.
+- **ASYS's side of the library.**
+  - `PasskeyStoreLive` over drizzle and row-level security. Its writes take the counter lock, and a duplicate credential id is caught outside its savepoint.
+  - A `PasskeyUnitOfWork` that is `withOwner` plus the counter lock.
+  - The hooks: sign-up gated by the link, the owner created with the first passkey, a session on sign-in, and the other sessions revoked when a passkey is removed.
+
+**Tables and functions**
+
+| Table | Columns |
+|---|---|
+| `sign_up_links` | `token_hash` (hex 64, unique), `created_at`, `expires_at`, `used_at` |
+| `passkeys` | `credential_id` (base64url, at most 1,366, unique), `public_key` (base64url COSE), `counter`, `transports`, `backed_up`, `name`, `created_at`, `last_used_at` |
+| `recovery_codes` | `code_hash` (hex 64, unique), `created_at`, `used_at` |
+| `sessions` | `token_hash` (hex 64, unique), `created_at`, `expires_at` |
+| `sign_in_identities` | `provider`, `subject` (unique together); empty until Stage 7 |
+
+- **Shape.** All five are owned and under forced row-level security, with primary key `(owner_id, id)`.
+- **Formats.** Hashes are lowercase hex text and binary values base64url text, because drizzle's `bytea` arrives as a view over a shared buffer.
+- **Grants to `asys_app`:** SELECT, INSERT and UPDATE on `sign_up_links`; also DELETE on `passkeys`, `recovery_codes` and `sessions`; nothing on `sign_in_identities`.
+- **Lookup functions** in decision 9's shape: `lookup_sign_up_link`, `lookup_session`, `lookup_passkey` and `lookup_recovery_code`. Each returns `(owner_id, id)` for the exact key.
+- **`failing_job_count()`** returns only a count: unfinished jobs whose `last_error` is set. A permanently failed one-off is not counted.
 
 **Tests**
-- HTTP tests run through `HttpRouter.toWebHandler`, with the WebAuthn verifier behind a service that tests stub.
-- Real passkeys are tried by hand in a browser on localhost.
+- **No browser.** The library's specs drive the ceremonies with a software authenticator: an ES256 key with a hand-built `none` attestation.
+- **HTTP.** HTTP tests run through `HttpRouter.toWebHandler` with the server's router config and Origin guard. A real-socket test checks the guard, the body cap and the log redaction.
+- **Locks and races.** Tests pin the link lock, the counter compare-and-set, the counter lock of the store and of the unit of work, concurrent recoveries and concurrent removals.
+
+**Known limits for slice 1** (also in ADR 0006's consequences)
+- Sessions have no absolute lifetime.
+- Credential changes need only a valid session; there is no step-up authentication.
+- A flood of anonymous sign-in options can evict real ones within their partition, and so delay sign-ins.
+- `pnpm audit` cannot see advisories for JSR packages.
+
+**Later work.** Publishing `@ionaru/effect-passkeys` on JSR needs a `jsr.json`, `npm:` import mappings, and a check of extensionless imports and slow types (`--allow-slow-types` is likely).
 
 ## Piece 5: PWA shell and data client (outline)
 
@@ -623,6 +699,12 @@ The handler holds its owner's counter lock while it runs.
 
 **Time zone.** The PWA reports the device time zone when it differs from the server's.
 
+**Notes from piece 4**
+- The passkey library gains its `/client` entry, with `@simplewebauthn/browser` 14.0.0 from JSR.
+- Try a real passkey in a browser, and try the `__Host-` cookie over `http://localhost` in Chrome.
+- The dev origin is `http://localhost:4200`, and the proxy must keep the `Origin` header, or the Origin guard answers 403.
+- After a recovery sign-in, prompt the User to add a passkey and remove the lost ones.
+
 **Testing.** There are no PWA unit tests (ADR 0010). It is checked end to end in a browser.
 
 ## Piece 6: PWA Task screens (outline)
@@ -639,7 +721,7 @@ Components stay thin, and the logic stays in `libs/domain`.
 ## Piece 7: deployment and phone check (outline)
 
 - Fix the public hostname (open question 11 in the MVP plan) before any passkey is enrolled.
-- Build a Node 24 image. It serves the PWA through `HttpStaticServer` with SPA fallback, on the same origin.
+- Build a Node 24 image. It serves the PWA through `HttpStaticServer` with SPA fallback, on the same origin. The static root comes from `Config` and is mounted next to the API in `asys serve`.
 - Run Compose on the VPS behind the existing TLS reverse proxy. Migrations run as `asys_owner`.
 - The phone check:
   1. Run `signup-link`.
@@ -655,8 +737,8 @@ These were checked against the installed packages (Effect 4.0.0-rc.117, drizzle-
 
 | Package | Version and licence | Notes |
 |---|---|---|
-| `@simplewebauthn/server` | 14.0.3, MIT | Node 20 or later, ESM and CJS |
-| `@simplewebauthn/browser` | 14.0.0, MIT | `startRegistration({ optionsJSON })` and `startAuthentication({ optionsJSON })` |
+| `@simplewebauthn/server` | 14.0.3, MIT | from JSR (decision 11): ESM only, no `license` or `engines` field |
+| `@simplewebauthn/browser` | 14.0.0, MIT | from JSR in piece 5; `startRegistration({ optionsJSON })` and `startAuthentication({ optionsJSON })` |
 | `temporal-polyfill` | 1.0.5, MIT | about 20 kB gzipped |
 | `@js-temporal/polyfill` | ISC | |
 | `fast-check` | 4.10.2, MIT | |
@@ -668,7 +750,7 @@ These were checked against the installed packages (Effect 4.0.0-rc.117, drizzle-
 ### HttpApi (`effect/http-api`)
 
 - **Definition.** `HttpApi.make(id).add(group).prefix('/v1')`. `.prefix()` and `.middleware()` apply only to groups and endpoints added before them.
-- **Endpoints.** `HttpApiEndpoint.get/post(name, path, { params, query, payload, success, error })`. Query values are coerced, so `Schema.Int` works for `?after=5`.
+- **Endpoints.** `HttpApiEndpoint.get/post/delete(identifier, path, { params, query, payload, success, error })`, the identifier first. Query values are coerced, so `Schema.Int` works for `?after=5` and rejects `abc` and `1.5`. Leaving out `success` gives 204, and `HttpApiSchema.status(201)` on a success schema gives 201. Excess keys are stripped, and an unknown route or a wrong method is a 404.
 - **Errors.** Declared as `Schema.TaggedError<Self>()(tag, fields, { httpApiStatus })`. There are built-in `HttpApiError.Gone`, `Conflict` and `UnprocessableEntity`. A schema failure is a 400 with an empty body.
 - **Handlers and serving.** `HttpApiBuilder.group(api, 'group', …)` with `handleAll`. `HttpApiBuilder.layer(api)`. Serve with `HttpRouter.serve` and `NodeHttpServer.layer`; there is no `HttpApiBuilder.serve`.
 - **OpenAPI and SSE.**
@@ -735,3 +817,43 @@ These were checked against the installed packages (Effect 4.0.0-rc.117, drizzle-
 - **Angular service worker.** Its `navigationUrls` default serves `index.html` for `/capture?…`, since the query is ignored. `@angular/service-worker` and `@angular/pwa` are not installed yet.
 - **Web Share Target.** A GET share target needs no service-worker code. It works for installed PWAs on Chrome for Android, not on iOS Safari.
 - **Temporal.** It is not native in Node 24 or on iOS Safari.
+
+## Facts checked on 2026-10-03 (piece 4)
+
+Checked against effect 4.0.0, @effect/platform-node 4.0.0, drizzle-orm 1.0.0-rc.5-5935859, Nx 23.2.1 and SimpleWebAuthn 14.0.3 from JSR, mostly by running probes.
+
+- **Open schemas.** A success schema that must encode values with `undefined` keys, such as SimpleWebAuthn's options, has to be `Schema.Any` cast to a typed codec. `Unknown`, `Json` and `Record` all answer 400.
+- **A group defined by a library.**
+  - A host-supplied error list needs `error: … as never` and explicit endpoint types, because the `error` option's guard cannot resolve generically.
+  - `HttpApiBuilder.group` cannot be called with a generic identifier, so the handler builder casts the Api to a widened group type, and the layer back.
+  - `isolatedDeclarations` cannot be used with Effect's class-extends patterns (TS9021).
+- **CLI.**
+  - `Flag.Int` accepts negatives.
+  - A root command without a handler, run without a subcommand, prints its help and fails with `CliError.ShowHelp`.
+  - `Command.run` reads the arguments from `Stdio`, and `Command.runWith(command, { version })(argv)` takes them explicitly.
+- **Config.** `Config.schema(schema, NAME)` checks a value. A ConfigError names its variable only in its message; its cause holds `issue.path`. Tests use `ConfigProvider.fromEnvRecord`.
+- **Logging.**
+  - The default request logger and `Effect.logError(cause)` print a defect's message and stack. For drizzle that includes the query parameters.
+  - `Logger.layer([...])` replaces the logger only when it is provided around the whole program.
+  - A logger gets `{ message, logLevel, cause, fiber, date }`. Annotations come from `fiber.getRef(References.CurrentLogAnnotations)`.
+  - `NodeRuntime.runMain` logs a failure itself unless `disableErrorReporting: true`.
+- **Drizzle and PostgreSQL.**
+  - `bytea` comes back as a view over a shared pool buffer.
+  - A regex allows at most 255 in a bounded repetition.
+  - A nested `withOwner` is a savepoint, rolled back only when the inner effect fails. An SQL error caught inside it leaves the outer transaction aborted.
+- **Cookies.**
+  - `securitySetCookie(security, value, { path: '/', sameSite: 'lax', maxAge: '30 days' })` gives `Max-Age`, `Path`, `HttpOnly`, `Secure` and `SameSite`. Clearing goes through `HttpEffect.appendPreResponseHandler` with `HttpServerResponse.expireCookie`.
+  - A missing or malformed cookie reaches the middleware as an empty credential. With duplicate names the first cookie wins.
+  - Safari refuses a Secure cookie over `http://localhost`; Chrome and Firefox accept it.
+- **Serving.**
+  - Nothing checks `Origin` or limits the body by default. `HttpServerRequest.MaxBodySize` resets the connection on the Node server only.
+  - `Layer.provideMerge(HttpRouter.serve(app, …), NodeHttpServer.layer(…))` keeps `HttpServer` in the output, so port 0 can be read back.
+- **SimpleWebAuthn 14.0.3.**
+  - `generateRegistrationOptions` takes `userID: Uint8Array` and mutates the `authenticatorSelection` it is given. `generateAuthenticationOptions` defaults to `userVerification: 'preferred'` and a 60 s timeout.
+  - `requireUserVerification` defaults to true.
+  - A stored and reported counter of 0 passes; otherwise the reported counter must be strictly greater.
+  - A bad signature returns `verified: false`; most other bad input throws.
+- **JSR through pnpm 11.22.**
+  - The lockfile aliases a JSR package to `@jsr/<scope>__<name>`.
+  - Nx treats it as an npm alias: `@nx/esbuild` keeps it external, and `generatePackageJson` writes `npm:@jsr/…`, which a frozen install resolves.
+  - `pnpm audit` queries the `@jsr/` name, under which no advisories are filed.

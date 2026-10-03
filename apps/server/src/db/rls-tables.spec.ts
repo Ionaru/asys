@@ -21,6 +21,11 @@ const EXPECTED_TABLES = [
   'change_counters',
   'idempotency_keys',
   'jobs',
+  'sign_up_links',
+  'passkeys',
+  'recovery_codes',
+  'sessions',
+  'sign_in_identities',
 ];
 
 const tableGuards = Effect.gen(function* () {
@@ -50,7 +55,7 @@ const tableGuards = Effect.gen(function* () {
 });
 
 layer(appDatabase())('row-level security guards every table', (it) => {
-  it.effect('the enumeration finds all ten known tables', () =>
+  it.effect('the enumeration finds all fifteen known tables', () =>
     Effect.gen(function* () {
       const names = (yield* tableGuards).map((row) => row.name);
       for (const expected of EXPECTED_TABLES) {
@@ -137,6 +142,11 @@ const GRANTS: Record<
   change_log: { select: true, insert: true, update: false, delete: true },
   idempotency_keys: { select: true, insert: true, update: false, delete: true },
   jobs: { select: true, insert: true, update: true, delete: false },
+  sign_up_links: { select: true, insert: true, update: true, delete: false },
+  passkeys: { select: true, insert: true, update: true, delete: true },
+  recovery_codes: { select: true, insert: true, update: true, delete: true },
+  sessions: { select: true, insert: true, update: true, delete: true },
+  sign_in_identities: { select: false, insert: false, update: false, delete: false },
 };
 
 layer(appDatabase())('asys_app grants', (it) => {
@@ -212,33 +222,19 @@ layer(appDatabase())('asys_app grants', (it) => {
 });
 
 // asys_lookup (NOLOGIN, BYPASSRLS) backs the SECURITY DEFINER functions. It
-// may only touch the job columns that claim_jobs and oldest_due_job_age need.
+// may only touch the columns that they need.
 
-const JOBS_COLUMNS = [
-  'id',
-  'owner_id',
-  'kind',
-  'payload',
-  'run_at',
-  'cron',
-  'dedupe_key',
-  'attempts',
-  'claimed_until',
-  'last_error',
-  'finished_at',
-  'failed',
-];
+const LOOKUP_SELECT_COLUMNS: Record<string, ReadonlyArray<string>> = {
+  jobs: ['id', 'owner_id', 'run_at', 'claimed_until', 'finished_at', 'attempts', 'last_error'],
+  sign_up_links: ['owner_id', 'id', 'token_hash'],
+  sessions: ['owner_id', 'id', 'token_hash'],
+  passkeys: ['owner_id', 'id', 'credential_id'],
+  recovery_codes: ['owner_id', 'id', 'code_hash'],
+};
 
-const LOOKUP_SELECT_COLUMNS = [
-  'id',
-  'owner_id',
-  'run_at',
-  'claimed_until',
-  'finished_at',
-  'attempts',
-];
-
-const LOOKUP_UPDATE_COLUMNS = ['claimed_until', 'attempts'];
+const LOOKUP_UPDATE_COLUMNS: Record<string, ReadonlyArray<string>> = {
+  jobs: ['claimed_until', 'attempts'],
+};
 
 const TABLE_PRIVILEGES = [
   'SELECT',
@@ -253,44 +249,71 @@ const TABLE_PRIVILEGES = [
 // has_any_column_privilege rejects DELETE and TRUNCATE.
 const COLUMN_PRIVILEGES = ['SELECT', 'INSERT', 'UPDATE', 'REFERENCES'];
 
-layer(appDatabase())('asys_lookup grants', (it) => {
-  it.effect('asys_lookup has no table-level privilege on jobs', () =>
-    Effect.gen(function* () {
-      const pg = yield* PgClient.PgClient;
-      for (const privilege of TABLE_PRIVILEGES) {
-        const [actual] = yield* pg<{ readonly granted: boolean }>`
-          select has_table_privilege('asys_lookup'::text, 'jobs'::text, ${privilege}::text) as granted`;
-        assert.strictEqual(actual.granted, false, `jobs: ${privilege}`);
-      }
-    }),
-  );
+const columnsOf = (table: string) =>
+  Effect.gen(function* () {
+    const pg = yield* PgClient.PgClient;
+    const rows = yield* pg<{ readonly name: string }>`
+      select a.attname as name
+      from pg_attribute a
+      where a.attrelid = ${table}::regclass and a.attnum > 0 and not a.attisdropped`;
+    return rows.map((row) => row.name);
+  });
 
-  it.effect('asys_lookup has column privileges on exactly the job columns the functions use', () =>
+layer(appDatabase())('asys_lookup grants', (it) => {
+  it.effect('asys_lookup has no table-level privilege on any table', () =>
     Effect.gen(function* () {
       const pg = yield* PgClient.PgClient;
-      const expected: Record<string, ReadonlyArray<string>> = {
-        SELECT: LOOKUP_SELECT_COLUMNS,
-        UPDATE: LOOKUP_UPDATE_COLUMNS,
-        INSERT: [],
-      };
-      for (const [privilege, columns] of Object.entries(expected)) {
-        for (const column of JOBS_COLUMNS) {
+      for (const table of EXPECTED_TABLES) {
+        for (const privilege of TABLE_PRIVILEGES) {
           const [actual] = yield* pg<{ readonly granted: boolean }>`
-            select has_column_privilege('asys_lookup'::text, 'jobs'::text, ${column}::text, ${privilege}::text) as granted`;
-          assert.strictEqual(
-            actual.granted,
-            columns.includes(column),
-            `jobs.${column}: ${privilege}`,
-          );
+            select has_table_privilege('asys_lookup'::text, ${table}::text, ${privilege}::text) as granted`;
+          assert.strictEqual(actual.granted, false, `${table}: ${privilege}`);
         }
       }
     }),
   );
 
-  it.effect('asys_lookup has no privilege at all on the other nine tables', () =>
+  it.effect('asys_lookup has column privileges on exactly the columns the functions use', () =>
     Effect.gen(function* () {
       const pg = yield* PgClient.PgClient;
-      for (const table of EXPECTED_TABLES.filter((name) => name !== 'jobs')) {
+      const expected: Record<string, Record<string, ReadonlyArray<string>>> = {
+        SELECT: LOOKUP_SELECT_COLUMNS,
+        UPDATE: LOOKUP_UPDATE_COLUMNS,
+        INSERT: {},
+      };
+      for (const [privilege, perTable] of Object.entries(expected)) {
+        for (const table of EXPECTED_TABLES) {
+          const columns = yield* columnsOf(table);
+          assert.isAbove(columns.length, 0, `${table}: columns found`);
+          for (const column of columns) {
+            const [actual] = yield* pg<{ readonly granted: boolean }>`
+              select has_column_privilege('asys_lookup'::text, ${table}::text, ${column}::text, ${privilege}::text) as granted`;
+            assert.strictEqual(
+              actual.granted,
+              (perTable[table] ?? []).includes(column),
+              `${table}.${column}: ${privilege}`,
+            );
+          }
+        }
+      }
+    }),
+  );
+
+  it.effect('the granted lookup columns exist', () =>
+    Effect.gen(function* () {
+      for (const [table, granted] of Object.entries(LOOKUP_SELECT_COLUMNS)) {
+        const columns = yield* columnsOf(table);
+        for (const column of granted) {
+          assert.include(columns, column, `${table}.${column}`);
+        }
+      }
+    }),
+  );
+
+  it.effect('asys_lookup has no privilege at all on the tables it does not look up', () =>
+    Effect.gen(function* () {
+      const pg = yield* PgClient.PgClient;
+      for (const table of EXPECTED_TABLES.filter((name) => !(name in LOOKUP_SELECT_COLUMNS))) {
         for (const privilege of TABLE_PRIVILEGES) {
           const [actual] = yield* pg<{ readonly granted: boolean }>`
             select has_table_privilege('asys_lookup'::text, ${table}::text, ${privilege}::text) as granted`;
@@ -307,17 +330,19 @@ layer(appDatabase())('asys_lookup grants', (it) => {
 });
 
 layer(appDatabase())('SECURITY DEFINER functions', (it) => {
-  it.effect('only claim_jobs and oldest_due_job_age exist, hardened and callable by asys_app', () =>
-    Effect.gen(function* () {
-      const pg = yield* PgClient.PgClient;
-      const functions = yield* pg<{
-        readonly signature: string;
-        readonly owner: string;
-        readonly config: ReadonlyArray<string> | null;
-        readonly volatility: string;
-        readonly publicExecute: boolean;
-        readonly appExecute: boolean;
-      }>`
+  it.effect(
+    'exactly the claim, count and lookup functions exist, hardened and callable by asys_app',
+    () =>
+      Effect.gen(function* () {
+        const pg = yield* PgClient.PgClient;
+        const functions = yield* pg<{
+          readonly signature: string;
+          readonly owner: string;
+          readonly config: ReadonlyArray<string> | null;
+          readonly volatility: string;
+          readonly publicExecute: boolean;
+          readonly appExecute: boolean;
+        }>`
         select p.oid::regprocedure::text as signature,
           r.rolname as owner,
           p.proconfig as config,
@@ -331,25 +356,35 @@ layer(appDatabase())('SECURITY DEFINER functions', (it) => {
           and n.nspname not in ('pg_catalog', 'information_schema')
         order by 1`;
 
-      assert.deepStrictEqual(functions.map((f) => f.signature).sort(), [
-        'claim_jobs(interval,integer)',
-        'oldest_due_job_age()',
-      ]);
-      const volatilities: Record<string, string> = {
-        'claim_jobs(interval,integer)': 'v',
-        'oldest_due_job_age()': 's',
-      };
-      for (const f of functions) {
-        assert.strictEqual(f.owner, 'asys_lookup', `${f.signature}: owner`);
-        assert.deepStrictEqual(
-          f.config === null ? null : [...f.config],
-          ['search_path=pg_catalog, pg_temp'],
-          `${f.signature}: search_path`,
-        );
-        assert.strictEqual(f.publicExecute, false, `${f.signature}: PUBLIC execute`);
-        assert.strictEqual(f.appExecute, true, `${f.signature}: asys_app execute`);
-        assert.strictEqual(f.volatility, volatilities[f.signature], `${f.signature}: volatility`);
-      }
-    }),
+        assert.deepStrictEqual(functions.map((f) => f.signature).sort(), [
+          'claim_jobs(interval,integer)',
+          'failing_job_count()',
+          'lookup_passkey(text)',
+          'lookup_recovery_code(text)',
+          'lookup_session(text)',
+          'lookup_sign_up_link(text)',
+          'oldest_due_job_age()',
+        ]);
+        const volatilities: Record<string, string> = {
+          'claim_jobs(interval,integer)': 'v',
+          'failing_job_count()': 's',
+          'lookup_passkey(text)': 's',
+          'lookup_recovery_code(text)': 's',
+          'lookup_session(text)': 's',
+          'lookup_sign_up_link(text)': 's',
+          'oldest_due_job_age()': 's',
+        };
+        for (const f of functions) {
+          assert.strictEqual(f.owner, 'asys_lookup', `${f.signature}: owner`);
+          assert.deepStrictEqual(
+            f.config === null ? null : [...f.config],
+            ['search_path=pg_catalog, pg_temp'],
+            `${f.signature}: search_path`,
+          );
+          assert.strictEqual(f.publicExecute, false, `${f.signature}: PUBLIC execute`);
+          assert.strictEqual(f.appExecute, true, `${f.signature}: asys_app execute`);
+          assert.strictEqual(f.volatility, volatilities[f.signature], `${f.signature}: volatility`);
+        }
+      }),
   );
 });

@@ -8,8 +8,9 @@ import { Effect, Layer } from 'effect';
 import { changesSince, lockCounter } from '../changes/change-log';
 import { runCommand } from '../commands/run-command';
 import { appDatabase, Db, ownerDatabase } from '../db/database';
-import { changeCounters, changeLog, idempotencyKeys, jobs } from '../db/schema';
+import { changeCounters, changeLog, idempotencyKeys, jobs, sessions } from '../db/schema';
 import { withOwner } from '../db/with-owner';
+import { hashToken, newToken } from '../auth/tokens';
 import { scopedOwner } from '../test/owners';
 import { nextCronRun } from './cron';
 import { coreJobsLayer, CoreJobKind, PRUNE_CRON, pruneOwner } from './prune';
@@ -219,6 +220,36 @@ layer(appDatabase(), { excludeTestServices: true })('pruneOwner', (it) => {
       assert.instanceOf(before, IdempotencyKeyReused);
       assert.deepStrictEqual(keysAfter, [keyFresh]);
       assert.strictEqual(afterPrune._tag, TransitionResultTag.Applied);
+    }),
+  );
+
+  it.effect('deletes a session that has expired and keeps one that has not', () =>
+    Effect.gen(function* () {
+      const o = yield* scopedOwner();
+      const db = yield* Db;
+      const t = Date.UTC(2026, 0, 1);
+      const expired = { id: randomUUID(), expiresAt: new Date(t) };
+      const live = { id: randomUUID(), expiresAt: new Date(t + 1) };
+      yield* withOwner(
+        o,
+        db.insert(sessions).values(
+          [expired, live].map((session) => ({
+            ownerId: o,
+            id: session.id,
+            tokenHash: hashToken(newToken()),
+            createdAt: new Date(t - DAY_MS),
+            expiresAt: session.expiresAt,
+          })),
+        ),
+      );
+
+      yield* prune(o, t);
+
+      const remaining = yield* withOwner(o, db.select({ id: sessions.id }).from(sessions));
+      assert.deepStrictEqual(
+        remaining.map((row) => row.id),
+        [live.id],
+      );
     }),
   );
 

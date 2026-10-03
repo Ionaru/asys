@@ -50,9 +50,26 @@ You can use `npx nx list` to get a list of installed plugins. Then, run `npx nx 
 
 [Learn more about Nx plugins &raquo;](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) | [Browse the plugin registry &raquo;](https://nx.dev/plugin-registry?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
 
+## Running the server
+
+The server is one CLI, `asys`, built into `dist/apps/server/main.js`.
+
+1. Start the database and migrate it: `docker compose up -d --wait`, then `pnpm exec drizzle-kit migrate --config apps/server/drizzle.config.ts`.
+2. Put the server's keys in `.env`, next to the database ones. For development:
+   - `PORT=3000`;
+   - `ASYS_PUBLIC_ORIGIN=http://localhost:4200`, the exact origin the browser uses;
+   - `ASYS_RP_ID=localhost`, the WebAuthn relying party id: the origin's host or a parent domain of it.
+3. `pnpm exec nx serve server` builds the bundle and runs `asys serve`: the HTTP API on `PORT` and the job worker. Nx loads `.env` into the task.
+4. The built CLI does not read `.env` by itself, so run it as `node --env-file=.env dist/apps/server/main.js <command>`:
+   - `signup-link [--expires-in-days 7]` prints a Sign-up link for a new Owner, valid for 1 to 30 days;
+   - `openapi` prints the OpenAPI document, which `pnpm exec nx run server:openapi` writes to `dist/apps/server/openapi.json`;
+   - `serve` runs the server, as `nx serve` does.
+
+Logs go to stderr and never contain error messages or query parameters. Stop `nx serve server` before running the server tests: they share the dev database, and its worker would claim their due jobs.
+
 ## CI
 
-CI is `.github/workflows/cd.yaml`: on every push and pull request an `audit` job (`pnpm audit --prod`, against the lockfile without installing dependencies) runs first, then the jobs `lint`, `typecheck`, `build`, `test`, `format`, `licences` and `palettes` run in parallel, without Nx Cloud. Each job's steps live in `cd.yaml`. Every job except `audit` starts with the composite action `.github/actions/setup`, which runs `.github/actions/checkout` and then sets up pnpm with Node 24 and installs from the frozen lockfile. Each job's commands can be run locally in the same way; the `test` job needs the database from `compose.yaml` (`docker compose up -d --wait`) and a `.env` with its passwords.
+CI is `.github/workflows/cd.yaml`: on every push and pull request an `audit` job (`pnpm audit --prod`, against the lockfile without installing dependencies) runs first, then the jobs `lint`, `typecheck`, `build`, `test`, `format`, `licences` and `palettes` run in parallel, without Nx Cloud. Each job's steps live in `cd.yaml`. The `build` job also writes the server's OpenAPI document (`nx run server:openapi`), which proves that the server bundle loads without a `.env`. Every job except `audit` starts with the composite action `.github/actions/setup`, which runs `.github/actions/checkout` and then sets up pnpm with Node 24 and installs from the frozen lockfile. Each job's commands can be run locally in the same way; the `test` job needs the database from `compose.yaml` (`docker compose up -d --wait`) and a `.env` with its passwords.
 
 ## Install Nx Console
 

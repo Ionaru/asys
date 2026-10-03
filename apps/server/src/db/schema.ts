@@ -285,3 +285,99 @@ export const jobs = pgTable.withRLS(
     ownerPolicy('jobs', t.ownerId),
   ],
 );
+
+export const signUpLinks = pgTable.withRLS(
+  'sign_up_links',
+  {
+    ownerId: ownerId(),
+    id: uuid('id').notNull(),
+    tokenHash: text('token_hash').notNull(),
+    createdAt: instant('created_at').notNull(),
+    expiresAt: instant('expires_at').notNull(),
+    usedAt: instant('used_at'),
+  },
+  (t) => [
+    primaryKey({ name: 'sign_up_links_pkey', columns: [t.ownerId, t.id] }),
+    unique('sign_up_links_token_hash_key').on(t.tokenHash),
+    check('sign_up_links_token_hash_check', sql`${t.tokenHash} ~ '^[0-9a-f]{64}$'`),
+    check('sign_up_links_expiry_check', sql`${t.expiresAt} > ${t.createdAt}`),
+    ownerPolicy('sign_up_links', t.ownerId),
+  ],
+);
+
+export const passkeys = pgTable.withRLS(
+  'passkeys',
+  {
+    ownerId: ownerId(),
+    id: uuid('id').notNull(),
+    credentialId: text('credential_id').notNull(),
+    publicKey: text('public_key').notNull(),
+    counter: bigint('counter', { mode: 'number' }).notNull(),
+    transports: jsonb('transports').$type<readonly string[]>().notNull(),
+    backedUp: boolean('backed_up').notNull(),
+    name: text('name').notNull(),
+    createdAt: instant('created_at').notNull(),
+    lastUsedAt: instant('last_used_at'),
+  },
+  (t) => [
+    primaryKey({ name: 'passkeys_pkey', columns: [t.ownerId, t.id] }),
+    unique('passkeys_credential_id_key').on(t.credentialId),
+    check(
+      'passkeys_credential_id_check',
+      sql`${t.credentialId} ~ '^[A-Za-z0-9_-]+$' and char_length(${t.credentialId}) <= 1366`,
+    ),
+    check('passkeys_counter_check', sql`${t.counter} >= 0`),
+    ownerPolicy('passkeys', t.ownerId),
+  ],
+);
+
+export const recoveryCodes = pgTable.withRLS(
+  'recovery_codes',
+  {
+    ownerId: ownerId(),
+    id: uuid('id').notNull(),
+    codeHash: text('code_hash').notNull(),
+    createdAt: instant('created_at').notNull(),
+    usedAt: instant('used_at'),
+  },
+  (t) => [
+    primaryKey({ name: 'recovery_codes_pkey', columns: [t.ownerId, t.id] }),
+    unique('recovery_codes_code_hash_key').on(t.codeHash),
+    check('recovery_codes_code_hash_check', sql`${t.codeHash} ~ '^[0-9a-f]{64}$'`),
+    ownerPolicy('recovery_codes', t.ownerId),
+  ],
+);
+
+export const sessions = pgTable.withRLS(
+  'sessions',
+  {
+    ownerId: ownerId(),
+    id: uuid('id').notNull(),
+    tokenHash: text('token_hash').notNull(),
+    createdAt: instant('created_at').notNull(),
+    expiresAt: instant('expires_at').notNull(),
+  },
+  (t) => [
+    primaryKey({ name: 'sessions_pkey', columns: [t.ownerId, t.id] }),
+    unique('sessions_token_hash_key').on(t.tokenHash),
+    check('sessions_token_hash_check', sql`${t.tokenHash} ~ '^[0-9a-f]{64}$'`),
+    check('sessions_expiry_check', sql`${t.expiresAt} > ${t.createdAt}`),
+    ownerPolicy('sessions', t.ownerId),
+  ],
+);
+
+export const signInIdentities = pgTable.withRLS(
+  'sign_in_identities',
+  {
+    ownerId: ownerId(),
+    id: uuid('id').notNull(),
+    provider: text('provider').notNull(),
+    subject: text('subject').notNull(),
+    createdAt: instant('created_at').notNull(),
+  },
+  (t) => [
+    primaryKey({ name: 'sign_in_identities_pkey', columns: [t.ownerId, t.id] }),
+    unique('sign_in_identities_subject_key').on(t.provider, t.subject),
+    ownerPolicy('sign_in_identities', t.ownerId),
+  ],
+);

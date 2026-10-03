@@ -4,7 +4,7 @@ import type { Instant, TimeZone } from '@asys/domain';
 import { and, eq, lt, lte, max, sql } from 'drizzle-orm';
 import { Effect, Layer } from 'effect';
 import { Db } from '../db/database';
-import { changeCounters, changeLog, idempotencyKeys } from '../db/schema';
+import { changeCounters, changeLog, idempotencyKeys, sessions } from '../db/schema';
 import { nextCronRun } from './cron';
 import { JobRegistry, type JobHandler } from './registry';
 import type { ScheduleJobInput } from './schedule-job';
@@ -26,13 +26,13 @@ export const RETENTION_DAYS = 30;
 const DAY_MS = 86_400_000;
 
 /**
- * Deletes the owner's change-log rows and idempotency keys created before `now` minus
- * `RETENTION_DAYS`. The change log goes as a contiguous prefix: everything up to the
- * highest old `seq`, even rows newer than the cutoff, because `created_at` is the
- * transaction start while `seq` follows commit order, so deleting by age alone could
- * leave a hole `changesSince` cannot detect. `pruned_through` then moves up to that
- * `seq` and never back. Must run inside the caller's `withOwner(ownerId, ...)`, after
- * `lockCounter`; it takes no lock itself.
+ * Deletes the owner's sessions that expired at or before `now`, and its change-log rows and
+ * idempotency keys created before `now` minus `RETENTION_DAYS`. The change log goes as a
+ * contiguous prefix: everything up to the highest old `seq`, even rows newer than the
+ * cutoff, because `created_at` is the transaction start while `seq` follows commit order,
+ * so deleting by age alone could leave a hole `changesSince` cannot detect.
+ * `pruned_through` then moves up to that `seq` and never back. Must run inside the
+ * caller's `withOwner(ownerId, ...)`, after `lockCounter`; it takes no lock itself.
  */
 export const pruneOwner = (ownerId: string, now: Instant) =>
   Effect.gen(function* () {
@@ -57,6 +57,10 @@ export const pruneOwner = (ownerId: string, now: Instant) =>
     yield* db
       .delete(idempotencyKeys)
       .where(and(eq(idempotencyKeys.ownerId, ownerId), lt(idempotencyKeys.createdAt, cutoff)));
+
+    yield* db
+      .delete(sessions)
+      .where(and(eq(sessions.ownerId, ownerId), lte(sessions.expiresAt, new Date(now))));
   });
 
 /** The prune job handler: prunes the job's owner at the worker's clock time. */

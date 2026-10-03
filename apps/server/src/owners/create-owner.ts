@@ -25,8 +25,13 @@ export interface CreateOwnerInput {
   readonly timeZone: string;
 }
 
-/** Sets up a new User: the user row, settings, the two seeded Areas, the change counter and the daily prune job. */
-export const createOwner = (input: CreateOwnerInput) =>
+/**
+ * Sets up a new User: the user row, settings, the two seeded Areas, the change counter and the
+ * daily prune job. Must run inside the caller's `withOwner(input.ownerId, ...)`; rejects with
+ * `CreateOwnerRejected` before writing when the name or time zone is invalid, and after the
+ * user insert when the owner already exists.
+ */
+export const createOwnerRows = (input: CreateOwnerInput) =>
   Effect.gen(function* () {
     const name = input.name.trim();
     if (name === '' || name.includes('\u0000')) {
@@ -39,35 +44,34 @@ export const createOwner = (input: CreateOwnerInput) =>
     const db = yield* Db;
     const { ownerId } = input;
 
-    yield* withOwner(
-      ownerId,
-      Effect.gen(function* () {
-        const created = yield* db
-          .insert(users)
-          .values({ ownerId, name })
-          .onConflictDoNothing()
-          .returning({ ownerId: users.ownerId });
-        if (created.length === 0) {
-          return yield* new CreateOwnerRejected({ reason: CreateOwnerRejectedReason.OwnerExists });
-        }
+    const created = yield* db
+      .insert(users)
+      .values({ ownerId, name })
+      .onConflictDoNothing()
+      .returning({ ownerId: users.ownerId });
+    if (created.length === 0) {
+      return yield* new CreateOwnerRejected({ reason: CreateOwnerRejectedReason.OwnerExists });
+    }
 
-        yield* db.insert(settings).values(
-          settingsToRow(ownerId, {
-            timeZone: input.timeZone,
-            urgencyWindowDays: DEFAULT_URGENCY_WINDOW_DAYS,
-          }),
-        );
-        yield* db
-          .insert(areas)
-          .values(
-            seedAreas({ workId: randomUUID(), personalId: randomUUID() }).map((area) =>
-              areaToRow(ownerId, area),
-            ),
-          );
-        yield* db.insert(changeCounters).values({ ownerId, lastSeq: 0, prunedThrough: 0 });
-
-        const now = yield* Clock.currentTimeMillis;
-        yield* scheduleJob(ownerId, pruneJob(input.timeZone, now));
+    yield* db.insert(settings).values(
+      settingsToRow(ownerId, {
+        timeZone: input.timeZone,
+        urgencyWindowDays: DEFAULT_URGENCY_WINDOW_DAYS,
       }),
     );
+    yield* db
+      .insert(areas)
+      .values(
+        seedAreas({ workId: randomUUID(), personalId: randomUUID() }).map((area) =>
+          areaToRow(ownerId, area),
+        ),
+      );
+    yield* db.insert(changeCounters).values({ ownerId, lastSeq: 0, prunedThrough: 0 });
+
+    const now = yield* Clock.currentTimeMillis;
+    yield* scheduleJob(ownerId, pruneJob(input.timeZone, now));
   });
+
+/** Sets up a new User in its own transaction; see `createOwnerRows`. */
+export const createOwner = (input: CreateOwnerInput) =>
+  withOwner(input.ownerId, createOwnerRows(input));

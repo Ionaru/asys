@@ -44,3 +44,13 @@ export const oldestDueJobAgeSeconds = Effect.gen(function* () {
   );
   return rows[0].seconds;
 });
+
+/** The number of unfinished jobs, across all owners, that have failed at least once. */
+export const failingJobCount = Effect.gen(function* () {
+  const db = yield* Db;
+  const rows = yield* db.execute<{ count: number }>(
+    sql`select failing_job_count() as count`,
+    'objects',
+  );
+  return rows[0].count;
+});
