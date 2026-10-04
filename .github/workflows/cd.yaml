@@ -264,6 +264,10 @@ jobs:
     needs: [image, push-image]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    # The DEPLOY_* secrets are environment secrets, visible only to a job in this environment.
+    environment:
+      name: production
+      url: https://tasks.saturnserver.org
     concurrency:
       group: deploy
       cancel-in-progress: false
