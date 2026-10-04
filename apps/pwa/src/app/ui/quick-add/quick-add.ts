@@ -82,6 +82,11 @@ import { Button, ButtonSize, ButtonVariant } from '../button/button';
       font-weight: 400;
     }
 
+    /* The root's overflow-wrap would let a squeezed button break its label mid-word, so the input gives way instead. */
+    .asys-quickadd__row > .asys-button {
+      flex: none;
+    }
+
     .asys-quickadd__input::placeholder {
       color: var(--ink-muted);
       opacity: 1;

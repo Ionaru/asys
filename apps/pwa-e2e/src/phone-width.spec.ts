@@ -120,6 +120,15 @@ test('Nothing covers the last Now row, with the pill or the open quick add', asy
   await scrollToBottom(page);
   await expectClearOf(lastRow, [quickAdd, nav]);
 
+  // A label broken over two lines makes its button taller than the input.
+  const inputBox = await page.getByLabel('Capture a Task').boundingBox();
+  if (inputBox === null) throw new Error('input has no box');
+  for (const name of ['Add', 'Close']) {
+    const buttonBox = await quickAdd.getByRole('button', { name, exact: true }).boundingBox();
+    if (buttonBox === null) throw new Error(`${name} has no box`);
+    expect(buttonBox.height, `${name} button height`).toBeLessThanOrEqual(inputBox.height);
+  }
+
   await page.getByLabel('Capture a Task').fill('Status line Task');
   await page.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(page.locator('.asys-quickadd__status')).toHaveText(
