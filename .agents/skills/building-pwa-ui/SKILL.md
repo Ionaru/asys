@@ -1,0 +1,91 @@
+---
+# SPDX-License-Identifier: EUPL-1.2
+name: building-pwa-ui
+description: Use when adding or changing an Angular component, screen, route, form control, style or palette in apps/pwa or libs/design-tokens, or when calling a new server endpoint or Command from the PWA.
+---
+
+# Building PWA UI
+
+## Overview
+
+`apps/pwa` is Angular 22, zoneless, with OnPush and standalone as defaults. Never set either explicitly. Its layers:
+
+| Layer                                     | Holds                                                                                 | May import                               |
+| ----------------------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `core/api`                                | `DataApi`, `AuthApi`, `wire.ts`; the only importer of `src/generated`                 | generated client, `@asys/domain`         |
+| `core/auth`, `core/data`, `core/platform` | session, `DataStore`, `CommandAttempts`, seams (`Clock`, `Ids`, `DeviceStorage`, ...) | `core/*`, `@asys/domain`                 |
+| `features/<screen>`                       | routed screens plus their pure helpers                                                | `core`, `ui`, `@asys/domain`             |
+| `layout/`                                 | the shell: header, outlet, quick add, bottom nav                                      | `core`, `ui`                             |
+| `ui/<name>/`                              | presentational components                                                             | `@angular/*`, `@asys/domain`, other `ui` |
+
+Lint bans runtime imports of `@asys/contract`, `effect` and `@ionaru/effect-passkeys/api` (type-only is fine). `@ionaru/effect-passkeys/server` and `/testing` are banned outright. `@ionaru/effect-passkeys/client` is the one passkeys entry the PWA may use at runtime.
+
+## Component conventions
+
+- Use signals throughout: `input()`, `output()`, `model()`, `viewChild()`, and `inject()` fields. Never `@Input`, `@Output`, `NgModule` or `ngModel`.
+- Write templates and styles inline. Forms use Signal Forms (`@angular/forms/signals`), and shared controls implement `FormValueControl<T>` (`ui/text-field`, `ui/segmented`).
+- **`ui` components:**
+  - Use the selector `asys-<name>` and `ViewEncapsulation.None`.
+  - The host class has the `asys-` prefix, with BEM elements and `--modifier` classes. Bind them in `host: {}` (see `ui/quadrant-chip`).
+  - Closed sets are exported `enum`s, exposed to the template as `protected readonly Variant = ButtonVariant`.
+- **Features** keep the default encapsulation, with classes such as `now__title`.
+- **Styling:**
+  - Use token CSS variables only (`--paper`, `--ink`, `--signal`, `--space-1` to `--space-7`, `--tap-target`, `--font-size-*`), never hex colours.
+  - Add a `[data-theme='drive']` rule when tap size or motion must differ in Voice only.
+  - Put a style in `src/styles.css` only when several controls share it.
+- **Accessibility:**
+  - Errors read "Error:" with `aria-invalid` and `aria-describedby`, never colour alone.
+  - Quadrants differ in lightness or form, never hue alone.
+  - The bottom nav's 56px height is repeated in `bottom-nav.ts`, `capture-button.ts` and `shell-layout.ts`, so change all three.
+
+## Recipes
+
+**UI component:**
+
+1. Create `ui/<name>/<name>.ts` and `<name>.spec.ts`. There is no barrel and nothing to register.
+2. Model it on `quadrant-chip` (display), `button` (attribute selector) or `text-field` (form control).
+3. Write the spec with a `Host` component that drives signals, and await `fixture.whenStable()`.
+
+**Screen and route:**
+
+1. Create `features/<name>/<name>.ts` and its spec, with `providers: [CommandAttempts]` when it sends Commands.
+2. Add the route in `app.routes.ts`: `loadComponent` and `title: '<Name> · ASYS'`, under `ShellLayout` unless it is an auth screen.
+3. Add the title row to `app.routes.spec.ts`.
+4. For a primary tab, update `ui/bottom-nav` and `CAPTURE_PATHS` in `layout/shell-layout.ts`. For an auth screen, add the path to `AUTH_PATHS` in `app.ts` (the sign-out redirect), and to `AUTH_PATHS` and `AUTH_SEGMENTS` in `core/auth/safe-return-url.ts` with a case in its spec. Use `signedOutGuard` on the route. A screen shown just after sign-in (like `recovered`) goes only in `safe-return-url.ts`, without `signedOutGuard`.
+5. An id-keyed editor gets a `<name>-route.ts` wrapper (see `task-editor-route.ts`).
+6. Add an e2e spec for the user-facing flow (`writing-e2e-specs`).
+
+**Calling a new endpoint or Command:**
+
+1. Run `pnpm exec nx run pwa:api-client`.
+2. Add a method in `core/api/data-api.ts` or `auth-api.ts` that imports `generated/api/fn/<tag>/<op>`. These services never reject; they return the `HttpOutcome` and `CommandOutcome` unions.
+3. Add a `SHAPES` entry in `wire.ts` for each new generated model that the PWA converts to a domain type with `fromWire` or `toWire`. Models with no domain type are used as generated.
+4. Fix the exhaustive switches in `core/data/command-subject.ts`, `outcome-message.ts` and `features/inbox/review-copy.ts`.
+5. Sending from a screen:
+   - Get a key from `CommandAttempts.keyFor(command)`, send with `DataStore.send(command, key)`, then call `attempts.settle(...)` and show `outcomeMessage(outcome)`.
+   - After every await, check `destroyRef.destroyed`.
+   - Disable the control while a send is pending or `awaitingSync()` holds its subject.
+   - There is no offline queue yet; that comes in slice 4. Offline, a send fails with "cannot reach the server".
+
+**Palette** (ADR 0013, `libs/design-tokens/README.md`):
+
+1. Add `{ name, accent, highlight, ground }` to `PALETTES` in `scripts/palettes.mts`.
+2. Run `node scripts/palettes.mts`. It enforces the contrast pairs (4.5 for text, 3 for lines, 7 for text in drive) and writes the token files and resolver contexts.
+3. Update the "12 contexts" count in the design-tokens README, ADR 0013 and `terrazzo.config.mts`.
+4. Never hand-edit the generated `palettes/*.tokens.json` or `asys.resolver.json`.
+
+## Tests and checks
+
+- Unit tests use `@angular/build:unit-test` (Vitest, jsdom). Vitest globals are not imported.
+- `vi.mock` of relative imports is refused, so override a seam service with `{ provide: X, useValue }`. `features/now/now.spec.ts` is the model.
+- Use the real domain functions over a fixed state and clock.
+
+```bash
+pnpm exec nx run-many -t lint typecheck test build -p pwa
+```
+
+```bash
+pnpm exec nx format:check --all
+```
+
+`typecheck` skips templates, so the `build` (which also checks bundle budgets) and `test` targets are the template check. The plain `nx serve pwa` runs no service worker; try that with `pnpm exec nx run pwa:serve-sw`.

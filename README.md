@@ -1,66 +1,70 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
 
-# Asys
+# ASYS
 
-<a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
+ASYS (Assisting System) is a personal task manager that answers "what should I do now?". It holds the work that can be done at any time, ranks what fits now, and keeps an Inbox for what needs a decision. It is an installable Angular PWA on an Effect server, with PostgreSQL row-level security keeping each User's data apart. It runs at <https://tasks.saturnserver.org>; sign-up is by invitation link only.
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) is ready ✨.
+Slice 1 (the Task loop: capture, triage, Now, Areas and Settings, passkey sign-in and deployment) is complete. What comes next is in [`docs/mvp-plan.md`](docs/mvp-plan.md).
 
-[Learn more about this workspace setup and its capabilities](https://nx.dev/getting-started/intro#learn-nx?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
+## Documentation
 
-## Run tasks
+- [`CONTEXT.md`](CONTEXT.md): the domain language. Every term the code and the app use (Task, Available from, Due, Picker, Voice, ...) is defined there.
+- [`docs/adr/`](docs/adr): the architecture decisions.
+- [`docs/mvp-plan.md`](docs/mvp-plan.md): the slices and stages, and what each holds.
+- [`docs/scenarios.md`](docs/scenarios.md): the real-life acceptance scenarios, mirrored by `libs/domain/src/scenarios/`.
+- [`docs/slice-1-plan.md`](docs/slice-1-plan.md): how slice 1 was built, its decisions and its known limits.
+- [`docs/research/`](docs/research): the studies behind some decisions.
+- [`AGENTS.md`](AGENTS.md): the conventions for working in this repository, for people and coding agents alike. Task recipes live in [`.agents/skills/`](.agents/skills).
 
-To run tasks with Nx use:
+## Workspace
 
-```sh
-npx nx <target> <project-name>
-```
+An [Nx](https://nx.dev) workspace with pnpm, in the classic layout with path aliases ([ADR 0010](docs/adr/0010-nx-classic-layout.md)):
 
-For example:
+| Project                | What it is                                                                   | Licence  |
+| ---------------------- | ---------------------------------------------------------------------------- | -------- |
+| `libs/domain`          | The domain rules as plain TypeScript: time, Tasks, the Picker, the commands. | MPL-2.0  |
+| `libs/contract`        | The API contract in Effect Schema, and the HTTP API definition.              | MPL-2.0  |
+| `libs/effect-passkeys` | `@ionaru/effect-passkeys`, WebAuthn sign-up and sign-in for Effect.          | MIT      |
+| `libs/design-tokens`   | The design tokens (DTCG), curated palettes and fonts.                        | EUPL-1.2 |
+| `apps/server`          | The `asys` CLI: the HTTP API, the job worker and the migrations.             | EUPL-1.2 |
+| `apps/pwa`             | The Angular PWA.                                                             | EUPL-1.2 |
+| `apps/pwa-e2e`         | Playwright end-to-end tests against the real stack.                          | EUPL-1.2 |
 
-```sh
-npx nx build myproject
-```
+Run any target with `pnpm exec nx <target> <project>`, for example `pnpm exec nx test domain`; `pnpm exec nx show project <project>` lists a project's targets. The root `package.json` has no scripts.
 
-These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
+## Development setup
 
-[More about running tasks in the docs &raquo;](https://nx.dev/features/run-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+You need Node 24, pnpm 11 and Docker with the Compose plugin.
 
-## Add new projects
+1. `pnpm install`.
+2. Create `.env` in the repository root. The development database and the server read it:
 
-While you could add new projects to your workspace manually, you might want to leverage [Nx plugins](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) and their [code generation](https://nx.dev/features/generate-code?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) feature.
+   ```dotenv
+   POSTGRES_PASSWORD=<hex>
+   ASYS_OWNER_PASSWORD=<hex>
+   ASYS_APP_PASSWORD=<hex>
+   DATABASE_URL_OWNER=postgresql://asys_owner:<ASYS_OWNER_PASSWORD>@127.0.0.1:5432/asys
+   DATABASE_URL_APP=postgresql://asys_app:<ASYS_APP_PASSWORD>@127.0.0.1:5432/asys
+   PORT=3000
+   ASYS_PUBLIC_ORIGIN=http://localhost:4200
+   ASYS_RP_ID=localhost
+   ```
 
-To install a new plugin you can use the `nx add` command. Here's an example of adding the React plugin:
+   Use hex passwords (`openssl rand -hex 24`): they go into the URLs unescaped.
 
-```sh
-npx nx add @nx/react
-```
-
-Use the plugin's generator to create new projects. For example, to create a new React app or library:
-
-```sh
-# Generate an app
-npx nx g @nx/react:app demo
-
-# Generate a library
-npx nx g @nx/react:lib some-lib
-```
-
-You can use `npx nx list` to get a list of installed plugins. Then, run `npx nx list <plugin-name>` to learn about more specific capabilities of a particular plugin. Alternatively, [install Nx Console](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) to browse plugins and generators in your IDE.
-
-[Learn more about Nx plugins &raquo;](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) | [Browse the plugin registry &raquo;](https://nx.dev/plugin-registry?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+3. `docker compose up -d --wait` starts PostgreSQL 18 on `127.0.0.1:5432`. On an empty volume, `docker/postgres/init/10-roles.sql` creates the roles `asys_owner` (owns the tables, runs migrations), `asys_app` (what the server uses, under row-level security) and `asys_lookup` (owns the few lookup functions) and the database `asys`.
+4. `pnpm exec drizzle-kit migrate --config apps/server/drizzle.config.ts` applies the migrations.
 
 ## Running the server
 
 The server is one CLI, `asys`, built into `dist/apps/server/main.js`.
 
-1. Start the database and migrate it: `docker compose up -d --wait`, then `pnpm exec drizzle-kit migrate --config apps/server/drizzle.config.ts`.
-2. Put the server's keys in `.env`, next to the database ones. For development:
-   - `PORT=3000`;
-   - `ASYS_PUBLIC_ORIGIN=http://localhost:4200`, the exact origin the browser uses;
-   - `ASYS_RP_ID=localhost`, the WebAuthn relying party id: the origin's host or a parent domain of it.
-3. `pnpm exec nx serve server` builds the bundle and runs `asys serve`: the HTTP API on `PORT` and the job worker. Nx loads `.env` into the task.
-4. The built CLI does not read `.env` by itself, so run it as `node --env-file=.env dist/apps/server/main.js <command>`:
+1. The server's own settings in `.env` are:
+   - `PORT`, the API's port (3000);
+   - `ASYS_PUBLIC_ORIGIN`, the exact origin the browser uses (`http://localhost:4200` in development);
+   - `ASYS_RP_ID`, the WebAuthn relying party id: the origin's host or a parent domain of it (`localhost`).
+2. `pnpm exec nx serve server` builds the bundle and runs `asys serve`: the HTTP API on `PORT` and the job worker. Nx loads `.env` into the task.
+3. The built CLI does not read `.env` by itself, so run it as `node --env-file=.env dist/apps/server/main.js <command>`:
    - `signup-link [--expires-in-days 7]` prints a Sign-up link for a new Owner, valid for 1 to 30 days;
    - `openapi` prints the OpenAPI document, which `pnpm exec nx run server:openapi` writes to `dist/apps/server/openapi.json`;
    - `migrate` applies the migrations in `ASYS_MIGRATIONS_FOLDER` (default `apps/server/drizzle`) as `asys_owner` (`DATABASE_URL_OWNER`), recording them exactly as `drizzle-kit migrate` does, so either can migrate the same database;
@@ -71,7 +75,11 @@ Optional settings for `serve`:
 - `ASYS_STATIC_ROOT`, an absolute path such as `/app/pwa`, serves the built PWA from that directory on the same origin as the API, with an SPA fallback. Content-hashed bundles and fonts are cached as `immutable`, everything else is `no-cache`, and static responses carry a Content-Security-Policy. Unset, the server serves the API only, as in development.
 - `OTEL_EXPORTER_OTLP_ENDPOINT`, the base URL of an OTLP/HTTP collector such as `http://signoz-ingester:4318`, turns on the export of traces and logs (no metrics) over protobuf. `OTEL_SERVICE_NAME` defaults to `asys`, and `OTEL_RESOURCE_ATTRIBUTES` is read as usual. Unset or empty, nothing is exported.
 
-Logs go to stderr and never contain error messages or query parameters. With an OTLP endpoint, each log line is also exported with the same redacted message and only allowlisted attributes, and only `/v1` requests and job runs are traced; an allowlist scrubber drops URLs, query strings, headers, client addresses, error messages and stacks before anything leaves the process. A successful `/health` writes no log line. Stop `nx serve server` before running the server tests: they share the dev database, and its worker would claim their due jobs.
+Logs go to stderr and never contain error messages or query parameters. With an OTLP endpoint, each log line is also exported with the same redacted message and only allowlisted attributes, and only `/v1` requests and job runs are traced; an allowlist scrubber drops URLs, query strings, headers, client addresses, error messages and stacks before anything leaves the process. A successful `/health` writes no log line.
+
+### Migrations
+
+The schema is `apps/server/src/db/schema.ts`; migrations live in `apps/server/drizzle/`, one folder each. `pnpm exec drizzle-kit generate --config apps/server/drizzle.config.ts --name <name>` writes a migration from a schema change. drizzle-kit never emits `FORCE ROW LEVEL SECURITY` or grants, so every generated migration is followed by a hand-written one from `drizzle-kit generate --custom --name <name>_force_rls_grants` ([ADR 0007](docs/adr/0007-shared-server-owner-keys-row-level-security.md)); `apps/server/src/db/rls-tables.spec.ts` fails without it. Add the SPDX line to each new `migration.sql`. Migrations only go forward, and each must keep working with the previous release's code.
 
 ## Running the PWA
 
@@ -86,6 +94,26 @@ The PWA is the Angular app in `apps/pwa`. Its API client is generated from the s
 
 A Sign-up link from `node --env-file=.env dist/apps/server/main.js signup-link` opens the sign-up screen; a passkey needs a browser with an authenticator (Chrome 138 or later on this setup).
 
+## Testing and checks
+
+Each check below is also a CI job (see [CI](#ci)):
+
+| Check            | Command                                                                                           |
+| ---------------- | ------------------------------------------------------------------------------------------------- |
+| Lint (oxlint)    | `pnpm exec nx run-many -t lint`                                                                   |
+| Typecheck        | `pnpm exec nx run-many -t typecheck` and `pnpm exec tsc -p scripts/tsconfig.json`                 |
+| Build            | `pnpm exec nx run-many -t build` and `pnpm exec nx run server:openapi`                            |
+| Unit tests       | `pnpm exec nx run-many -t test --skip-nx-cache`                                                   |
+| End-to-end tests | `pnpm exec nx e2e pwa-e2e` (see [End-to-end tests](#end-to-end-tests))                            |
+| Format (oxfmt)   | `pnpm exec nx format:check --all`, or `pnpm exec nx format:write --all` to fix                    |
+| Licences         | `node scripts/check-spdx.mts`, `pipx run reuse==6.2.0 lint` and `node scripts/check-licenses.mts` |
+| Palettes         | `node scripts/palettes.mts --check`                                                               |
+
+- The server tests run against the development database, which must be up and migrated. They share it, so always pass `--skip-nx-cache`: Nx would otherwise replay a cached result that no longer reflects the database. Stop `nx serve server` before running them, or its job worker claims the tests' due jobs.
+- `pnpm exec nx test pwa` runs the PWA's unit tests (`@angular/build:unit-test`, Vitest and jsdom) and needs no database. `nx typecheck pwa` does not check templates; `nx build pwa` and `nx test pwa` do.
+- Every file with comment syntax carries an `SPDX-License-Identifier` line in its first five lines: MPL-2.0 in `libs/domain` and `libs/contract`, MIT in `libs/effect-passkeys`, EUPL-1.2 elsewhere. `scripts/check-spdx.mts` enforces it.
+- The palette token files in `libs/design-tokens/src/palettes/` are generated: change `PALETTES` in `scripts/palettes.mts` and run `node scripts/palettes.mts` ([ADR 0013](docs/adr/0013-design-tokens-in-dtcg.md)).
+
 ## End-to-end tests
 
 `apps/pwa-e2e` runs Playwright in Chromium against the real stack. Each test signs up a new Owner with a WebAuthn virtual authenticator (over the Chrome DevTools Protocol), so passkeys work without a person.
@@ -98,11 +126,11 @@ A Sign-up link from `node --env-file=.env dist/apps/server/main.js signup-link` 
 
 ## CI
 
-CI is `.github/workflows/cd.yaml`: on every push and pull request an `audit` job (`pnpm audit --prod`, against the lockfile without installing dependencies) runs first, then the jobs `lint`, `typecheck`, `build`, `test`, `e2e`, `format`, `licences` and `palettes` run in parallel, without Nx Cloud. Each job's steps live in `cd.yaml`. The `build` job also writes the server's OpenAPI document (`nx run server:openapi`), which proves that the server bundle loads without a `.env`. Each of these jobs except `audit` starts with the composite action `.github/actions/setup`, which runs `.github/actions/checkout` and then sets up pnpm with Node 24 and installs from the frozen lockfile. Each job's commands can be run locally in the same way; the `test` and `e2e` jobs need the database from `compose.yaml` (`docker compose up -d --wait`) and a `.env` with its passwords, and the `e2e` job installs Chromium with its system dependencies and uploads `dist/.playwright` when it fails.
+CI is `.github/workflows/cd.yaml`: on every push and pull request an `audit` job (`pnpm audit --prod`, against the lockfile without installing dependencies) runs first, then the jobs `lint`, `typecheck`, `build`, `test`, `e2e`, `format`, `licences` and `palettes` run in parallel, without Nx Cloud. Each job's steps live in `cd.yaml`. The `build` job also writes the server's OpenAPI document (`nx run server:openapi`), which proves that the server bundle loads without a `.env`. Each of these jobs except `audit` starts with the composite action `.github/actions/setup`, which runs `.github/actions/checkout` and then sets up pnpm with Node 24 and installs from the frozen lockfile. The `typecheck` job also typechecks `scripts/` with `tsc -p scripts/tsconfig.json`. Each job's commands can be run locally in the same way; the `test` and `e2e` jobs need the database from `compose.yaml` (`docker compose up -d --wait`) and a `.env` with its passwords, and the `e2e` job installs Chromium with its system dependencies and uploads `dist/.playwright` when it fails.
 
 Three more jobs build and ship the image:
 
-- **`image`** runs on every push and pull request, in parallel with the checks. It builds the image from the root `Dockerfile` through `deploy/compose.yaml`, starts the whole stack on an empty database with throwaway passwords, runs `node scripts/smoke-image.mts`, then runs `up --wait` again to prove that `migrate` passes on a migrated database. On a push to `main` it saves the image as a one-day artifact.
+- **`image`** runs on every push and pull request, in parallel with the checks, and installs no dependencies (it uses `.github/actions/checkout` and `pnpm/setup` only). It builds the image from the root `Dockerfile` through `deploy/compose.yaml`, starts the whole stack on an empty database with throwaway passwords, runs `node scripts/smoke-image.mts`, then runs `up --wait` again to prove that `migrate` passes on a migrated database. On a push to `main` it saves the image as a one-day artifact.
 - **`push-image`** (pushes to `main` only, after every check and `image`) tags the image with the 12-character commit and `latest` and pushes both to `ghcr.io/ionaru/asys`.
 - **`deploy`** (pushes to `main` only) logs in to the VPS over SSH, checks out the deployed commit, sets `ASYS_GIT_REVISION` in `deploy/.env`, and runs `docker compose pull` and `up --wait`. It prints `docker compose ps` and the `migrate` logs, and the app's logs only when the deploy fails, because the repository's Actions logs are public.
 
@@ -166,23 +194,6 @@ Use hex passwords only (`openssl rand -hex 32`): they go into database URLs unes
 
 In `deploy/`, run `git checkout <sha>`, set `ASYS_GIT_REVISION` in `.env` to that commit's 12-character tag, and run `docker compose pull && docker compose up -d --wait`. Migrations only go forward, so every migration must keep working with the previous release's code.
 
-## Install Nx Console
+## Licence
 
-Nx Console is an editor extension that enriches your developer experience. It lets you run tasks, generate code, and improves code autocompletion in your IDE. It is available for VSCode and IntelliJ.
-
-[Install Nx Console &raquo;](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Useful links
-
-Learn more:
-
-- [Learn more about this workspace setup](https://nx.dev/getting-started/intro#learn-nx?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Releasing Packages with Nx release](https://nx.dev/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [What are Nx plugins?](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-And join the Nx community:
-
-- [Discord](https://go.nx.dev/community)
-- [Follow us on X](https://twitter.com/nxdevtools) or [LinkedIn](https://www.linkedin.com/company/nrwl)
-- [Our Youtube channel](https://www.youtube.com/@nxdevtools)
-- [Our blog](https://nx.dev/blog?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+ASYS is licensed under the [EUPL-1.2](LICENSE). `libs/domain` and `libs/contract` are MPL-2.0, so third-party front-ends can bundle them, and `libs/effect-passkeys` is MIT ([ADR 0011](docs/adr/0011-license-eupl-and-mpl.md)). The licence texts are in [`LICENSES/`](LICENSES); [`REUSE.toml`](REUSE.toml) records which applies where.

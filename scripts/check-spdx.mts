@@ -2,7 +2,7 @@
 
 // Checks that every file with comment syntax carries the expected licence tag.
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
@@ -56,6 +56,9 @@ const foundLicence = (file: string): string => {
   return '';
 };
 
+// A symbolic link, such as a .claude/skills entry that points into .agents/skills, is checked at its target.
+const isSymbolicLink = (file: string): boolean => lstatSync(resolve(root, file)).isSymbolicLink();
+
 const files = execFileSync(
   'git',
   ['ls-files', '-z', '--cached', '--others', '--exclude-standard'],
@@ -73,7 +76,7 @@ const failures: string[] = [];
 let count = 0;
 
 for (const file of files) {
-  if (!existsSync(resolve(root, file)) || isExempt(file)) continue;
+  if (!existsSync(resolve(root, file)) || isExempt(file) || isSymbolicLink(file)) continue;
   count++;
   const expected = expectedLicence(file);
   const found = foundLicence(file);
