@@ -79,6 +79,15 @@
         },
         "development": {
           "buildTarget": "pwa:build:development"
+        },
+        "e2e": {
+          "buildTarget": "pwa:build:development",
+          "port": 4300,
+          "proxyConfig": "apps/pwa/proxy.e2e.conf.json",
+          "prebundle": false,
+          "watch": false,
+          "liveReload": false,
+          "hmr": false
         }
       },
       "dependsOn": ["api-client", "design-tokens:css"],

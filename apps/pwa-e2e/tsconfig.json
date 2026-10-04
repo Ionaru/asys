@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "lib": ["es2023", "dom"]
+  },
+  "include": ["src/**/*.ts", "scripts/**/*.mts", "playwright.config.mts"]
+}

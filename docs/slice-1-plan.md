@@ -770,12 +770,23 @@ Re-planned and built on 2026-10-04. The re-plan was reviewed adversarially by th
 - The global link colour is lowered with `:where()`, so links inside components keep their own colour.
 - TriageCard's `(drop)` output is named `dropTask`, because `drop` is also a DOM event that bubbles from the card's inputs and would drop the Task without its confirmation.
 
+**Browser checks (Playwright e2e, 2026-10-04).** The browser pane cannot make passkeys, so the checklist runs as `apps/pwa-e2e` (see the README): Playwright and Chromium with a WebAuthn virtual authenticator, a new Owner per test, and data seeded through `POST /v1/commands`, against the API on 3100, the dev server on 4300 and the database `asys_e2e`. It runs in CI as the `e2e` job. The specs were reviewed adversarially (coverage, flakiness) with a judge, and the confirmed findings are fixed.
+- **Capture** (`capture.spec.ts`): passed. Quick add three Tasks; `/capture?title=a&text=…` adds once, and a reload captures nothing twice.
+- **Triage** (`triage.spec.ts`): passed. Later, Drop through the confirmation, and Triage; the badge counts down and the raw text shows. "1 of N" does not advance on Later, as designed.
+- **Now** (`now.spec.ts`): passed. Reason lines in the new style, ink-coloured rows without underline, and Done on the TopPick with no gap (the TopPick article stays in the DOM).
+- **Editor** (`editor.spec.ts`): passed. Due and Estimate saved, A blocked by B and shown as "Blocked by B" in Waiting, A not offered as a blocker of B, Done on B frees A, and Log progress lowers the Estimate.
+- **Two tabs** (`two-tabs.spec.ts`): passed. The second tab's polls are held with `page.route`; its Done is NotApplicable and leaves a Review item that Dismiss clears.
+- **Areas and Settings** (`areas-settings.spec.ts`): passed. Work's hours moved past now take its Task off Now; an unchanged Personal sends nothing; the Urgency window moves a Task between Plan and Do; a chosen time zone survives focus and a reload.
+- **Phone width** (`phone-width.spec.ts`): passed. At 375 px no screen scrolls sideways, and neither the Capture button, the quick add nor the bottom bar covers the last row or the Triage card's footer.
+- **No app fix was needed.** Every check passed against the code of `a6e58f8`.
+- **Not automated.** Whether the Android keyboard keeps the quick add above it stays for the phone check in piece 7.
+
 **Known limits**
 - The copy is English only, in the domain (reason lines and display formats) and in the PWA.
 - Review items can only be dismissed; applying their command again is later work.
 - Cycles through closed Tasks are caught by the server only, and the editor shows its answer under Add a blocker.
 - Read-your-writes costs one poll round trip before a screen updates; Slice 4's outbox removes it.
-- DateSpecField writes `''` back into a date input whose typed date became partial, which may clear a half-typed date on desktop Chrome. The Area editor's time inputs share the cause: clearing one part of a time empties the whole input.
+- DateSpecField writes `''` back into a date input whose date became partial. Typing a date into an empty Date input works, because Chromium fires no `input` event until the date is complete. Editing one part of a filled date empties the field: the date, its Time and the Clear button all go. The Area editor's time inputs share the cause: clearing one part of a From or To empties the whole time and shows "Enter a time". `apps/pwa-e2e/src/known-limits.spec.ts` pins all three, so a fix flips those tests and this bullet together.
 - The Area editor keeps its inputs enabled while sending; only Save or Create is disabled. A missing Area offers "Go to Areas".
 - Areas cannot be deleted, because no command exists, and Privacy gets no UI until Stage 2.
 - The initial bundle is 480.83 kB (127.18 kB transferred), 19 kB under the 500 kB warning; the next screens may need Inbox or the shared controls loaded lazily.
@@ -996,3 +1007,11 @@ Checked against Angular 22.2.1, Vitest 5.0.2 with jsdom 30.1.1, Node 24 and Chro
 - **Angular.** A `linkedSignal` computation runs tracked, so reading other signals in it makes them sources; read them under `untracked`. `@Service({ autoProvided: false })` is the form for a service each screen provides itself.
 - **Budgets.** Every ported component style stays under the 4 kB `anyComponentStyle` warning; the largest, TriageCard, is 2.72 kB minified. With Now, Inbox and `/capture` eager, the initial bundle grew from 403.74 kB (111.72 kB transferred) to 480.83 kB (127.18 kB).
 - **Time zones.** Chrome 152's `Intl.supportedValuesOf('timeZone')` lists 418 zones and neither `UTC` nor `Etc/UTC`, as in Node 24 and jsdom, so Settings adds `UTC` itself.
+- **Playwright** (`@playwright/test` 1.63.0 with Chromium 1243, and `@nx/playwright` 23.2.1, for the e2e checks).
+  - The CDP calls `WebAuthn.enable` and `WebAuthn.addVirtualAuthenticator` (ctap2, internal, resident key, user verification, `automaticPresenceSimulation`) work headless, and sign-up and sign-in need no person.
+  - `context.request` shares the context's cookies, so the `Secure` `__Host-` session cookie set over `http://localhost` goes with seeded commands.
+  - `page.clock` does not drive `Temporal.Now` in 1.63, so the specs use the real clock and fixed wall times, and skip near midnight.
+- **Chromium date and time inputs.**
+  - A date typed into an empty input fires no `input` event until it is complete.
+  - Clearing one part of a filled date or time fires `input` with `''`.
+  - With `lang="en"` the typed digits `05062026` became 2026-06-05, so the parts are read day first.

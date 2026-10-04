@@ -1,0 +1,32 @@
+{
+  "name": "pwa-e2e",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/pwa-e2e/src",
+  "tags": ["scope:e2e"],
+  "implicitDependencies": ["pwa", "server"],
+  "targets": {
+    "reset-db": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["server:build"],
+      "options": {
+        "command": "node apps/pwa-e2e/scripts/reset-db.mts",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "e2e": {
+      "cache": false,
+      "dependsOn": ["reset-db", "server:build", "pwa:api-client", "design-tokens:css"]
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["default", "^default", "{workspaceRoot}/tsconfig.base.json"],
+      "options": {
+        "command": "tsc --noEmit -p apps/pwa-e2e/tsconfig.json",
+        "cwd": "{workspaceRoot}"
+      }
+    }
+  }
+}

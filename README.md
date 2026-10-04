@@ -80,9 +80,19 @@ The PWA is the Angular app in `apps/pwa`. Its API client is generated from the s
 
 A Sign-up link from `node --env-file=.env dist/apps/server/main.js signup-link` opens the sign-up screen; a passkey needs a browser with an authenticator (Chrome 138 or later on this setup).
 
+## End-to-end tests
+
+`apps/pwa-e2e` runs Playwright in Chromium against the real stack. Each test signs up a new Owner with a WebAuthn virtual authenticator (over the Chrome DevTools Protocol), so passkeys work without a person.
+
+- **Prerequisites.** The database from `compose.yaml` is up (`docker compose up -d --wait`), `.env` holds its passwords and URLs, and Chromium is installed once with `pnpm exec playwright install chromium`.
+- **Run.** `pnpm exec nx e2e pwa-e2e` is the only supported entry point: its `reset-db` dependency recreates the database first. Pass Playwright arguments after `--`, for example `pnpm exec nx e2e pwa-e2e -- src/now.spec.ts`. Reports and traces land in `dist/.playwright/apps/pwa-e2e`.
+- **An isolated stack.** The API runs on port 3100 and the PWA dev server on 4300 (`pwa:serve:e2e`, with `apps/pwa/.env.serve.e2e` and `apps/pwa/proxy.e2e.conf.json`), against a database `asys_e2e` in the same Postgres container. `reset-db` drops and recreates `asys_e2e`, migrates it, and copies the server bundle to `dist/pwa-e2e/server`, so a rebuild during a run cannot change the API under it. The scripts refuse to run unless both database URLs point at `asys_e2e`.
+- **`prebundle` is off** for `pwa:serve:e2e`, so it does not share the Vite prebundle cache with a running `nx serve pwa`.
+- **Beside a running dev stack.** `nx e2e pwa-e2e` rebuilds `dist/apps/server` and `apps/pwa/src/generated`, which the dev stack uses. With `nx serve server` and `nx serve pwa` running, build once while they are down (`pnpm exec nx run-many -t build -p server pwa`), then run `pnpm exec nx run pwa-e2e:reset-db --exclude-task-dependencies` and `pnpm exec nx e2e pwa-e2e --exclude-task-dependencies`.
+
 ## CI
 
-CI is `.github/workflows/cd.yaml`: on every push and pull request an `audit` job (`pnpm audit --prod`, against the lockfile without installing dependencies) runs first, then the jobs `lint`, `typecheck`, `build`, `test`, `format`, `licences` and `palettes` run in parallel, without Nx Cloud. Each job's steps live in `cd.yaml`. The `build` job also writes the server's OpenAPI document (`nx run server:openapi`), which proves that the server bundle loads without a `.env`. Every job except `audit` starts with the composite action `.github/actions/setup`, which runs `.github/actions/checkout` and then sets up pnpm with Node 24 and installs from the frozen lockfile. Each job's commands can be run locally in the same way; the `test` job needs the database from `compose.yaml` (`docker compose up -d --wait`) and a `.env` with its passwords.
+CI is `.github/workflows/cd.yaml`: on every push and pull request an `audit` job (`pnpm audit --prod`, against the lockfile without installing dependencies) runs first, then the jobs `lint`, `typecheck`, `build`, `test`, `e2e`, `format`, `licences` and `palettes` run in parallel, without Nx Cloud. Each job's steps live in `cd.yaml`. The `build` job also writes the server's OpenAPI document (`nx run server:openapi`), which proves that the server bundle loads without a `.env`. Every job except `audit` starts with the composite action `.github/actions/setup`, which runs `.github/actions/checkout` and then sets up pnpm with Node 24 and installs from the frozen lockfile. Each job's commands can be run locally in the same way; the `test` and `e2e` jobs need the database from `compose.yaml` (`docker compose up -d --wait`) and a `.env` with its passwords, and the `e2e` job installs Chromium with its system dependencies and uploads `dist/.playwright` when it fails.
 
 ## Install Nx Console
 

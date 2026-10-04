@@ -94,6 +94,43 @@ jobs:
       - name: Test
         run: pnpm exec nx run-many -t test --skip-nx-cache
 
+  e2e:
+    needs: audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Set up
+        uses: $/.github/actions/setup
+      - name: Write .env
+        run: |
+          owner_pw="$(openssl rand -hex 24)"
+          app_pw="$(openssl rand -hex 24)"
+          (
+            umask 077
+            {
+              echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)"
+              echo "ASYS_OWNER_PASSWORD=${owner_pw}"
+              echo "ASYS_APP_PASSWORD=${app_pw}"
+              echo "DATABASE_URL_OWNER=postgresql://asys_owner:${owner_pw}@127.0.0.1:5432/asys"
+              echo "DATABASE_URL_APP=postgresql://asys_app:${app_pw}@127.0.0.1:5432/asys"
+            } > .env
+          )
+      - name: Start the database
+        run: docker compose up -d --wait
+      - name: Install Chromium for Playwright
+        run: pnpm exec playwright install --with-deps chromium
+      - name: End-to-end tests
+        run: pnpm exec nx e2e pwa-e2e
+      - name: Upload the Playwright report and traces
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright
+          path: dist/.playwright
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7
+
   format:
     needs: audit
     runs-on: ubuntu-24.04

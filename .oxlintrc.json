@@ -85,6 +85,10 @@
             ]
           },
           {
+            "sourceTag": "scope:e2e",
+            "onlyDependOnLibsWithTags": ["scope:contract", "scope:domain", "scope:e2e"]
+          },
+          {
             "sourceTag": "scope:design",
             "onlyDependOnLibsWithTags": ["scope:design"]
           }
