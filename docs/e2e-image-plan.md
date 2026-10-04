@@ -20,7 +20,7 @@ These are slice 1's agreements, in short:
 - **One piece, one commit,** after review and full verification. Nothing is pushed unless the maintainer asks. A push to `main` deploys.
 - **Test-first where there is behaviour to pin.** The image spec in unit 3 is seen to fail once for the right reason before it counts.
 - **One builder per checkout.** The dev-stack suite and the image suite both use Chromium and the Docker daemon, so run them one after the other, never side by side.
-- **SPDX headers.** Every new file carries `SPDX-License-Identifier: EUPL-1.2` in its comment form: `//` for `.ts` and `.mts`, `#` for `.yaml`. Each unit's check includes `node scripts/check-spdx.mts`.
+- **SPDX headers.** Every new file carries an `SPDX-License-Identifier` line for EUPL-1.2 in its comment form: `//` for `.ts` and `.mts`, `#` for `.yaml`. Each unit's check includes `node scripts/check-spdx.mts`.
 
 ## Decisions
 
@@ -466,19 +466,28 @@ Unit 4 found no spec that relied on the dev server. It did find a flake in `two-
   - The full suite passed 23 of 23 against it.
   - `migrate-image`'s two starts ran under `-p asys-migrate-check`: `migrate` exited 0 both times and `asys` stayed healthy.
 - **Gate.** `nx run-many -t lint typecheck build test --skip-nx-cache` over all seven projects, the scripts' tsc, `nx run server:openapi`, `nx format:check --all`, `check-spdx`, `check-licenses`, `palettes.mts --check` and `pnpm audit --prod` are green. `reuse lint` was not run locally (pipx is not installed); CI's `licences` job runs it.
-- **CI.** CI_RESULTS
+- **CI.**
+  - **The branch run.** Run 37243558078, a `push` run on the branch `e2e-against-image`: `revision`, `build-image`, `migrate-image` and `e2e-image` were green, `e2e-image` passed 23 tests, and `push-image` and `deploy` were skipped off `main`.
+  - **The `licences` failure.** The same run's `licences` job failed `reuse lint`. This plan's SPDX working agreement quoted the identifier followed by a colon, and `reuse` read the rest of that line as an invalid licence expression. The line is reworded.
+  - **The spec proof.** The throwaway branch `e2e-image-gate-spec` made `static-files.image.spec.ts` expect `no-store` on `/`. `e2e-image` turned red on `Expected: "no-store"`, `Received: "no-cache"`, while `build-image` and `migrate-image` stayed green.
+  - **The migrate proof.** The throwaway branch `e2e-image-gate-migrate` added a migration that changes `asys_owner`'s own password. "Migrate an empty database" passed, and "Start again on the migrated database" failed when `migrate` exited 1 on `SqlError AuthenticationError 28P01`, while `e2e-image` stayed green. Its `test` job went red too, because the migration changed the role's password in that job's database as well.
+  - **Departure.** The proofs ran on pushed branches without pull requests. A `push` run has the same jobs, but the fork question (fact 2) stays open.
 
 **Facts checked while building (2026-10-05)**, numbered as in "Facts to check while building":
 1. **Confirmed.** After `docker image rm` and `docker load`, `up --pull never --no-build` starts the loaded image, although `asys` has `build:`.
 2. **Not confirmed.** No primary source says that a fork pull request's later job can download the run's artefact. Artefacts move within a run on the runner's own token, not on `GITHUB_TOKEN` permissions, so it is expected to work. It stays unverified until a fork pull request runs (see Known limits).
 3. **Confirmed.** Chromium reaches the binding on `127.0.0.1` only, through `localhost`.
-4. RERUN_RESULT
+4. **Confirmed.** "Re-run failed jobs" on run 37243590929 re-ran only `licences` and `e2e-image`. `build-image` kept its first attempt. The re-run `e2e-image` downloaded the first attempt's `asys-image`, loaded it and started the stack, then failed on the broken spec again, as intended.
 5. **Settled.** `main` has no branch protection and the repository has no rulesets (`gh api`, 2026-10-05), so no required check names `image`.
 6. **Partly.**
    - GitHub's billing docs say standard runners are free in public repositories, but do not say the same of artefact storage. A community discussion says public repositories' artefacts do not count. In private repositories, artefact storage shares the GitHub Packages quota.
-   - The tar is 100 MB, not 483 MB: Docker 29's containerd image store saves compressed layers. CI_TAR_SIZE So `compression-level: 0` and `archive: false` (single file, and the artefact takes the file's name) are not worth it yet.
+   - The tar is 100 MB, not 483 MB: Docker 29's containerd image store saves compressed layers. On CI the uploaded artefact is 99.6 MB. So `compression-level: 0` and `archive: false` (single file, and the artefact takes the file's name) are not worth it yet.
 7. **Confirmed.** A `compose exec ... signup-link` with stdin closed takes about 0.66 s.
-8. **Locally:** build 26 s (warm cache), save 1 s, load 4 s, start 16 s, suite 13 s. CI_TIMES
+8. **Locally:** build 26 s (warm cache), save 1 s, load 4 s, start 16 s, suite 13 s.
+   - **On CI** (run 37243558078), every job is far inside its timeout:
+     - `build-image` 80 s: build 62 s, save 4 s, upload 9 s.
+     - `migrate-image` 37 s: download 5 s, load 10 s, first start 16 s, second start 2 s.
+     - `e2e-image` 106 s: set up 13 s, download 2 s, load 16 s, start 16 s, Chromium 19 s, suite 28 s.
 
 **Known limits**
 - Whether a fork pull request's `migrate-image` and `e2e-image` can download `asys-image` is unverified (fact 2).
