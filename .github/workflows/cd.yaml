@@ -264,7 +264,7 @@ jobs:
     needs: [image, push-image]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    # The DEPLOY_* secrets are environment secrets, visible only to a job in this environment.
+    # The DEPLOY_* variables and secrets belong to this environment, visible only to a job in it.
     environment:
       name: production
       url: https://tasks.saturnserver.org
@@ -279,8 +279,8 @@ jobs:
           ASYS_GIT_REVISION: ${{ needs.image.outputs.short }}
           ASYS_GIT_SHA: ${{ needs.image.outputs.sha }}
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
+          host: ${{ vars.DEPLOY_HOST }}
+          username: ${{ vars.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_KEY }}
           envs: DEPLOY_PATH,ASYS_GIT_REVISION,ASYS_GIT_SHA
           command_timeout: 15m
