@@ -18,6 +18,7 @@ import {
 } from '../task';
 import { availableFromInstant, type Instant } from '../time';
 import { reasonText } from './reason-text';
+import { waitingText } from './waiting-text';
 
 export enum ExclusionReasonTag {
   NotYetAvailable = 'NotYetAvailable',
@@ -47,6 +48,7 @@ export interface RankedTask {
 export interface WaitingTask {
   readonly task: Task;
   readonly reasons: readonly ExclusionReason[];
+  readonly reasonText: string;
 }
 
 export interface PickResult {
@@ -113,7 +115,7 @@ export const pick = (
         urgent,
         latestStart: start,
       };
-      ranked.push({ task, reason, reasonText: reasonText(reason, tz) });
+      ranked.push({ task, reason, reasonText: reasonText(task, reason, now, tz) });
     } else if (task.status === TaskStatus.Open && !isInInbox(task)) {
       const reasons: ExclusionReason[] = [];
       if (task.availableFrom !== null) {
@@ -121,7 +123,7 @@ export const pick = (
         if (now < from) reasons.push({ _tag: ExclusionReasonTag.NotYetAvailable, from });
       }
       reasons.push(...blockedReasons(task, tasks, links));
-      waiting.push({ task, reasons });
+      waiting.push({ task, reasons, reasonText: waitingText(task, reasons, tasks, now, tz) });
     }
   }
   ranked.sort(compareRanked);

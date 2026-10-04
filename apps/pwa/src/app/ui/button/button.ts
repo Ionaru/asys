@@ -91,6 +91,13 @@ export enum ButtonSize {
       inset: -6px;
     }
 
+    .asys-button-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-2);
+    }
+
     .asys-button--block {
       display: flex;
       width: 100%;

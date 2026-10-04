@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
+import { waitsFor } from '../task';
 import type { Instant } from '../time';
 import {
   ChangeEntity,
@@ -21,22 +22,6 @@ const rejected = (
     | RejectedReason.Cycle,
 ) => ({ _tag: TransitionResultTag.Rejected, reason }) as const satisfies TransitionResult;
 
-/** True when `from` already waits for `target`, directly or through other Tasks. Visited set keeps the walk finite on cyclic link sets. */
-const reaches = (state: DomainState, from: string, target: string): boolean => {
-  const seen = new Set<string>();
-  const stack = [from];
-  while (stack.length > 0) {
-    const current = stack.pop() as string;
-    if (current === target) return true;
-    if (seen.has(current)) continue;
-    seen.add(current);
-    for (const link of state.links) {
-      if (link.taskId === current) stack.push(link.blockerId);
-    }
-  }
-  return false;
-};
-
 export const addBlocker = (
   state: DomainState,
   command: AddBlocker,
@@ -50,7 +35,7 @@ export const addBlocker = (
   if (state.links.some((l) => l.taskId === taskId && l.blockerId === blockerId)) {
     return rejected(RejectedReason.DuplicateLink);
   }
-  if (reaches(state, blockerId, taskId)) return rejected(RejectedReason.Cycle);
+  if (waitsFor(state.links, blockerId, taskId)) return rejected(RejectedReason.Cycle);
   return {
     _tag: TransitionResultTag.Applied,
     changes: [

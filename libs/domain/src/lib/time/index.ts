@@ -2,3 +2,4 @@
 
 export * from './local-date';
 export * from './zoned';
+export * from './display';

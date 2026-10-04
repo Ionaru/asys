@@ -237,14 +237,14 @@ describe('pick reasons', () => {
   });
 
   it('gives a ranked Task its reason text', () => {
-    expect(run([big]).ranked[0]?.reasonText).toBe('Do · start by 2026-10-15 11:30');
+    expect(run([big]).ranked[0]?.reasonText).toBe('Latest start tomorrow 11:30 · important');
   });
 
   it('returns the original Task object in the ranked entry', () => {
     expect(run([big]).ranked[0]?.task).toBe(big);
   });
 
-  it('prefixes Overdue in the reason text of an overdue Task', () => {
+  it('gives an overdue Task the Due text', () => {
     const late = aTask({
       id: 'late',
       important: false,
@@ -253,13 +253,36 @@ describe('pick reasons', () => {
     });
     const entry = run([late]).ranked[0];
     expect(entry?.reason.overdue).toBe(true);
-    expect(entry?.reasonText.startsWith('Overdue · Delegate')).toBe(true);
+    expect(entry?.reasonText).toBe('Due yesterday 17:00');
+  });
+
+  it.each([
+    [30, 'Latest start 23:30'],
+    [1, 'Latest start 23:59'],
+  ])(
+    'gives a date-only due today a latest start at the end of the day (%i min)',
+    (minutes, text) => {
+      const today = aTask({
+        id: 'today',
+        important: false,
+        due: { date: '2026-10-04' },
+        estimateMinutes: minutes,
+      });
+      expect(run([today], [], at('2026-10-04T08:00:00.000Z')).ranked[0]?.reasonText).toBe(text);
+    },
+  );
+
+  it('gives an overdue important Task the Due text with important', () => {
+    const late = aTask({ id: 'late', important: true, due: { date: '2026-10-03', time: '17:00' } });
+    expect(run([late], [], at('2026-10-04T08:00:00.000Z')).ranked[0]?.reasonText).toBe(
+      'Due yesterday 17:00 · important',
+    );
   });
 });
 
 describe('pick waiting', () => {
   const soon = aTask({ id: 'soon', availableFrom: { date: '2026-10-15', time: '09:00' } });
-  const before = aTask({ id: 'before' });
+  const before = aTask({ id: 'before', title: 'Order card' });
 
   it('lists a not yet available Task with its NotYetAvailable reason', () => {
     const result = run([soon]);
@@ -270,6 +293,7 @@ describe('pick waiting', () => {
         reasons: [
           { _tag: ExclusionReasonTag.NotYetAvailable, from: at('2026-10-15T07:00:00.000Z') },
         ],
+        reasonText: 'Available from tomorrow 09:00',
       },
     ]);
   });
@@ -279,7 +303,11 @@ describe('pick waiting', () => {
     const result = run([after, before], [aLink('after', 'before')]);
     expect(ids(result.ranked)).toEqual(['before']);
     expect(result.waiting).toEqual([
-      { task: after, reasons: [{ _tag: BlockedReasonTag.BlockedBy, taskIds: ['before'] }] },
+      {
+        task: after,
+        reasons: [{ _tag: BlockedReasonTag.BlockedBy, taskIds: ['before'] }],
+        reasonText: 'Blocked by Order card',
+      },
     ]);
   });
 
@@ -293,6 +321,7 @@ describe('pick waiting', () => {
           { _tag: ExclusionReasonTag.NotYetAvailable, from: at('2026-10-15T07:00:00.000Z') },
           { _tag: BlockedReasonTag.BlockedBy, taskIds: ['before'] },
         ],
+        reasonText: 'Available from tomorrow 09:00 · Blocked by Order card',
       },
     ]);
   });
@@ -303,11 +332,15 @@ describe('pick waiting', () => {
   ])(
     'gives no NotYetAvailable reason when the blocker availableFrom %s',
     (_name, availableFrom) => {
-      const blocker = aTask({ id: 'blocker', availableFrom });
+      const blocker = aTask({ id: 'blocker', title: 'Prepare', availableFrom });
       const blocked = aTask({ id: 'blocked' });
       const result = run([blocked, blocker], [aLink('blocked', 'blocker')]);
       expect(result.waiting).toEqual([
-        { task: blocked, reasons: [{ _tag: BlockedReasonTag.BlockedBy, taskIds: ['blocker'] }] },
+        {
+          task: blocked,
+          reasons: [{ _tag: BlockedReasonTag.BlockedBy, taskIds: ['blocker'] }],
+          reasonText: 'Blocked by Prepare',
+        },
       ]);
     },
   );

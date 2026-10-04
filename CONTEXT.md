@@ -19,6 +19,10 @@ _Avoid_: Checklist item, child task
 The time a Task still needs; you lower it as you make progress.
 _Avoid_: Duration (reserved for Activities)
 
+**Log progress**:
+Lowering a Task's Estimate to the time it still needs after you worked on it; the Task stays Open.
+_Avoid_: Update estimate, track time
+
 **Activity**:
 Something that starts at a fixed moment and lasts a set duration; it is either Busy or Free, and either Workable or not. An Activity that is not Workable, such as a call, can need a Voice.
 _Avoid_: Event, calendar event, appointment
@@ -208,6 +212,9 @@ Giving an Inbox Task its Importance and Estimate, which moves it out of the Inbo
 
 **Picker**:
 The answer to "what should I do now?": the Available Tasks that fit the current Gap, Place, Current voice and Active hours, ranked by Urgency and Importance, each with a reason; while Voice only holds, only Tasks that need a Voice are ranked. Tasks left out only because of their Place, their Voice or Voice only are listed under **Not here** with the reason, and the urgent ones among them are shown above the ranking, except while Voice only holds. It can be filtered to the Tasks that need exactly a given Voice. Shown as **Now** in the app.
+
+**Waiting**:
+The Open, triaged Tasks that are not Available, listed under Now with why they wait: not yet Available, or Blocked by other Tasks. They are not ranked.
 
 **Reminder**:
 A moment ASYS tells you about something, such as an Activity about to start with open Prep.

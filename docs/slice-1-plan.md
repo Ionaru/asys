@@ -720,21 +720,65 @@ Re-planned and built on 2026-10-03. Ten probes ran first, and their facts are li
 - `animate.enter` and `animate.leave` do nothing in jsdom, so the unit tests cannot show that `animation: none` removes an element at once; that is checked in a browser.
 - `pwa:typecheck` is plain `tsc` and does not check templates; `pwa:build` and `pwa:test` do.
 - Validating all 12 token contexts and the typography references in the token build stays open (ADR 0013).
-- The reason line ("start by 2026-10-03 14:30") differs from the design system's reason style; piece 6 settles it.
+- The reason line ("start by 2026-10-03 14:30") differed from the design system's reason style; piece 6 settled it (domain rules 0.3.0).
 - Safari cannot keep the `__Host-` cookie on `http://localhost` (development only), and its passkey activation timing is untested.
 - `pnpm audit` cannot see advisories for `@simplewebauthn/browser` from JSR, as for the server package.
 - The variable fonts are 126 kB together, larger than a Latin subset would be.
 
-## Piece 6: PWA Task screens (outline)
+## Piece 6: PWA Task screens
 
-- Quick add, and the `/capture` share route.
-- The Inbox: untriaged Tasks and open Review items, with Triage one at a time.
-- The Task editor: its fields, a blockers picker, log progress, complete and drop.
-- Now: the ranked list with reason lines, and a collapsed Waiting list.
-- Areas with their Active hours.
-- Settings: the Urgency window and the time zone.
+Re-planned and built on 2026-10-04. The re-plan was reviewed adversarially by three critics (codebase fit, design system and UX, feasibility and concurrency) and a judge who checked each finding against the code, and the confirmed findings are folded in. Five probes ran first, and their facts are listed under "Facts checked on 2026-10-04 (piece 6)". The contracts of the screen units were reviewed again before they were built, and their amendments are folded in.
 
-Components stay thin, and the logic stays in `libs/domain`.
+**Reason and Waiting text.** The domain rules move to 0.3.0 (see `libs/domain/CHANGELOG.md`). A ranked Task's reason line is one fact, `Due yesterday 17:00`, `Latest start 14:30` or `No Due`, then ` · important` when it is important; Overdue and the Quadrant move to the StatusBadge and the QuadrantChip. `WaitingTask` gains `reasonText`, such as `Available from Tue 6 Oct · Blocked by Order card`. Days, times and Estimates have fixed English formats in `time/display.ts`. The domain also gains `inboxTasks` and `openReviewItems`, `blockerCandidates` and `blocks`, and `activeHoursSummary` with the time-input helpers.
+
+**Read-your-writes in the DataStore.**
+- **`send`** resolves an Applied or NotApplicable outcome only after a request that started after the response has settled: the follow-up poll, or the reloaded snapshot after a 410. That follow-up is forced, so it runs while the page is hidden. Other outcomes, a store that is not started or stopped, and a generation change resolve at once; a 401 settle and `stop()` resolve every waiter.
+- **`awaitingSync`** holds the subjects (`commandSubject`: the Task, link, Area or Review item id, or `settings`) whose follow-up failed, until the next successful poll or snapshot. Screens disable that subject's actions meanwhile and say "Saved. Waiting for the server.", so a second Done cannot make a spurious Review item.
+- **`runOnly`** (private) posts without waiting; the automatic zone report uses it and records the reported zone on its immediate outcome.
+- **`chooseTimeZone`** waits for an automatic report in flight, blocks new ones while it runs, posts SetTimeZone itself, records the device zone as last reported on Applied, then waits for the poll like `send`.
+- The store applies no command locally; Slice 4's outbox does that for queued commands.
+- **Leaving mid-send.** Because `send` waits for a poll, a person can leave a screen while it waits. Every screen checks its `DestroyRef` after each awaited send and then does nothing: no navigation, no `Location.back()`, no focus.
+
+**Commands and retries.** A screen builds one Command per intent, with its new ids from `Ids.next()` at the first attempt, and keeps it as pending until an outcome other than `Failed`, so a retry resends the same Command. `CommandAttempts`, provided per screen, keys each Command by its canonical JSON (sorted keys, the server's request-hash rule) and forgets the key on any outcome other than `Failed`; such an outcome also ends earlier attempts of the same kind on the same subject, so choosing a value again later is a new intent with a new key, never a replay of an old one. Expectations are by status only: Triage, Log progress, Done and Drop expect `open`, and the editor's EditTask carries only the changed fields and expects the status the Task had when the form opened. Nothing sends `version`, Areas included, so edits to different fields on two devices both land. Every submit button is disabled while its send is pending, and outcomes read through `outcomeMessage`.
+
+**Screens.**
+- **Now.** The first ranked Task sits in the TopPick (Done, Log progress and Open); the others are PickerRows with the Overdue badge, the reason line, the Estimate and the QuadrantChip. Waiting is a collapsed SectionHeader whose rows show the Estimate and the Waiting line. A `role="status"` region announces "“X” is Done." and the new Estimate, and focus moves to the new TopPick's title.
+- **Inbox.** Review items come first, with copy per command tag in `features/inbox/review-copy.ts` and Dismiss; then one Triage card for the oldest Inbox Task not deferred, with "1 of N" over the visit, Importance, an Estimate, the Area, and Triage, Later, Drop and Edit. The card is keyed by its Task, and its draft resets only on a new id.
+- **The Task editor** (`/tasks/:taskId`) edits the title, Notes, Area, Importance, Estimate, Available from and Due, and saves only the changed fields (`buildTaskPatch`). Each field follows the store while it equals its baseline. It shows the Overdue and Blocked badges, the Inbox, Latest start and Effective due lines, Done, Log progress and Drop, the Blocked by list with Add a blocker (`blockerCandidates`) and Remove, and Blocks. A Task that leaves the working set while the form is dirty stays visible and read-only.
+- **Capture.** Quick add opens from the Capture button above the bottom bar on Now, Today and Inbox, and keeps its text until Applied. `/capture?title&text&url` prefills one title field (`sharedCapture`); Add captures once, then replaces the URL with `/capture`, so a reload cannot capture twice.
+- **Settings** (the header link) sets the Urgency window and the Current time zone, each applied on change, and links to Areas and Account.
+- **Areas** are listed by name with their Active hours text. The Area editor edits the name and each weekday's intervals, sorts them by start, and saves only the changed fields.
+
+**Components.** TopPick, PickerRow, TriageCard, QuickAdd, ReviewItem, StatusBadge and QuadrantChip are ported from the design system's `bundle.css` with their `asys-` classes and token-only CSS. The shared controls are Signal Forms controls like TextField: Segmented, EstimateField, DateSpecField and SelectField. InlineConfirm asks before Drop, and LogProgressForm is shared by Now and the Task editor.
+
+**Routes.** The new routes (`tasks/:taskId`, `settings`, `settings/areas`, `settings/areas/new` and `settings/areas/:areaId`) are lazy children of the shell with titles; Now, Inbox and `/capture` stay eager, because lazy loading saves almost nothing for small screens. The Task and Area editor routes are thin wrappers that render the editor inside `@for (id of [id()]; track id)`, because the router reuses the route component when only the id changes; each id gets a fresh draft, forms and `CommandAttempts`. After Done or Drop the editor goes back when there is a previous navigation, otherwise to `/now`.
+
+**Tests.** Each unit with behaviour got an implementer and a test-writer from one contract, and each unit's tests were seen to fail once for the right reason before it counted. Specs use the real `pick` over a fixed state and clock, and change the state from outside the screen.
+
+**Departures from the design system**
+- PickerRow is a link (`a[asys-picker-row]`), with no `(select)` output.
+- TopPick's third action is Open, not Not now, and it has no Gap row in Slice 1. It shows an Overdue badge in its meta row when the Task is Overdue, and Now projects the Log progress form into it.
+- TriageCard adds Later and Edit, and "1 of N" counts over the whole visit. Importance and Estimate are the shared Segmented and EstimateField controls, which took the segment and chip CSS. Its title is an `h2`, and Change is disabled while a send is pending.
+- Drop is confirmed inline everywhere (InlineConfirm, a new component), with focus starting on Cancel.
+- ReviewItem projects an "Open Task" link after its buttons.
+- QuickAdd has no `open` model: the shell renders the bar while it is open, and the bar replaces the Capture button.
+- `/capture` skips the shared Loading and Failed rule, because capturing needs no working set.
+- LogProgressForm is a shared component.
+- The `.asys-field` CSS moved from TextField into the global `styles.css`, so every control is styled.
+- The editor's draft keeps the Area as a string (`''` is No Area), so the select binds directly.
+- `chooseTimeZone` posts directly instead of through `runOnly`, which avoids a redundant poll.
+- The global link colour is lowered with `:where()`, so links inside components keep their own colour.
+- TriageCard's `(drop)` output is named `dropTask`, because `drop` is also a DOM event that bubbles from the card's inputs and would drop the Task without its confirmation.
+
+**Known limits**
+- The copy is English only, in the domain (reason lines and display formats) and in the PWA.
+- Review items can only be dismissed; applying their command again is later work.
+- Cycles through closed Tasks are caught by the server only, and the editor shows its answer under Add a blocker.
+- Read-your-writes costs one poll round trip before a screen updates; Slice 4's outbox removes it.
+- DateSpecField writes `''` back into a date input whose typed date became partial, which may clear a half-typed date on desktop Chrome. The Area editor's time inputs share the cause: clearing one part of a time empties the whole input.
+- The Area editor keeps its inputs enabled while sending; only Save or Create is disabled. A missing Area offers "Go to Areas".
+- Areas cannot be deleted, because no command exists, and Privacy gets no UI until Stage 2.
+- The initial bundle is 480.83 kB (127.18 kB transferred), 19 kB under the 500 kB warning; the next screens may need Inbox or the shared controls loaded lazily.
 
 ## Piece 7: deployment and phone check (outline)
 
@@ -928,3 +972,27 @@ Checked against Angular 22.2.1, Nx 23.2.1, Effect 4.0.0, ng-openapi-gen 1.1.0, T
   - The Claude desktop app's browser pane cannot fetch service-worker scripts, so the service worker is checked in Chrome.
   - `@nx/web:file-server` implements `spa` as a proxy to itself, so a `proxyUrl` to the API breaks deep links; `scripts/serve-pwa.mts` replaces it.
   - Node's `listen(…, 'localhost')` bound only `::1` here.
+
+## Facts checked on 2026-10-04 (piece 6)
+
+Checked against Angular 22.2.1, Vitest 5.0.2 with jsdom 30.1.1, Node 24 and Chrome 152, by running probes in throwaway worktrees.
+
+- **Signal Forms with non-string controls.**
+  - `[formField]` binds custom `FormValueControl`s of `boolean | null`, `number | null` and `DateSpec | null` under strict templates. An object-valued `DateSpec` binds as one leaf value, not as a field tree, and flows both ways.
+  - `validate()` runs on `null` at creation, so a control gets `errors` before any touch; the `touched() && errors().length` pattern hides them until then.
+  - `submit()` marks every field touched, including untouched ones. On an invalid form the action does not run and `onInvalid` does.
+  - `disabled(path, { when: () => flag() })` reaches the control and its native input; the `disabled(path, logicFn)` overload is deprecated.
+  - A `[disabled]` binding next to `[formField]` is a compile error (`FORM_FIELD_UNSUPPORTED_BINDING`), so read-only state goes through the schema.
+  - `f().reset(value)` replaces the model and clears touched and dirty; `model.set` alone does not reset touched.
+- **Native inputs in jsdom.**
+  - A date input sanitises invalid dates (`2026-02-30`) to `''`. A time input rejects `24:00` and `9:05`, and keeps seconds (`09:05:30`) with or without `step`, so code cuts them off.
+  - `[value]` on a `<select>` with `@for` options is unreliable, because it applies before the options exist; `[selected]` on each option works.
+  - `focus()` needs the component host attached to `document.body`. `afterNextRender` runs during `fixture.whenStable()`.
+- **The router.**
+  - The route component is reused when only its params change; its bound input updates. A component inside `@for (id of [id()]; track id)` is recreated with fresh state.
+  - `router.lastSuccessfulNavigation` is a Signal. Its `previousNavigation` is `null` on the first navigation, and it means "the router navigated before", not "history has an entry to go back to".
+  - The router uses the first match, so `settings/areas/new` is listed before `settings/areas/:areaId`.
+  - In tests, `Location.back()` moves the router only after `router.initialNavigation()`, which sets up the popstate listener.
+- **Angular.** A `linkedSignal` computation runs tracked, so reading other signals in it makes them sources; read them under `untracked`. `@Service({ autoProvided: false })` is the form for a service each screen provides itself.
+- **Budgets.** Every ported component style stays under the 4 kB `anyComponentStyle` warning; the largest, TriageCard, is 2.72 kB minified. With Now, Inbox and `/capture` eager, the initial bundle grew from 403.74 kB (111.72 kB transferred) to 480.83 kB (127.18 kB).
+- **Time zones.** Chrome 152's `Intl.supportedValuesOf('timeZone')` lists 418 zones and neither `UTC` nor `Etc/UTC`, as in Node 24 and jsdom, so Settings adds `UTC` itself.

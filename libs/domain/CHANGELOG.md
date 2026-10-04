@@ -4,6 +4,54 @@
 
 `RULES_VERSION` in `src/lib/rules-version.ts` names the rules a front-end derives its values with. Any change to a rule is at least a minor version (ADR 0003).
 
+## 0.3.0 (2026-10-04)
+
+The display formats, the reason and Waiting lines in the design system's style, the Inbox order, the blocker lists and the Active hours text.
+
+### Display formats
+
+- **Days** read `today`, `tomorrow` or `yesterday`, else the weekday, day and month, such as `Sat 3 Oct`. The year follows when it differs from today's, such as `Mon 4 Jan 2027`.
+- Day and month names come from fixed English tables (`Mon` to `Sun`, `Jan` to `Dec`), never from `Intl`.
+- A Due or Available from reads as its day, then its own time when it has one: `today 17:00`, `Tue 6 Oct`.
+- **Times** are 24-hour `HH:MM` in the Current time zone: the time alone on today's local day (`14:30`), else the day and the time (`tomorrow 09:00`, `Sat 10 Oct 14:30`).
+- An instant 1 ms before a minute boundary shows the next minute, so a date-only Due's Latest start reads `23:30`, not `23:29`. The exception is the end of a local day, which shows as the ending day's `23:59`; it is found by the change of local date, so a day that starts at 01:00 (daylight saving in some zones) is handled too.
+- **Estimates** read `5 min`, `59 min`, `1 h`, `1 h 05` and `2 h`.
+
+### The reason line
+
+- This replaces the rule of 0.1.0, which listed `Overdue`, the Quadrant and `start by YYYY-MM-DD HH:MM`.
+- The reason line of a ranked Task is one fact:
+  - when it is Overdue, `Due` and the Task's own Due with a day word (`Due yesterday 17:00`, `Due yesterday`);
+  - otherwise, with a Latest start, `Latest start` and its time, or its day and time (`Latest start 14:30`, `Latest start Sat 10 Oct 14:30`);
+  - otherwise `No Due`.
+- ` · important` follows when the Task is important: `Latest start 14:30 · important`, `No Due · important`.
+- Overdue and the Quadrant are no longer in the line. Front-ends show them as a badge and a chip.
+
+### The Waiting line
+
+- Each Waiting Task has a one-line reason, its known reasons joined by a middle dot between spaces:
+  - not yet Available: `Available from` and the Task's own Available from (`Available from Tue 6 Oct`, `Available from tomorrow 09:00`);
+  - Blocked: `Blocked by A`, `Blocked by A and B`, or `Blocked by A and 2 more`. Blocker titles are ordered by title, then id, in code units.
+- Unknown reasons are skipped, and a Task with no known reason reads `Waiting`.
+
+### Inbox order
+
+- The Inbox Tasks and the unresolved Review items are each ordered by creation time, then id.
+
+### Blockers
+
+- A Task may be made to wait for an Open or Delegated Task that is not itself, is not already its blocker, and does not already wait for it, directly or through other Tasks, following every link.
+- **Blocks** lists the Open or Delegated Tasks that wait for a Task directly.
+- Both lists are ordered by title, then id, in code units.
+
+### Active hours text
+
+- A day's intervals read `08:00–18:00`, with an en dash, joined by `, `. A whole day reads `all day`.
+- Days with equal hours are grouped: consecutive days as a range (`Mon–Fri`, `Sat–Sun`), others with commas (`Mon, Wed, Fri`), and all seven as `Every day`.
+- Groups go Monday first and are joined by a middle dot between spaces: `Mon–Fri 08:00–18:00`, `Every day, all day`, `Mon 09:00–12:00, 13:00–17:00 · Sat 10:00–12:00`.
+- An Area without hours reads `No Active hours`.
+- In a time input, an end of `00:00` means the end of the day.
+
 ## 0.2.0 (2026-10-03)
 
 The working set and how change-log entries apply to it, and the Inbox count.

@@ -123,6 +123,20 @@ const advance = async (ms: number): Promise<void> => {
   await vi.advanceTimersByTimeAsync(ms);
 };
 
+const track = (promise: Promise<unknown>): { done: boolean } => {
+  const flag = { done: false };
+
+  void promise.then(() => {
+    flag.done = true;
+  });
+
+  return flag;
+};
+
+const applied = (seq: number): object => ({ _tag: 'Applied', seq });
+
+const completeTask: Command = { _tag: CommandTag.CompleteTask, taskId: 't1' };
+
 describe('DataStore', () => {
   let store: DataStore;
   let http: HttpTestingController;
@@ -949,14 +963,57 @@ describe('DataStore', () => {
       });
     });
 
-    it('drops the poll trigger of an Applied outcome while hidden', async () => {
+    it('runs the forced follow-up of an Applied outcome while hidden, resolves after it and sets no timer', async () => {
       await begin(12);
       setVisibility('hidden');
 
       const result = store.send(capture, 'k');
-      await respond(http.expectOne('/v1/commands'), { _tag: 'Applied', seq: 13 });
+      const flag = track(result);
+      await respond(http.expectOne('/v1/commands'), applied(13));
+      const poll = http.expectOne('/v1/changes?after=12');
+      expect(flag.done).toBe(false);
+
+      await respond(poll, changesBody(13, [putTask(13, 't1')]));
+
+      expect(flag.done).toBe(true);
+      expect(store.state()?.tasks.map((task) => task.id)).toEqual(['t1']);
+      expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 13 });
+      noRequests();
+      await advance(POLL_INTERVAL_MS * 3);
+      noRequests();
+    });
+
+    it('still drops a focus while hidden, before and after the forced follow-up', async () => {
+      await begin(12);
+      setVisibility('hidden');
+      window.dispatchEvent(new Event('focus'));
+      noRequests();
+
+      const result = store.send(capture, 'k');
+      await respond(http.expectOne('/v1/commands'), applied(13));
+      await respond(http.expectOne('/v1/changes?after=12'), changesBody(13));
       await result;
 
+      window.dispatchEvent(new Event('focus'));
+      store.refresh();
+      noRequests();
+    });
+
+    it('runs the forced follow-up recorded during a request that settles while hidden', async () => {
+      await begin(12);
+      await advance(POLL_INTERVAL_MS);
+      const inFlight = http.expectOne('/v1/changes?after=12');
+      const result = store.send(capture, 'k');
+      const flag = track(result);
+      await respond(http.expectOne('/v1/commands'), applied(13));
+      setVisibility('hidden');
+
+      await respond(inFlight, changesBody(12));
+
+      expect(flag.done).toBe(false);
+      await respond(http.expectOne('/v1/changes?after=12'), changesBody(13));
+      expect(flag.done).toBe(true);
+      await advance(POLL_INTERVAL_MS * 3);
       noRequests();
     });
   });
@@ -1052,12 +1109,16 @@ describe('DataStore', () => {
   });
 
   describe('send', () => {
-    const respondCommand = async (body: object | null, status = 200): Promise<CommandOutcome> => {
+    const submit = async (
+      body: object | null,
+      status = 200,
+    ): Promise<{ result: Promise<CommandOutcome>; flag: { done: boolean } }> => {
       const result = store.send(capture, 'key-1');
+      const flag = track(result);
 
       await respond(http.expectOne({ method: 'POST', url: '/v1/commands' }), body, status);
 
-      return await result;
+      return { result, flag };
     };
 
     it('posts the command with the key and resolves the outcome unchanged', async () => {
@@ -1067,7 +1128,8 @@ describe('DataStore', () => {
 
       const req = http.expectOne({ method: 'POST', url: '/v1/commands' });
       expect(req.request.body).toEqual({ ...capture, idempotencyKey: 'key-1' });
-      await respond(req, { _tag: 'Applied', seq: 13 });
+      await respond(req, applied(13));
+      await respond(http.expectOne('/v1/changes?after=12'), changesBody(13));
       expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 13 });
     });
 
@@ -1076,12 +1138,13 @@ describe('DataStore', () => {
 
       const first = store.send(capture);
       const firstReq = http.expectOne('/v1/commands');
-      await respond(firstReq, { _tag: 'Applied', seq: 13 });
-      await first;
+      await respond(firstReq, applied(13));
       await respond(http.expectOne('/v1/changes?after=12'), changesBody(13));
+      await first;
       const second = store.send(capture);
       const secondReq = http.expectOne('/v1/commands');
-      await respond(secondReq, { _tag: 'Applied', seq: 14 });
+      await respond(secondReq, applied(14));
+      await respond(http.expectOne('/v1/changes?after=13'), changesBody(14));
       await second;
 
       const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -1092,84 +1155,787 @@ describe('DataStore', () => {
       expect(firstKey).not.toBe(secondKey);
     });
 
-    it('starts a poll at once for an Applied outcome', async () => {
+    it('starts a poll at once for an Applied outcome and resolves after it', async () => {
       await begin(12);
 
-      expect(await respondCommand({ _tag: 'Applied', seq: 13 })).toEqual({
-        _tag: CommandOutcomeTag.Applied,
-        seq: 13,
+      const { result, flag } = await submit(applied(13));
+
+      const poll = http.expectOne('/v1/changes?after=12');
+      expect(flag.done).toBe(false);
+      await respond(poll, changesBody(13));
+      expect(flag.done).toBe(true);
+      expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 13 });
+    });
+
+    it('starts a poll at once for a NotApplicable outcome and resolves after it', async () => {
+      await begin(12);
+
+      const { result, flag } = await submit({
+        _tag: 'NotApplicable',
+        reason: 'expectation_failed',
+        reviewItemId: 'r9',
       });
 
-      http.expectOne('/v1/changes?after=12');
+      const poll = http.expectOne('/v1/changes?after=12');
+      expect(flag.done).toBe(false);
+      await respond(poll, changesBody(13));
+      expect(flag.done).toBe(true);
+      expect(await result).toMatchObject({
+        _tag: CommandOutcomeTag.NotApplicable,
+        reviewItemId: 'r9',
+      });
     });
 
-    it('starts a poll at once for a NotApplicable outcome', async () => {
+    it('resolves a Rejected outcome at once and triggers nothing', async () => {
       await begin(12);
 
-      expect(
-        await respondCommand({
-          _tag: 'NotApplicable',
-          reason: 'expectation_failed',
-          reviewItemId: 'r9',
-        }),
-      ).toMatchObject({ _tag: CommandOutcomeTag.NotApplicable, reviewItemId: 'r9' });
+      const { result, flag } = await submit(
+        { _tag: 'CommandRejected', reason: 'invalid_date' },
+        422,
+      );
 
-      http.expectOne('/v1/changes?after=12');
-    });
-
-    it('triggers nothing for a Rejected outcome', async () => {
-      await begin(12);
-
-      expect(
-        await respondCommand({ _tag: 'CommandRejected', reason: 'invalid_date' }, 422),
-      ).toEqual({ _tag: CommandOutcomeTag.Rejected, reason: 'invalid_date' });
-
+      expect(flag.done).toBe(true);
+      expect(await result).toEqual({ _tag: CommandOutcomeTag.Rejected, reason: 'invalid_date' });
       noRequests();
     });
 
-    it('triggers nothing for a KeyReused outcome', async () => {
+    it('resolves a KeyReused outcome at once and triggers nothing', async () => {
       await begin(12);
 
-      expect(await respondCommand({ _tag: 'IdempotencyKeyReused' }, 409)).toEqual({
-        _tag: CommandOutcomeTag.KeyReused,
-      });
+      const { result, flag } = await submit({ _tag: 'IdempotencyKeyReused' }, 409);
 
+      expect(flag.done).toBe(true);
+      expect(await result).toEqual({ _tag: CommandOutcomeTag.KeyReused });
       noRequests();
     });
 
-    it('triggers nothing for a SignedOut outcome', async () => {
+    it('resolves a SignedOut outcome at once and triggers nothing', async () => {
       await begin(12);
 
-      expect(await respondCommand(unauthorized, 401)).toEqual({
-        _tag: CommandOutcomeTag.SignedOut,
-      });
+      const { result, flag } = await submit(unauthorized, 401);
 
+      expect(flag.done).toBe(true);
+      expect(await result).toEqual({ _tag: CommandOutcomeTag.SignedOut });
       noRequests();
     });
 
-    it('triggers nothing for a Failed outcome', async () => {
+    it('resolves a Failed outcome at once and triggers nothing', async () => {
       await begin(12);
 
-      expect(await respondCommand(null, 503)).toEqual({
-        _tag: CommandOutcomeTag.Failed,
-        status: 503,
-      });
+      const { result, flag } = await submit(null, 503);
 
+      expect(flag.done).toBe(true);
+      expect(await result).toEqual({ _tag: CommandOutcomeTag.Failed, status: 503 });
       noRequests();
     });
 
-    it('makes an Applied outcome during a poll a pending follow-up', async () => {
+    it('records an Applied outcome during a poll as a follow-up and resolves only after that follow-up', async () => {
       await begin(12);
       await advance(POLL_INTERVAL_MS);
       const poll = http.expectOne('/v1/changes?after=12');
 
       const result = store.send(capture, 'key-1');
-      await respond(http.expectOne('/v1/commands'), { _tag: 'Applied', seq: 13 });
-      await result;
+      const flag = track(result);
+      await respond(http.expectOne('/v1/commands'), applied(13));
       noRequests();
       await respond(poll, changesBody(13));
 
-      http.expectOne('/v1/changes?after=13');
+      expect(flag.done).toBe(false);
+      const followUp = http.expectOne('/v1/changes?after=13');
+      await respond(followUp, changesBody(13));
+      expect(flag.done).toBe(true);
+      expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 13 });
+    });
+  });
+
+  describe('reading its own writes', () => {
+    const commandsOf: readonly {
+      readonly name: string;
+      readonly command: Command;
+      readonly subject: string;
+    }[] = [
+      { name: 'CompleteTask', command: completeTask, subject: 't1' },
+      {
+        name: 'RemoveBlocker',
+        command: { _tag: CommandTag.RemoveBlocker, linkId: 'l1' },
+        subject: 'l1',
+      },
+      {
+        name: 'UpdateArea',
+        command: { _tag: CommandTag.UpdateArea, areaId: 'a1', patch: { name: 'Home' } },
+        subject: 'a1',
+      },
+      {
+        name: 'ResolveReviewItem',
+        command: { _tag: CommandTag.ResolveReviewItem, reviewItemId: 'r1' },
+        subject: 'r1',
+      },
+      {
+        name: 'SetUrgencyWindow',
+        command: { _tag: CommandTag.SetUrgencyWindow, days: 3 },
+        subject: 'settings',
+      },
+    ];
+
+    it('resolves only after the triggered poll applied its entries', async () => {
+      await begin(12);
+
+      const result = store.send(completeTask, 'k');
+      const flag = track(result);
+      await respond(http.expectOne('/v1/commands'), applied(13));
+      const poll = http.expectOne('/v1/changes?after=12');
+      await advance(1_000);
+      expect(flag.done).toBe(false);
+
+      await respond(poll, changesBody(13, [putTask(13, 't1', { title: 'Done soon' })]));
+
+      expect(flag.done).toBe(true);
+      expect(store.state()?.tasks.map((task) => task.id)).toEqual(['t1']);
+      expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 13 });
+    });
+
+    it('resolves with the command outcome, never the poll outcome', async () => {
+      await begin(12);
+
+      const result = store.send(completeTask, 'k');
+      await respond(http.expectOne('/v1/commands'), applied(13));
+      await respond(http.expectOne('/v1/changes?after=12'), changesBody(99));
+
+      expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 13 });
+    });
+
+    it('waits for the follow-up poll, not the poll that was already in flight', async () => {
+      await begin(12);
+      await advance(POLL_INTERVAL_MS);
+      const inFlight = http.expectOne('/v1/changes?after=12');
+      const result = store.send(completeTask, 'k');
+      const flag = track(result);
+      await respond(http.expectOne('/v1/commands'), applied(13));
+
+      await respond(inFlight, changesBody(12));
+
+      expect(flag.done).toBe(false);
+      const followUp = http.expectOne('/v1/changes?after=12');
+      noRequests();
+      await respond(followUp, changesBody(13, [putTask(13, 't1')]));
+      expect(flag.done).toBe(true);
+      expect(store.state()?.tasks.map((task) => task.id)).toEqual(['t1']);
+    });
+
+    it('gives exactly one follow-up for several commands and triggers during one request', async () => {
+      await begin(12);
+      await advance(POLL_INTERVAL_MS);
+      const inFlight = http.expectOne('/v1/changes?after=12');
+      const first = store.send(completeTask, 'k1');
+      const second = store.send({ _tag: CommandTag.RemoveBlocker, linkId: 'l1' }, 'k2');
+      const firstFlag = track(first);
+      const secondFlag = track(second);
+      const [firstReq, secondReq] = http.match('/v1/commands');
+      await respond(firstReq, applied(13));
+      await respond(secondReq, applied(14));
+      window.dispatchEvent(new Event('focus'));
+      store.refresh();
+
+      await respond(inFlight, changesBody(12));
+
+      expect(firstFlag.done).toBe(false);
+      expect(secondFlag.done).toBe(false);
+      const followUp = http.match('/v1/changes?after=12');
+      expect(followUp).toHaveLength(1);
+      noRequests();
+      await respond(followUp[0], changesBody(14));
+      expect(firstFlag.done).toBe(true);
+      expect(secondFlag.done).toBe(true);
+      noRequests();
+    });
+
+    it('resolves a command whose response arrived during a poll after the next poll', async () => {
+      await begin(12);
+      const first = store.send(completeTask, 'k1');
+      const firstFlag = track(first);
+      await respond(http.expectOne('/v1/commands'), applied(13));
+      const firstPoll = http.expectOne('/v1/changes?after=12');
+      const second = store.send({ _tag: CommandTag.RemoveBlocker, linkId: 'l1' }, 'k2');
+      const secondFlag = track(second);
+      await respond(http.expectOne('/v1/commands'), applied(14));
+
+      await respond(firstPoll, changesBody(13));
+
+      expect(firstFlag.done).toBe(true);
+      expect(secondFlag.done).toBe(false);
+      await respond(http.expectOne('/v1/changes?after=13'), changesBody(14));
+      expect(secondFlag.done).toBe(true);
+    });
+
+    it('requests the follow-up after the start snapshot when the command applied during it', async () => {
+      store.start();
+      const snapshot = http.expectOne('/v1/snapshot');
+      const result = store.send(completeTask, 'k');
+      const flag = track(result);
+      await respond(http.expectOne('/v1/commands'), applied(13));
+
+      await respond(snapshot, snapshotBody(12));
+
+      expect(flag.done).toBe(false);
+      await respond(http.expectOne('/v1/changes?after=12'), changesBody(13));
+      expect(flag.done).toBe(true);
+    });
+
+    it('resolves a command that is Applied after a failed snapshot only after the next snapshot settles', async () => {
+      store.start();
+      await respond(http.expectOne('/v1/snapshot'), null, 503);
+      const result = store.send(completeTask, 'k');
+      const flag = track(result);
+      await respond(http.expectOne('/v1/commands'), applied(13));
+
+      expect(flag.done).toBe(false);
+      await respond(http.expectOne('/v1/snapshot'), snapshotBody(13, { tasks: [aTask('t1')] }));
+      expect(flag.done).toBe(true);
+      expect(store.state()?.tasks.map((task) => task.id)).toEqual(['t1']);
+    });
+
+    describe('410 ChangesExpired', () => {
+      it('resolves only after the reloaded snapshot settled', async () => {
+        await begin(12);
+        const result = store.send(completeTask, 'k');
+        const flag = track(result);
+        await respond(http.expectOne('/v1/commands'), applied(13));
+
+        await respond(http.expectOne('/v1/changes?after=12'), expired(12), 410);
+
+        expect(flag.done).toBe(false);
+        const snapshot = http.expectOne('/v1/snapshot');
+        await respond(snapshot, snapshotBody(40, { tasks: [aTask('t1')] }));
+        expect(flag.done).toBe(true);
+        expect(store.state()?.tasks.map((task) => task.id)).toEqual(['t1']);
+        expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 13 });
+      });
+
+      it('resolves when the reloaded snapshot fails too', async () => {
+        await begin(12);
+        const result = store.send(completeTask, 'k');
+        const flag = track(result);
+        await respond(http.expectOne('/v1/commands'), applied(13));
+        await respond(http.expectOne('/v1/changes?after=12'), expired(12), 410);
+        expect(flag.done).toBe(false);
+
+        await respond(http.expectOne('/v1/snapshot'), null, 503);
+
+        expect(flag.done).toBe(true);
+        expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 13 });
+        expect(store.awaitingSync()).toEqual(new Set(['t1']));
+      });
+    });
+
+    describe('awaitingSync', () => {
+      it('starts empty', () => {
+        expect(store.awaitingSync().size).toBe(0);
+      });
+
+      it.each(commandsOf)(
+        'holds the subject of a $name whose follow-up failed, until the next successful poll',
+        async ({ command, subject }) => {
+          await begin(12);
+          const result = store.send(command, 'k');
+          const flag = track(result);
+          await respond(http.expectOne('/v1/commands'), applied(13));
+
+          await respond(http.expectOne('/v1/changes?after=12'), null, 503);
+
+          expect(flag.done).toBe(true);
+          expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 13 });
+          expect(store.awaitingSync()).toEqual(new Set([subject]));
+          await advance(POLL_INTERVAL_MS);
+          await respond(http.expectOne('/v1/changes?after=12'), changesBody(13));
+          expect(store.awaitingSync().size).toBe(0);
+        },
+      );
+
+      it('holds the subject when the follow-up failed with a network error', async () => {
+        await begin(12);
+        const result = store.send(completeTask, 'k');
+        const flag = track(result);
+        await respond(http.expectOne('/v1/commands'), applied(13));
+
+        await networkError(http.expectOne('/v1/changes?after=12'));
+
+        expect(flag.done).toBe(true);
+        expect(store.awaitingSync()).toEqual(new Set(['t1']));
+      });
+
+      it('holds the subject of a NotApplicable outcome whose follow-up failed', async () => {
+        await begin(12);
+        const result = store.send(completeTask, 'k');
+        await respond(http.expectOne('/v1/commands'), {
+          _tag: 'NotApplicable',
+          reason: 'expectation_failed',
+          reviewItemId: 'r9',
+        });
+
+        await respond(http.expectOne('/v1/changes?after=12'), null, 503);
+
+        expect(await result).toMatchObject({ _tag: CommandOutcomeTag.NotApplicable });
+        expect(store.awaitingSync()).toEqual(new Set(['t1']));
+      });
+
+      it('holds a 410 with another tag as a failure', async () => {
+        await begin(12);
+        const result = store.send(completeTask, 'k');
+        await respond(http.expectOne('/v1/commands'), applied(13));
+
+        await respond(http.expectOne('/v1/changes?after=12'), { _tag: 'Other' }, 410);
+
+        await result;
+        expect(store.awaitingSync()).toEqual(new Set(['t1']));
+      });
+
+      it('holds every subject whose command waited for the same failing follow-up', async () => {
+        await begin(12);
+        await advance(POLL_INTERVAL_MS);
+        const inFlight = http.expectOne('/v1/changes?after=12');
+        const first = store.send(completeTask, 'k1');
+        const second = store.send({ _tag: CommandTag.RemoveBlocker, linkId: 'l1' }, 'k2');
+        const [firstReq, secondReq] = http.match('/v1/commands');
+        await respond(firstReq, applied(13));
+        await respond(secondReq, applied(14));
+        await respond(inFlight, changesBody(12));
+
+        await respond(http.expectOne('/v1/changes?after=12'), null, 503);
+
+        await Promise.all([first, second]);
+        expect(store.awaitingSync()).toEqual(new Set(['t1', 'l1']));
+      });
+
+      it('is a new object on every change and keeps the same one when nothing changes', async () => {
+        await begin(12);
+        const empty = store.awaitingSync();
+        const result = store.send(completeTask, 'k');
+        await respond(http.expectOne('/v1/commands'), applied(13));
+        await respond(http.expectOne('/v1/changes?after=12'), null, 503);
+        await result;
+        const holding = store.awaitingSync();
+        expect(holding).not.toBe(empty);
+
+        await advance(POLL_INTERVAL_MS);
+        await respond(http.expectOne('/v1/changes?after=12'), changesBody(12));
+        const cleared = store.awaitingSync();
+        expect(cleared).not.toBe(holding);
+        expect(holding).toEqual(new Set(['t1']));
+
+        await advance(POLL_INTERVAL_MS);
+        await respond(http.expectOne('/v1/changes?after=12'), changesBody(12));
+        expect(store.awaitingSync()).toBe(cleared);
+      });
+
+      it('is emptied by a successful snapshot', async () => {
+        await begin(12);
+        const result = store.send(completeTask, 'k');
+        await respond(http.expectOne('/v1/commands'), applied(13));
+        await respond(http.expectOne('/v1/changes?after=12'), null, 503);
+        await result;
+        expect(store.awaitingSync().size).toBe(1);
+        await advance(POLL_INTERVAL_MS);
+        await respond(http.expectOne('/v1/changes?after=12'), expired(12), 410);
+
+        await respond(http.expectOne('/v1/snapshot'), snapshotBody(40));
+
+        expect(store.awaitingSync().size).toBe(0);
+      });
+
+      it('is emptied before a waiter of the successful settle resolves', async () => {
+        await begin(12);
+        const first = store.send(completeTask, 'k1');
+        await respond(http.expectOne('/v1/commands'), applied(13));
+        await respond(http.expectOne('/v1/changes?after=12'), null, 503);
+        await first;
+        expect(store.awaitingSync().size).toBe(1);
+        const second = store.send({ _tag: CommandTag.RemoveBlocker, linkId: 'l1' }, 'k2');
+        let seen: ReadonlySet<string> | null = null;
+        void second.then(() => {
+          seen = store.awaitingSync();
+        });
+        await respond(http.expectOne('/v1/commands'), applied(14));
+
+        await respond(http.expectOne('/v1/changes?after=12'), changesBody(14));
+
+        expect(seen).toEqual(new Set());
+      });
+
+      it('is emptied by stop', async () => {
+        await begin(12);
+        const result = store.send(completeTask, 'k');
+        await respond(http.expectOne('/v1/commands'), applied(13));
+        await respond(http.expectOne('/v1/changes?after=12'), null, 503);
+        await result;
+        expect(store.awaitingSync().size).toBe(1);
+
+        store.stop();
+
+        expect(store.awaitingSync().size).toBe(0);
+      });
+    });
+
+    describe('401 Unauthorized', () => {
+      it('resolves a waiting send and holds its subject when the request already in flight is unauthorized', async () => {
+        await begin(12);
+        await advance(POLL_INTERVAL_MS);
+        const inFlight = http.expectOne('/v1/changes?after=12');
+        const result = store.send(completeTask, 'k');
+        const flag = track(result);
+        await respond(http.expectOne('/v1/commands'), applied(13));
+        expect(flag.done).toBe(false);
+
+        await respond(inFlight, unauthorized, 401);
+
+        expect(flag.done).toBe(true);
+        expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 13 });
+        expect(store.awaitingSync()).toEqual(new Set(['t1']));
+        noRequests();
+        await advance(POLL_INTERVAL_MS * 4);
+        noRequests();
+      });
+
+      it('resolves a waiting send and holds its subject when its own follow-up is unauthorized', async () => {
+        await begin(12);
+        const result = store.send(completeTask, 'k');
+        const flag = track(result);
+        await respond(http.expectOne('/v1/commands'), applied(13));
+
+        await respond(http.expectOne('/v1/changes?after=12'), unauthorized, 401);
+
+        expect(flag.done).toBe(true);
+        expect(store.awaitingSync()).toEqual(new Set(['t1']));
+      });
+    });
+
+    describe('stop while waiting', () => {
+      it('resolves the waiting send at once with its outcome and holds nothing', async () => {
+        await begin(12);
+        const result = store.send(completeTask, 'k');
+        const flag = track(result);
+        await respond(http.expectOne('/v1/commands'), applied(13));
+        const poll = http.expectOne('/v1/changes?after=12');
+        expect(flag.done).toBe(false);
+
+        store.stop();
+        await advance(0);
+
+        expect(flag.done).toBe(true);
+        expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 13 });
+        expect(store.awaitingSync().size).toBe(0);
+        await respond(poll, changesBody(13));
+        expect(store.awaitingSync().size).toBe(0);
+        noRequests();
+      });
+    });
+
+    describe('without a follow-up', () => {
+      it('resolves at once, with no request, on a generation change between post and response', async () => {
+        await begin(12);
+        const result = store.send(completeTask, 'k');
+        const flag = track(result);
+        const req = http.expectOne('/v1/commands');
+        store.stop();
+        store.start();
+        http.expectOne('/v1/snapshot');
+
+        await respond(req, applied(13));
+
+        expect(flag.done).toBe(true);
+        expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 13 });
+        noRequests();
+      });
+
+      it('resolves at once, with no request, when the store stopped between post and response', async () => {
+        await begin(12);
+        const result = store.send(completeTask, 'k');
+        const flag = track(result);
+        const req = http.expectOne('/v1/commands');
+        store.stop();
+
+        await respond(req, applied(13));
+
+        expect(flag.done).toBe(true);
+        noRequests();
+        expect(store.awaitingSync().size).toBe(0);
+      });
+
+      it('resolves a NotApplicable outcome at once before start', async () => {
+        const result = store.send(completeTask, 'k');
+        const flag = track(result);
+
+        await respond(http.expectOne('/v1/commands'), {
+          _tag: 'NotApplicable',
+          reason: 'expectation_failed',
+          reviewItemId: 'r9',
+        });
+
+        expect(flag.done).toBe(true);
+        noRequests();
+      });
+    });
+  });
+
+  describe('chooseTimeZone', () => {
+    const TOKYO = 'Asia/Tokyo';
+
+    it('waits for the automatic report, posts the chosen zone, keeps the device zone as reported and sends no second report', async () => {
+      current.mockReturnValue(LONDON);
+      await begin(12);
+      const report = http.expectOne('/v1/commands');
+      expect(report.request.body).toMatchObject({
+        _tag: CommandTag.SetTimeZone,
+        timeZone: LONDON,
+      });
+
+      const result = store.chooseTimeZone(TOKYO);
+      const flag = track(result);
+      await advance(0);
+      http.expectNone('/v1/commands');
+
+      await respond(report, applied(13));
+      expect(stored.get(LAST_REPORTED_ZONE_KEY)).toBe(LONDON);
+      const reportPoll = http.expectOne('/v1/changes?after=12');
+      const chosen = http.expectOne('/v1/commands');
+      expect(chosen.request.body).toMatchObject({ _tag: CommandTag.SetTimeZone, timeZone: TOKYO });
+      expect((chosen.request.body as { idempotencyKey: string }).idempotencyKey).not.toBe(
+        (report.request.body as { idempotencyKey: string }).idempotencyKey,
+      );
+      set.mockClear();
+
+      await respond(chosen, applied(14));
+
+      expect(set).toHaveBeenCalledWith(LAST_REPORTED_ZONE_KEY, LONDON);
+      expect(flag.done).toBe(false);
+      await respond(reportPoll, changesBody(13));
+      expect(flag.done).toBe(false);
+      const followUp = http.expectOne('/v1/changes?after=13');
+      await respond(followUp, changesBody(14, [putSettings(14, TOKYO)]));
+
+      http.expectNone('/v1/commands');
+      expect(flag.done).toBe(true);
+      expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 14 });
+      expect(store.state()?.settings.timeZone).toBe(TOKYO);
+    });
+
+    it('posts at once with no automatic report in flight, and waits like send for a poll', async () => {
+      await begin(12);
+
+      const result = store.chooseTimeZone(TOKYO);
+      const flag = track(result);
+      const chosen = http.expectOne('/v1/commands');
+      expect(chosen.request.body).toMatchObject({ _tag: CommandTag.SetTimeZone, timeZone: TOKYO });
+      await respond(chosen, applied(13));
+
+      expect(flag.done).toBe(false);
+      await respond(http.expectOne('/v1/changes?after=12'), changesBody(13));
+      expect(flag.done).toBe(true);
+    });
+
+    it('holds the settings subject when the follow-up failed', async () => {
+      await begin(12);
+      const result = store.chooseTimeZone(TOKYO);
+      await respond(http.expectOne('/v1/commands'), applied(13));
+
+      await respond(http.expectOne('/v1/changes?after=12'), null, 503);
+
+      expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 13 });
+      expect(store.awaitingSync()).toEqual(new Set(['settings']));
+    });
+
+    it('writes nothing when the device has no zone', async () => {
+      await begin(12);
+
+      const result = store.chooseTimeZone(TOKYO);
+      await respond(http.expectOne('/v1/commands'), applied(13));
+      await respond(http.expectOne('/v1/changes?after=12'), changesBody(13));
+      await result;
+
+      expect(set).not.toHaveBeenCalled();
+    });
+
+    it('sends no automatic report during it, from a focus, a snapshot or a settings entry', async () => {
+      current.mockReturnValue(AMSTERDAM);
+      await begin(12);
+      const result = store.chooseTimeZone(TOKYO);
+      const flag = track(result);
+      const chosen = http.expectOne('/v1/commands');
+      current.mockReturnValue(LONDON);
+
+      window.dispatchEvent(new Event('focus'));
+      http.expectNone('/v1/commands');
+      await respond(
+        http.expectOne('/v1/changes?after=12'),
+        changesBody(13, [putSettings(13, 'Europe/Paris')]),
+      );
+      http.expectNone('/v1/commands');
+      await advance(POLL_INTERVAL_MS);
+      await respond(http.expectOne('/v1/changes?after=13'), expired(13), 410);
+      await respond(http.expectOne('/v1/snapshot'), snapshotBody(20));
+      http.expectNone('/v1/commands');
+      expect(flag.done).toBe(false);
+
+      await respond(chosen, { _tag: 'CommandRejected', reason: 'invalid_time_zone' }, 422);
+      expect(flag.done).toBe(true);
+    });
+
+    it('still records the device zone during it when it equals the server zone', async () => {
+      current.mockReturnValue(LONDON);
+      stored.set(LAST_REPORTED_ZONE_KEY, LONDON);
+      await begin(12);
+      const result = store.chooseTimeZone(TOKYO);
+      const chosen = http.expectOne('/v1/commands');
+      set.mockClear();
+
+      window.dispatchEvent(new Event('focus'));
+      await respond(
+        http.expectOne('/v1/changes?after=12'),
+        changesBody(13, [putSettings(13, LONDON)]),
+      );
+
+      expect(set).toHaveBeenCalledWith(LAST_REPORTED_ZONE_KEY, LONDON);
+      await respond(chosen, { _tag: 'CommandRejected', reason: 'invalid_time_zone' }, 422);
+      await result;
+    });
+
+    it('lets the automatic check report a later device zone change after it resolved', async () => {
+      current.mockReturnValue(AMSTERDAM);
+      await begin(12);
+      const result = store.chooseTimeZone(TOKYO);
+      await respond(http.expectOne('/v1/commands'), applied(13));
+      expect(stored.get(LAST_REPORTED_ZONE_KEY)).toBe(AMSTERDAM);
+      await respond(
+        http.expectOne('/v1/changes?after=12'),
+        changesBody(13, [putSettings(13, TOKYO)]),
+      );
+      await result;
+      current.mockReturnValue(LONDON);
+
+      window.dispatchEvent(new Event('focus'));
+
+      const report = http.expectOne('/v1/commands');
+      expect(report.request.body).toMatchObject({
+        _tag: CommandTag.SetTimeZone,
+        timeZone: LONDON,
+      });
+    });
+
+    it('resolves a Rejected invalid_time_zone at once, starts no poll and writes nothing', async () => {
+      current.mockReturnValue(LONDON);
+      stored.set(LAST_REPORTED_ZONE_KEY, LONDON);
+      await begin(12);
+
+      const result = store.chooseTimeZone('Mars/Olympus');
+      const flag = track(result);
+      await respond(
+        http.expectOne('/v1/commands'),
+        { _tag: 'CommandRejected', reason: 'invalid_time_zone' },
+        422,
+      );
+
+      expect(flag.done).toBe(true);
+      expect(await result).toEqual({
+        _tag: CommandOutcomeTag.Rejected,
+        reason: 'invalid_time_zone',
+      });
+      noRequests();
+      expect(set).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      { name: 'Failed', body: null, status: 503 },
+      { name: 'KeyReused', body: { _tag: 'IdempotencyKeyReused' }, status: 409 },
+      { name: 'SignedOut', body: unauthorized, status: 401 },
+    ])('resolves a $name outcome at once and writes nothing', async ({ body, status }) => {
+      current.mockReturnValue(LONDON);
+      stored.set(LAST_REPORTED_ZONE_KEY, LONDON);
+      await begin(12);
+
+      const result = store.chooseTimeZone(TOKYO);
+      const flag = track(result);
+      await respond(http.expectOne('/v1/commands'), body, status);
+
+      expect(flag.done).toBe(true);
+      noRequests();
+      expect(set).not.toHaveBeenCalled();
+    });
+
+    it('writes nothing for a NotApplicable outcome but waits for the poll', async () => {
+      current.mockReturnValue(LONDON);
+      stored.set(LAST_REPORTED_ZONE_KEY, LONDON);
+      await begin(12);
+
+      const result = store.chooseTimeZone(TOKYO);
+      const flag = track(result);
+      await respond(http.expectOne('/v1/commands'), {
+        _tag: 'NotApplicable',
+        reason: 'expectation_failed',
+        reviewItemId: 'r9',
+      });
+
+      expect(set).not.toHaveBeenCalled();
+      expect(flag.done).toBe(false);
+      await respond(http.expectOne('/v1/changes?after=12'), changesBody(12));
+      expect(flag.done).toBe(true);
+    });
+
+    it('resolves at once and writes nothing when the store stopped before the response', async () => {
+      current.mockReturnValue(LONDON);
+      stored.set(LAST_REPORTED_ZONE_KEY, LONDON);
+      await begin(12);
+      const result = store.chooseTimeZone(TOKYO);
+      const flag = track(result);
+      const chosen = http.expectOne('/v1/commands');
+
+      store.stop();
+      await respond(chosen, applied(13));
+
+      expect(flag.done).toBe(true);
+      expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 13 });
+      expect(set).not.toHaveBeenCalled();
+      noRequests();
+    });
+
+    it('resolves at once and writes nothing more when the store stops while it waits', async () => {
+      current.mockReturnValue(LONDON);
+      stored.set(LAST_REPORTED_ZONE_KEY, LONDON);
+      await begin(12);
+      const result = store.chooseTimeZone(TOKYO);
+      const flag = track(result);
+      await respond(http.expectOne('/v1/commands'), applied(13));
+      const poll = http.expectOne('/v1/changes?after=12');
+      set.mockClear();
+
+      store.stop();
+      await advance(0);
+
+      expect(flag.done).toBe(true);
+      expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 13 });
+      expect(store.awaitingSync().size).toBe(0);
+      await respond(poll, changesBody(13, [putSettings(13, TOKYO)]));
+      expect(set).not.toHaveBeenCalled();
+    });
+
+    it('resolves and writes nothing when the store stops while it waits for the automatic report', async () => {
+      current.mockReturnValue(LONDON);
+      await begin(12);
+      const report = http.expectOne('/v1/commands');
+      const result = store.chooseTimeZone(TOKYO);
+      const flag = track(result);
+      await advance(0);
+
+      store.stop();
+      await respond(report, applied(13));
+      await advance(0);
+
+      for (const req of http.match('/v1/commands')) {
+        await respond(req, applied(14));
+      }
+
+      expect(flag.done).toBe(true);
+      expect(set).not.toHaveBeenCalled();
+      expect(await result).toMatchObject({ _tag: CommandOutcomeTag.Applied });
+      noRequests();
     });
   });
 
@@ -1192,6 +1958,30 @@ describe('DataStore', () => {
 
       expect(set).toHaveBeenCalledWith(LAST_REPORTED_ZONE_KEY, LONDON);
       http.expectNone('/v1/commands');
+    });
+
+    it('records the reported zone at once for an automatic report, before the triggered poll settles', async () => {
+      current.mockReturnValue(LONDON);
+      await begin(12);
+
+      await respond(http.expectOne('/v1/commands'), applied(13));
+
+      expect(stored.get(LAST_REPORTED_ZONE_KEY)).toBe(LONDON);
+      http.expectOne('/v1/changes?after=12');
+    });
+
+    it('starts no poll for an automatic report that applied while hidden, and writes the zone', async () => {
+      setVisibility('hidden', false);
+      current.mockReturnValue(LONDON);
+      store.start();
+      await respond(http.expectOne('/v1/snapshot'), snapshotBody(12));
+
+      await respond(http.expectOne('/v1/commands'), applied(13));
+
+      expect(stored.get(LAST_REPORTED_ZONE_KEY)).toBe(LONDON);
+      noRequests();
+      await advance(POLL_INTERVAL_MS * 3);
+      noRequests();
     });
 
     it('reads the last reported zone from the storage key', async () => {

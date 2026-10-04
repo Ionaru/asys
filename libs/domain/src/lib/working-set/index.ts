@@ -2,3 +2,4 @@
 
 export * from './apply-changes';
 export * from './inbox-count';
+export * from './inbox';

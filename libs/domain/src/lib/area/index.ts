@@ -2,3 +2,4 @@
 
 export * from './active-hours';
 export * from './area';
+export * from './active-hours-text';

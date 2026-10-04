@@ -2,3 +2,4 @@
 
 export * from './picker';
 export * from './reason-text';
+export * from './waiting-text';

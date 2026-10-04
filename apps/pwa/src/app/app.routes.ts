@@ -44,6 +44,34 @@ export const routes: Routes = [
       { path: 'inbox', component: Inbox, title: 'Inbox · ASYS' },
       { path: 'capture', component: Capture, title: 'Capture · ASYS' },
       {
+        path: 'tasks/:taskId',
+        loadComponent: () =>
+          import('./features/task/task-editor-route').then((m) => m.TaskEditorRoute),
+        title: 'Task · ASYS',
+      },
+      {
+        path: 'settings',
+        loadComponent: () => import('./features/settings/settings').then((m) => m.Settings),
+        title: 'Settings · ASYS',
+      },
+      {
+        path: 'settings/areas',
+        loadComponent: () => import('./features/areas/area-list').then((m) => m.AreaList),
+        title: 'Areas · ASYS',
+      },
+      {
+        path: 'settings/areas/new',
+        loadComponent: () =>
+          import('./features/areas/area-editor-route').then((m) => m.AreaEditorRoute),
+        title: 'New Area · ASYS',
+      },
+      {
+        path: 'settings/areas/:areaId',
+        loadComponent: () =>
+          import('./features/areas/area-editor-route').then((m) => m.AreaEditorRoute),
+        title: 'Area · ASYS',
+      },
+      {
         path: 'account',
         loadComponent: () => import('./features/account/account').then((m) => m.Account),
         title: 'Account · ASYS',

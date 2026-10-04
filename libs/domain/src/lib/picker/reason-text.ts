@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: MPL-2.0
 
-import { toLocalDateTime, type TimeZone } from '../time';
-import { Quadrant } from '../task';
+import type { Task } from '../task';
+import { formatClock, formatDateSpec, toLocalDateTime, type Instant, type TimeZone } from '../time';
 import type { Reason } from './picker';
 
-const QUADRANT_LABELS: Readonly<Record<Quadrant, string>> = {
-  [Quadrant.Do]: 'Do',
-  [Quadrant.Plan]: 'Plan',
-  [Quadrant.Delegate]: 'Delegate',
-  [Quadrant.Drop]: 'Drop',
-};
-
-export const reasonText = (reason: Reason, timeZone: TimeZone): string => {
-  const parts: string[] = [];
-  if (reason.overdue) parts.push('Overdue');
-  parts.push(QUADRANT_LABELS[reason.quadrant]);
-  if (reason.latestStart !== null) {
-    const { date, time } = toLocalDateTime(reason.latestStart, timeZone);
-    parts.push(`start by ${date} ${time}`);
+/** The one-line reason a ranked Task is where it is: one fact, then 'important' when it is. */
+export const reasonText = (
+  task: Task,
+  reason: Reason,
+  now: Instant,
+  timeZone: TimeZone,
+): string => {
+  let fact: string;
+  if (reason.overdue && task.due !== null) {
+    fact = `Due ${formatDateSpec(task.due, toLocalDateTime(now, timeZone).date)}`;
+  } else if (reason.latestStart !== null) {
+    fact = `Latest start ${formatClock(reason.latestStart, now, timeZone)}`;
+  } else {
+    fact = 'No Due';
   }
-  return parts.join(' · ');
+  return task.important === true ? `${fact} · important` : fact;
 };
