@@ -6,7 +6,7 @@ This plan cuts [Slice 1 of the MVP plan](mvp-plan.md#slice-1-foundations-and-the
 - The installed packages were checked the same day.
 - An adversarial review then checked it, and its confirmed findings are folded in.
 
-Pieces 1 to 4 were specified in full here; pieces 5 to 7 were outlined only as far as they constrained the earlier pieces, and each got a re-plan before it started. All seven are built; piece 7 waits for the phone check.
+Pieces 1 to 4 were specified in full here; pieces 5 to 7 were outlined only as far as they constrained the earlier pieces, and each got a re-plan before it started. All seven are built, and the phone check of piece 7 passed on 2026-10-04.
 
 ## Working agreements
 
@@ -808,7 +808,7 @@ Planned and built on 2026-10-04. A research workflow drafted the plan and a crit
 | Proxy | The existing Caddy, configured outside the repo; no Docker labels. |
 | Compose | The root `compose.yaml` stays the development database. The production stack is `deploy/compose.yaml` (project `asys`) with its own `deploy/.env`. |
 | Telemetry | Traces and logs to SigNoz, no metrics, through Effect 4.0.0's own OTLP exporter (`effect/observability`, http/protobuf) behind an allowlist scrubber. No new dependency. |
-| Deploy | `appleboy/ssh-action` pinned by commit, as in fruiz, without host-key fingerprint pinning (as in the maintainer's other deployments). |
+| Deploy | `appleboy/ssh-action` pinned by commit, as in fruiz, without host-key fingerprint pinning (as in the maintainer's other deployments). The job runs in the GitHub environment `production`, with `DEPLOY_HOST` and `DEPLOY_USER` as environment variables and `DEPLOY_KEY` and `DEPLOY_PATH` as environment secrets. |
 
 **Static files** (`http/static-files.ts`, `http/paths.ts`). With `ASYS_STATIC_ROOT` set (an absolute path; a relative one is a ConfigError), `serverLayer` serves `Layer.mergeAll(apiLayer, staticFilesLayer(root))`.
 - The layer checks at startup that `<root>/index.html` is a file and fails with `StaticRootInvalid` otherwise, so `serve` stops.
@@ -835,7 +835,7 @@ Planned and built on 2026-10-04. A research workflow drafted the plan and a crit
 - The stack is `asys-postgres` (PostgreSQL 18.6 pinned by digest, on the internal `database` network), the one-shot `migrate` (owner URL only) and `asys` (app URL only, on `database`, `edge` and `telemetry`, read-only, no capabilities, no published port, a `/health` healthcheck). Every service logs with the rotating `local` driver.
 - `scripts/smoke-image.mts` checks a running stack from the host over the `edge` network: the app shell and its headers, `/health`, the manifest's type, every file in `ngsw.json` (and an immutable chunk), `/v1/meta` 401, `/v1/nope` 404, and the shape of `signup-link`'s line without printing it.
 
-**CD** (`.github/workflows/cd.yaml`). `image` builds and smoke-tests the stack on every push and pull request and runs `up --wait` a second time; on `main` it hands the image to `push-image`, which pushes `:<12-char sha>` and `:latest` to GHCR after every check, and `deploy` checks out the commit on the VPS over SSH and runs `pull` and `up --wait`. Main runs queue rather than cancel. The runbook is in the README under "Deploying".
+**CD** (`.github/workflows/cd.yaml`). `image` builds and smoke-tests the stack on every push and pull request and runs `up --wait` a second time; on `main` it hands the image to `push-image`, which pushes `:<12-char sha>` and `:latest` to GHCR after every check, and `deploy`, in the `production` environment, checks out the commit on the VPS over SSH and runs `pull` and `up --wait`. Main runs queue rather than cancel. The first deploy needed two fixes after the piece was committed: the job had to declare the environment its secrets live in, and the host and user moved to environment variables, because as secrets GitHub masked their values in every log line and would not set the environment URL. The runbook is in the README under "Deploying".
 
 **Departures from the plan**
 - `server:prune-lockfile` is not used: it fails because `apps/server` has no `package.json`, and `nx build server` already writes the pruned `package.json`, `pnpm-lock.yaml` (737 lines) and `pnpm-workspace.yaml` next to `main.js`.
@@ -852,13 +852,13 @@ Planned and built on 2026-10-04. A research workflow drafted the plan and a crit
 - **The real export.** The same server exported protobuf to a local listener on `/v1/traces` and `/v1/logs` only. Requests with `?x=secret-123`, a session cookie, `X-Forwarded-For` and a browser user agent, and a malformed POST, left none of those values in any exported body, while stderr kept its redacted lines and `/health`, static files and `/capture?text=...` logged nothing.
 - **The image.** With `-p asys-verify`, the stack came up healthy on an empty volume (all 11 migrations), the smoke script passed every check, and a second `up --wait` ran `migrate` again with exit 0 while `asys` stayed healthy. The image is 483 MB, of which 128 MB is `node_modules`.
 
-**The phone check** (the maintainer, after the first deploy; results go into this section in a follow-up docs commit):
-1. Load the app on the phone and check remote devtools for CSP violations; `main-*.js` arrives compressed.
-2. `cd "$DEPLOY_PATH/deploy" && docker compose exec asys node /app/main.js signup-link`.
-3. Enrol a passkey on the Android phone.
-4. Install the PWA.
-5. Share text from another app into the Inbox.
-6. Check that the quick add stays above the keyboard (left over from piece 6).
+**The first deploy and the phone check (2026-10-04).** The first deploy created the volume, applied every migration and started `asys` healthy, and https://tasks.saturnserver.org serves the app through Caddy with the headers above, zstd-compressed bundles, and `/health` answering 404 from outside. The maintainer then ran the phone check on an Android phone, in the personal profile:
+- **Sign-up and passkey: passed.** A link from `docker compose exec asys node /app/main.js signup-link` enrolled a passkey.
+- **Install: passed.**
+- **Share into the Inbox: passed.** Sharing text from another app opened Capture with the title filled in, and the Task landed in the Inbox.
+- **Quick add above the keyboard: passed** (left over from piece 6).
+- **CSP: passed, checked from a desktop Chromium.** Remote devtools on the phone were not reachable, so `/signin` on the live site was loaded in a desktop Chromium instead: no CSP violation, the stylesheet and font applied, and the service worker active. The headers are the same for every browser. `curl` showed `main-*.js` arriving zstd-compressed and `immutable`.
+- **Not in the work profile.** In the phone's Android work profile, where the PWA is installed too, ASYS does not appear in the share sheet. The cause was not investigated (see Known limits).
 
 **Known limits**
 - A file-level backup of a running PostgreSQL volume is not crash-consistent; backups stay the VPS's job.
@@ -871,6 +871,7 @@ Planned and built on 2026-10-04. A research workflow drafted the plan and a crit
 - The deploy job does not pin the VPS host key, and appleboy/ssh-action downloads drone-ssh at run time without a checksum (both accepted, as in fruiz).
 - pnpm in the image is checked only by npm's registry integrity, and the image digests are updated by hand.
 - `migrate` runs in one transaction without a lock, so two migrators at once are not safe; the stack runs one.
+- In an Android work profile the installed PWA does not show up as a share target, while the personal profile works. Not investigated; likely causes are a work-profile install that is a home-screen shortcut rather than a WebAPK, or the profile's management policy.
 
 ## Facts checked on 2026-09-30
 
