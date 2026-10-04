@@ -2,7 +2,7 @@
 import { randomBytes } from 'node:crypto';
 import { PasskeyChallenges, passkeyRouterConfig } from '@ionaru/effect-passkeys/server';
 import type { SoftAuthenticator, SoftCredential } from '@ionaru/effect-passkeys/testing';
-import { Context, Effect, Layer } from 'effect';
+import { Context, Effect, Layer, Logger } from 'effect';
 import { HttpRouter, HttpServer } from 'effect/http';
 import { PasskeyStoreLive } from '../auth/passkey-store';
 import { createSignUpLink } from '../auth/sign-up-links';
@@ -12,6 +12,8 @@ import { appDatabase, type Db } from '../db/database';
 import { apiLayer } from '../http/app';
 import { HealthReader } from '../http/health';
 import { httpMiddleware } from '../http/origin-guard';
+import { makeRedactingLogger } from '../logging/logger';
+import { serverLayer } from '../server';
 import { newSoftAuthenticator } from './sign-up';
 import { removeOwner } from './owners';
 
@@ -78,7 +80,7 @@ export const headersOf = (init: SendInit): Record<string, string> => {
  * What `apiLayer` and `serverLayer` need, over the real database (as `asys_app`): the passkey
  * services, an in-memory challenge store, the server configuration and a health reader.
  */
-export const httpDependencies = (health?: Layer.Layer<HealthReader>) => {
+export const httpDependencies = (health?: Layer.Layer<HealthReader>, staticRoot?: string) => {
   const healthLayer: Layer.Layer<HealthReader, never, Db> = health ?? HealthReader.layer;
 
   return Layer.mergeAll(
@@ -91,7 +93,12 @@ export const httpDependencies = (health?: Layer.Layer<HealthReader>) => {
     Layer.provideMerge(
       Layer.mergeAll(
         appDatabase(),
-        ServerConfig.layerOf({ port: 0, publicOrigin: HTTP_ORIGIN, rpId: 'localhost' }),
+        ServerConfig.layerOf({
+          port: 0,
+          publicOrigin: HTTP_ORIGIN,
+          rpId: 'localhost',
+          ...(staticRoot === undefined ? {} : { staticRoot }),
+        }),
       ),
     ),
   );
@@ -154,6 +161,58 @@ export const makeHttp = (options: { readonly health?: Layer.Layer<HealthReader> 
       return { fetch, send };
     }),
   );
+
+/**
+ * Starts the server on a free port, over the real database. The server stops when the scope
+ * closes. `send` and `fetch` go over the real socket; `lines` holds the redacting logger's lines.
+ */
+export const startServer = <Provided = never>(
+  options: {
+    readonly health?: Layer.Layer<HealthReader>;
+    readonly staticRoot?: string;
+    /** Built after the log capture is installed and before the server, which runs in its context. */
+    readonly around?: Layer.Layer<Provided, never, never>;
+  } = {},
+) =>
+  Effect.gen(function* () {
+    const lines: Array<string> = [];
+    const capture = Logger.layer([makeRedactingLogger((line) => lines.push(line))]);
+    const aroundContext =
+      options.around === undefined
+        ? Context.empty()
+        : yield* Layer.build(options.around).pipe(Effect.provide(capture));
+    const context = yield* Layer.build(
+      serverLayer.pipe(Layer.provide(httpDependencies(options.health, options.staticRoot))),
+    ).pipe(Effect.provide(aroundContext), Effect.provide(capture));
+    const { address } = Context.get(context, HttpServer.HttpServer);
+    if (!('port' in address)) return yield* Effect.die('The server is not on a TCP port');
+    const base = `http://127.0.0.1:${address.port}`;
+
+    const send: Http['send'] = (path, init = {}) =>
+      Effect.promise(async () =>
+        toReply(
+          await globalThis.fetch(`${base}${path}`, {
+            method: init.method ?? (init.body === undefined ? 'GET' : 'POST'),
+            headers: headersOf(init),
+            body: init.body === undefined ? undefined : JSON.stringify(init.body),
+          }),
+        ),
+      );
+
+    const fetch: Http['fetch'] = (path, init = {}) =>
+      Effect.promise(() => {
+        const { origin, headers, ...rest } = init;
+        const merged = new Headers(headers);
+        if (origin !== null) merged.set('origin', origin ?? HTTP_ORIGIN);
+        if (rest.body !== undefined && rest.body !== null && !merged.has('content-type')) {
+          merged.set('content-type', 'application/json');
+        }
+
+        return globalThis.fetch(`${base}${path}`, { ...rest, headers: merged });
+      });
+
+    return { send, fetch, lines, base };
+  });
 
 /** `name=value` of a Set-Cookie header. */
 export const cookiePairOf = (setCookie: string): string => setCookie.split(';')[0];

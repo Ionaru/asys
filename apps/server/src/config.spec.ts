@@ -60,6 +60,36 @@ describe('ServerConfig.layer', () => {
     }),
   );
 
+  for (const [name, env] of [
+    ['absent', GOOD],
+    ['empty', { ...GOOD, ASYS_STATIC_ROOT: '' }],
+  ] as const) {
+    it.effect(`leaves the staticRoot key out when ASYS_STATIC_ROOT is ${name}`, () =>
+      Effect.gen(function* () {
+        const exit = yield* readConfig(env);
+
+        assert.isTrue(Exit.isSuccess(exit));
+        if (Exit.isSuccess(exit)) {
+          assert.deepStrictEqual(
+            { ...exit.value },
+            { port: 3000, publicOrigin: 'https://asys.example.com', rpId: 'asys.example.com' },
+          );
+        }
+      }),
+    );
+  }
+
+  it.effect('keeps an absolute ASYS_STATIC_ROOT as given', () =>
+    Effect.gen(function* () {
+      const exit = yield* readConfig({ ...GOOD, ASYS_STATIC_ROOT: '/app/pwa' });
+
+      assert.isTrue(Exit.isSuccess(exit));
+      if (Exit.isSuccess(exit)) {
+        assert.strictEqual(exit.value.staticRoot, '/app/pwa');
+      }
+    }),
+  );
+
   const rejected: ReadonlyArray<{
     readonly name: string;
     readonly env: Record<string, string>;
@@ -107,6 +137,12 @@ describe('ServerConfig.layer', () => {
       env: { ASYS_PUBLIC_ORIGIN: 'https://asys.example.com' },
       variable: 'ASYS_RP_ID',
       secret: 'example',
+    },
+    {
+      name: 'a relative static root',
+      env: { ...GOOD, ASYS_STATIC_ROOT: 'dist/apps/pwa/browser' },
+      variable: 'ASYS_STATIC_ROOT',
+      secret: 'dist',
     },
   ];
 

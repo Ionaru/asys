@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: EUPL-1.2
+# Keeps secrets and local build state out of the build context. .gitignore stays
+# in: Nx hashes it as a build input.
+**/.env*
+.git
+**/node_modules
+dist
+.nx
+.angular
+tmp
+coverage
+.idea
+.vscode
+.claude
+apps/pwa/src/generated

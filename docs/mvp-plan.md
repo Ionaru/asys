@@ -218,5 +218,5 @@ Criteria that hold only because a feature is missing (such as S8.4 and S6.7, whe
 8. Is the Weekly review as a screen opened by a Task Series acceptable until Stage 2?
 9. Which Area's Active hours decide the Working days of an anchored item whose Area differs from its Anchor's (S4 puts 'Disable accounts' in IT under a People Ops Occasion)? Proposed: the Area of the item being placed. This must be settled before Stage 1.
 10. Is authoring Playbooks as validated JSON acceptable for Stage 1, with the form editor in Stage 6?
-11. Which public hostname will the passkeys be bound to, and is a CLI-printed Sign-up link acceptable for the first User?
+11. Which public hostname will the passkeys be bound to, and is a CLI-printed Sign-up link acceptable for the first User? Answered on 2026-10-04: `https://tasks.saturnserver.org`, with the relying party id `tasks.saturnserver.org` (the exact host), and a Sign-up link printed by `asys signup-link` stays the first User's path.
 12. Should a date-only Due set in one time zone keep its end-of-day meaning in the new zone after travel (proposed), or keep its original instant?

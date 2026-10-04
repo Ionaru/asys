@@ -63,9 +63,15 @@ The server is one CLI, `asys`, built into `dist/apps/server/main.js`.
 4. The built CLI does not read `.env` by itself, so run it as `node --env-file=.env dist/apps/server/main.js <command>`:
    - `signup-link [--expires-in-days 7]` prints a Sign-up link for a new Owner, valid for 1 to 30 days;
    - `openapi` prints the OpenAPI document, which `pnpm exec nx run server:openapi` writes to `dist/apps/server/openapi.json`;
+   - `migrate` applies the migrations in `ASYS_MIGRATIONS_FOLDER` (default `apps/server/drizzle`) as `asys_owner` (`DATABASE_URL_OWNER`), recording them exactly as `drizzle-kit migrate` does, so either can migrate the same database;
    - `serve` runs the server, as `nx serve` does.
 
-Logs go to stderr and never contain error messages or query parameters. Stop `nx serve server` before running the server tests: they share the dev database, and its worker would claim their due jobs.
+Optional settings for `serve`:
+
+- `ASYS_STATIC_ROOT`, an absolute path such as `/app/pwa`, serves the built PWA from that directory on the same origin as the API, with an SPA fallback. Content-hashed bundles and fonts are cached as `immutable`, everything else is `no-cache`, and static responses carry a Content-Security-Policy. Unset, the server serves the API only, as in development.
+- `OTEL_EXPORTER_OTLP_ENDPOINT`, the base URL of an OTLP/HTTP collector such as `http://signoz-ingester:4318`, turns on the export of traces and logs (no metrics) over protobuf. `OTEL_SERVICE_NAME` defaults to `asys`, and `OTEL_RESOURCE_ATTRIBUTES` is read as usual. Unset or empty, nothing is exported.
+
+Logs go to stderr and never contain error messages or query parameters. With an OTLP endpoint, each log line is also exported with the same redacted message and only allowlisted attributes, and only `/v1` requests and job runs are traced; an allowlist scrubber drops URLs, query strings, headers, client addresses, error messages and stacks before anything leaves the process. A successful `/health` writes no log line. Stop `nx serve server` before running the server tests: they share the dev database, and its worker would claim their due jobs.
 
 ## Running the PWA
 
@@ -92,7 +98,73 @@ A Sign-up link from `node --env-file=.env dist/apps/server/main.js signup-link` 
 
 ## CI
 
-CI is `.github/workflows/cd.yaml`: on every push and pull request an `audit` job (`pnpm audit --prod`, against the lockfile without installing dependencies) runs first, then the jobs `lint`, `typecheck`, `build`, `test`, `e2e`, `format`, `licences` and `palettes` run in parallel, without Nx Cloud. Each job's steps live in `cd.yaml`. The `build` job also writes the server's OpenAPI document (`nx run server:openapi`), which proves that the server bundle loads without a `.env`. Every job except `audit` starts with the composite action `.github/actions/setup`, which runs `.github/actions/checkout` and then sets up pnpm with Node 24 and installs from the frozen lockfile. Each job's commands can be run locally in the same way; the `test` and `e2e` jobs need the database from `compose.yaml` (`docker compose up -d --wait`) and a `.env` with its passwords, and the `e2e` job installs Chromium with its system dependencies and uploads `dist/.playwright` when it fails.
+CI is `.github/workflows/cd.yaml`: on every push and pull request an `audit` job (`pnpm audit --prod`, against the lockfile without installing dependencies) runs first, then the jobs `lint`, `typecheck`, `build`, `test`, `e2e`, `format`, `licences` and `palettes` run in parallel, without Nx Cloud. Each job's steps live in `cd.yaml`. The `build` job also writes the server's OpenAPI document (`nx run server:openapi`), which proves that the server bundle loads without a `.env`. Each of these jobs except `audit` starts with the composite action `.github/actions/setup`, which runs `.github/actions/checkout` and then sets up pnpm with Node 24 and installs from the frozen lockfile. Each job's commands can be run locally in the same way; the `test` and `e2e` jobs need the database from `compose.yaml` (`docker compose up -d --wait`) and a `.env` with its passwords, and the `e2e` job installs Chromium with its system dependencies and uploads `dist/.playwright` when it fails.
+
+Three more jobs build and ship the image:
+
+- **`image`** runs on every push and pull request, in parallel with the checks. It builds the image from the root `Dockerfile` through `deploy/compose.yaml`, starts the whole stack on an empty database with throwaway passwords, runs `node scripts/smoke-image.mts`, then runs `up --wait` again to prove that `migrate` passes on a migrated database. On a push to `main` it saves the image as a one-day artifact.
+- **`push-image`** (pushes to `main` only, after every check and `image`) tags the image with the 12-character commit and `latest` and pushes both to `ghcr.io/ionaru/asys`.
+- **`deploy`** (pushes to `main` only) logs in to the VPS over SSH, checks out the deployed commit, sets `ASYS_GIT_REVISION` in `deploy/.env`, and runs `docker compose pull` and `up --wait`. It prints `docker compose ps` and the `migrate` logs, and the app's logs only when the deploy fails, because the repository's Actions logs are public.
+
+Runs on `main` queue instead of cancelling each other. `workflow_dispatch` runs the whole pipeline by hand; on `main` that includes `push-image` and `deploy`.
+
+## Deploying
+
+ASYS runs on the VPS as the Compose project `asys` from `deploy/compose.yaml`, behind the Caddy TLS proxy on the external `edge` network, and sends telemetry to SigNoz on the external `telemetry` network. The root `compose.yaml` is the development database only; run every VPS command from `deploy/`.
+
+The stack:
+
+- **`asys-postgres`**, PostgreSQL 18 on an internal `database` network with no published port. On an empty volume, `docker/postgres/init/10-roles.sql` creates the roles and the database. The service name is unique because the app also sits on the shared `edge` and `telemetry` networks.
+- **`migrate`**, the app image running `asys migrate` as `asys_owner`, once per `up`. The app starts only after it exits 0.
+- **`asys`**, the app image running `asys serve` as `asys_app`, with the built PWA in `/app/pwa`, read-only and without capabilities. Caddy reaches it as `http://asys:3000`.
+
+### `deploy/.env`
+
+Compose reads `deploy/.env` next to the file. Create it with `chmod 600`, and never run `git clean -x` in the checkout, which would delete it.
+
+| Variable                 | Required | Meaning                                                                                                    |
+| ------------------------ | -------- | ---------------------------------------------------------------------------------------------------------- |
+| `POSTGRES_PASSWORD`      | yes      | The PostgreSQL superuser's password.                                                                       |
+| `ASYS_OWNER_PASSWORD`    | yes      | `asys_owner`'s password, which owns the tables and runs `migrate`.                                         |
+| `ASYS_APP_PASSWORD`      | yes      | `asys_app`'s password, which the server uses under row-level security.                                     |
+| `ASYS_PUBLIC_ORIGIN`     | yes      | `https://tasks.saturnserver.org`. Passkeys are bound to it, so it never changes after the first enrolment. |
+| `ASYS_RP_ID`             | yes      | `tasks.saturnserver.org`.                                                                                  |
+| `ASYS_GIT_REVISION`      | no       | The image tag to run, `latest` by default. The deploy job keeps it on the deployed commit.                 |
+| `ASYS_OTLP_ENDPOINT`     | no       | The OTLP collector, `http://signoz-ingester:4318` by default. Set it empty to turn the export off.         |
+| `ASYS_ENVIRONMENT`       | no       | `deployment.environment` in SigNoz, `production` by default.                                               |
+| `ASYS_TELEMETRY_NETWORK` | no       | The collector's network, `telemetry` by default.                                                           |
+
+Use hex passwords only (`openssl rand -hex 32`): they go into database URLs unescaped. The init script reads the passwords only on an empty volume, so to rotate one later, change it in the database first (`docker compose exec asys-postgres psql -U postgres -c "ALTER ROLE asys_app PASSWORD '<new>'"`), then in `deploy/.env`, then run `docker compose up -d --wait`. Any other change to roles or grants is a migration.
+
+### First deployment
+
+1. Point DNS A and AAAA records for `tasks.saturnserver.org` at the VPS.
+2. On the VPS (Docker Engine 25 or newer with the Compose plugin, because the healthcheck uses `start_interval`), add the deploy user to the `docker` group, clone `https://github.com/Ionaru/asys` at the deploy path, write `deploy/.env` (`chmod 600`), and create the networks if they do not exist yet: `docker network create edge` and `docker network create telemetry`.
+3. Add the site to Caddy and reload it:
+
+   ```caddyfile
+   tasks.saturnserver.org {
+   	encode zstd gzip
+   	respond /health 404
+   	reverse_proxy asys:3000 {
+   		header_up -traceparent
+   		header_up -tracestate
+   		header_up -b3
+   		header_up -X-B3-*
+   	}
+   }
+   ```
+
+   `/health` is for the container healthcheck and the smoke script, which reach the app directly; drop that line if an outside monitor should see it. Removing the trace headers keeps a client from joining or steering ASYS's traces. Keep Caddy's access log off for this site (it is off unless a `log` directive is present). The Android share target puts the shared text in the query string of `/capture`, so an access log would hold it; if you need one, filter it with `format filter`, at least `request>headers>Referer delete` and a filter that removes the query from `request>uri`.
+
+4. Add the repository secrets `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_KEY` (a private key whose public half is in the deploy user's `authorized_keys`) and `DEPLOY_PATH` (the checkout).
+5. Push to `main`. After the first `push-image`, set the `ghcr.io/ionaru/asys` package to Public (a first GHCR package is private even for a public repository), confirm with an anonymous `docker pull ghcr.io/ionaru/asys:latest`, and run the workflow on `main` again with `workflow_dispatch`, which builds, pushes and deploys.
+6. Check the stack with `docker compose ps` in `deploy/`. To check the collector, `docker run --rm --network telemetry curlimages/curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/x-protobuf' --data-binary '' http://signoz-ingester:4318/v1/traces` should print `200`, and SigNoz should list the service `asys` with traces and logs after a few requests.
+7. Print the first Sign-up link with `docker compose exec asys node /app/main.js signup-link` and open it on the phone.
+
+### Rolling back
+
+In `deploy/`, run `git checkout <sha>`, set `ASYS_GIT_REVISION` in `.env` to that commit's 12-character tag, and run `docker compose pull && docker compose up -d --wait`. Migrations only go forward, so every migration must keep working with the previous release's code.
 
 ## Install Nx Console
 

@@ -6,7 +6,7 @@ This plan cuts [Slice 1 of the MVP plan](mvp-plan.md#slice-1-foundations-and-the
 - The installed packages were checked the same day.
 - An adversarial review then checked it, and its confirmed findings are folded in.
 
-Pieces 1 to 4 are specified in full. Pieces 5 to 7 are outlined only as far as they constrain the earlier pieces, and each gets a short re-plan before it starts.
+Pieces 1 to 4 were specified in full here; pieces 5 to 7 were outlined only as far as they constrained the earlier pieces, and each got a re-plan before it started. All seven are built; piece 7 waits for the phone check.
 
 ## Working agreements
 
@@ -594,16 +594,20 @@ Re-planned and built on 2026-10-03, in two commits: the passkey library (4a), th
 - **The build** is the bundled ESM of decision 6, with `@types/node` ^24.19.1. `dist/apps/server/main.js` is the `asys` CLI:
   - `serve` runs the HTTP server and the job worker;
   - `signup-link [--expires-in-days 7]` (1 to 30) prints `${ASYS_PUBLIC_ORIGIN}/signup#token=…` and the expiry;
-  - `openapi` prints `OpenApi.fromApi(Api)`.
+  - `openapi` prints `OpenApi.fromApi(Api)`;
+  - from piece 7, `migrate` applies the migrations as `asys_owner`.
 - **OpenAPI** is written, not served. The `server:openapi` target writes `dist/apps/server/openapi.json`. CI runs it, which also proves that the bundle loads without a `.env`.
 - **Config** (`ServerConfig`):
   - `PORT`, default 3000;
   - `ASYS_PUBLIC_ORIGIN`, an exact origin: https, or http on localhost;
   - `ASYS_RP_ID`, the origin's host or a parent domain of it;
-  - the database URLs.
+  - the database URLs;
+  - from piece 7, `ASYS_STATIC_ROOT`, an optional absolute path to the built PWA.
+- **Other settings from piece 7**, read outside `ServerConfig`: `ASYS_MIGRATIONS_FOLDER` for `asys migrate`, default `apps/server/drizzle` (`db/migrate.ts`), and `OTEL_EXPORTER_OTLP_ENDPOINT` (empty or absent means no export) with `OTEL_SERVICE_NAME`, default `asys` (`telemetry/layer.ts`).
 - **Logging.** Every line goes through one redacting logger on stderr.
   - It prints message strings and primitive annotations as given, and every Cause as `describeError`: tags, SQLSTATE and constraint only. A ConfigError shows the names of its variables, never a value.
   - It covers the default request logger (which strips the query), the worker, startup and the CLI. The CLI runs with `disableErrorReporting`, so `runMain` prints nothing of its own.
+  - From piece 7, `asys serve` also sends each log line to the OTLP sink when an endpoint is set: the same redacted message without date, level or annotations, and only the allowlisted attributes `http.method`, `http.status`, `job.kind` and `job.outcome`.
 
 **The API** (`libs/contract`, decision 5)
 
@@ -791,16 +795,82 @@ Re-planned and built on 2026-10-04. The re-plan was reviewed adversarially by th
 - Areas cannot be deleted, because no command exists, and Privacy gets no UI until Stage 2.
 - The initial bundle is 480.83 kB (127.18 kB transferred), 19 kB under the 500 kB warning; the next screens may need Inbox or the shared controls loaded lazily.
 
-## Piece 7: deployment and phone check (outline)
+## Piece 7: deployment and phone check
 
-- Fix the public hostname (open question 11 in the MVP plan) before any passkey is enrolled.
-- Build a Node 24 image. It serves the PWA through `HttpStaticServer` with SPA fallback, on the same origin. The static root comes from `Config` and is mounted next to the API in `asys serve`.
-- Run Compose on the VPS behind the existing TLS reverse proxy. Migrations run as `asys_owner`.
-- The phone check:
-  1. Run `signup-link`.
-  2. Enrol a passkey on the phone.
-  3. Install the PWA.
-  4. Share text from another Android app into the Inbox.
+Planned and built on 2026-10-04. A research workflow drafted the plan and a critique workflow (a fact-checker, three critics for security, operations and codebase fit, and a judge) confirmed 33 findings, which are folded in. Units 1 to 5 each got an implementer and a test-writer from one contract, and each unit's tests were seen to fail once for the right reason (a planted mutation) before it counted; unit 6 was verified by building the image and running the stack.
+
+**Decisions (maintainer, 2026-10-04)**
+
+| Topic | Decision |
+|---|---|
+| Hostname | `ASYS_PUBLIC_ORIGIN=https://tasks.saturnserver.org`, `ASYS_RP_ID=tasks.saturnserver.org` (the exact host). This answers MVP open question 11; a Sign-up link printed by the CLI stays the first User's path. |
+| Database | Its own PostgreSQL container in the stack, on an internal network, with no published port. |
+| Proxy | The existing Caddy, configured outside the repo; no Docker labels. |
+| Compose | The root `compose.yaml` stays the development database. The production stack is `deploy/compose.yaml` (project `asys`) with its own `deploy/.env`. |
+| Telemetry | Traces and logs to SigNoz, no metrics, through Effect 4.0.0's own OTLP exporter (`effect/observability`, http/protobuf) behind an allowlist scrubber. No new dependency. |
+| Deploy | `appleboy/ssh-action` pinned by commit, as in fruiz, without host-key fingerprint pinning (as in the maintainer's other deployments). |
+
+**Static files** (`http/static-files.ts`, `http/paths.ts`). With `ASYS_STATIC_ROOT` set (an absolute path; a relative one is a ConfigError), `serverLayer` serves `Layer.mergeAll(apiLayer, staticFilesLayer(root))`.
+- The layer checks at startup that `<root>/index.html` is a file and fails with `StaticRootInvalid` otherwise, so `serve` stops.
+- It registers `GET /*` around `HttpStaticServer.make({ root, spa: true })`. API routes win; HEAD falls back to GET; the SPA fallback answers extensionless paths that accept HTML.
+- `/v1` and `/v1/...` answer an empty 404 without reaching the static handler. `isApiPath` classifies a path the way the router matches it (percent-decoded, slashes collapsed, case-insensitive), so `/V1/meta` and `//v1/meta` count as API paths for the headers and the tracing scope too. Handler errors go through `HttpServerRespondable.toResponse`: 404 for a missing file, 500 otherwise.
+- Every static response gets `Cache-Control` from its path, set on the final response so a 304 and the SPA fallback keep it: `public, max-age=31536000, immutable` for `main|chunk|polyfills|styles-<8 chars>.js|css` and `media/<name>-<8 uppercase letters or digits>.woff2` when the status is below 400, and `no-cache` for everything else, error responses included.
+- Every static response carries `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`, and a static response below 500 writes no request log line.
+
+**Headers and a quiet probe** (`http/origin-guard.ts`, `http/health.ts`).
+- `httpMiddleware` registers a pre-response handler that sets `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Cross-Origin-Opener-Policy: same-origin` and `Strict-Transport-Security: max-age=31536000` on every response, and `Cache-Control: no-store` on `/v1` paths. The Origin guard's 403 bypasses pre-response handlers, so it carries the headers itself.
+- The server never trusts `X-Forwarded-*`.
+- A 200 from `/health` writes no log line; a 503 or a 500 still logs by tag.
+
+**`asys migrate`** (`db/migrate.ts`). `checkMigrationsFolder` reads the folder with drizzle's `readMigrationFiles` before anything connects and fails with `MigrationsFolderInvalid` for a missing, legacy (`meta/_journal.json`) or empty folder. `runMigrations` then runs drizzle's effect-postgres `migrate`, which records in `drizzle.__drizzle_migrations` exactly as `drizzle-kit migrate` does, in one transaction. The command reads `ASYS_MIGRATIONS_FOLDER`, checks the folder, connects with `ownerDatabase()` and logs `Migrations are up to date`.
+
+**Telemetry** (`telemetry/scrub.ts`, `telemetry/layer.ts`).
+- `serveCommand` provides `telemetryLayer` around the server and the worker, on top of the redacting stderr logger. With `OTEL_EXPORTER_OTLP_ENDPOINT` unset or empty it does nothing; an endpoint that is not an http(s) URL is a ConfigError. It exports traces to `/v1/traces` and logs to `/v1/logs` through one shared flusher, so shutdown flushes both, and logs the collector's origin once.
+- Log records carry `redactedMessage`: the stderr line's message parts and cause description, without date, level or annotations, and never a Cause.
+- The scrubber wraps the protobuf serialization. Span attributes are kept only for `http.request.method`, `http.route`, `http.response.status_code`, `url.scheme`, `db.operation.name`, `db.query.text`, `db.system.name`, `db.namespace`, `server.address`, `server.port`, `job.kind` and `job.outcome`. Links and status messages go; `exception` events keep only `exception.type` (a safe name, else `Unknown`), and only the `db.transaction.*` events stay besides. Log records keep a string body and the primitive attributes `http.method`, `http.status`, `job.kind` and `job.outcome`.
+- Only `/v1` requests and job runs are traced. Non-`/v1` requests run inside `Effect.withTracerEnabled(false)` and `TracerDisabledWhen` drops their server span, so `/health`, static files and the claim poll export nothing. Each claimed job runs in a `job.run` span with `job.kind` and `job.outcome` (a root span in the worker loop, which has no span of its own), and `Effect.withParentSpan` puts its `sql.transaction` and `sql.execute` spans under it.
+
+**Image and stack** (`Dockerfile`, `.dockerignore`, `deploy/compose.yaml`).
+- The image builds the PWA and the server with Nx in a build stage, installs the server's pruned production dependencies hoisted in a deps stage, and runs `node /app/main.js` as `node` from `node:24.21.0-trixie-slim` pinned by digest, with `/app/pwa`, `/app/drizzle`, `ASYS_STATIC_ROOT`, `ASYS_MIGRATIONS_FOLDER` and `CMD ["serve"]`.
+- The stack is `asys-postgres` (PostgreSQL 18.6 pinned by digest, on the internal `database` network), the one-shot `migrate` (owner URL only) and `asys` (app URL only, on `database`, `edge` and `telemetry`, read-only, no capabilities, no published port, a `/health` healthcheck). Every service logs with the rotating `local` driver.
+- `scripts/smoke-image.mts` checks a running stack from the host over the `edge` network: the app shell and its headers, `/health`, the manifest's type, every file in `ngsw.json` (and an immutable chunk), `/v1/meta` 401, `/v1/nope` 404, and the shape of `signup-link`'s line without printing it.
+
+**CD** (`.github/workflows/cd.yaml`). `image` builds and smoke-tests the stack on every push and pull request and runs `up --wait` a second time; on `main` it hands the image to `push-image`, which pushes `:<12-char sha>` and `:latest` to GHCR after every check, and `deploy` checks out the commit on the VPS over SSH and runs `pull` and `up --wait`. Main runs queue rather than cancel. The runbook is in the README under "Deploying".
+
+**Departures from the plan**
+- `server:prune-lockfile` is not used: it fails because `apps/server` has no `package.json`, and `nx build server` already writes the pruned `package.json`, `pnpm-lock.yaml` (737 lines) and `pnpm-workspace.yaml` next to `main.js`.
+- `job.run` uses `Effect.withParentSpan` as well as `useSpan`, because `useSpan` alone does not make its span the parent of the job's SQL spans.
+- `DEPLOY_FINGERPRINT` was dropped by the maintainer.
+- The failing-request telemetry test sends a malformed body to `/v1/auth/register/options`: a 401 from `/v1/meta` is not a failed span.
+- `migrate`'s own folder check before `ownerDatabase()` is kept although `runMigrations` checks too: the pool connects lazily today, and the early check keeps the guarantee if that changes.
+
+**Review.** A review workflow (reviewers for telemetry privacy, deployment and contract fit, each followed by an Opus judge that tried to refute the findings) kept 12 of 15 findings, all low or medium, and they are fixed: `isApiPath` now normalises like the router; static error responses are `no-cache` instead of `immutable`; the job abort warning carries the job id as an annotation, so the exported message has none; `workflow_dispatch` on `main` also pushes and deploys; the migration count in the tests comes from the folder; `telemetryLayer`'s startup line is tested; the README runbook gained the Docker Engine 25 requirement and keeps `/health` off the public site; and the Dockerfile gained the `org.opencontainers.image.revision` label.
+
+**Verification (2026-10-04)**
+- `nx run-many -t lint typecheck build test` over all seven projects (the server's 49 spec files and 502 tests), `nx format:check --all`, the scripts' tsc, `check-spdx`, `reuse lint`, `check-licenses` and `nx e2e pwa-e2e` (21 passed) are green.
+- **CSP in a browser.** `asys serve` with `ASYS_STATIC_ROOT=dist/apps/pwa/browser` served `/signin` with no CSP violation in the console: the stylesheet applies without an `onload` handler, both fonts load, and the service worker registers.
+- **The real export.** The same server exported protobuf to a local listener on `/v1/traces` and `/v1/logs` only. Requests with `?x=secret-123`, a session cookie, `X-Forwarded-For` and a browser user agent, and a malformed POST, left none of those values in any exported body, while stderr kept its redacted lines and `/health`, static files and `/capture?text=...` logged nothing.
+- **The image.** With `-p asys-verify`, the stack came up healthy on an empty volume (all 11 migrations), the smoke script passed every check, and a second `up --wait` ran `migrate` again with exit 0 while `asys` stayed healthy. The image is 483 MB, of which 128 MB is `node_modules`.
+
+**The phone check** (the maintainer, after the first deploy; results go into this section in a follow-up docs commit):
+1. Load the app on the phone and check remote devtools for CSP violations; `main-*.js` arrives compressed.
+2. `cd "$DEPLOY_PATH/deploy" && docker compose exec asys node /app/main.js signup-link`.
+3. Enrol a passkey on the Android phone.
+4. Install the PWA.
+5. Share text from another app into the Inbox.
+6. Check that the quick add stays above the keyboard (left over from piece 6).
+
+**Known limits**
+- A file-level backup of a running PostgreSQL volume is not crash-consistent; backups stay the VPS's job.
+- Caddy strips incoming `traceparent`, `tracestate`, `b3` and `X-B3-*`, but containers on `edge` or `telemetry` can still reach `asys:3000` directly and set them.
+- Export failures are silent (Debug level only); SigNoz itself is the check.
+- `GET /v1/<unknown>` is a bodyless 404, not a JSON error, and writes no log line.
+- A static file that exists but cannot be read closes the connection without a status, because `HttpStaticServer` opens it while the body streams, after the route has returned; the server keeps serving. The image's files are always readable.
+- The service name `asys-postgres` must stay unique on `edge` and `telemetry`, because the app resolves it on every network it joins.
+- An HTTP span's `server.address` comes from the request's Host header.
+- The deploy job does not pin the VPS host key, and appleboy/ssh-action downloads drone-ssh at run time without a checksum (both accepted, as in fruiz).
+- pnpm in the image is checked only by npm's registry integrity, and the image digests are updated by hand.
+- `migrate` runs in one transaction without a lock, so two migrators at once are not safe; the stack runs one.
 
 ## Facts checked on 2026-09-30
 
@@ -1015,3 +1085,32 @@ Checked against Angular 22.2.1, Vitest 5.0.2 with jsdom 30.1.1, Node 24 and Chro
   - A date typed into an empty input fires no `input` event until it is complete.
   - Clearing one part of a filled date or time fires `input` with `''`.
   - With `lang="en"` the typed digits `05062026` became 2026-06-05, so the parts are read day first.
+
+## Facts checked on 2026-10-04 (piece 7)
+
+Checked against the installed Effect 4.0.0, drizzle-orm 1.0.0-rc.5-5935859, Nx 23.2.1, Docker 29.8 with Compose 5.5, and primary sources, by probes and by the unit tests that pin them.
+
+- **Static serving and routing.**
+  - `HttpStaticServer.make({ root, spa })` returns the handler as an Effect; a custom `HttpRouter.use((router) => router.add('GET', '/*', ...))` mounts it like `HttpStaticServer.layer`. API routes win over it, HEAD falls back to GET, and its 304s come from inside the handler, so headers set on the handler's response cover them. Its MIME table already maps `.webmanifest` to `application/manifest+json`.
+  - `HttpRouter.serve`'s `middleware` option cannot change the response the app sends; `HttpEffect.appendPreResponseHandler` can. A response the middleware returns without running the app is sent directly and skips the pre-response handlers.
+  - `HttpMiddleware.withLoggerDisabled(effect)` silences the request's log line from anywhere inside the request. The request logger writes its line before the response is sent.
+- **Tracing.**
+  - `TracerDisabledWhen` removes only the `http.server` span, so child SQL spans would become exported root spans; `Effect.withTracerEnabled(false)` removes every span inside it.
+  - `Effect.useSpan` gives a span handle but does not make it the parent of spans inside; `Effect.withParentSpan(span)` does. A job's spans nest as `job.run`, `sql.transaction`, `sql.execute`, and only `sql.execute` carries `db.query.text`.
+  - A 401 from the HttpApi authentication middleware ends its server span with status OK; a request body that fails its schema (400) ends it with status Error and `exception` events. A 404 on an unknown `/v1` path has no `http.route`.
+  - Building the Drizzle database layer under a tracer exports one root span `PgDrizzle.make` without attributes. In `asys serve` the database layer is built outside the telemetry layer, so it is not exported.
+  - The OTLP exporter's own HTTP requests run with the tracer disabled.
+- **OTLP export.**
+  - `OtlpTracer.layer` and `OtlpLogger.make` need `OtlpSerialization | HttpClient` (and a shared `OtlpExporter.layerFlusher`); `url` is the full signal URL. Both read the resource through `OtlpResource.fromConfig`, so `OTEL_RESOURCE_ATTRIBUTES` is merged in even with an explicit `serviceName`.
+  - `OtlpLogger` exports every log annotation plus `fiberId`, `logSpan.*` and `log.error = Cause.pretty(cause)`. It must be installed with `Logger.layer([...], { mergeWithExisting: true })` on top of the redacting logger; merged beside it, the redacting logger is lost.
+  - Without scrubbing, HTTP spans carry `url.full`, `url.query`, `client.address`, `user_agent.original` and the request headers, and failed spans carry `exception.message`, `exception.stacktrace` and `status.message`.
+  - In OTLP JSON an `intValue` is a JSON number, and a root span has no `parentSpanId`.
+- **Migrations and build.**
+  - `drizzle-orm/effect-postgres/migrator`'s `migrate` reads the folder-per-migration layout and records in `drizzle.__drizzle_migrations` like drizzle-kit, in one transaction and without a lock. `readMigrationFiles` throws on a missing folder or a legacy `meta/_journal.json` and returns `[]` for an empty folder. `@effect/sql-pg`'s pool connects lazily, on the first query.
+  - `nx build server` with `generatePackageJson` writes `package.json`, a pruned `pnpm-lock.yaml` with explicit JSR tarball URLs, and `pnpm-workspace.yaml` (`packages: []`) next to `main.js`. `nx run server:prune-lockfile` fails because `apps/server` has no `package.json`.
+  - Nx 23 builds without `.git` with `NX_DAEMON=false`, `NX_NO_CLOUD=true` and `NX_TUI=false`; `pnpm` must be on PATH and `.gitignore` is a hash input. `npm install --global pnpm@11.22.0` works on Node 24.
+- **Compose and Docker.** `${VAR:?}` is checked for the whole file; `${VAR-default}` keeps an empty value empty; a one-shot service under `up --wait` needs a dependent with `service_completed_successfully`, and a second `up` runs the exited one-shot container again; `start_interval` needs Engine 25+; the `local` log driver rotates and `docker compose logs` still reads it. With `-f deploy/compose.yaml`, Compose reads `.env` from `deploy/`. A first GHCR package is private even for a public repository. Index digests: `node:24.21.0-trixie-slim@sha256:8ec5d7557396cfe32d21c3f9c13072355ceab22b584578ca4bb28af31120cffe`, `postgres:18.6-trixie@sha256:5a5a84b19854a9ffaa54082c166ff4ec27473a361e496e5ea167f298f2da9722`.
+- **Path matching.** Effect's router (FindMyWay with its defaults `caseSensitive: false` and `ignoreDuplicateSlashes: true`) percent-decodes, collapses slashes and ignores case, so `/V1/meta`, `//v1/meta` and `/%761/meta` reach the `/v1/meta` handler. Caddy's `path` matcher is also case-insensitive and matches after cleaning, merging slashes and URL-decoding the path.
+- **Caddy** (v2.11.7 current). `header_up -<name>` deletes a request header upstream, and a trailing `*` deletes by prefix (since v2.5.2), so `header_up -X-B3-*` works. `encode zstd gzip` prefers zstd. A site writes no access log unless it has a `log` directive; the `filter` log format can delete `request>headers>Referer`, but has no built-in action that drops a whole query string.
+- **CD.** appleboy/ssh-action v1.2.5 is `0ff4204d59e8e51228ff73bce53f80d53301dee2`; its `envs` input names step `env:` variables to pass, and it has no `script_stop`, so the script sets `set -eu` itself. Pins: docker/login-action v4.6.0 `dbcb813823bdd20940b903addbd779551569679f`, actions/upload-artifact v7.0.1 `043fb46d1a93c77aae656e7c1c64a875d1fc6a0a`, actions/download-artifact v8.0.1 `3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c`.
+- **SigNoz** reads `deployment.environment`, and newer builds `deployment.environment.name`; its OTLP/HTTP receiver on 4318 accepts protobuf.

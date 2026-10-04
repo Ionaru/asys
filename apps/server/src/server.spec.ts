@@ -1,19 +1,9 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { assert, layer } from '@effect/vitest';
-import { Context, Effect, Layer, Logger } from 'effect';
-import { HttpServer } from 'effect/http';
+import { Effect, Layer } from 'effect';
 import { appDatabase } from './db/database';
-import { HealthReader } from './http/health';
-import { makeRedactingLogger } from './logging/logger';
-import { serverLayer } from './server';
-import {
-  addPasskeyOverHttp,
-  headersOf,
-  httpDependencies,
-  signUpOverHttp,
-  toReply,
-  type Sender,
-} from './test/http';
+import { HealthReader, HealthUnavailable } from './http/health';
+import { addPasskeyOverHttp, headersOf, signUpOverHttp, startServer } from './test/http';
 
 // These tests open real sockets on port 0 and run against the real database (docker compose),
 // on the real clock. The server's own log lines are collected through the redacting logger.
@@ -22,31 +12,6 @@ import {
 const TIMEOUT = 30_000;
 
 const KIB = 1024;
-
-/** Starts the server on a free port. The server stops when the scope closes. */
-const startServer = (health?: Layer.Layer<HealthReader>) =>
-  Effect.gen(function* () {
-    const lines: Array<string> = [];
-    const context = yield* Layer.build(
-      serverLayer.pipe(Layer.provide(httpDependencies(health))),
-    ).pipe(Effect.provide(Logger.layer([makeRedactingLogger((line) => lines.push(line))])));
-    const { address } = Context.get(context, HttpServer.HttpServer);
-    if (!('port' in address)) return yield* Effect.die('The server is not on a TCP port');
-    const base = `http://127.0.0.1:${address.port}`;
-
-    const send: Sender['send'] = (path, init = {}) =>
-      Effect.promise(async () =>
-        toReply(
-          await fetch(`${base}${path}`, {
-            method: init.method ?? (init.body === undefined ? 'GET' : 'POST'),
-            headers: headersOf(init),
-            body: init.body === undefined ? undefined : JSON.stringify(init.body),
-          }),
-        ),
-      );
-
-    return { send, lines, base };
-  });
 
 const waitFor = (condition: () => boolean) =>
   Effect.gen(function* () {
@@ -119,9 +84,9 @@ layer(appDatabase(), { excludeTestServices: true })('server', (it) => {
     'logs a defect by its class and never prints its message',
     () =>
       Effect.gen(function* () {
-        const server = yield* startServer(
-          Layer.succeed(HealthReader)({ read: Effect.die(new Error('secret-123')) }),
-        );
+        const server = yield* startServer({
+          health: Layer.succeed(HealthReader)({ read: Effect.die(new Error('secret-123')) }),
+        });
 
         const reply = yield* server.send('/health');
         yield* waitFor(() => server.lines.some((line) => line.includes('Die: Error')));
@@ -129,6 +94,47 @@ layer(appDatabase(), { excludeTestServices: true })('server', (it) => {
         assert.strictEqual(reply.status, 500);
         assert.isFalse(server.lines.some((line) => line.includes('secret-123')));
         assert.isTrue(server.lines.some((line) => line.includes('Die: Error')));
+      }),
+    TIMEOUT,
+  );
+
+  it.effect(
+    'writes no request log line for a healthy /health while /v1/meta still logs',
+    () =>
+      Effect.gen(function* () {
+        const server = yield* startServer();
+        const isHealth = (line: string) => /http\.url=\/health(\s|$)/.test(line);
+        const isMeta = (line: string) => /http\.url=\/v1\/meta(\s|$)/.test(line);
+        const sent = () => server.lines.filter((line) => line.includes('Sent HTTP response'));
+
+        const health = yield* server.send('/health');
+        yield* server.send('/v1/meta');
+        yield* waitFor(() => sent().some(isMeta));
+
+        assert.strictEqual(health.status, 200);
+        assert.isTrue(sent().some(isMeta));
+        assert.isFalse(sent().some(isHealth));
+      }),
+    TIMEOUT,
+  );
+
+  it.effect(
+    'answers 503 and logs the line when the health figures are unavailable',
+    () =>
+      Effect.gen(function* () {
+        const server = yield* startServer({
+          health: Layer.succeed(HealthReader)({ read: Effect.fail(new HealthUnavailable()) }),
+        });
+        const isLine = (line: string) =>
+          line.includes('Sent HTTP response') &&
+          /http\.url=\/health(\s|$)/.test(line) &&
+          /http\.status=503(\s|$)/.test(line);
+
+        const reply = yield* server.send('/health');
+        yield* waitFor(() => server.lines.some(isLine));
+
+        assert.strictEqual(reply.status, 503);
+        assert.isTrue(server.lines.some(isLine));
       }),
     TIMEOUT,
   );

@@ -1,15 +1,23 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { assert, describe, it } from '@effect/vitest';
 import * as NodeServices from '@effect/platform-node/NodeServices';
-import { ConfigProvider, Effect, Exit } from 'effect';
+import { ConfigProvider, Effect, Exit, Logger } from 'effect';
 import { CliError, Command } from 'effect/cli';
 import { TestConsole } from 'effect/testing';
 import { lookupSignUpLink } from '../auth/lookups';
 import { hashToken } from '../auth/tokens';
 import { appDatabase, Db } from '../db/database';
+import { MigrationsFolderInvalid } from '../db/migrate';
 import { signUpLinks } from '../db/schema';
 import { withOwner } from '../db/with-owner';
+import { makeRedactingLogger } from '../logging/logger';
+import {
+  COMMITTED_MIGRATION_COUNT,
+  migrateDatabase,
+  migrationRows,
+} from '../test/migrate-database';
 import { removeOwner } from '../test/owners';
+import { join, resolve } from 'node:path';
 import { asys, ExpiresInDaysOutOfRange } from './commands';
 
 // The signup-link tests run against the real database (docker compose), on the live clock.
@@ -189,6 +197,52 @@ describe('asys', () => {
       assert.isTrue(help.includes('serve'));
       assert.isTrue(help.includes('signup-link'));
       assert.isTrue(help.includes('openapi'));
+    }),
+  );
+});
+
+describe('asys migrate', () => {
+  const COMMITTED_FOLDER = resolve(import.meta.dirname, '../../drizzle');
+
+  /** Runs the CLI on `argv`, returning its exit and the log lines written through the logger. */
+  const runCliLogged = (argv: ReadonlyArray<string>, record: Record<string, string>) => {
+    const logLines: Array<string> = [];
+    return runCli(argv, record).pipe(
+      Effect.provide(Logger.layer([makeRedactingLogger((line) => logLines.push(line))])),
+      Effect.map((result) => ({ ...result, logLines })),
+    );
+  };
+
+  it.live(
+    'applies the migrations to the owner database and logs that they are up to date',
+    () =>
+      Effect.gen(function* () {
+        const ownerUrl = yield* migrateDatabase();
+
+        const { exit, logLines } = yield* runCliLogged(['migrate'], {
+          ASYS_MIGRATIONS_FOLDER: COMMITTED_FOLDER,
+          DATABASE_URL_OWNER: ownerUrl,
+        });
+        const rows = yield* migrationRows(ownerUrl);
+
+        assert.isTrue(Exit.isSuccess(exit));
+        assert.isTrue(logLines.some((line) => line.includes('Migrations are up to date')));
+        assert.strictEqual(rows.length, COMMITTED_MIGRATION_COUNT);
+      }).pipe(Effect.scoped),
+    60_000,
+  );
+
+  it.live('fails with MigrationsFolderInvalid for a missing folder without connecting', () =>
+    Effect.gen(function* () {
+      const { exit } = yield* runCliLogged(['migrate'], {
+        ASYS_MIGRATIONS_FOLDER: join(
+          resolve(import.meta.dirname, '../../drizzle'),
+          'does-not-exist',
+        ),
+        DATABASE_URL_OWNER: 'postgresql://asys_owner:x@127.0.0.1:1/none',
+      });
+
+      assert.isTrue(failureOf(exit) instanceof MigrationsFolderInvalid);
     }),
   );
 });

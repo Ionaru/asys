@@ -8,8 +8,10 @@ import { createSignUpLink, MAX_LINK_DAYS } from '../auth/sign-up-links';
 import { PasskeyStoreLive } from '../auth/passkey-store';
 import { PasskeyUnitOfWorkLive } from '../auth/unit-of-work';
 import { ServerConfig, passkeyConfigLayer } from '../config';
-import { appDatabase } from '../db/database';
+import { appDatabase, ownerDatabase } from '../db/database';
+import { checkMigrationsFolder, migrationsFolderConfig, runMigrations } from '../db/migrate';
 import { HealthReader } from '../http/health';
+import { telemetryLayer } from '../telemetry/layer';
 import { serverLayer } from '../server';
 import { workerLayer } from '../worker-layer';
 
@@ -48,7 +50,10 @@ export const openapiCommand = Command.make('openapi', {}, () =>
   Console.log(JSON.stringify(OpenApi.fromApi(Api), null, 2)),
 ).pipe(Command.withDescription('Print the OpenAPI document'));
 
-/** `serve`: runs the HTTP server and the job worker until interrupted, on one shared pool. */
+/**
+ * `serve`: runs the HTTP server and the job worker until interrupted, on one shared pool. When
+ * `OTEL_EXPORTER_OTLP_ENDPOINT` is set it exports traces and logs through the scrubber.
+ */
 export const serveCommand = Command.make('serve', {}, () => {
   const database = appDatabase();
   const services = Layer.mergeAll(
@@ -59,13 +64,30 @@ export const serveCommand = Command.make('serve', {}, () => {
     PasskeyUnitOfWorkLive,
     HealthReader.layer,
   ).pipe(Layer.provideMerge(database));
-  return Layer.launch(Layer.mergeAll(serverLayer, workerLayer)).pipe(Effect.provide(services));
+  return Layer.launch(
+    Layer.mergeAll(serverLayer, workerLayer).pipe(Layer.provide(telemetryLayer)),
+  ).pipe(Effect.provide(services));
 }).pipe(Command.withDescription('Run the HTTP server and the job worker'));
 
-/** The root: no handler, the three subcommands. */
+/**
+ * `migrate`: applies the committed database migrations as `asys_owner`. An invalid migrations
+ * folder fails before any database connection is made.
+ */
+export const migrateCommand = Command.make(
+  'migrate',
+  {},
+  Effect.fnUntraced(function* () {
+    const folder = yield* migrationsFolderConfig;
+    yield* checkMigrationsFolder(folder);
+    yield* runMigrations(folder).pipe(Effect.provide(ownerDatabase()));
+    yield* Effect.logInfo('Migrations are up to date');
+  }),
+).pipe(Command.withDescription('Apply the database migrations'));
+
+/** The root: no handler, the four subcommands. */
 export const asys = Command.make('asys').pipe(
   Command.withDescription('ASYS server'),
-  Command.withSubcommands([serveCommand, signupLinkCommand, openapiCommand]),
+  Command.withSubcommands([serveCommand, signupLinkCommand, openapiCommand, migrateCommand]),
 );
 
 /** Runs the CLI on the process arguments. */

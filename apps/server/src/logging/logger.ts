@@ -15,18 +15,37 @@ const isPrintable = (value: unknown): value is string | number | boolean | null 
   typeof value === 'number' ||
   typeof value === 'boolean';
 
+const messageParts = (options: Logger.Options<unknown>): Array<string> => {
+  const messages: ReadonlyArray<unknown> = Array.isArray(options.message)
+    ? options.message
+    : [options.message];
+  return messages.map(part);
+};
+
+/**
+ * The message of a log record with nothing that could leak: the message parts (a Cause or any
+ * other value described by identifiers only), followed by the description of the record's cause
+ * when it has one, joined with single spaces. No date, level or annotations.
+ */
+export const redactedMessage = (options: Logger.Options<unknown>): string => {
+  const parts = messageParts(options);
+  if (options.cause.reasons.length > 0) parts.push(describeError(options.cause));
+  return parts.join(' ');
+};
+
 /**
  * A logger that never prints an error's message or stack: drizzle error messages carry query
  * parameters. A line holds the ISO date, the level, the message parts (a Cause or any other
- * value described by identifiers only) and the string, number, boolean and null annotations.
+ * value described by identifiers only), the string, number, boolean and null annotations, then
+ * the cause description. `redactedMessage` is the same text without date, level and annotations.
  */
 export const makeRedactingLogger = (write: (line: string) => void): Logger.Logger<unknown, void> =>
   Logger.make((options) => {
-    const parts: Array<string> = [options.date.toISOString(), options.logLevel];
-    const messages: ReadonlyArray<unknown> = Array.isArray(options.message)
-      ? options.message
-      : [options.message];
-    for (const message of messages) parts.push(part(message));
+    const parts: Array<string> = [
+      options.date.toISOString(),
+      options.logLevel,
+      ...messageParts(options),
+    ];
     for (const [key, value] of Object.entries(
       options.fiber.getRef(References.CurrentLogAnnotations),
     )) {

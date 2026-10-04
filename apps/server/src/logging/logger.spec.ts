@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { assert, describe, it } from '@effect/vitest';
 import { Cause, Effect, Logger } from 'effect';
-import { makeRedactingLogger } from './logger';
+import { makeRedactingLogger, redactedMessage } from './logger';
 
 /** The lines the redacting logger writes while `program` runs. */
 const linesOf = <A, E>(program: Effect.Effect<A, E>) =>
@@ -97,6 +97,57 @@ describe('makeRedactingLogger', () => {
 
       assert.include(lines[0], 'x');
       assert.notInclude(lines[0], 'secret-annotation');
+    }),
+  );
+});
+
+/** The `redactedMessage` of every record logged while `program` runs. */
+const messagesOf = <A, E>(program: Effect.Effect<A, E>) =>
+  Effect.gen(function* () {
+    const messages: Array<string> = [];
+    yield* program.pipe(
+      Effect.provide(
+        Logger.layer([Logger.make((options) => messages.push(redactedMessage(options)))]),
+      ),
+    );
+
+    return messages;
+  });
+
+describe('redactedMessage', () => {
+  it.effect('is the message alone, without date, level or annotations', () =>
+    Effect.gen(function* () {
+      const messages = yield* messagesOf(
+        Effect.logInfo('Migrations are up to date').pipe(Effect.annotateLogs('http.status', 500)),
+      );
+
+      assert.deepStrictEqual(messages, ['Migrations are up to date']);
+    }),
+  );
+
+  it.effect('describes a cause by its class and never prints its message', () =>
+    Effect.gen(function* () {
+      const messages = yield* messagesOf(
+        Effect.logWarning('Probe', Cause.die(new Error('insert into x values (secret-123)'))),
+      );
+
+      assert.deepStrictEqual(messages, ['Probe Die: Error']);
+    }),
+  );
+
+  it.effect('joins strings, numbers and booleans with single spaces', () =>
+    Effect.gen(function* () {
+      const messages = yield* messagesOf(Effect.log('count', 42, true));
+
+      assert.deepStrictEqual(messages, ['count 42 true']);
+    }),
+  );
+
+  it.effect('describes any other value by its class and never prints its message', () =>
+    Effect.gen(function* () {
+      const messages = yield* messagesOf(Effect.log('failed with', new TypeError('secret-value')));
+
+      assert.deepStrictEqual(messages, ['failed with TypeError']);
     }),
   );
 });

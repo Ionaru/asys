@@ -1,0 +1,108 @@
+# SPDX-License-Identifier: EUPL-1.2
+# Production stack. Compose reads deploy/.env (next to this file) for the ${...}
+# values below; nothing is passed to the containers as a whole env file.
+name: asys
+
+services:
+  # Named asys-postgres because the app also sits on the shared edge network,
+  # where a bare "postgres" would clash with the other stacks' databases.
+  asys-postgres:
+    image: postgres:18.6-trixie@sha256:5a5a84b19854a9ffaa54082c166ff4ec27473a361e496e5ea167f298f2da9722
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      ASYS_OWNER_PASSWORD: ${ASYS_OWNER_PASSWORD:?set ASYS_OWNER_PASSWORD in deploy/.env}
+      ASYS_APP_PASSWORD: ${ASYS_APP_PASSWORD:?set ASYS_APP_PASSWORD in deploy/.env}
+    volumes:
+      # From PostgreSQL 18 the image keeps its data under /var/lib/postgresql/18/docker.
+      - asys-postgres-data:/var/lib/postgresql
+      - ../docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # TCP, not the socket: the init server only listens on the socket, so this
+      # stays unhealthy until the init scripts have finished.
+      test: ['CMD', 'pg_isready', '-h', '127.0.0.1', '-U', 'postgres', '-d', 'postgres']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 60s
+    networks: [database]
+    restart: unless-stopped
+    stop_grace_period: 60s
+    security_opt: [no-new-privileges:true]
+    logging:
+      driver: local
+
+  # One-shot: applies the migrations as the owner role, then exits. The app never
+  # holds the owner credentials.
+  migrate:
+    image: ghcr.io/ionaru/asys:${ASYS_GIT_REVISION:-latest}
+    command: [migrate]
+    environment:
+      DATABASE_URL_OWNER: postgresql://asys_owner:${ASYS_OWNER_PASSWORD}@asys-postgres:5432/asys
+    depends_on:
+      asys-postgres:
+        condition: service_healthy
+    networks: [database]
+    restart: 'no'
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    logging:
+      driver: local
+
+  asys:
+    image: ghcr.io/ionaru/asys:${ASYS_GIT_REVISION:-latest}
+    build:
+      context: ..
+    environment:
+      DATABASE_URL_APP: postgresql://asys_app:${ASYS_APP_PASSWORD}@asys-postgres:5432/asys
+      ASYS_PUBLIC_ORIGIN: ${ASYS_PUBLIC_ORIGIN:?set ASYS_PUBLIC_ORIGIN in deploy/.env}
+      ASYS_RP_ID: ${ASYS_RP_ID:?set ASYS_RP_ID in deploy/.env}
+      OTEL_SERVICE_NAME: asys
+      # An empty ASYS_OTLP_ENDPOINT turns telemetry export off.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${ASYS_OTLP_ENDPOINT-http://signoz-ingester:4318}
+      # SigNoz reads deployment.environment, newer builds deployment.environment.name.
+      OTEL_RESOURCE_ATTRIBUTES: service.version=${ASYS_GIT_REVISION:-local},deployment.environment=${ASYS_ENVIRONMENT:-production},deployment.environment.name=${ASYS_ENVIRONMENT:-production}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      asys-postgres:
+        condition: service_healthy
+    # No published port: Caddy reaches the app as http://asys:3000 over edge.
+    networks: [database, edge, telemetry]
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/health',{signal:AbortSignal.timeout(5000)}).then(r=>process.exit(r.ok?0:1),()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+      start_interval: 2s
+    stop_grace_period: 30s
+    init: true
+    read_only: true
+    tmpfs: ['/tmp:rw,noexec,nosuid,size=16m']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    logging:
+      driver: local
+
+networks:
+  database:
+    internal: true
+  # Shared with the reverse proxy; created outside the stack.
+  edge:
+    external: true
+  # The SigNoz collector's network.
+  telemetry:
+    external: true
+    name: '${ASYS_TELEMETRY_NETWORK:-telemetry}'
+
+volumes:
+  asys-postgres-data: {}

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 import type { Instant } from '@asys/domain';
 import { and, eq, sql } from 'drizzle-orm';
-import { Clock, Duration, Effect, Exit, Layer, Schedule } from 'effect';
+import { Clock, Duration, Effect, Exit, Layer, Schedule, type Tracer } from 'effect';
 import { lockCounter } from '../changes/change-log';
 import { Db } from '../db/database';
 import { jobs, settings } from '../db/schema';
@@ -29,7 +29,7 @@ export interface JobRun {
   readonly outcome: JobOutcome;
 }
 
-const body = (claimed: ClaimedJob, lockTimeout: Duration.Input) =>
+const body = (claimed: ClaimedJob, lockTimeout: Duration.Input, span?: Tracer.Span) =>
   Effect.gen(function* () {
     const db = yield* Db;
     const registry = yield* JobRegistry;
@@ -60,6 +60,7 @@ const body = (claimed: ClaimedJob, lockTimeout: Duration.Input) =>
       .for('update');
     if (rows.length === 0) return JobOutcome.Skipped;
     const row = rows[0];
+    span?.attribute('job.kind', row.kind);
 
     yield* db
       .update(jobs)
@@ -134,16 +135,22 @@ const body = (claimed: ClaimedJob, lockTimeout: Duration.Input) =>
  * retries with backoff until `MAX_ATTEMPTS`. Every update is guarded by the `run_at`
  * read under the lock, so a handler that moved its own job keeps its move. The error is
  * stored as `describeError` gives it, never as a message. A lock wait longer than
- * `lockTimeout` (30 seconds by default) is a defect.
+ * `lockTimeout` (30 seconds by default) is a defect. When a `span` is given, the job's kind is
+ * set on it as `job.kind` once the job row is read.
  */
-export const runJob = (claimed: ClaimedJob, options?: { readonly lockTimeout?: Duration.Input }) =>
-  withOwner(claimed.ownerId, body(claimed, options?.lockTimeout ?? '30 seconds'));
+export const runJob = (
+  claimed: ClaimedJob,
+  options?: { readonly lockTimeout?: Duration.Input; readonly span?: Tracer.Span },
+) => withOwner(claimed.ownerId, body(claimed, options?.lockTimeout ?? '30 seconds', options?.span));
 
 /**
  * Claims up to `max` due jobs (10 by default) with a lease (5 minutes by default) and
  * runs them one after another. A job whose run fails or dies outside its handler's
- * savepoint is logged and reported as `Aborted`; its row stays as the claim left it and
- * is claimed again after the lease. A failing claim fails the whole call.
+ * savepoint is logged (the job id is a log annotation, never part of the message) and
+ * reported as `Aborted`; its row stays as the claim left it and
+ * is claimed again after the lease. A failing claim fails the whole call. The claim itself is
+ * not traced; each claimed job runs in a `job.run` span, a child of the caller's span, carrying
+ * `job.kind` and `job.outcome`.
  */
 export const runDueJobs = (options?: {
   readonly lease?: Duration.Input;
@@ -154,14 +161,19 @@ export const runDueJobs = (options?: {
     const claimed = yield* claimJobs({
       lease: options?.lease ?? '5 minutes',
       max: options?.max ?? 10,
-    });
+    }).pipe(Effect.withTracerEnabled(false));
     const runs: Array<JobRun> = [];
     for (const job of claimed) {
-      const outcome = yield* runJob(job, { lockTimeout: options?.lockTimeout }).pipe(
-        Effect.catchCause((cause) =>
-          Effect.logWarning(`Job ${job.id} aborted: ${describeError(cause)}`).pipe(
-            Effect.as(JobOutcome.Aborted),
+      const outcome = yield* Effect.useSpan('job.run', { kind: 'internal' }, (span) =>
+        runJob(job, { lockTimeout: options?.lockTimeout, span }).pipe(
+          Effect.withParentSpan(span),
+          Effect.catchCause((cause) =>
+            Effect.logWarning(`Job aborted: ${describeError(cause)}`).pipe(
+              Effect.annotateLogs('job.id', job.id),
+              Effect.as(JobOutcome.Aborted),
+            ),
           ),
+          Effect.tap((outcome) => Effect.sync(() => span.attribute('job.outcome', outcome))),
         ),
       );
       runs.push({ id: job.id, ownerId: job.ownerId, outcome });

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: EUPL-1.2
+import { isAbsolute } from 'node:path';
 import { PasskeyConfig } from '@ionaru/effect-passkeys/server';
 import { Config, Context, Effect, Layer, Schema } from 'effect';
 
@@ -10,6 +11,8 @@ export interface ServerConfigValues {
   readonly publicOrigin: string;
   /** The WebAuthn relying party id: the origin's host or a parent domain of it. */
   readonly rpId: string;
+  /** The absolute directory of the built PWA. Absent means the server serves the API only. */
+  readonly staticRoot?: string;
 }
 
 const isPublicOrigin = (value: string): boolean => {
@@ -26,6 +29,11 @@ const originConfig = Config.schema(
   'ASYS_PUBLIC_ORIGIN',
 );
 
+const staticRootConfig = Config.schema(
+  Schema.String.check(Schema.makeFilter((value: string) => value === '' || isAbsolute(value))),
+  'ASYS_STATIC_ROOT',
+).pipe(Config.withDefault(''));
+
 const rpIdConfig = (origin: string) => {
   const hostname = new URL(origin).hostname;
   return Config.schema(
@@ -41,9 +49,17 @@ const rpIdConfig = (origin: string) => {
 const serverConfig = Config.all({
   port: Config.Port('PORT').pipe(Config.withDefault(3000)),
   publicOrigin: originConfig,
+  staticRoot: staticRootConfig,
 }).pipe(
-  Config.flatMap(({ port, publicOrigin }) =>
-    rpIdConfig(publicOrigin).pipe(Config.map((rpId) => ({ port, publicOrigin, rpId }))),
+  Config.flatMap(({ port, publicOrigin, staticRoot }) =>
+    rpIdConfig(publicOrigin).pipe(
+      Config.map((rpId): ServerConfigValues => ({
+        port,
+        publicOrigin,
+        rpId,
+        ...(staticRoot === '' ? {} : { staticRoot }),
+      })),
+    ),
   ),
 );
 
@@ -51,7 +67,7 @@ const serverConfig = Config.all({
 export class ServerConfig extends Context.Service<ServerConfig, ServerConfigValues>()(
   'asys/ServerConfig',
 ) {
-  /** Read from PORT (default 3000), ASYS_PUBLIC_ORIGIN and ASYS_RP_ID. */
+  /** Read from PORT (default 3000), ASYS_PUBLIC_ORIGIN, ASYS_RP_ID and the optional absolute ASYS_STATIC_ROOT. */
   static readonly layer: Layer.Layer<ServerConfig, Config.ConfigError> =
     Layer.effect(ServerConfig)(serverConfig);
 

@@ -2,7 +2,8 @@
 import { Cause } from 'effect';
 import { findSqlError } from '../db/sql-error';
 
-const SAFE_NAME = /^[A-Za-z0-9_.-]{1,64}$/;
+/** The identifier shape that is safe to export: letters, digits, underscore, dot and dash, at most 64 characters. */
+export const SAFE_NAME = /^[A-Za-z0-9_.-]{1,64}$/;
 
 const SQLSTATE = /^[0-9A-Z]{5}$/;
 
@@ -10,7 +11,8 @@ const CONSTRAINT = /^[A-Za-z0-9_]{1,63}$/;
 
 const CONFIG_NAME = /^[A-Z][A-Z0-9_]{0,63}$/;
 
-const safeName = (value: unknown): string =>
+/** The value when it is a string matching `SAFE_NAME`, otherwise `Unknown`. */
+export const safeName = (value: unknown): string =>
   typeof value === 'string' && SAFE_NAME.test(value) ? value : 'Unknown';
 
 const keep = (value: unknown, pattern: RegExp): string | undefined =>
