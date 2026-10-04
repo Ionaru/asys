@@ -167,73 +167,132 @@ jobs:
       - name: Check the curated palettes
         run: node scripts/palettes.mts --check
 
-  image:
-    needs: audit
+  revision:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 5
     outputs:
       sha: ${{ steps.revision.outputs.sha }}
       short: ${{ steps.revision.outputs.short }}
     steps:
-      - name: Check out
-        uses: $/.github/actions/checkout
-      - name: Set up pnpm and Node without installing dependencies
-        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
-        with:
-          runtime: node@24
-          install: false
       - name: Work out the revision
         id: revision
         run: |
           echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           echo "short=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
-      - name: Write deploy/.env
-        run: |
-          (
-            umask 077
-            {
-              echo "POSTGRES_PASSWORD=$(openssl rand -hex 32)"
-              echo "ASYS_OWNER_PASSWORD=$(openssl rand -hex 32)"
-              echo "ASYS_APP_PASSWORD=$(openssl rand -hex 32)"
-              echo "ASYS_PUBLIC_ORIGIN=http://localhost:3000"
-              echo "ASYS_RP_ID=localhost"
-              # Empty: no telemetry export in CI.
-              echo "ASYS_OTLP_ENDPOINT="
-            } > deploy/.env
-          )
-      - name: Create the external networks
-        run: |
-          docker network create edge
-          docker network create telemetry
+
+  build-image:
+    needs: [audit, revision]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: $/.github/actions/checkout
       - name: Build the image
-        run: docker compose -f deploy/compose.yaml build asys --build-arg ASYS_GIT_REVISION="${{ steps.revision.outputs.short }}"
-      - name: Start the stack and smoke-test it
+        run: docker build --build-arg ASYS_GIT_REVISION="${{ needs.revision.outputs.short }}" --tag ghcr.io/ionaru/asys:latest .
+      - name: Save the image
+        run: docker save -o asys-image.tar ghcr.io/ionaru/asys:latest
+      - name: Upload the image
+        # On every run, so the exact image behind a failed check can be downloaded and inspected.
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: asys-image
+          path: asys-image.tar
+          retention-days: 7
+          if-no-files-found: error
+
+  migrate-image:
+    needs: build-image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: $/.github/actions/checkout
+      - name: Prepare the stack
+        uses: $/.github/actions/prepare-stack
+        with:
+          public-origin: http://localhost:3000
+      - name: Download the image
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: asys-image
+      - name: Load the image
         run: |
-          docker compose -f deploy/compose.yaml up -d --wait
-          node scripts/smoke-image.mts
-      - name: Start the stack again on the migrated database
+          docker load -i asys-image.tar
+          rm asys-image.tar
+      - name: Migrate an empty database
+        # Pull Postgres only; --pull never then fails rather than fetch :latest from GHCR.
+        run: |
+          docker compose -f deploy/compose.yaml pull asys-postgres
+          docker compose -f deploy/compose.yaml up -d --wait --pull never --no-build
+      - name: Start again on the migrated database
         # The migrate container runs again and must exit 0; asys must stay healthy.
-        run: docker compose -f deploy/compose.yaml up -d --wait
+        run: docker compose -f deploy/compose.yaml up -d --wait --pull never --no-build
       - name: Show the stack state and logs
         if: failure()
         run: |
           docker compose -f deploy/compose.yaml ps -a
           docker compose -f deploy/compose.yaml logs --no-color
-      - name: Save the image
-        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
-        run: docker save -o asys-image.tar ghcr.io/ionaru/asys:latest
-      - name: Upload the image
-        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+
+  e2e-image:
+    needs: build-image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Set up
+        uses: $/.github/actions/setup
+      - name: Prepare the stack
+        uses: $/.github/actions/prepare-stack
+        with:
+          public-origin: http://localhost:3200
+      - name: Download the image
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: asys-image
-          path: asys-image.tar
-          retention-days: 1
-          if-no-files-found: error
+      - name: Load the image
+        run: |
+          docker load -i asys-image.tar
+          rm asys-image.tar
+      - name: Start the stack from the loaded image
+        run: |
+          docker compose -p asys-e2e -f deploy/compose.yaml -f deploy/compose.e2e.yaml pull asys-postgres
+          docker compose -p asys-e2e -f deploy/compose.yaml -f deploy/compose.e2e.yaml up -d --wait --pull never --no-build
+      - name: Install Chromium for Playwright
+        run: pnpm exec playwright install --with-deps chromium
+      - name: End-to-end tests against the image
+        run: pnpm exec nx run pwa-e2e:e2e-image
+      - name: Show the stack state and logs
+        if: failure()
+        run: |
+          docker compose -p asys-e2e -f deploy/compose.yaml -f deploy/compose.e2e.yaml ps -a
+          docker compose -p asys-e2e -f deploy/compose.yaml -f deploy/compose.e2e.yaml logs --no-color
+      - name: Upload the Playwright report and traces
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-image
+          path: dist/.playwright
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7
 
   push-image:
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
-    needs: [audit, lint, typecheck, build, test, e2e, format, licences, palettes, image]
+    needs:
+      [
+        audit,
+        lint,
+        typecheck,
+        build,
+        test,
+        e2e,
+        format,
+        licences,
+        palettes,
+        revision,
+        build-image,
+        migrate-image,
+        e2e-image,
+      ]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -247,7 +306,7 @@ jobs:
       - name: Load and tag the image
         run: |
           docker load -i asys-image.tar
-          docker tag ghcr.io/ionaru/asys:latest "ghcr.io/ionaru/asys:${{ needs.image.outputs.short }}"
+          docker tag ghcr.io/ionaru/asys:latest "ghcr.io/ionaru/asys:${{ needs.revision.outputs.short }}"
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
@@ -257,11 +316,11 @@ jobs:
       - name: Push the image
         run: |
           docker push ghcr.io/ionaru/asys:latest
-          docker push "ghcr.io/ionaru/asys:${{ needs.image.outputs.short }}"
+          docker push "ghcr.io/ionaru/asys:${{ needs.revision.outputs.short }}"
 
   deploy:
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
-    needs: [image, push-image]
+    needs: [revision, push-image]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     # The DEPLOY_* variables and secrets belong to this environment, visible only to a job in it.
@@ -276,8 +335,8 @@ jobs:
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         env:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-          ASYS_GIT_REVISION: ${{ needs.image.outputs.short }}
-          ASYS_GIT_SHA: ${{ needs.image.outputs.sha }}
+          ASYS_GIT_REVISION: ${{ needs.revision.outputs.short }}
+          ASYS_GIT_SHA: ${{ needs.revision.outputs.sha }}
         with:
           host: ${{ vars.DEPLOY_HOST }}
           username: ${{ vars.DEPLOY_USER }}

@@ -37,22 +37,23 @@ Use Node 24 and pnpm 11. `package.json` has no scripts, so everything runs throu
 
 CI (`.github/workflows/cd.yaml`) runs each check below as its own job. Run the ones your change touches before you call it done:
 
-| Check     | Command                                                                                        |
-| --------- | ---------------------------------------------------------------------------------------------- |
-| lint      | `pnpm exec nx run-many -t lint`                                                                |
-| typecheck | `pnpm exec nx run-many -t typecheck`, then `pnpm exec tsc -p scripts/tsconfig.json`            |
-| build     | `pnpm exec nx run-many -t build`, then `pnpm exec nx run server:openapi`                       |
-| test      | `pnpm exec nx run-many -t test --skip-nx-cache` (database up and migrated)                     |
-| e2e       | `pnpm exec nx e2e pwa-e2e` (database up, Chromium installed, ports 3100 and 4300 free)         |
-| format    | `pnpm exec nx format:check --all`; fix with `pnpm exec nx format:write --all`                  |
-| licences  | `node scripts/check-spdx.mts`, `pipx run reuse==6.2.0 lint`, `node scripts/check-licenses.mts` |
-| palettes  | `node scripts/palettes.mts --check`                                                            |
+| Check       | Command                                                                                                                  |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------ |
+| lint        | `pnpm exec nx run-many -t lint`                                                                                          |
+| typecheck   | `pnpm exec nx run-many -t typecheck`, then `pnpm exec tsc -p scripts/tsconfig.json`                                      |
+| build       | `pnpm exec nx run-many -t build`, then `pnpm exec nx run server:openapi`                                                 |
+| test        | `pnpm exec nx run-many -t test --skip-nx-cache` (database up and migrated)                                               |
+| e2e         | `pnpm exec nx e2e pwa-e2e` (database up, Chromium installed, ports 3100 and 4300 free)                                   |
+| e2e (image) | `pnpm exec nx run pwa-e2e:e2e-image` (the stack from the `README.md` recipe running, Chromium installed, port 3200 free) |
+| format      | `pnpm exec nx format:check --all`; fix with `pnpm exec nx format:write --all`                                            |
+| licences    | `node scripts/check-spdx.mts`, `pipx run reuse==6.2.0 lint`, `node scripts/check-licenses.mts`                           |
+| palettes    | `node scripts/palettes.mts --check`                                                                                      |
 
 Traps when testing:
 
 - The server tests share the dev database `asys`, and Nx caches tests on file hashes alone. Always pass `--skip-nx-cache` to database tests, and stop `nx serve server` first, or its job worker claims the tests' due jobs.
 - `pwa:typecheck` runs plain `tsc` and does not check templates. `nx build pwa` and `nx test pwa` do.
-- `nx e2e pwa-e2e` is the only supported e2e entry point. It recreates the `asys_e2e` database and rebuilds the files a running dev stack uses. To run it beside a dev stack, follow `README.md`.
+- `nx e2e pwa-e2e` (dev stack) and `nx run pwa-e2e:e2e-image` (image stack, started by hand from the `README.md` recipe) are the only supported e2e entry points. `e2e` recreates the `asys_e2e` database and rebuilds the files a running dev stack uses. To run it beside a dev stack, follow `README.md`. Both write to `dist/.playwright/apps/pwa-e2e`.
 - Only one process builds or tests in a checkout at a time.
 
 ## Enforced rules

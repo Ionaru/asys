@@ -98,16 +98,17 @@ A Sign-up link from `node --env-file=.env dist/apps/server/main.js signup-link` 
 
 Each check below is also a CI job (see [CI](#ci)):
 
-| Check            | Command                                                                                           |
-| ---------------- | ------------------------------------------------------------------------------------------------- |
-| Lint (oxlint)    | `pnpm exec nx run-many -t lint`                                                                   |
-| Typecheck        | `pnpm exec nx run-many -t typecheck` and `pnpm exec tsc -p scripts/tsconfig.json`                 |
-| Build            | `pnpm exec nx run-many -t build` and `pnpm exec nx run server:openapi`                            |
-| Unit tests       | `pnpm exec nx run-many -t test --skip-nx-cache`                                                   |
-| End-to-end tests | `pnpm exec nx e2e pwa-e2e` (see [End-to-end tests](#end-to-end-tests))                            |
-| Format (oxfmt)   | `pnpm exec nx format:check --all`, or `pnpm exec nx format:write --all` to fix                    |
-| Licences         | `node scripts/check-spdx.mts`, `pipx run reuse==6.2.0 lint` and `node scripts/check-licenses.mts` |
-| Palettes         | `node scripts/palettes.mts --check`                                                               |
+| Check                    | Command                                                                                                          |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| Lint (oxlint)            | `pnpm exec nx run-many -t lint`                                                                                  |
+| Typecheck                | `pnpm exec nx run-many -t typecheck` and `pnpm exec tsc -p scripts/tsconfig.json`                                |
+| Build                    | `pnpm exec nx run-many -t build` and `pnpm exec nx run server:openapi`                                           |
+| Unit tests               | `pnpm exec nx run-many -t test --skip-nx-cache`                                                                  |
+| End-to-end tests         | `pnpm exec nx e2e pwa-e2e` (see [End-to-end tests](#end-to-end-tests))                                           |
+| End-to-end tests (image) | `pnpm exec nx run pwa-e2e:e2e-image`, with the image stack running (see [Against the image](#against-the-image)) |
+| Format (oxfmt)           | `pnpm exec nx format:check --all`, or `pnpm exec nx format:write --all` to fix                                   |
+| Licences                 | `node scripts/check-spdx.mts`, `pipx run reuse==6.2.0 lint` and `node scripts/check-licenses.mts`                |
+| Palettes                 | `node scripts/palettes.mts --check`                                                                              |
 
 - The server tests run against the development database, which must be up and migrated. They share it, so always pass `--skip-nx-cache`: Nx would otherwise replay a cached result that no longer reflects the database. Stop `nx serve server` before running them, or its job worker claims the tests' due jobs.
 - `pnpm exec nx test pwa` runs the PWA's unit tests (`@angular/build:unit-test`, Vitest and jsdom) and needs no database. `nx typecheck pwa` does not check templates; `nx build pwa` and `nx test pwa` do.
@@ -119,20 +120,51 @@ Each check below is also a CI job (see [CI](#ci)):
 `apps/pwa-e2e` runs Playwright in Chromium against the real stack. Each test signs up a new Owner with a WebAuthn virtual authenticator (over the Chrome DevTools Protocol), so passkeys work without a person.
 
 - **Prerequisites.** The database from `compose.yaml` is up (`docker compose up -d --wait`), `.env` holds its passwords and URLs, and Chromium is installed once with `pnpm exec playwright install chromium`.
-- **Run.** `pnpm exec nx e2e pwa-e2e` is the only supported entry point: its `reset-db` dependency recreates the database first. Pass Playwright arguments after `--`, for example `pnpm exec nx e2e pwa-e2e -- src/now.spec.ts`. Reports and traces land in `dist/.playwright/apps/pwa-e2e`.
+- **Run.** There are two entry points. `pnpm exec nx e2e pwa-e2e` runs the suite against the dev stack, and its `reset-db` dependency recreates the database first. `pnpm exec nx run pwa-e2e:e2e-image` runs it against the production image, with the image stack from [Against the image](#against-the-image) running. Pass Playwright arguments after `--`, for example `pnpm exec nx e2e pwa-e2e -- src/now.spec.ts`. Both write reports and traces to `dist/.playwright/apps/pwa-e2e`, so each run replaces the other's.
 - **An isolated stack.** The API runs on port 3100 and the PWA dev server on 4300 (`pwa:serve:e2e`, with `apps/pwa/.env.serve.e2e` and `apps/pwa/proxy.e2e.conf.json`), against a database `asys_e2e` in the same Postgres container. `reset-db` drops and recreates `asys_e2e`, migrates it, and copies the server bundle to `dist/pwa-e2e/server`, so a rebuild during a run cannot change the API under it. The scripts refuse to run unless both database URLs point at `asys_e2e`.
 - **`prebundle` is off** for `pwa:serve:e2e`, so it does not share the Vite prebundle cache with a running `nx serve pwa`.
 - **Beside a running dev stack.** `nx e2e pwa-e2e` rebuilds `dist/apps/server` and `apps/pwa/src/generated`, which the dev stack uses. With `nx serve server` and `nx serve pwa` running, build once while they are down (`pnpm exec nx run-many -t build -p server pwa`), then run `pnpm exec nx run pwa-e2e:reset-db --exclude-task-dependencies` and `pnpm exec nx e2e pwa-e2e --exclude-task-dependencies`.
+
+### Against the image
+
+The image target runs the same suite, plus the image-only specs (`apps/pwa-e2e/src/<topic>.image.spec.ts`), against the production image from the root `Dockerfile`: the production Angular build, the static file server, the pruned `node_modules` and the read-only container. It needs no host database and builds nothing, because the stack runs from `deploy/compose.yaml` and `deploy/compose.e2e.yaml` under the compose project `asys-e2e`, with the app published on `http://localhost:3200`. The image config blocks service workers, and the fixture gets each Sign-up link from `docker compose exec ... signup-link` in the image's own container.
+
+Never run this in the deployed checkout, where `deploy/.env` holds the production values.
+
+1. Create the external networks if they are missing: `docker network inspect edge >/dev/null 2>&1 || docker network create edge`, and the same for `telemetry`.
+2. If an earlier run left the `asys-e2e` stack behind, remove it first with the step 5 command, while its `deploy/.env` is still in place: its database keeps the passwords it was created with. Then, if `deploy/.env` exists, move it aside and restore it after step 5. Write a new `deploy/.env`:
+
+   ```ini
+   POSTGRES_PASSWORD=<openssl rand -hex 32>
+   ASYS_OWNER_PASSWORD=<openssl rand -hex 32>
+   ASYS_APP_PASSWORD=<openssl rand -hex 32>
+   ASYS_PUBLIC_ORIGIN=http://localhost:3200
+   ASYS_RP_ID=localhost
+   ASYS_OTLP_ENDPOINT=
+   ```
+
+3. Build and start the stack. Port 3200 must be free:
+
+   ```bash
+   docker build --tag ghcr.io/ionaru/asys:latest .
+   docker compose -p asys-e2e -f deploy/compose.yaml -f deploy/compose.e2e.yaml up -d --wait --no-build
+   ```
+
+4. Run `pnpm exec nx run pwa-e2e:e2e-image`.
+5. Remove the stack: `docker compose -p asys-e2e -f deploy/compose.yaml -f deploy/compose.e2e.yaml down -v`.
 
 ## CI
 
 CI is `.github/workflows/cd.yaml`: on every push and pull request an `audit` job (`pnpm audit --prod`, against the lockfile without installing dependencies) runs first, then the jobs `lint`, `typecheck`, `build`, `test`, `e2e`, `format`, `licences` and `palettes` run in parallel, without Nx Cloud. Each job's steps live in `cd.yaml`. The `build` job also writes the server's OpenAPI document (`nx run server:openapi`), which proves that the server bundle loads without a `.env`. Each of these jobs except `audit` starts with the composite action `.github/actions/setup`, which runs `.github/actions/checkout` and then sets up pnpm with Node 24 and installs from the frozen lockfile. The `typecheck` job also typechecks `scripts/` with `tsc -p scripts/tsconfig.json`. Each job's commands can be run locally in the same way; the `test` and `e2e` jobs need the database from `compose.yaml` (`docker compose up -d --wait`) and a `.env` with its passwords, and the `e2e` job installs Chromium with its system dependencies and uploads `dist/.playwright` when it fails.
 
-Three more jobs build and ship the image:
+Six more jobs build, check and ship the image:
 
-- **`image`** runs on every push and pull request, in parallel with the checks, and installs no dependencies (it uses `.github/actions/checkout` and `pnpm/setup` only). It builds the image from the root `Dockerfile` through `deploy/compose.yaml`, starts the whole stack on an empty database with throwaway passwords, runs `node scripts/smoke-image.mts`, then runs `up --wait` again to prove that `migrate` passes on a migrated database. On a push to `main` it saves the image as a one-day artifact.
-- **`push-image`** (pushes to `main` only, after every check and `image`) tags the image with the 12-character commit and `latest` and pushes both to `ghcr.io/ionaru/asys`.
-- **`deploy`** (pushes to `main` only) logs in to the VPS over SSH, checks out the deployed commit, sets `ASYS_GIT_REVISION` in `deploy/.env`, and runs `docker compose pull` and `up --wait`. It prints `docker compose ps` and the `migrate` logs, and the app's logs only when the deploy fails, because the repository's Actions logs are public.
+- **`revision`** works out the commit SHA and its 12-character short form as outputs, once, so every later job reads the same tag.
+- **`build-image`** (after `audit` and `revision`) builds the image with `docker build` from the repository root, saves it as a tar and uploads it as the artefact `asys-image` on every run, pull requests included, kept for 7 days. It uses `.github/actions/checkout` only, with no Node or pnpm. To inspect the image behind a failed run, download `asys-image`, then `docker load -i asys-image.tar` and `docker run --rm -it --entrypoint sh ghcr.io/ionaru/asys:latest`. A pull request's image never reaches GHCR.
+- **`migrate-image`** (after `build-image`) loads the image, starts the stack on an empty database with throwaway passwords, then runs `up --wait` again to prove that `migrate` passes on a migrated database.
+- **`e2e-image`** (after `build-image`, in parallel with `migrate-image`) sets up like the other checks, loads the image, starts the `asys-e2e` stack, installs Chromium and runs `pnpm exec nx run pwa-e2e:e2e-image`. On failure it prints the stack state and logs and uploads `dist/.playwright` as the artefact `playwright-image`. `migrate-image` and `e2e-image` both write `deploy/.env` and create the `edge` and `telemetry` networks through the composite action `.github/actions/prepare-stack` (input `public-origin`).
+- **`push-image`** (pushes to `main` only, after every check, `revision`, `build-image`, `migrate-image` and `e2e-image`) tags the image with the 12-character commit and `latest` and pushes the tar that `build-image` uploaded to `ghcr.io/ionaru/asys`, so the image that passed is the image that ships.
+- **`deploy`** (pushes to `main` only, after `revision` and `push-image`, whose outputs give it the revision) logs in to the VPS over SSH, checks out the deployed commit, sets `ASYS_GIT_REVISION` in `deploy/.env`, and runs `docker compose pull` and `up --wait`. It prints `docker compose ps` and the `migrate` logs, and the app's logs only when the deploy fails, because the repository's Actions logs are public.
 
 Runs on `main` queue instead of cancelling each other. `workflow_dispatch` runs the whole pipeline by hand; on `main` that includes `push-image` and `deploy`.
 
@@ -183,7 +215,7 @@ Use hex passwords only (`openssl rand -hex 32`): they go into database URLs unes
    }
    ```
 
-   `/health` is for the container healthcheck and the smoke script, which reach the app directly; drop that line if an outside monitor should see it. Removing the trace headers keeps a client from joining or steering ASYS's traces. Keep Caddy's access log off for this site (it is off unless a `log` directive is present). The Android share target puts the shared text in the query string of `/capture`, so an access log would hold it; if you need one, filter it with `format filter`, at least `request>headers>Referer delete` and a filter that removes the query from `request>uri`.
+   `/health` is for the container healthcheck, which reaches the app directly; drop that line if an outside monitor should see it. Removing the trace headers keeps a client from joining or steering ASYS's traces. Keep Caddy's access log off for this site (it is off unless a `log` directive is present). The Android share target puts the shared text in the query string of `/capture`, so an access log would hold it; if you need one, filter it with `format filter`, at least `request>headers>Referer delete` and a filter that removes the query from `request>uri`.
 
 4. In the repository's `production` environment, which the `deploy` job runs in, add the variables `DEPLOY_HOST` (the VPS host name) and `DEPLOY_USER`, and the secrets `DEPLOY_KEY` (a private key whose public half is in the deploy user's `authorized_keys`) and `DEPLOY_PATH` (the checkout).
 5. Push to `main`. After the first `push-image`, set the `ghcr.io/ionaru/asys` package to Public (a first GHCR package is private even for a public repository), confirm with an anonymous `docker pull ghcr.io/ionaru/asys:latest`, and run the workflow on `main` again with `workflow_dispatch`, which builds, pushes and deploys.

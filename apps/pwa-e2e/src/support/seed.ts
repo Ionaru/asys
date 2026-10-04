@@ -3,7 +3,6 @@
 // Seeds an Owner's data through the HTTP API with the page's session. Call these before page.reload() so the PWA syncs it.
 import { randomUUID } from 'node:crypto';
 import type { Page } from '@playwright/test';
-import { E2E_ORIGIN } from './e2e-env.ts';
 
 /** The parts of GET /v1/snapshot the specs read; the full shape is Snapshot in @asys/contract. */
 export interface Snapshot {
@@ -36,8 +35,12 @@ export const command = async (
   page: Page,
   body: Record<string, unknown>,
 ): Promise<{ seq: number }> => {
+  const url = new URL(page.url());
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error('seed: the page is not on the app');
+  }
   const response = await page.context().request.post('/v1/commands', {
-    headers: { Origin: E2E_ORIGIN },
+    headers: { Origin: url.origin },
     data: { idempotencyKey: randomUUID(), ...body },
   });
   const text = await response.text();

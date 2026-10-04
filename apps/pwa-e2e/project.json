@@ -19,6 +19,14 @@
       "cache": false,
       "dependsOn": ["reset-db", "server:build", "pwa:api-client", "design-tokens:css"]
     },
+    "e2e-image": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "playwright test -c apps/pwa-e2e/playwright.image.config.mts",
+        "cwd": "{workspaceRoot}"
+      }
+    },
     "typecheck": {
       "executor": "nx:run-commands",
       "cache": true,

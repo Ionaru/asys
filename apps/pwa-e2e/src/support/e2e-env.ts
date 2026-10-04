@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: EUPL-1.2
 
-// The isolated e2e stack: API on 3100, dev server on 4300, database asys_e2e. Loaded by Node type stripping
-// (scripts/*.mts), Playwright's loader and tsc alike, so: only node: builtins, no enums, no import.meta, nothing read at import.
+// The two e2e stacks. The dev stack: API on 3100, dev server on 4300, database asys_e2e. The image stack: the
+// production image from deploy/compose.e2e.yaml, published on 3200, in the compose project asys-e2e. Loaded by Node
+// type stripping (scripts/*.mts), Playwright's loader and tsc alike, so: only node: builtins, no enums, no
+// import.meta, nothing read at import.
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { parseEnv } from 'node:util';
@@ -13,6 +15,18 @@ export const E2E_PWA_PORT = 4300;
 export const E2E_ORIGIN = `http://localhost:${E2E_PWA_PORT}`;
 
 export const E2E_DATABASE = 'asys_e2e';
+
+export const E2E_IMAGE_PORT = 3200;
+
+export const E2E_IMAGE_ORIGIN = `http://localhost:${E2E_IMAGE_PORT}`;
+
+export const E2E_IMAGE_PROJECT = 'asys-e2e';
+
+export const E2E_IMAGE_COMPOSE_FILES = ['deploy/compose.yaml', 'deploy/compose.e2e.yaml'] as const;
+
+export const Stack = { Dev: 'dev', Image: 'image' } as const;
+
+export type StackName = (typeof Stack)[keyof typeof Stack];
 
 export interface E2eEnv {
   readonly PORT: string;

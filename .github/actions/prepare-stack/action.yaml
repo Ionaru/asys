@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: EUPL-1.2
+name: Prepare the stack
+description: Write deploy/.env with random passwords and create the external networks edge and telemetry. It writes the relative path deploy/.env, so run it after a checkout.
+
+inputs:
+  public-origin:
+    description: The origin the app is served on, written as ASYS_PUBLIC_ORIGIN, for example http://localhost:3200.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Write deploy/.env and create the external networks
+      shell: bash
+      env:
+        PUBLIC_ORIGIN: ${{ inputs.public-origin }}
+      run: |
+        (
+          umask 077
+          {
+            echo "POSTGRES_PASSWORD=$(openssl rand -hex 32)"
+            echo "ASYS_OWNER_PASSWORD=$(openssl rand -hex 32)"
+            echo "ASYS_APP_PASSWORD=$(openssl rand -hex 32)"
+            echo "ASYS_PUBLIC_ORIGIN=${PUBLIC_ORIGIN}"
+            echo "ASYS_RP_ID=localhost"
+            # Empty: no telemetry export in CI.
+            echo "ASYS_OTLP_ENDPOINT="
+          } > deploy/.env
+        )
+        docker network create edge
+        docker network create telemetry

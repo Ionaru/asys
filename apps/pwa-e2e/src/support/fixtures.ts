@@ -5,7 +5,15 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { test as base } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { E2E_ORIGIN, childEnv, loadE2eEnv, workspaceRootFrom } from './e2e-env.ts';
+import type { StackName } from './e2e-env.ts';
+import {
+  E2E_IMAGE_COMPOSE_FILES,
+  E2E_IMAGE_PROJECT,
+  Stack,
+  childEnv,
+  loadE2eEnv,
+  workspaceRootFrom,
+} from './e2e-env.ts';
 
 export { expect } from '@playwright/test';
 
@@ -17,19 +25,42 @@ const run = promisify(execFile);
 
 const OWNER_NAME = 'E2E Owner';
 
-/** Prints a Sign-up link from the e2e server bundle against asys_e2e. */
-const signupLink = async (): Promise<string> => {
+/** Prints a Sign-up link: from the e2e server bundle against asys_e2e, or from the running image. */
+const signupLink = async (stack: StackName, baseURL: string): Promise<string> => {
   const root = workspaceRootFrom(__dirname);
-  const { env } = loadE2eEnv(root);
-  const { stdout } = await run('node', ['dist/pwa-e2e/server/main.js', 'signup-link'], {
-    cwd: root,
-    env: childEnv(env),
-  });
+  let stdout: string;
+  if (stack === Stack.Image) {
+    const pending = run(
+      'docker',
+      [
+        'compose',
+        '-p',
+        E2E_IMAGE_PROJECT,
+        ...E2E_IMAGE_COMPOSE_FILES.flatMap((file) => ['-f', file]),
+        'exec',
+        '-T',
+        'asys',
+        'node',
+        '/app/main.js',
+        'signup-link',
+      ],
+      { cwd: root },
+    );
+    // compose exec attaches the stdin pipe execFile opens, so close it at once.
+    pending.child.stdin?.end();
+    ({ stdout } = await pending);
+  } else {
+    const { env } = loadE2eEnv(root);
+    ({ stdout } = await run('node', ['dist/pwa-e2e/server/main.js', 'signup-link'], {
+      cwd: root,
+      env: childEnv(env),
+    }));
+  }
   const link = stdout
     .split('\n')
     .find((line) => /\/signup#token=/.test(line))
     ?.trim();
-  if (!link?.startsWith(`${E2E_ORIGIN}/`))
+  if (!link?.startsWith(`${baseURL}/`))
     throw new Error('signup-link printed no Sign-up link for the e2e origin');
   return link;
 };
@@ -50,11 +81,13 @@ export const addAuthenticator = async (page: Page): Promise<void> => {
   });
 };
 
-export const test = base.extend<{ owner: Owner }>({
+export const test = base.extend<{ owner: Owner; stack: StackName }>({
   owner: { name: OWNER_NAME },
+  stack: [Stack.Dev, { option: true }],
   page: [
-    async ({ page, owner }, use) => {
-      const link = await signupLink();
+    async ({ page, owner, stack, baseURL }, use) => {
+      if (baseURL === undefined) throw new Error('the e2e config sets no baseURL');
+      const link = await signupLink(stack, baseURL);
       await addAuthenticator(page);
       await page.goto(link);
       await page.getByLabel('Name').fill(owner.name);

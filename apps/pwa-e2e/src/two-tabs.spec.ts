@@ -28,12 +28,19 @@ test('A Done Task closed in another tab leaves a Review item in the Inbox', asyn
   await page.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(page.locator('.now__status')).toHaveText('“Pay the invoice” is Done.');
 
-  const commandResponse = page2.waitForResponse(
-    (response) => response.url().includes('/v1/commands') && response.request().method() === 'POST',
-  );
+  // The answer is read in the route, not with response.text(): under CPU load Chromium can hold no
+  // body for the XHR by the time DevTools asks ("No data found for resource with given identifier").
+  let answer: (text: string) => void = () => undefined;
+  const commandAnswer = new Promise<string>((resolve) => {
+    answer = resolve;
+  });
+  await page2.route('**/v1/commands', async (route) => {
+    const response = await route.fetch();
+    answer(await response.text());
+    await route.fulfill({ response });
+  });
   await page2.getByRole('button', { name: 'Done', exact: true }).click();
-  const response = await commandResponse;
-  expect(await response.text()).toContain('NotApplicable');
+  expect(await commandAnswer).toContain('NotApplicable');
   release();
 
   await page2

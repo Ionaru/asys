@@ -36,6 +36,7 @@ ASYS is built in slices (`docs/mvp-plan.md`). Each slice is cut into pieces that
    Then run the rest of what CI runs:
    - `pnpm exec tsc -p scripts/tsconfig.json` and `pnpm exec nx run server:openapi`;
    - `pnpm exec nx e2e pwa-e2e` (Chromium installed, ports 3100 and 4300 free);
+   - `pnpm exec nx run pwa-e2e:e2e-image`, with the image stack from the README's "Against the image" recipe running (port 3200 free);
    - `pnpm exec nx format:check --all`;
    - `node scripts/check-spdx.mts`, `pipx run reuse==6.2.0 lint` and `node scripts/check-licenses.mts`;
    - `node scripts/palettes.mts --check`;

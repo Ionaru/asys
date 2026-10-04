@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: EUPL-1.2
+# For the end-to-end tests only: publishes the app on loopback so a browser on the
+# host reaches it as http://localhost:3200, a secure context. Never used in production.
+# Keep the port in step with E2E_IMAGE_PORT in apps/pwa-e2e/src/support/e2e-env.ts.
+services:
+  asys:
+    ports:
+      - '127.0.0.1:3200:3000'

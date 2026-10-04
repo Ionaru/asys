@@ -10,6 +10,7 @@ const workspaceRoot = workspaceRootFrom(import.meta.dirname);
 
 export default defineConfig({
   ...nxE2EPreset(import.meta.dirname, { testDir: './src', openHtmlReport: 'never' }),
+  testIgnore: ['**/*.image.spec.ts'],
   fullyParallel: true,
   workers: process.env['CI'] ? 2 : 4,
   retries: process.env['CI'] ? 1 : 0,

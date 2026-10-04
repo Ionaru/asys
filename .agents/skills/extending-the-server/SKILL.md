@@ -53,7 +53,7 @@ Read it with Effect `Config` in `src/config.ts` (`Config.Redacted` for secrets),
 A variable with no default must also be added in two more places:
 
 - `E2eEnv` and `loadE2eEnv` in `apps/pwa-e2e/src/support/e2e-env.ts`, because the e2e API gets no `.env`;
-- the `Write deploy/.env` step of the `image` job in `.github/workflows/cd.yaml`, when `deploy/compose.yaml` requires it (`${VAR:?}`). The built CLI does not read `.env`, so locally run it with `node --env-file=.env dist/apps/server/main.js`.
+- the composite action `.github/actions/prepare-stack`, which writes `deploy/.env` for the `migrate-image` and `e2e-image` jobs, and the `deploy/.env` block in the README's "Against the image" recipe, when `deploy/compose.yaml` requires it (`${VAR:?}`). The built CLI does not read `.env`, so locally run it with `node --env-file=.env dist/apps/server/main.js`.
 
 ## Verify
 
