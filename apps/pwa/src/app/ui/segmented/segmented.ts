@@ -90,7 +90,7 @@ let nextId = 0;
       font-size: var(--font-size-body-strong);
       line-height: var(--line-height-body-strong);
       font-weight: 600;
-      transition: background 150ms ease-out;
+      transition: background var(--duration-quick) var(--ease-out);
     }
 
     .asys-segmented__option[aria-pressed='true'],

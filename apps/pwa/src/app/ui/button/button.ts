@@ -47,7 +47,7 @@ export enum ButtonSize {
       font-size: var(--font-size-body-strong);
       line-height: var(--line-height-body-strong);
       font-weight: 600;
-      transition: opacity 150ms ease-out;
+      transition: opacity var(--duration-quick) var(--ease-out);
     }
 
     a.asys-button {

@@ -39,42 +39,48 @@ export const routes: Routes = [
     component: ShellLayout,
     canActivate: [signedInGuard],
     children: [
-      { path: 'now', component: Now, title: 'Now · ASYS' },
-      { path: 'today', component: Today, title: 'Today · ASYS' },
-      { path: 'inbox', component: Inbox, title: 'Inbox · ASYS' },
-      { path: 'capture', component: Capture, title: 'Capture · ASYS' },
+      { path: 'now', component: Now, title: 'Now · ASYS', data: { level: 0 } },
+      { path: 'today', component: Today, title: 'Today · ASYS', data: { level: 0 } },
+      { path: 'inbox', component: Inbox, title: 'Inbox · ASYS', data: { level: 0 } },
+      { path: 'capture', component: Capture, title: 'Capture · ASYS', data: { level: 0 } },
       {
         path: 'tasks/:taskId',
         loadComponent: () =>
           import('./features/task/task-editor-route').then((m) => m.TaskEditorRoute),
         title: 'Task · ASYS',
+        data: { level: 1 },
       },
       {
         path: 'settings',
         loadComponent: () => import('./features/settings/settings').then((m) => m.Settings),
         title: 'Settings · ASYS',
+        data: { level: 1 },
       },
       {
         path: 'settings/areas',
         loadComponent: () => import('./features/areas/area-list').then((m) => m.AreaList),
         title: 'Areas · ASYS',
+        data: { level: 2 },
       },
       {
         path: 'settings/areas/new',
         loadComponent: () =>
           import('./features/areas/area-editor-route').then((m) => m.AreaEditorRoute),
         title: 'New Area · ASYS',
+        data: { level: 3 },
       },
       {
         path: 'settings/areas/:areaId',
         loadComponent: () =>
           import('./features/areas/area-editor-route').then((m) => m.AreaEditorRoute),
         title: 'Area · ASYS',
+        data: { level: 3 },
       },
       {
         path: 'account',
         loadComponent: () => import('./features/account/account').then((m) => m.Account),
         title: 'Account · ASYS',
+        data: { level: 2 },
       },
     ],
   },

@@ -20,6 +20,7 @@ import { outcomeMessage } from '../../core/data/outcome-message';
 import { DataStore, SyncStatus } from '../../core/data/data-store';
 import { Clock } from '../../core/platform/clock';
 import { Ids } from '../../core/platform/ids';
+import { TaskMorph } from '../../core/platform/task-morph';
 import { Now } from './now';
 
 const ZONE = 'Europe/Amsterdam';
@@ -1095,6 +1096,115 @@ describe('Now', () => {
 
       expect(topTitle().textContent?.trim()).toBe('Steady one');
       expect(form()).toBeNull();
+    });
+  });
+
+  describe('the task title hooks', () => {
+    const titleIdOf = (row: Element): string | null | undefined =>
+      row.querySelector('.asys-picker-row__title')?.getAttribute('data-task-id');
+    const waitingRows = (rows: () => HTMLAnchorElement[]): HTMLAnchorElement[] =>
+      rows().filter((a) => a.classList.contains('asys-picker-row--waiting'));
+    const marked = (root: () => HTMLElement): Element[] =>
+      Array.from(root().querySelectorAll('[data-morph]'));
+
+    it('gives the top pick title and each ranked row title their own Task id', async () => {
+      const { root, topTitle, rows, now } = await setup();
+
+      expect(now().ranked.map((r) => r.task.id)).toEqual(['invoice', 'dentist', 'plants']);
+      expect(topTitle().getAttribute('data-task-id')).toBe('invoice');
+      expect(rows().map(titleIdOf)).toEqual(['dentist', 'plants']);
+      expect(
+        Array.from(root().querySelectorAll('[data-task-id]')).map((el) =>
+          el.getAttribute('data-task-id'),
+        ),
+      ).toEqual(['invoice', 'dentist', 'plants']);
+    });
+
+    it('gives each Waiting row title its own Task id once Waiting is expanded', async () => {
+      const { root, waitingHeader, click, rows } = await setup();
+
+      expect(root().querySelector('[data-task-id="flights"]')).toBeNull();
+      expect(root().querySelector('[data-task-id="report"]')).toBeNull();
+
+      await click(must(waitingHeader()));
+
+      expect(waitingRows(rows).map(titleIdOf)).toEqual(['flights', 'report']);
+    });
+
+    it('marks only the second ranked row title while TaskMorph holds its id', async () => {
+      const { root, now, settle } = await setup();
+      const secondId = must(now().ranked[1]).task.id;
+
+      TestBed.inject(TaskMorph).taskId.set(secondId);
+      await settle();
+
+      const elements = marked(root);
+
+      expect(secondId).toBe('dentist');
+      expect(elements).toHaveLength(1);
+      expect(elements[0]).toBe(root().querySelector('.asys-picker-row__title'));
+      expect(elements[0]?.getAttribute('data-task-id')).toBe(secondId);
+      expect(elements[0]?.getAttribute('data-morph')).toBe('');
+    });
+
+    it('marks only the top pick title while TaskMorph holds the top id', async () => {
+      const { root, topTitle, now, settle } = await setup();
+      const topId = must(now().ranked[0]).task.id;
+
+      TestBed.inject(TaskMorph).taskId.set(topId);
+      await settle();
+
+      const elements = marked(root);
+
+      expect(topId).toBe('invoice');
+      expect(elements).toHaveLength(1);
+      expect(elements[0]).toBe(topTitle());
+      expect(elements[0]?.getAttribute('data-task-id')).toBe(topId);
+      expect(elements[0]?.getAttribute('data-morph')).toBe('');
+    });
+
+    it('marks nothing for an id that is not listed, nor for a Waiting id while Waiting is collapsed', async () => {
+      const { root, settle } = await setup();
+
+      TestBed.inject(TaskMorph).taskId.set('not-a-task');
+      await settle();
+
+      expect(marked(root)).toEqual([]);
+
+      TestBed.inject(TaskMorph).taskId.set('flights');
+      await settle();
+
+      expect(marked(root)).toEqual([]);
+    });
+
+    it('marks nothing for null, also after an id was set', async () => {
+      const { root, settle } = await setup();
+
+      expect(marked(root)).toEqual([]);
+
+      TestBed.inject(TaskMorph).taskId.set('dentist');
+      await settle();
+
+      expect(marked(root)).toHaveLength(1);
+
+      TestBed.inject(TaskMorph).taskId.set(null);
+      await settle();
+
+      expect(marked(root)).toEqual([]);
+    });
+
+    it('marks only a Waiting row title while TaskMorph holds its id', async () => {
+      const { root, waitingHeader, click, rows, settle } = await setup();
+
+      await click(must(waitingHeader()));
+      TestBed.inject(TaskMorph).taskId.set('report');
+      await settle();
+
+      const elements = marked(root);
+
+      expect(elements).toHaveLength(1);
+      expect(elements[0]).toBe(must(waitingRows(rows)[1]).querySelector('.asys-picker-row__title'));
+      expect(elements[0]?.getAttribute('data-task-id')).toBe('report');
     });
   });
 });

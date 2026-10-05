@@ -198,3 +198,106 @@ describe('TopPick', () => {
     expect(document.activeElement).toBe(q('.asys-top-pick__title'));
   });
 });
+
+@Component({
+  imports: [TopPick],
+  template: `
+    <asys-top-pick
+      [title]="'Call Marit'"
+      [reason]="'Due today'"
+      [quadrant]="quadrant"
+      [estimate]="'25 min'"
+      [taskId]="taskId()"
+      [morph]="morph()"
+    />
+  `,
+})
+class HookHost {
+  readonly quadrant = Quadrant.Plan;
+
+  readonly taskId = signal<string | null>(null);
+
+  readonly morph = signal(false);
+}
+
+const setupHooks = async () => {
+  const fixture = TestBed.createComponent(HookHost);
+  document.body.appendChild(fixture.nativeElement);
+  await fixture.whenStable();
+
+  const title = (): HTMLElement => {
+    const el = fixture.nativeElement.querySelector('.asys-top-pick__title');
+
+    if (el === null) {
+      throw new Error('Missing the top pick title');
+    }
+
+    return el;
+  };
+  const withAttribute = (name: string): Element[] =>
+    Array.from(fixture.nativeElement.querySelectorAll(`[${name}]`));
+
+  return { fixture, host: fixture.componentInstance, title, withAttribute };
+};
+
+describe('TopPick task hooks', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('puts data-task-id on the title for a taskId', async () => {
+    const { fixture, host, title, withAttribute } = await setupHooks();
+
+    host.taskId.set('abc');
+    await fixture.whenStable();
+
+    expect(title().getAttribute('data-task-id')).toBe('abc');
+    expect(withAttribute('data-task-id')).toHaveLength(1);
+    expect(withAttribute('data-task-id')[0]).toBe(title());
+  });
+
+  it('has no data-task-id on the title when taskId is null, also after it was cleared', async () => {
+    const { fixture, host, title } = await setupHooks();
+
+    expect(title().hasAttribute('data-task-id')).toBe(false);
+
+    host.taskId.set('abc');
+    await fixture.whenStable();
+
+    expect(title().getAttribute('data-task-id')).toBe('abc');
+
+    host.taskId.set(null);
+    await fixture.whenStable();
+
+    expect(title().hasAttribute('data-task-id')).toBe(false);
+  });
+
+  it('has data-morph on the title while morph is true and drops it when morph is false', async () => {
+    const { fixture, host, title, withAttribute } = await setupHooks();
+
+    expect(title().hasAttribute('data-morph')).toBe(false);
+
+    host.morph.set(true);
+    await fixture.whenStable();
+
+    expect(title().hasAttribute('data-morph')).toBe(true);
+    expect(title().getAttribute('data-morph')).toBe('');
+    expect(withAttribute('data-morph')).toHaveLength(1);
+    expect(withAttribute('data-morph')[0]).toBe(title());
+
+    host.morph.set(false);
+    await fixture.whenStable();
+
+    expect(title().hasAttribute('data-morph')).toBe(false);
+    expect(withAttribute('data-morph')).toEqual([]);
+  });
+
+  it('has neither attribute while neither input is bound', async () => {
+    const { q } = await setup();
+
+    expect(q('.asys-top-pick__title')?.hasAttribute('data-task-id')).toBe(false);
+    expect(q('.asys-top-pick__title')?.hasAttribute('data-morph')).toBe(false);
+    expect(q('[data-task-id]')).toBeNull();
+    expect(q('[data-morph]')).toBeNull();
+  });
+});

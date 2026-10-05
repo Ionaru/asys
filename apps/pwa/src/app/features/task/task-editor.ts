@@ -45,6 +45,7 @@ import { DataStore, SyncStatus } from '../../core/data/data-store';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
 import { Ids } from '../../core/platform/ids';
+import { TaskMorph } from '../../core/platform/task-morph';
 import { Button, ButtonSize, ButtonVariant } from '../../ui/button/button';
 import { DateSpecField } from '../../ui/date-spec-field/date-spec-field';
 import { EstimateField } from '../../ui/estimate-field/estimate-field';
@@ -120,7 +121,15 @@ const mixDraft = (
   ],
   providers: [CommandAttempts],
   template: `
-    <h1 #heading class="task-editor__title" tabindex="-1">{{ headingText() }}</h1>
+    <h1
+      #heading
+      class="task-editor__title"
+      tabindex="-1"
+      [attr.data-task-id]="taskId()"
+      [attr.data-morph]="morph() ? '' : null"
+    >
+      {{ headingText() }}
+    </h1>
     <p class="task-editor__status" role="status">{{ statusLine() }}</p>
     @if (view(); as v) {
       @if (overdue() || blocked()) {
@@ -467,6 +476,8 @@ export class TaskEditor {
 
   private readonly ids = inject(Ids);
 
+  private readonly taskMorph = inject(TaskMorph);
+
   private readonly attempts = inject(CommandAttempts);
 
   private readonly router = inject(Router);
@@ -549,6 +560,9 @@ export class TaskEditor {
     source: () => this.task(),
     computation: (task, previous) => task?.title ?? previous?.value ?? 'Task',
   });
+
+  /** Whether the running view transition morphs this Task's title. */
+  protected readonly morph = computed(() => this.taskMorph.taskId() === this.taskId());
 
   private readonly baseline = signal<TaskDraft | null>(null);
 

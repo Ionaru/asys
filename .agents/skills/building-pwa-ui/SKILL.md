@@ -10,13 +10,13 @@ description: Use when adding or changing an Angular component, screen, route, fo
 
 `apps/pwa` is Angular 22, zoneless, with OnPush and standalone as defaults. Never set either explicitly. Its layers:
 
-| Layer                                     | Holds                                                                                 | May import                               |
-| ----------------------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------- |
-| `core/api`                                | `DataApi`, `AuthApi`, `wire.ts`; the only importer of `src/generated`                 | generated client, `@asys/domain`         |
-| `core/auth`, `core/data`, `core/platform` | session, `DataStore`, `CommandAttempts`, seams (`Clock`, `Ids`, `DeviceStorage`, ...) | `core/*`, `@asys/domain`                 |
-| `features/<screen>`                       | routed screens plus their pure helpers                                                | `core`, `ui`, `@asys/domain`             |
-| `layout/`                                 | the shell: header, outlet, quick add, bottom nav                                      | `core`, `ui`                             |
-| `ui/<name>/`                              | presentational components                                                             | `@angular/*`, `@asys/domain`, other `ui` |
+| Layer                                     | Holds                                                                                                                   | May import                               |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `core/api`                                | `DataApi`, `AuthApi`, `wire.ts`; the only importer of `src/generated`                                                   | generated client, `@asys/domain`         |
+| `core/auth`, `core/data`, `core/platform` | session, `DataStore`, `CommandAttempts`, seams (`Clock`, `Ids`, `DeviceStorage`, `Motion`, `Haptics`, `TaskMorph`, ...) | `core/*`, `@asys/domain`                 |
+| `features/<screen>`                       | routed screens plus their pure helpers                                                                                  | `core`, `ui`, `@asys/domain`             |
+| `layout/`                                 | the shell: header, outlet, quick add, bottom nav                                                                        | `core`, `ui`                             |
+| `ui/<name>/`                              | presentational components                                                                                               | `@angular/*`, `@asys/domain`, other `ui` |
 
 Lint bans runtime imports of `@asys/contract`, `effect` and `@ionaru/effect-passkeys/api` (type-only is fine). `@ionaru/effect-passkeys/server` and `/testing` are banned outright. `@ionaru/effect-passkeys/client` is the one passkeys entry the PWA may use at runtime.
 
@@ -31,7 +31,10 @@ Lint bans runtime imports of `@asys/contract`, `effect` and `@ionaru/effect-pass
 - **Features** keep the default encapsulation, with classes such as `now__title`.
 - **Styling:**
   - Use token CSS variables only (`--paper`, `--ink`, `--signal`, `--space-1` to `--space-7`, `--tap-target`, `--font-size-*`), never hex colours.
-  - Add a `[data-theme='drive']` rule when tap size or motion must differ in Voice only.
+  - Add a `[data-theme='drive']` rule when tap size must differ in Voice only. Motion needs none: the kill switches in `src/styles.css` and `Motion.allowed()` already turn it off there and under reduced motion.
+  - Timings come only from the motion tokens `--duration-quick`, `--duration-moderate`, `--ease-out`, `--ease-in` and `--ease-emphasized`. Never write a literal `ms` value or curve.
+  - Script motion goes through `Motion.play` with `MotionDuration` and `MotionEasing`, and a haptic through `Haptics.tick()`. Never call `animate` or `navigator.vibrate` directly; jsdom has neither.
+  - View-transition CSS (names, the z-index ladder, keyframes) lives only in `src/styles.css`. The ladder is `page` auto, `task-title` 1, `shell-capture`, `shell-undo` and `shell-nav` 2, `nav-mark` 3. New fixed shell chrome gets a name and a rung, or the sliding page paints over it.
   - Put a style in `src/styles.css` only when several controls share it.
 - **Accessibility:**
   - Errors read "Error:" with `aria-invalid` and `aria-describedby`, never colour alone.
@@ -49,7 +52,7 @@ Lint bans runtime imports of `@asys/contract`, `effect` and `@ionaru/effect-pass
 **Screen and route:**
 
 1. Create `features/<name>/<name>.ts` and its spec, with `providers: [CommandAttempts]` when it sends Commands.
-2. Add the route in `app.routes.ts`: `loadComponent` and `title: '<Name> · ASYS'`, under `ShellLayout` unless it is an auth screen.
+2. Add the route in `app.routes.ts`: `loadComponent` and `title: '<Name> · ASYS'`, under `ShellLayout` with `data: { level }` unless it is an auth screen. The level is 0 for a tab or a screen of its own, otherwise one more than the screen it opens from. `app.routes.spec.ts` fails without it, and the level decides Push, Pop or Swap.
 3. Add the title row to `app.routes.spec.ts`.
 4. For a primary tab, update `ui/bottom-nav` and `CAPTURE_PATHS` in `layout/shell-layout.ts`. For an auth screen, add the path to `AUTH_PATHS` in `app.ts` (the sign-out redirect), and to `AUTH_PATHS` and `AUTH_SEGMENTS` in `core/auth/safe-return-url.ts` with a case in its spec. Use `signedOutGuard` on the route. A screen shown just after sign-in (like `recovered`) goes only in `safe-return-url.ts`, without `signedOutGuard`.
 5. An id-keyed editor gets a `<name>-route.ts` wrapper (see `task-editor-route.ts`).
@@ -79,6 +82,7 @@ Lint bans runtime imports of `@asys/contract`, `effect` and `@ionaru/effect-pass
 - Unit tests use `@angular/build:unit-test` (Vitest, jsdom). Vitest globals are not imported.
 - `vi.mock` of relative imports is refused, so override a seam service with `{ provide: X, useValue }`. `features/now/now.spec.ts` is the model.
 - Use the real domain functions over a fixed state and clock.
+- Specs that render scripted motion provide a fake `Motion` whose `play` promise they control. The real one resolves at once in jsdom.
 
 ```bash
 pnpm exec nx run-many -t lint typecheck test build -p pwa

@@ -245,6 +245,8 @@ So a module-level `active` holds the transition the handler last took on. Its `f
 
 **Before building,** ask the maintainer whether the amendment below may be applied to the design-system artifact. Record the answer in this plan. With a go-ahead, apply it and build unit 1 as written. Without, build the decision 4 fallback.
 
+**Answered 2026-10-05: go-ahead.** The maintainer asked for the amendment to be applied as part of the build. It was published to the artifact on 2026-10-05 (its version 10), word for word as below, and unit 1 was built as written, not the fallback.
+
 **Files it owns:**
 - `libs/design-tokens/src/base.tokens.json`;
 - `apps/pwa/src/styles.css`, lines 202, 206 and the kill-switch block at 209-224;
@@ -723,6 +725,45 @@ Plan 3 adds a case to this file: during the editor's Done Pop, `shell-undo` is i
 **Not changed:** `CONTEXT.md` (this plan adds no term), `docs/slice-1-plan.md` (the record of slice 1).
 
 **Check:** `node scripts/check-spdx.mts`; unit 1's literal-timing pattern, run as `grep -nE '<pattern>' .agents/skills/building-pwa-ui/SKILL.md`, finds nothing (it finds nothing today either); `pnpm exec nx format:check --all`.
+
+## Built on 2026-10-05
+
+All six units were built in order, as written, on the go-ahead branch of decision 4 (unit 1 records the answer). Each unit's source and its tests were written separately from the same contract, and every new test was then seen to fail on an assertion by breaking the behaviour it covers.
+
+### Departures from the plan
+
+- **Unit 5's helper takes a count.** `lastSettled(page, before)` waits until a record newer than the first `before` records exists and has settled, and returns it. Polling only the newest record could return the previous navigation's record when a click has not started its transition yet.
+- **Unit 5's recorder wraps `startViewTransition` with an arrow function** that applies the original to `document`, in line with the const-arrow convention, rather than a `function` expression bound to `this`.
+- **Whitespace around two titles.** oxfmt laid the TopPick `h2` and the editor `h1` out over several lines once they gained two bindings, so their text nodes now carry a leading and a trailing space (Angular collapses whitespace but does not trim it). Nothing renders differently, and every assertion on these titles trims or normalises. The PickerRow title keeps its projected text exact.
+- **`Motion.play` resolves only an exact `var(--name)`.** A `var()` with a fallback, or any other string, passes through unchanged. Callers pass the enums, so this never arises in practice.
+- **Extra spec cases.** The specs pin a few behaviours the tables imply but do not list: the `TransitionKind` and enum string values, a cleanup that leaves alone a `data-morph` it did not set, an interrupted transition whose `finished` rejects, a takeover by a second transition that names its own element, a Waiting row's morph in Now, and options other than `duration` and `easing` passing through `play`.
+
+### Verification (2026-10-05)
+
+- **Proving the tests can fail.** Unit 1: breaking the `AbortError` test, the Voice only test, the seconds conversion, the listener removal and the vibrate argument failed seven `motion.spec.ts` and `haptics.spec.ts` cases. Unit 2: removing the `active` comparison failed the three race cases on the attribute (`expected null to be 'pop'`); breaking the leaving test, the ranked test, the skip call, Push and Pop, and one route level failed 28 cases. Unit 4: dropping one binding per component failed nine hook cases. Unit 5, as planned: `::view-transition-group(nav-mark)` at `z-index: 1` failed the tab test on `navMarkZ` (`Expected: "3"`, `Received: "1"`), and the morph without its "listed in Now" condition failed the Done test on `task-title`.
+- **Gate.** `nx run-many -t lint typecheck build test --skip-nx-cache` passed for all seven projects: 1649 PWA tests in 57 files, 502 server, 676 domain (90 todo), 260 contract and 158 effect-passkeys. `tsc -p scripts/tsconfig.json`, `nx run server:openapi`, `nx format:check --all`, `check-spdx`, `reuse lint` (6.2.0), `check-licenses`, `palettes --check` and `pnpm audit --prod` passed. The literal-timing grep finds nothing in `apps/pwa/src` or in the skill.
+- **Bundle.** The initial total went from 480.88 kB (127.21 kB transferred) to 488.97 kB after units 1 to 3 and 489.53 kB (129.13 kB) after unit 4, under the 500 kB warning, with no budget warning. The global stylesheet went from 6.42 kB to 10.20 kB, and no component's styles grew.
+- **Tokens.** `tokens.css` holds the five motion variables in the light block only.
+- **End-to-end.** `view-transitions.spec.ts` passed on the dev stack and against the production image, five tests each. The full dev-stack suite passed with transitions on: 26 tests, none skipped. The full image suite passed: 28 tests, the two image-only specs included.
+- **The environment.** These runs used the container's Chromium 141 through a local browser-path shim, because Playwright 1.63 pins Chromium 153 (revision 1243) and the container could not install it. The image was built from a scratch copy of the `Dockerfile` that trusts the sandbox's TLS proxy in the `base` stage only, with the pinned Node image pulled by the same digest from a registry mirror; the runtime stage, which starts again from the Node image, is unchanged. CI runs both with its own pinned versions.
+
+### Facts checked while building
+
+1. **The recorder's microtask runs after Angular's handler:** confirmed. Every record carries the handler's `data-transition` and the old-side `task-title`.
+2. **`getComputedStyle(document.documentElement, '::view-transition-group(nav-mark)')`** returns the group's `z-index` (`'3'`, and `'2'` for `shell-nav`) in Chromium.
+3. **Two elements with one name skip the transition:** confirmed in a scratch page. `ready` rejects with `InvalidStateError` ("Transition was aborted because of invalid state"); with one of the two removed, it resolves.
+4. **The Undo bar during a tab switch:** not checkable until plan 3 renders the bar. Both `shell-undo` rules are in the built, minified `styles.css`.
+5. **Clicks right after a navigation** are not swallowed: the full dev-stack suite passed with transitions on, with no waiting added.
+6. **The back gesture on the device:** open, after a deploy.
+7. **The morph between two text sizes:** frames grabbed at a slowed playback rate show no stretching, because both titles are full-width blocks, so the group changes height, not width. The two sizes cross-fade inside the moving box. The judgement on the phone is still open.
+8. **60 fps on the device:** open, after a deploy.
+9. **The initial bundle:** see Verification.
+10. **The amendment:** accepted, and the go-ahead branch was built.
+
+### Known limits
+
+- Facts 6, 7 and 8 need the installed PWA on a phone.
+- In dev mode every skipped transition (None, reduced motion, Voice only, an interrupted one) logs a rejected `ready` with `console.error`, as decision 11 says. The production build logs nothing.
 
 ## Out of scope
 

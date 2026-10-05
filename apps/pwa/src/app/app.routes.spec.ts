@@ -2,7 +2,7 @@
 import { signal, type Type } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { By, Title } from '@angular/platform-browser';
-import { provideRouter, withComponentInputBinding } from '@angular/router';
+import { Router, provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import type { Instant } from '@asys/domain';
 
@@ -12,10 +12,12 @@ import { DataStore, SyncStatus } from './core/data/data-store';
 import { Clock } from './core/platform/clock';
 import { DeviceZone } from './core/platform/device-zone';
 import { Ids } from './core/platform/ids';
+import { routeMotion } from './core/platform/view-transitions';
 import { AreaEditor } from './features/areas/area-editor';
 import { AreaEditorRoute } from './features/areas/area-editor-route';
 import { TaskEditor } from './features/task/task-editor';
 import { TaskEditorRoute } from './features/task/task-editor-route';
+import { ShellLayout } from './layout/shell-layout';
 
 const NOW = Date.parse('2026-10-03T08:05:00Z') as Instant;
 
@@ -79,6 +81,54 @@ describe('routes', () => {
       await harness.navigateByUrl(url);
 
       expect(title.getTitle()).toBe(expected);
+    });
+  });
+
+  describe('levels', () => {
+    it('gives every ShellLayout child a numeric level', () => {
+      const shell = routes.find((route) => route.component === ShellLayout);
+      const children = shell?.children ?? [];
+
+      const unlevelled = children.filter((child) => typeof child.data?.['level'] !== 'number');
+
+      expect(shell).toBeDefined();
+      expect(unlevelled.map((child) => child.path)).toEqual([]);
+      expect(
+        Object.fromEntries(children.map((child) => [child.path, child.data?.['level']])),
+      ).toStrictEqual({
+        now: 0,
+        today: 0,
+        inbox: 0,
+        capture: 0,
+        'tasks/:taskId': 1,
+        settings: 1,
+        'settings/areas': 2,
+        'settings/areas/new': 3,
+        'settings/areas/:areaId': 3,
+        account: 2,
+      });
+    });
+
+    it.each([
+      ['/now', 0],
+      ['/today', 0],
+      ['/inbox', 0],
+      ['/capture', 0],
+      ['/tasks/abc', 1],
+      ['/settings', 1],
+      ['/settings/areas', 2],
+      ['/settings/areas/new', 3],
+      ['/settings/areas/abc', 3],
+    ])('%s is at level %i and is not an auth route', async (url, level) => {
+      const { harness } = await setup();
+
+      await harness.navigateByUrl(url);
+
+      expect(routeMotion(TestBed.inject(Router).routerState.snapshot.root)).toMatchObject({
+        path: url,
+        level,
+        auth: false,
+      });
     });
   });
 
