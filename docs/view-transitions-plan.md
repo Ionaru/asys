@@ -760,6 +760,20 @@ All six units were built in order, as written, on the go-ahead branch of decisio
 9. **The initial bundle:** see Verification.
 10. **The amendment:** accepted, and the go-ahead branch was built.
 
+### Changed after review (2026-10-06)
+
+The maintainer's review of the pull request asked for these, and the code now differs from the units above as follows.
+
+- **Swap keeps the browser's cross-fade.** Unit 3's two Swap rules used the `animation` shorthand, which replaced the UA's `animation-name` list and with it `-ua-mix-blend-mode-plus-lighter`. Two full-length fades then overlapped with normal blending, and anything both screens share dipped to about 75% at the midpoint. The rules now set only `animation-duration` and `animation-timing-function`, so the UA fades and their blend stay, and the `asys-vt-fade-in` keyframes are gone. A sixth e2e test checks that a Swap's new page carries the blend.
+- **An unpaired title moves with the page.** Four `:only-child` rules give a `task-title` image with no partner the page's own Push or Pop slide, instead of the UA's fade in place above the sliding page. The Pop morph still asks `DataStore` whether Now lists the Task, so a Done Pop names nothing, as decision 9 says; the rules only cover a Now that drifts from that prediction in the same frame.
+- **The take-over unnames everything first.** A new transition removes `data-morph` from every element before it names its own. Before, it cleared only the element the previous transition had named directly, which missed a partner that the `TaskMorph` binding had named on the new page. The cleanup on `finished` still clears only its own element, by reference.
+- **`RouteMotion` is `{ path, level, tab, taskId }`.** `level` is null for a leaf without a numeric `data.level`, replacing `auth`, so the rule says what it checks: rule 2 of the matrix is now "either level is null". `taskId` is the leaf's `taskId` parameter, so the handler computes each side's `RouteMotion` once and needs no separate leaf walk.
+- **`TaskMorph.taskId` is read-only.** The writable signal is private, and the handler names a Task with `TaskMorph.set(id)`, as `Theme` and `Motion` expose theirs.
+- **One tab list.** `TAB_PATHS` lives in `core/platform/tabs.ts`, shared by the handler and the shell, which used it as `CAPTURE_PATHS`. `shell-layout.spec.ts` checks that it lists the bottom nav's links in order, and the `building-pwa-ui` skill names it for a new tab.
+- **`/account`** joins the level check in `app.routes.spec.ts`.
+
+Verified on 2026-10-06 as before: the new unit cases failed with the take-over clear removed, `TAB_PATHS` reordered and `/account` at level 1, and the Swap test failed on the shorthand rules (`Received string: "asys-fade-out"`). The gate passed for all seven projects with 1652 PWA tests, as did the format, SPDX and REUSE checks. The dev-stack suite passed with 27 tests and the image suite with 29. The initial total is 490.01 kB.
+
 ### Known limits
 
 - Facts 6, 7 and 8 need the installed PWA on a phone.

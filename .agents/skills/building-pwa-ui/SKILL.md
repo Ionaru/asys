@@ -54,7 +54,7 @@ Lint bans runtime imports of `@asys/contract`, `effect` and `@ionaru/effect-pass
 1. Create `features/<name>/<name>.ts` and its spec, with `providers: [CommandAttempts]` when it sends Commands.
 2. Add the route in `app.routes.ts`: `loadComponent` and `title: '<Name> · ASYS'`, under `ShellLayout` with `data: { level }` unless it is an auth screen. The level is 0 for a tab or a screen of its own, otherwise one more than the screen it opens from. `app.routes.spec.ts` fails without it, and the level decides Push, Pop or Swap.
 3. Add the title row to `app.routes.spec.ts`.
-4. For a primary tab, update `ui/bottom-nav` and `CAPTURE_PATHS` in `layout/shell-layout.ts`. For an auth screen, add the path to `AUTH_PATHS` in `app.ts` (the sign-out redirect), and to `AUTH_PATHS` and `AUTH_SEGMENTS` in `core/auth/safe-return-url.ts` with a case in its spec. Use `signedOutGuard` on the route. A screen shown just after sign-in (like `recovered`) goes only in `safe-return-url.ts`, without `signedOutGuard`.
+4. For a primary tab, update `ui/bottom-nav` and `TAB_PATHS` in `core/platform/tabs.ts`: it gives view transitions the tab order and shows Capture on the tabs, and `shell-layout.spec.ts` fails when it and the bottom nav disagree. For an auth screen, add the path to `AUTH_PATHS` in `app.ts` (the sign-out redirect), and to `AUTH_PATHS` and `AUTH_SEGMENTS` in `core/auth/safe-return-url.ts` with a case in its spec. Use `signedOutGuard` on the route. A screen shown just after sign-in (like `recovered`) goes only in `safe-return-url.ts`, without `signedOutGuard`.
 5. An id-keyed editor gets a `<name>-route.ts` wrapper (see `task-editor-route.ts`).
 6. Add an e2e spec for the user-facing flow (`writing-e2e-specs`).
 

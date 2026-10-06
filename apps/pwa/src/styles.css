@@ -376,16 +376,6 @@ textarea.asys-field__input,
   }
 }
 
-@keyframes asys-vt-fade-in {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
 :root[data-transition='tab-forward']::view-transition-group(page),
 :root[data-transition='tab-back']::view-transition-group(page),
 :root[data-transition='swap']::view-transition-group(page) {
@@ -421,12 +411,28 @@ textarea.asys-field__input,
   animation: asys-vt-axis-in-from-left var(--duration-moderate) var(--ease-emphasized) both;
 }
 
-:root[data-transition='swap']::view-transition-old(page) {
-  animation: asys-fade-out var(--duration-quick) var(--ease-out) both;
+/* Swap keeps the UA's cross-fade: its plus-lighter blend keeps what both screens share from dipping mid-fade. */
+:root[data-transition='swap']::view-transition-old(page),
+:root[data-transition='swap']::view-transition-new(page) {
+  animation-duration: var(--duration-quick);
+  animation-timing-function: var(--ease-out);
 }
 
-:root[data-transition='swap']::view-transition-new(page) {
-  animation: asys-vt-fade-in var(--duration-quick) var(--ease-out) both;
+/* A title that finds no partner on the other side moves with the page instead of fading in place above it. */
+:root[data-transition='push']::view-transition-old(task-title):only-child {
+  animation: asys-vt-axis-out-left var(--duration-moderate) var(--ease-emphasized) both;
+}
+
+:root[data-transition='push']::view-transition-new(task-title):only-child {
+  animation: asys-vt-axis-in-from-right var(--duration-moderate) var(--ease-emphasized) both;
+}
+
+:root[data-transition='pop']::view-transition-old(task-title):only-child {
+  animation: asys-vt-axis-out-right var(--duration-moderate) var(--ease-emphasized) both;
+}
+
+:root[data-transition='pop']::view-transition-new(task-title):only-child {
+  animation: asys-vt-axis-in-from-left var(--duration-moderate) var(--ease-emphasized) both;
 }
 
 /* Motion kill switches: reduced motion and the drive theme. */

@@ -1135,7 +1135,7 @@ describe('Now', () => {
       const { root, now, settle } = await setup();
       const secondId = must(now().ranked[1]).task.id;
 
-      TestBed.inject(TaskMorph).taskId.set(secondId);
+      TestBed.inject(TaskMorph).set(secondId);
       await settle();
 
       const elements = marked(root);
@@ -1151,7 +1151,7 @@ describe('Now', () => {
       const { root, topTitle, now, settle } = await setup();
       const topId = must(now().ranked[0]).task.id;
 
-      TestBed.inject(TaskMorph).taskId.set(topId);
+      TestBed.inject(TaskMorph).set(topId);
       await settle();
 
       const elements = marked(root);
@@ -1166,12 +1166,12 @@ describe('Now', () => {
     it('marks nothing for an id that is not listed, nor for a Waiting id while Waiting is collapsed', async () => {
       const { root, settle } = await setup();
 
-      TestBed.inject(TaskMorph).taskId.set('not-a-task');
+      TestBed.inject(TaskMorph).set('not-a-task');
       await settle();
 
       expect(marked(root)).toEqual([]);
 
-      TestBed.inject(TaskMorph).taskId.set('flights');
+      TestBed.inject(TaskMorph).set('flights');
       await settle();
 
       expect(marked(root)).toEqual([]);
@@ -1182,12 +1182,12 @@ describe('Now', () => {
 
       expect(marked(root)).toEqual([]);
 
-      TestBed.inject(TaskMorph).taskId.set('dentist');
+      TestBed.inject(TaskMorph).set('dentist');
       await settle();
 
       expect(marked(root)).toHaveLength(1);
 
-      TestBed.inject(TaskMorph).taskId.set(null);
+      TestBed.inject(TaskMorph).set(null);
       await settle();
 
       expect(marked(root)).toEqual([]);
@@ -1197,7 +1197,7 @@ describe('Now', () => {
       const { root, waitingHeader, click, rows, settle } = await setup();
 
       await click(must(waitingHeader()));
-      TestBed.inject(TaskMorph).taskId.set('report');
+      TestBed.inject(TaskMorph).set('report');
       await settle();
 
       const elements = marked(root);

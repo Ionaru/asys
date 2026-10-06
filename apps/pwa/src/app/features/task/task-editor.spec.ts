@@ -1599,7 +1599,7 @@ describe('TaskEditor task title hooks', () => {
 
     expect(heading().hasAttribute('data-morph')).toBe(false);
 
-    TestBed.inject(TaskMorph).taskId.set('t1');
+    TestBed.inject(TaskMorph).set('t1');
     await settle();
 
     expect(heading().hasAttribute('data-morph')).toBe(true);
@@ -1607,7 +1607,7 @@ describe('TaskEditor task title hooks', () => {
     expect(marked(root)).toHaveLength(1);
     expect(marked(root)[0]).toBe(heading());
 
-    TestBed.inject(TaskMorph).taskId.set('def');
+    TestBed.inject(TaskMorph).set('def');
     await settle();
 
     expect(heading().hasAttribute('data-morph')).toBe(false);

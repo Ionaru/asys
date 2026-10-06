@@ -39,19 +39,19 @@ const testRoutes: Routes = [
   },
 ];
 
-const NOW: RouteMotion = { path: '/now', level: 0, tab: 0, auth: false };
-const TODAY: RouteMotion = { path: '/today', level: 0, tab: 1, auth: false };
-const INBOX: RouteMotion = { path: '/inbox', level: 0, tab: 2, auth: false };
-const CAPTURE: RouteMotion = { path: '/capture', level: 0, tab: null, auth: false };
-const TASK_ABC: RouteMotion = { path: '/tasks/abc', level: 1, tab: null, auth: false };
-const TASK_DEF: RouteMotion = { path: '/tasks/def', level: 1, tab: null, auth: false };
-const SETTINGS: RouteMotion = { path: '/settings', level: 1, tab: null, auth: false };
-const AREAS: RouteMotion = { path: '/settings/areas', level: 2, tab: null, auth: false };
-const AREA_NEW: RouteMotion = { path: '/settings/areas/new', level: 3, tab: null, auth: false };
-const AREA_ABC: RouteMotion = { path: '/settings/areas/abc', level: 3, tab: null, auth: false };
-const ACCOUNT: RouteMotion = { path: '/account', level: 2, tab: null, auth: false };
-const SIGNIN: RouteMotion = { path: '/signin', level: 0, tab: null, auth: true };
-const RECOVERED: RouteMotion = { path: '/recovered', level: 0, tab: null, auth: true };
+const NOW: RouteMotion = { path: '/now', level: 0, tab: 0, taskId: null };
+const TODAY: RouteMotion = { path: '/today', level: 0, tab: 1, taskId: null };
+const INBOX: RouteMotion = { path: '/inbox', level: 0, tab: 2, taskId: null };
+const CAPTURE: RouteMotion = { path: '/capture', level: 0, tab: null, taskId: null };
+const TASK_ABC: RouteMotion = { path: '/tasks/abc', level: 1, tab: null, taskId: 'abc' };
+const TASK_DEF: RouteMotion = { path: '/tasks/def', level: 1, tab: null, taskId: 'def' };
+const SETTINGS: RouteMotion = { path: '/settings', level: 1, tab: null, taskId: null };
+const AREAS: RouteMotion = { path: '/settings/areas', level: 2, tab: null, taskId: null };
+const AREA_NEW: RouteMotion = { path: '/settings/areas/new', level: 3, tab: null, taskId: null };
+const AREA_ABC: RouteMotion = { path: '/settings/areas/abc', level: 3, tab: null, taskId: null };
+const ACCOUNT: RouteMotion = { path: '/account', level: 2, tab: null, taskId: null };
+const SIGNIN: RouteMotion = { path: '/signin', level: null, tab: null, taskId: null };
+const RECOVERED: RouteMotion = { path: '/recovered', level: null, tab: null, taskId: null };
 
 type MatrixRow = [string, RouteMotion, RouteMotion, TransitionKind];
 
@@ -287,14 +287,14 @@ describe('routeMotion', () => {
     TestBed.resetTestingModule();
   });
 
-  it('reads the root before any navigation as an auth route at the root path', async () => {
+  it('reads the root before any navigation as unlevelled at the root path', async () => {
     const { router } = await setup();
 
     expect(routeMotion(router.routerState.snapshot.root)).toStrictEqual({
       path: '/',
-      level: 0,
+      level: null,
       tab: null,
-      auth: true,
+      taskId: null,
     });
   });
 
@@ -305,7 +305,7 @@ describe('routeMotion', () => {
       path: '/now',
       level: 0,
       tab: 0,
-      auth: false,
+      taskId: null,
     });
   });
 
@@ -316,7 +316,7 @@ describe('routeMotion', () => {
       path: '/today',
       level: 0,
       tab: 1,
-      auth: false,
+      taskId: null,
     });
   });
 
@@ -327,7 +327,7 @@ describe('routeMotion', () => {
       path: '/inbox',
       level: 0,
       tab: 2,
-      auth: false,
+      taskId: null,
     });
   });
 
@@ -338,18 +338,18 @@ describe('routeMotion', () => {
       path: '/capture',
       level: 0,
       tab: null,
-      auth: false,
+      taskId: null,
     });
   });
 
-  it('reads /tasks/abc as level 1 on no tab, with every url segment in the path', async () => {
+  it('reads /tasks/abc as level 1 on no tab, with every url segment in the path and its Task id', async () => {
     const { snapshot } = await setup();
 
     expect(routeMotion(await snapshot('/tasks/abc'))).toStrictEqual({
       path: '/tasks/abc',
       level: 1,
       tab: null,
-      auth: false,
+      taskId: 'abc',
     });
   });
 
@@ -360,18 +360,18 @@ describe('routeMotion', () => {
       path: '/settings/areas/abc',
       level: 3,
       tab: null,
-      auth: false,
+      taskId: null,
     });
   });
 
-  it('reads /signin, a leaf without a level, as an auth route at level 0', async () => {
+  it('reads /signin, a leaf without a level, as unlevelled', async () => {
     const { snapshot } = await setup();
 
     expect(routeMotion(await snapshot('/signin'))).toStrictEqual({
       path: '/signin',
-      level: 0,
+      level: null,
       tab: null,
-      auth: true,
+      taskId: null,
     });
   });
 });
@@ -709,11 +709,13 @@ describe('onViewTransitionCreated', () => {
 
     it('removes data-morph only from the element it named, not from another element that carries it', async () => {
       const { between, run } = await setup();
-      const host = addToBody('<h2 data-task-id="abc"></h2><h1 data-task-id="abc" data-morph></h1>');
+      const host = addToBody('<h2 data-task-id="abc"></h2><h1 data-task-id="abc"></h1>');
       const { from, to } = await between('/now', '/tasks/abc');
       const fake = createTransition();
 
       run(fake, from, to);
+      // The new side's TaskMorph binding names the editor title during the transition.
+      pick(host, 'h1').setAttribute('data-morph', '');
 
       expect(pick(host, 'h2').getAttribute('data-morph')).toBe('');
       expect(pick(host, 'h1').getAttribute('data-morph')).toBe('');
@@ -850,6 +852,36 @@ describe('onViewTransitionCreated', () => {
       expect(pick(host, 'h2').hasAttribute('data-morph')).toBe(false);
       expectNothingNamed();
       expect(taskMorph.taskId()).toBeNull();
+
+      await first.finish();
+      await second.finish();
+    });
+
+    it('unnames the partner a TaskMorph binding named when a Push interrupts a Pop', async () => {
+      const { snapshot, run, taskMorph } = await setup({ ranked: ['abc', 'def'] });
+      const editor = addToBody('<h1 data-task-id="abc"></h1>');
+      const taskAbcSnapshot = await snapshot('/tasks/abc');
+      const nowSnapshot = await snapshot('/now');
+      const taskDefSnapshot = await snapshot('/tasks/def');
+      const first = createTransition();
+      const second = createTransition();
+
+      run(first, taskAbcSnapshot, nowSnapshot);
+
+      expect(taskMorph.taskId()).toBe('abc');
+
+      // Now replaces the editor, and its binding names the Pop's partner before change detection catches up.
+      editor.remove();
+      const now = addToBody(
+        '<h2 data-task-id="abc" data-morph=""></h2><span data-task-id="def"></span>',
+      );
+
+      run(second, nowSnapshot, taskDefSnapshot);
+
+      expect(attribute()).toBe('push');
+      expectNamedOnly(pick(now, 'span'));
+      expect(pick(now, 'h2').hasAttribute('data-morph')).toBe(false);
+      expect(taskMorph.taskId()).toBe('def');
 
       await first.finish();
       await second.finish();

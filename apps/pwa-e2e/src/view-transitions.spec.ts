@@ -19,6 +19,7 @@ interface TransitionRecord {
   settled: boolean;
   navMarkZ: string | null;
   shellNavZ: string | null;
+  pageNewAnimation: string | null;
 }
 
 declare global {
@@ -52,6 +53,9 @@ const recordViewTransitions = (): void => {
   const groupZ = (name: string): string =>
     getComputedStyle(document.documentElement, `::view-transition-group(${name})`).zIndex;
 
+  const pageNewAnimation = (): string =>
+    getComputedStyle(document.documentElement, '::view-transition-new(page)').animationName;
+
   const original = Document.prototype.startViewTransition;
 
   Document.prototype.startViewTransition = (
@@ -66,6 +70,7 @@ const recordViewTransitions = (): void => {
       settled: false,
       navMarkZ: null,
       shellNavZ: null,
+      pageNewAnimation: null,
     };
     records.push(record);
 
@@ -80,6 +85,7 @@ const recordViewTransitions = (): void => {
         record.newNames = named();
         record.navMarkZ = groupZ('nav-mark');
         record.shellNavZ = groupZ('shell-nav');
+        record.pageNewAnimation = pageNewAnimation();
         record.settled = true;
       },
       () => {
@@ -230,6 +236,25 @@ test("goes back from the editor's Done without a morph", async ({ page }) => {
   expect(pop.kind).toBe('pop');
   expect(withName(pop.oldNames, 'task-title')).toEqual([]);
   expect(withName(pop.newNames, 'task-title')).toEqual([]);
+});
+
+test("swaps from the editor to Settings with the browser's own cross-fade", async ({ page }) => {
+  await seedTask(page, { title: 'Send the report', important: false, estimateMinutes: 25 });
+  await page.reload();
+
+  let before = await recordCount(page);
+  await page.locator('article.asys-top-pick').getByRole('button', { name: 'Open' }).click();
+  await expect(page.locator('h1.task-editor__title')).toBeVisible();
+  await lastSettled(page, before);
+
+  before = await recordCount(page);
+  await page.getByRole('banner').getByRole('link', { name: 'Settings' }).click();
+  await expect(page).toHaveURL(/\/settings$/);
+  const swap = await lastSettled(page, before);
+
+  expect(swap.kind).toBe('swap');
+  // The UA's plus-lighter blend keeps what both screens share at full opacity through the cross-fade.
+  expect(swap.pageNewAnimation).toContain('-ua-mix-blend-mode-plus-lighter');
 });
 
 test.describe('under reduced motion', () => {

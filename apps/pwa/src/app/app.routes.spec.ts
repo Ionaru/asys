@@ -119,7 +119,8 @@ describe('routes', () => {
       ['/settings/areas', 2],
       ['/settings/areas/new', 3],
       ['/settings/areas/abc', 3],
-    ])('%s is at level %i and is not an auth route', async (url, level) => {
+      ['/account', 2],
+    ])('%s is at level %i', async (url, level) => {
       const { harness } = await setup();
 
       await harness.navigateByUrl(url);
@@ -127,7 +128,6 @@ describe('routes', () => {
       expect(routeMotion(TestBed.inject(Router).routerState.snapshot.root)).toMatchObject({
         path: url,
         level,
-        auth: false,
       });
     });
   });

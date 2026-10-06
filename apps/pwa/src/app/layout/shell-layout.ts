@@ -18,12 +18,11 @@ import { CommandAttempts } from '../core/data/command-attempts';
 import { DataStore } from '../core/data/data-store';
 import { outcomeMessage } from '../core/data/outcome-message';
 import { Ids } from '../core/platform/ids';
+import { TAB_PATHS } from '../core/platform/tabs';
 import { BottomNav } from '../ui/bottom-nav/bottom-nav';
 import { Button, ButtonSize, ButtonVariant } from '../ui/button/button';
 import { CaptureButton } from '../ui/capture-button/capture-button';
 import { QuickAdd } from '../ui/quick-add/quick-add';
-
-const CAPTURE_PATHS: readonly string[] = ['/now', '/today', '/inbox'];
 
 /** The signed-in frame: a Settings link, the routed screen, quick add and the bottom navigation. */
 @Component({
@@ -137,7 +136,7 @@ export class ShellLayout {
     const url = this.router.serializeUrl(navigation.finalUrl ?? navigation.extractedUrl);
     const path = url.split(/[?#]/)[0];
 
-    return CAPTURE_PATHS.includes(path);
+    return TAB_PATHS.includes(path);
   });
 
   protected readonly open = linkedSignal<boolean, boolean>({
