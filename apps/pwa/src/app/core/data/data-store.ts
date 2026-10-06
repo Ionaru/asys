@@ -7,6 +7,7 @@ import {
   ChangeEntity,
   type Command,
   CommandTag,
+  type CompleteTask,
   type DomainState,
   type Instant,
   inboxCount,
@@ -22,6 +23,7 @@ import { Clock } from '../platform/clock';
 import { DeviceStorage } from '../platform/device-storage';
 import { DeviceZone } from '../platform/device-zone';
 import { commandSubject, SETTINGS_SUBJECT } from './command-subject';
+import { applyHolds, type Hold, isStillHeld } from './held-state';
 import { zoneToReport } from './zone-to-report';
 
 /** Where the store stands with the server. */
@@ -77,10 +79,23 @@ export class DataStore {
   private readonly statusSignal = signal<SyncStatus>(SyncStatus.Idle);
   private readonly stateSignal = signal<DomainState | null>(null);
   private readonly syncedAtSignal = signal<Instant | null>(null);
+  private readonly holds = signal<readonly Hold[]>([]);
   private readonly awaitingSyncSignal = signal<ReadonlySet<string>>(new Set());
 
   readonly status = this.statusSignal.asReadonly();
-  readonly state = this.stateSignal.asReadonly();
+
+  /** The synced state with the holds applied locally; null without state. */
+  readonly state: Signal<DomainState | null> = computed<DomainState | null>(() => {
+    const synced = this.stateSignal();
+
+    return synced === null ? null : applyHolds(synced, this.holds());
+  });
+
+  /** The keys of the Dones currently held. */
+  readonly heldKeys: Signal<ReadonlySet<string>> = computed<ReadonlySet<string>>(
+    () => new Set(this.holds().map((hold) => hold.key)),
+  );
+
   readonly syncedAt = this.syncedAtSignal.asReadonly();
 
   /** The subjects (see commandSubject) whose command applied but whose follow-up request failed; empty once a later request succeeds. */
@@ -88,7 +103,7 @@ export class DataStore {
 
   /** The ranked tasks for now; null without state. */
   readonly now = computed<PickResult | null>(() => {
-    const state = this.stateSignal();
+    const state = this.state();
 
     if (state === null) {
       return null;
@@ -103,7 +118,7 @@ export class DataStore {
 
   /** The number of items waiting in the Inbox; 0 without state. */
   readonly inboxCount = computed<number>(() => {
-    const state = this.stateSignal();
+    const state = this.state();
 
     return state === null ? 0 : inboxCount(state);
   });
@@ -175,6 +190,7 @@ export class DataStore {
     this.zoneReport = null;
     this.seq = 0;
     this.stateSignal.set(null);
+    this.holds.set([]);
     this.syncedAtSignal.set(null);
     this.statusSignal.set(SyncStatus.Idle);
     this.clearAwaitingSync();
@@ -185,6 +201,22 @@ export class DataStore {
 
     for (const waiter of waiters) {
       waiter.resolve();
+    }
+  }
+
+  /** Hides a Done from the state at once, before it is sent. A hold with a key already held replaces it. */
+  hold(command: CompleteTask, key: string): void {
+    const hold: Hold = { key, command, at: this.clock.now() };
+
+    this.holds.set([...this.holds().filter((held) => held.key !== key), hold]);
+  }
+
+  /** Lets go of the hold with this key; an unknown key changes nothing. */
+  release(key: string): void {
+    const holds = this.holds();
+
+    if (holds.some((hold) => hold.key === key)) {
+      this.holds.set(holds.filter((hold) => hold.key !== key));
     }
   }
 
@@ -311,6 +343,16 @@ export class DataStore {
     }
   }
 
+  /** Drops the holds the new synced state no longer needs. */
+  private pruneHolds(synced: DomainState): void {
+    const holds = this.holds();
+    const kept = holds.filter((hold) => isStillHeld(synced, hold));
+
+    if (kept.length !== holds.length) {
+      this.holds.set(kept);
+    }
+  }
+
   private isVisible(): boolean {
     return this.document.visibilityState === 'visible';
   }
@@ -372,6 +414,7 @@ export class DataStore {
 
       if (outcome._tag === HttpOutcomeTag.Ok) {
         this.stateSignal.set(outcome.value.state);
+        this.pruneHolds(outcome.value.state);
         this.seq = outcome.value.seq;
         this.needsSnapshot = false;
         this.statusSignal.set(SyncStatus.Ready);
@@ -438,7 +481,10 @@ export class DataStore {
 
     const fresh = entries.filter((entry) => entry.seq > this.seq);
 
-    this.stateSignal.set(applyChanges(state, fresh));
+    const next = applyChanges(state, fresh);
+
+    this.stateSignal.set(next);
+    this.pruneHolds(next);
     this.seq = seq;
     this.statusSignal.set(SyncStatus.Ready);
     this.syncedAtSignal.set(Date.now() as Instant);

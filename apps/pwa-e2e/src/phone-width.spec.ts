@@ -56,6 +56,8 @@ const scrollToBottom = async (page: Page): Promise<void> => {
 };
 
 const expectClearOf = async (target: Locator, covers: readonly Locator[]): Promise<void> => {
+  // Boxes mid-animation say nothing about where the elements settle.
+  await expect.poll(() => target.page().evaluate(() => document.getAnimations().length)).toBe(0);
   const box = await target.boundingBox();
   if (box === null) throw new Error('target has no box');
   for (const cover of covers) {
@@ -136,6 +138,26 @@ test('Nothing covers the last Now row, with the pill or the open quick add', asy
   );
   await scrollToBottom(page);
   await expectClearOf(lastRow, [quickAdd, nav]);
+
+  // A Done by keyboard puts focus on Undo, which pauses the 5 s window, so the bar stays up for the checks.
+  await quickAdd.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(pill).toBeVisible();
+  const done = page
+    .locator('article.asys-top-pick')
+    .getByRole('button', { name: 'Done', exact: true });
+  await done.focus();
+  await done.press('Enter');
+  const undoBar = page.locator('.asys-undobar');
+  await expect(undoBar.getByRole('button', { name: 'Undo' })).toBeFocused();
+  await scrollToBottom(page);
+  await expectClearOf(lastRow, [undoBar, pill, nav]);
+
+  // The pointer keeps the bar paused while focus moves to the pill and opens quick add.
+  await undoBar.hover();
+  await pill.press('Enter');
+  await expect(quickAdd).toBeVisible();
+  await scrollToBottom(page);
+  await expectClearOf(lastRow, [undoBar, quickAdd, nav]);
 });
 
 test('Nothing covers the Inbox Triage card footer or its open Drop confirmation', async ({

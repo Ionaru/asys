@@ -13,6 +13,7 @@ import {
 
 import { CommandOutcomeTag, DataApi } from './data-api';
 import { HttpOutcomeTag } from './http-outcome';
+import { KEEPALIVE } from './keepalive';
 
 const task = {
   id: 't1',
@@ -334,6 +335,40 @@ describe('DataApi', () => {
       http.expectOne('/v1/commands').flush(body as object | null, { status, statusText: 'Error' });
 
       expect(await result).toEqual({ _tag: CommandOutcomeTag.Failed, status });
+    });
+
+    it('marks the request KEEPALIVE when asked for keepalive, keeping the key in the body', async () => {
+      const result = api.runCommand(capture, 'k', { keepalive: true });
+
+      const req = http.expectOne({ method: 'POST', url: '/v1/commands' });
+      expect(req.request.context.get(KEEPALIVE)).toBe(true);
+      expect(req.request.body).toEqual({ ...capture, idempotencyKey: 'k' });
+      req.flush({ _tag: 'Applied', seq: 7 } as object | null);
+
+      expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 7 });
+    });
+
+    it.each([
+      ['no options', undefined],
+      ['keepalive false', { keepalive: false }],
+      ['empty options', {}],
+    ])('does not mark the request KEEPALIVE with %s', async (_name, options) => {
+      const result = api.runCommand(capture, 'k', options);
+
+      const req = http.expectOne({ method: 'POST', url: '/v1/commands' });
+      expect(req.request.context.get(KEEPALIVE)).toBe(false);
+      expect(req.request.body).toEqual({ ...capture, idempotencyKey: 'k' });
+      req.flush({ _tag: 'Applied', seq: 7 } as object | null);
+
+      await result;
+    });
+
+    it('still maps outcomes of a keepalive send and never rejects', async () => {
+      const result = api.runCommand(capture, 'k', { keepalive: true });
+
+      http.expectOne('/v1/commands').error(new ProgressEvent('error'), { status: 0 });
+
+      expect(await result).toEqual({ _tag: CommandOutcomeTag.Failed, status: 0 });
     });
 
     it('never rejects', async () => {

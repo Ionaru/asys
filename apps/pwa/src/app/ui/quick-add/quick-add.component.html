@@ -1,0 +1,58 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
+<form class="asys-quickadd" (submit)="submit($event)" (keydown.escape)="close.emit()">
+  @for (failure of failures(); track failure.id) {
+    <div class="asys-quickadd__failure">
+      <p class="asys-quickadd__failure-text">Not captured: “{{ failure.text }}”</p>
+      @if (failure.message !== null) {
+        <p class="asys-quickadd__failure-reason">{{ failure.message }}</p>
+      }
+      <div class="asys-quickadd__failure-actions">
+        @if (failure.canRetry) {
+          <button asys-button type="button" (click)="retryFailure(failure.id)">Try again</button>
+        }
+        <button
+          asys-button
+          type="button"
+          [variant]="Variants.Quiet"
+          (click)="discardFailure(failure.id)"
+        >
+          Discard
+        </button>
+      </div>
+    </div>
+  }
+  <div class="asys-quickadd__row">
+    <label class="asys-visually-hidden" [for]="inputId">Capture a Task</label>
+    <input
+      class="asys-quickadd__input"
+      type="text"
+      placeholder="Capture a Task"
+      autocomplete="off"
+      enterkeyhint="send"
+      [id]="inputId"
+      [value]="value()"
+      (input)="value.set($any($event.target).value)"
+    />
+    <button
+      asys-button
+      type="submit"
+      [variant]="Variants.Primary"
+      [attr.aria-disabled]="blank() ? 'true' : null"
+      [class.is-disabled]="blank()"
+      (mousedown)="$event.preventDefault()"
+    >
+      Add
+    </button>
+    <button
+      asys-button
+      type="button"
+      [variant]="Variants.Quiet"
+      [size]="Sizes.Small"
+      (click)="close.emit()"
+    >
+      Close
+    </button>
+  </div>
+  <p class="asys-quickadd__hint">Goes to the Inbox until Triage</p>
+  <p class="asys-quickadd__status" role="status">{{ message() }}</p>
+</form>

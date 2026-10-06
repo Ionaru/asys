@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: EUPL-1.2
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpErrorResponse } from '@angular/common/http';
 import { inject, Service } from '@angular/core';
 import {
   type Change,
@@ -14,6 +14,7 @@ import { dataChanges } from '../../../generated/api/fn/data/data-changes';
 import { dataRunCommand } from '../../../generated/api/fn/data/data-run-command';
 import { dataSnapshot } from '../../../generated/api/fn/data/data-snapshot';
 import { callApi, errorTagOf, HttpOutcomeTag, type HttpOutcome } from './http-outcome';
+import { KEEPALIVE } from './keepalive';
 import { fromWire, toWire } from './wire';
 
 /** The server state at a sequence number. */
@@ -105,13 +106,21 @@ export class DataApi {
     };
   }
 
-  /** `POST /v1/commands`. */
-  async runCommand(command: Command, idempotencyKey: string): Promise<CommandOutcome> {
+  /** `POST /v1/commands`. With `keepalive`, the request outlives the page. */
+  async runCommand(
+    command: Command,
+    idempotencyKey: string,
+    options?: { readonly keepalive?: boolean },
+  ): Promise<CommandOutcome> {
     try {
+      const context = options?.keepalive ? new HttpContext().set(KEEPALIVE, true) : undefined;
       const response = await firstValueFrom(
-        dataRunCommand(this.http, '', {
-          body: toWire<CommandWithKey>({ ...command, idempotencyKey }),
-        }),
+        dataRunCommand(
+          this.http,
+          '',
+          { body: toWire<CommandWithKey>({ ...command, idempotencyKey }) },
+          context,
+        ),
       );
 
       return fromWire<CommandApplied>(response.body);

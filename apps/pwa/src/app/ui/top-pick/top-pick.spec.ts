@@ -16,7 +16,8 @@ import { TopPick } from './top-pick';
       [overdue]="overdue()"
       [canLogProgress]="canLogProgress()"
       [actionsDisabled]="actionsDisabled()"
-      (done)="done = done + 1"
+      [completed]="completed()"
+      (done)="done = done + 1; doneEvents.push($event)"
       (logProgress)="logProgress = logProgress + 1"
       (open)="open = open + 1"
     >
@@ -40,6 +41,10 @@ class Host {
   readonly canLogProgress = signal(true);
 
   readonly actionsDisabled = signal(false);
+
+  readonly completed = signal(false);
+
+  readonly doneEvents: { readonly keyboard: boolean }[] = [];
 
   done = 0;
 
@@ -112,6 +117,24 @@ describe('TopPick', () => {
     expect([host.done, host.logProgress, host.open]).toEqual([1, 1, 1]);
   });
 
+  it('emits done with keyboard true for a click without a pointer (detail 0)', async () => {
+    const { fixture, host, button } = await setup();
+
+    button('Done')?.click();
+    await fixture.whenStable();
+
+    expect(host.doneEvents).toEqual([{ keyboard: true }]);
+  });
+
+  it('emits done with keyboard false for a pointer click (detail 1)', async () => {
+    const { fixture, host, button } = await setup();
+
+    button('Done')?.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    await fixture.whenStable();
+
+    expect(host.doneEvents).toEqual([{ keyboard: false }]);
+  });
+
   it('hides Log progress when canLogProgress is false', async () => {
     const { fixture, host, buttons } = await setup();
 
@@ -167,6 +190,89 @@ describe('TopPick', () => {
     expect(projected).not.toBeNull();
     expect(card?.contains(projected)).toBe(true);
     expect(card?.lastElementChild).toBe(projected);
+  });
+
+  describe('completed', () => {
+    const topPickCss = (): string =>
+      Array.from(document.querySelectorAll('style'))
+        .map((el) => el.textContent ?? '')
+        .join('\n');
+
+    it('shows no Done line and keeps the buttons while completed is false', async () => {
+      const { q, buttons } = await setup();
+
+      expect(q('.asys-top-pick__done')).toBeNull();
+      expect(buttons()).toHaveLength(3);
+    });
+
+    it('shows a check and the text Done in place of the buttons when completed is true', async () => {
+      const { fixture, host, q, buttons } = await setup();
+
+      host.completed.set(true);
+      await fixture.whenStable();
+
+      const line = q('.asys-top-pick__actions > p.asys-top-pick__done');
+
+      expect(line).not.toBeNull();
+      expect(line?.textContent?.trim()).toBe('Done');
+      expect(buttons()).toEqual([]);
+      expect(q('.asys-top-pick__actions .asys-button-group')).toBeNull();
+    });
+
+    it('draws the check as a hidden inline SVG whose path has pathLength 1', async () => {
+      const { fixture, host, q } = await setup();
+
+      host.completed.set(true);
+      await fixture.whenStable();
+
+      const check = q('.asys-top-pick__done svg.asys-top-pick__check');
+
+      expect(check).not.toBeNull();
+      expect(check?.getAttribute('aria-hidden')).toBe('true');
+      expect(check?.getAttribute('viewBox')).toBe('0 0 24 24');
+      expect(check?.querySelector('path')?.getAttribute('pathLength')).toBe('1');
+    });
+
+    it('styles the check to draw with asys-check-draw and the Done line in ink-muted', async () => {
+      const { fixture, host } = await setup();
+
+      host.completed.set(true);
+      await fixture.whenStable();
+
+      const css = topPickCss();
+
+      expect(css).toMatch(/@keyframes\s+asys-check-draw/);
+      expect(css).toMatch(/stroke-dasharray:\s*1\b/);
+      expect(css).toMatch(
+        /animation:\s*asys-check-draw\s+var\(--duration-quick\)\s+var\(--ease-out\)/,
+      );
+      expect(css).toMatch(/\.asys-top-pick__done\s*\{[^}]*var\(--ink-muted\)/);
+    });
+
+    it('keeps the title, reason and projected content, with the content still last', async () => {
+      const { fixture, host, q } = await setup();
+
+      host.completed.set(true);
+      await fixture.whenStable();
+
+      const card = q('article.asys-top-pick');
+
+      expect(q('.asys-top-pick__title')?.textContent?.trim()).toBe('Call Marit');
+      expect(q('.asys-top-pick__reason')?.textContent?.trim()).toBe('Due today');
+      expect(card?.lastElementChild).toBe(q('#projected'));
+    });
+
+    it('brings the buttons back when completed returns to false', async () => {
+      const { fixture, host, q, buttons } = await setup();
+
+      host.completed.set(true);
+      await fixture.whenStable();
+      host.completed.set(false);
+      await fixture.whenStable();
+
+      expect(q('.asys-top-pick__done')).toBeNull();
+      expect(buttons().map((b) => b.textContent?.trim())).toEqual(['Done', 'Log progress', 'Open']);
+    });
   });
 
   it('focusTitle moves focus to the title', async () => {

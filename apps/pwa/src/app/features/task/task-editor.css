@@ -1,0 +1,120 @@
+/* SPDX-License-Identifier: EUPL-1.2 */
+.task-editor__title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
+  font-weight: 700;
+}
+
+.task-editor__status {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+}
+
+.task-editor__status:empty {
+  margin: 0;
+}
+
+.task-editor__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+}
+
+.task-editor__line,
+.task-editor__reason,
+.task-editor__sync,
+.task-editor__blocker-message {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-reason);
+  line-height: var(--line-height-reason);
+  color: var(--ink-muted);
+}
+
+.task-editor__reason,
+.task-editor__blocker-message:empty {
+  margin: 0;
+}
+
+.task-editor__captured {
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+  background: var(--sunken);
+  border-radius: var(--radius-md);
+}
+
+.task-editor__captured-text {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+}
+
+.task-editor__subtitle {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-label);
+  line-height: var(--line-height-label);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.task-editor__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: var(--space-4) 0;
+}
+
+.task-editor__actions {
+  margin: 0 0 var(--space-3);
+}
+
+.task-editor__section {
+  margin: var(--space-4) 0 0;
+}
+
+.task-editor__list {
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.task-editor__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.task-editor__row-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.task-editor__blocks-link {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap-target);
+}
+
+.task-editor__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-target);
+}
+
+.task-editor__picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+}
+
+.task-editor__missing,
+.task-editor__text {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+}

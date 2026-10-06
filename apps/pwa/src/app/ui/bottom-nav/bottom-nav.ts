@@ -1,5 +1,12 @@
 // SPDX-License-Identifier: EUPL-1.2
-import { Component, input, ViewEncapsulation } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  input,
+  linkedSignal,
+  viewChild,
+  ViewEncapsulation,
+} from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 
 /**
@@ -12,6 +19,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
   imports: [RouterLink, RouterLinkActive],
   encapsulation: ViewEncapsulation.None,
   template: `
+    @let popKey = pop();
     <nav class="asys-bottomnav" aria-label="Primary">
       <a
         class="asys-bottomnav__item"
@@ -32,6 +40,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
         <span class="asys-bottomnav__label">Today</span>
       </a>
       <a
+        #inbox
         class="asys-bottomnav__item"
         routerLink="/inbox"
         routerLinkActive="is-current"
@@ -40,89 +49,46 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
         <span class="asys-bottomnav__pill" aria-hidden="true"></span>
         <span class="asys-bottomnav__label"
           >Inbox
-          @if (inboxCount() > 0) {
-            <span class="asys-bottomnav__badge">{{ inboxCount() }}</span>
+          @if ((inboxCount() ?? 0) > 0) {
+            @for (key of [popKey]; track key) {
+              @if (popKey > 0) {
+                <span class="asys-bottomnav__badge" animate.enter="asys-pop">{{
+                  inboxCount()
+                }}</span>
+              } @else {
+                <span class="asys-bottomnav__badge">{{ inboxCount() }}</span>
+              }
+            }
           }
         </span>
       </a>
     </nav>
   `,
-  styles: `
-    .asys-bottomnav {
-      display: flex;
-      background: var(--surface);
-      border-top: 1px solid var(--line);
-    }
-
-    .asys-bottomnav__item {
-      flex: 1 1 0;
-      min-width: 0;
-      min-height: 56px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: var(--space-1);
-      padding: var(--space-1) var(--space-2);
-      background: transparent;
-      border: 0;
-      border-radius: 0;
-      color: var(--ink-muted);
-      text-decoration: none;
-      cursor: pointer;
-      font-family: var(--font-sans);
-      font-size: var(--font-size-label);
-      line-height: var(--line-height-label);
-      font-weight: 700;
-      letter-spacing: 0.02em;
-    }
-
-    .asys-bottomnav__item:active {
-      background: var(--signal-soft);
-    }
-
-    .asys-bottomnav__pill {
-      display: block;
-      width: 32px;
-      height: 4px;
-      border-radius: var(--radius-sm);
-      background: transparent;
-    }
-
-    .asys-bottomnav__item[aria-current='page'] {
-      color: var(--ink);
-    }
-
-    .asys-bottomnav__item[aria-current='page'] .asys-bottomnav__pill {
-      background: var(--signal);
-    }
-
-    .asys-bottomnav__label {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-1);
-    }
-
-    .asys-bottomnav__badge {
-      min-width: calc(var(--line-height-label) + var(--space-1));
-      padding: 0 var(--space-1);
-      border-radius: var(--radius-sm);
-      background: var(--ink);
-      color: var(--paper);
-      text-align: center;
-      font-family: var(--font-mono);
-      font-variant-numeric: tabular-nums;
-      font-size: var(--font-size-label);
-      line-height: var(--line-height-label);
-      font-weight: 700;
-      letter-spacing: 0.02em;
-    }
-
-    [data-theme='drive'] .asys-bottomnav {
-      display: none;
-    }
-  `,
+  styleUrl: './bottom-nav.css',
 })
 export class BottomNav {
-  readonly inboxCount = input<number>(0);
+  /** The Inbox count; null while it is not known yet, which shows no badge. */
+  readonly inboxCount = input<number | null>(0);
+
+  private readonly inbox = viewChild<ElementRef<HTMLElement>>('inbox');
+
+  /**
+   * Bumps when the count rises from one known number to a larger one, so the badge is re-created and
+   * pops. A count that first appears after load (from null) does not bump.
+   */
+  protected readonly pop = linkedSignal<number | null, number>({
+    source: this.inboxCount,
+    computation: (count, previous) =>
+      previous !== undefined &&
+      previous.source !== null &&
+      count !== null &&
+      count > previous.source
+        ? previous.value + 1
+        : (previous?.value ?? 0),
+  });
+
+  /** The Inbox link, or null before it renders. */
+  inboxTab(): HTMLElement | null {
+    return this.inbox()?.nativeElement ?? null;
+  }
 }

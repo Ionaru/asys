@@ -3,7 +3,6 @@ import { Routes } from '@angular/router';
 
 import { signedInGuard, signedOutGuard } from './core/auth/guards';
 import { Capture } from './features/capture/capture';
-import { Inbox } from './features/inbox/inbox';
 import { Now } from './features/now/now';
 import { Today } from './features/today/today';
 import { ShellLayout } from './layout/shell-layout';
@@ -41,7 +40,12 @@ export const routes: Routes = [
     children: [
       { path: 'now', component: Now, title: 'Now · ASYS', data: { level: 0 } },
       { path: 'today', component: Today, title: 'Today · ASYS', data: { level: 0 } },
-      { path: 'inbox', component: Inbox, title: 'Inbox · ASYS', data: { level: 0 } },
+      {
+        path: 'inbox',
+        loadComponent: () => import('./features/inbox/inbox').then((m) => m.Inbox),
+        title: 'Inbox · ASYS',
+        data: { level: 0 },
+      },
       { path: 'capture', component: Capture, title: 'Capture · ASYS', data: { level: 0 } },
       {
         path: 'tasks/:taskId',

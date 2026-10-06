@@ -1,0 +1,72 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
+<article class="asys-top-pick">
+  <h2
+    class="asys-top-pick__title"
+    tabindex="-1"
+    [attr.data-task-id]="taskId()"
+    [attr.data-morph]="morph() ? '' : null"
+  >
+    {{ title() }}
+  </h2>
+  <p class="asys-top-pick__reason">{{ reason() }}</p>
+  <div class="asys-top-pick__meta">
+    @if (overdue()) {
+      <asys-status-badge [status]="Statuses.Overdue" />
+    }
+    <asys-quadrant-chip [quadrant]="quadrant()" />
+    <span class="asys-top-pick__estimate">{{ estimate() }}</span>
+  </div>
+  <div class="asys-top-pick__actions">
+    @if (completed()) {
+      <p class="asys-top-pick__done">
+        <svg class="asys-top-pick__check" aria-hidden="true" viewBox="0 0 24 24">
+          <path
+            pathLength="1"
+            d="M5 12.5l4.5 4.5L19 7.5"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+        Done
+      </p>
+    } @else {
+      <div class="asys-button-group">
+        <button
+          asys-button
+          type="button"
+          [variant]="Variants.Primary"
+          class="asys-top-pick__main-action"
+          [disabled]="actionsDisabled()"
+          (click)="done.emit({ keyboard: $event.detail === 0 })"
+        >
+          Done
+        </button>
+        @if (canLogProgress()) {
+          <button
+            asys-button
+            type="button"
+            [variant]="Variants.Secondary"
+            class="asys-top-pick__secondary asys-top-pick__log-progress"
+            [disabled]="actionsDisabled()"
+            (click)="logProgress.emit()"
+          >
+            Log progress
+          </button>
+        }
+        <button
+          asys-button
+          type="button"
+          [variant]="Variants.Quiet"
+          class="asys-top-pick__secondary"
+          (click)="open.emit()"
+        >
+          Open
+        </button>
+      </div>
+    }
+  </div>
+  <ng-content />
+</article>

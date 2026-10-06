@@ -184,6 +184,10 @@ The Check-in Outcome that returns a Delegated Task to you as Open.
 **Done**:
 A Task that has been completed.
 
+**Undo**:
+Cancelling a change you just made while ASYS still holds it on the phone, before it is sent. For now only a Done can be undone, during the few seconds its Undo bar shows. Once sent, a change is not undone.
+_Avoid_: Take back (a Check-in Outcome), reopen, revert
+
 **Dropped**:
 A Task you decided not to do; it stays in history.
 

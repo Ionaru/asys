@@ -42,6 +42,7 @@ import {
 import { CommandOutcomeTag, type CommandOutcome } from '../../core/api/data-api';
 import { CommandAttempts } from '../../core/data/command-attempts';
 import { DataStore, SyncStatus } from '../../core/data/data-store';
+import { DoneOrigin, DoneUndo } from '../../core/data/done-undo';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
 import { Ids } from '../../core/platform/ids';
@@ -120,352 +121,8 @@ const mixDraft = (
     TextField,
   ],
   providers: [CommandAttempts],
-  template: `
-    <h1
-      #heading
-      class="task-editor__title"
-      tabindex="-1"
-      [attr.data-task-id]="taskId()"
-      [attr.data-morph]="morph() ? '' : null"
-    >
-      {{ headingText() }}
-    </h1>
-    <p class="task-editor__status" role="status">{{ statusLine() }}</p>
-    @if (view(); as v) {
-      @if (overdue() || blocked()) {
-        <p class="task-editor__badges">
-          @if (overdue()) {
-            <asys-status-badge [status]="Badge.Overdue" />
-          }
-          @if (blocked()) {
-            <asys-status-badge [status]="Badge.Blocked" />
-          }
-        </p>
-      }
-      @if (inInbox()) {
-        <p class="task-editor__line">In the Inbox until Triage</p>
-      }
-      @if (deadlines(); as d) {
-        @if (d.latestStart !== null) {
-          <p class="task-editor__line">Latest start {{ d.latestStart }}</p>
-        }
-        <p class="task-editor__line">Effective due {{ d.effectiveDue }}</p>
-      }
-      @if (capturedText(); as text) {
-        <section class="task-editor__captured">
-          <h2 class="task-editor__subtitle">Captured text</h2>
-          <p class="task-editor__captured-text">{{ text }}</p>
-        </section>
-      }
-      <ng-container [ngTemplateOutlet]="draftForm" />
-      @if (v.task.status === TaskStatuses.Open) {
-        <div class="asys-button-group task-editor__actions">
-          <button
-            asys-button
-            type="button"
-            [variant]="Variant.Secondary"
-            [disabled]="actionsBusy()"
-            (click)="done()"
-          >
-            Done
-          </button>
-          @if (canLogProgress()) {
-            <button
-              #logButton
-              asys-button
-              type="button"
-              [variant]="Variant.Secondary"
-              [disabled]="actionsBusy()"
-              (click)="logOpen.set(true)"
-            >
-              Log progress
-            </button>
-          }
-          <button
-            #dropButton
-            asys-button
-            type="button"
-            [variant]="Variant.Quiet"
-            [disabled]="actionsBusy()"
-            (click)="confirmingDrop.set(true)"
-          >
-            Drop
-          </button>
-        </div>
-        @if (logOpen() && canLogProgress() && v.task.estimateMinutes !== null) {
-          <asys-log-progress-form
-            [estimateMinutes]="v.task.estimateMinutes"
-            [busy]="actionsBusy()"
-            (save)="logProgress($event)"
-            (cancel)="cancelLogProgress()"
-          />
-        }
-        @if (confirmingDrop()) {
-          <asys-inline-confirm
-            [message]="'Drop “' + v.task.title + '”? This cannot be undone.'"
-            confirmLabel="Drop"
-            [busy]="actionsBusy()"
-            (confirm)="drop()"
-            (cancel)="cancelDrop()"
-          />
-        }
-      }
-      @if (dataStore.awaitingSync().has(taskId())) {
-        <p class="task-editor__sync">Saved. Waiting for the server.</p>
-      }
-      <section class="task-editor__section">
-        <h2 class="task-editor__subtitle">Blocked by</h2>
-        @if (blockedBy().length > 0) {
-          <ul class="task-editor__list">
-            @for (row of blockedBy(); track row.linkId) {
-              <li class="task-editor__row">
-                <span class="task-editor__row-title">{{ row.title }}</span>
-                <button
-                  asys-button
-                  type="button"
-                  [variant]="Variant.Quiet"
-                  [size]="Size.Small"
-                  [disabled]="removeBusy(row.linkId)"
-                  (click)="removeBlocker(row.linkId)"
-                >
-                  Remove
-                </button>
-              </li>
-            }
-          </ul>
-        } @else {
-          <p class="task-editor__text">Waits for no other Task.</p>
-        }
-        <button
-          #addBlockerButton
-          asys-button
-          type="button"
-          [variant]="Variant.Secondary"
-          [disabled]="addBusy()"
-          (click)="pickerOpen.set(true)"
-        >
-          Add a blocker
-        </button>
-        <p class="task-editor__blocker-message" role="status">{{ blockerMessage() }}</p>
-        @if (pickerOpen()) {
-          <div class="task-editor__picker">
-            <asys-text-field label="Find a Task" [(value)]="filter" />
-            @if (candidates().length > 0) {
-              <ul class="task-editor__list">
-                @for (candidate of candidates(); track candidate.id) {
-                  <li>
-                    <button
-                      asys-button
-                      type="button"
-                      [variant]="Variant.Quiet"
-                      [disabled]="addBusy()"
-                      (click)="addBlocker(candidate.id)"
-                    >
-                      {{ candidate.title }}
-                    </button>
-                  </li>
-                }
-              </ul>
-            } @else {
-              <p class="task-editor__text">No Task matches.</p>
-            }
-            <button asys-button type="button" [variant]="Variant.Quiet" (click)="closePicker()">
-              Close
-            </button>
-          </div>
-        }
-      </section>
-      <section class="task-editor__section">
-        <h2 class="task-editor__subtitle">Blocks</h2>
-        @if (blocksTasks().length > 0) {
-          <ul class="task-editor__list">
-            @for (dependant of blocksTasks(); track dependant.id) {
-              <li>
-                <a class="task-editor__blocks-link" [routerLink]="['/tasks', dependant.id]">{{
-                  dependant.title
-                }}</a>
-              </li>
-            }
-          </ul>
-        } @else {
-          <p class="task-editor__text">No Task waits for this one.</p>
-        }
-      </section>
-    } @else if (dataStore.state() === null) {
-      @if (dataStore.status() === Status.Failed) {
-        <p role="alert">ASYS could not load your Tasks.</p>
-        <button asys-button type="button" [variant]="Variant.Quiet" (click)="dataStore.refresh()">
-          Try again
-        </button>
-      } @else {
-        <p>Loading…</p>
-      }
-    } @else if (!leaving()) {
-      <p class="task-editor__missing">This Task is no longer open.</p>
-      <p class="task-editor__text"><a class="task-editor__link" routerLink="/now">Go to Now</a></p>
-      @if (dirty()) {
-        <ng-container [ngTemplateOutlet]="draftForm" />
-      }
-    }
-
-    <ng-template #draftForm>
-      <div class="task-editor__form">
-        <asys-text-field [formField]="editForm.title" label="Title" />
-        <asys-text-field [formField]="editForm.notes" label="Notes" [multiline]="true" />
-        <asys-select-field [formField]="editForm.areaId" label="Area" [options]="areaOptions()" />
-        <asys-segmented
-          [formField]="editForm.important"
-          legend="Importance"
-          trueLabel="Important"
-          falseLabel="Not important"
-        />
-        <asys-estimate-field [formField]="editForm.estimateMinutes" />
-        <asys-date-spec-field [formField]="editForm.availableFrom" legend="Available from" />
-        <asys-date-spec-field [formField]="editForm.due" legend="Due" />
-        <div class="asys-button-group">
-          <button
-            asys-button
-            type="button"
-            [variant]="Variant.Primary"
-            [disabled]="!canSave()"
-            (click)="save()"
-          >
-            Save
-          </button>
-          @if (needsTitle()) {
-            <p class="task-editor__reason">Needs a title</p>
-          }
-          @if (needsEstimate()) {
-            <p class="task-editor__reason">Needs an Estimate</p>
-          }
-          @if (needsImportance()) {
-            <p class="task-editor__reason">Needs an Importance</p>
-          }
-        </div>
-      </div>
-    </ng-template>
-  `,
-  styles: `
-    .task-editor__title {
-      margin: 0 0 var(--space-3);
-      font-size: var(--font-size-title);
-      line-height: var(--line-height-title);
-      font-weight: 700;
-    }
-
-    .task-editor__status {
-      margin: 0 0 var(--space-3);
-      font-size: var(--font-size-body);
-      line-height: var(--line-height-body);
-    }
-
-    .task-editor__status:empty {
-      margin: 0;
-    }
-
-    .task-editor__badges {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-2);
-      margin: 0 0 var(--space-2);
-    }
-
-    .task-editor__line,
-    .task-editor__reason,
-    .task-editor__sync,
-    .task-editor__blocker-message {
-      margin: 0 0 var(--space-2);
-      font-size: var(--font-size-reason);
-      line-height: var(--line-height-reason);
-      color: var(--ink-muted);
-    }
-
-    .task-editor__reason,
-    .task-editor__blocker-message:empty {
-      margin: 0;
-    }
-
-    .task-editor__captured {
-      margin: var(--space-3) 0;
-      padding: var(--space-3);
-      background: var(--sunken);
-      border-radius: var(--radius-md);
-    }
-
-    .task-editor__captured-text {
-      margin: 0;
-      white-space: pre-wrap;
-      font-size: var(--font-size-body);
-      line-height: var(--line-height-body);
-    }
-
-    .task-editor__subtitle {
-      margin: 0 0 var(--space-2);
-      font-size: var(--font-size-label);
-      line-height: var(--line-height-label);
-      font-weight: 700;
-      letter-spacing: 0.02em;
-    }
-
-    .task-editor__form {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-4);
-      margin: var(--space-4) 0;
-    }
-
-    .task-editor__actions {
-      margin: 0 0 var(--space-3);
-    }
-
-    .task-editor__section {
-      margin: var(--space-4) 0 0;
-    }
-
-    .task-editor__list {
-      margin: 0 0 var(--space-3);
-      padding: 0;
-      list-style: none;
-    }
-
-    .task-editor__row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--space-2);
-    }
-
-    .task-editor__row-title {
-      min-width: 0;
-      overflow-wrap: anywhere;
-    }
-
-    .task-editor__blocks-link {
-      display: flex;
-      align-items: center;
-      min-height: var(--tap-target);
-    }
-
-    .task-editor__link {
-      display: inline-flex;
-      align-items: center;
-      min-height: var(--tap-target);
-    }
-
-    .task-editor__picker {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2);
-      margin: var(--space-3) 0 0;
-    }
-
-    .task-editor__missing,
-    .task-editor__text {
-      margin: 0 0 var(--space-3);
-      font-size: var(--font-size-body);
-      line-height: var(--line-height-body);
-    }
-  `,
+  templateUrl: './task-editor.component.html',
+  styleUrl: './task-editor.css',
 })
 export class TaskEditor {
   readonly taskId = input.required<string>();
@@ -479,6 +136,8 @@ export class TaskEditor {
   private readonly taskMorph = inject(TaskMorph);
 
   private readonly attempts = inject(CommandAttempts);
+
+  private readonly doneUndo = inject(DoneUndo);
 
   private readonly router = inject(Router);
 
@@ -512,7 +171,10 @@ export class TaskEditor {
 
   protected readonly blockerMessage = signal('');
 
-  /** Set before a Done or Drop is sent, cleared when its outcome is not Applied. */
+  /**
+   * Set before a Done or Drop leaves. A Done holds the Task and leaves at once, so it stays true; a Drop
+   * clears it again when its outcome is not Applied.
+   */
   protected readonly leaving = signal(false);
 
   /** Whether a Save, Done, Drop or Log progress send is in flight. */
@@ -819,12 +481,23 @@ export class TaskEditor {
     this.statusLine.set('Saved.');
   }
 
-  protected async done(): Promise<void> {
-    await this.leaveWith({
-      _tag: CommandTag.CompleteTask,
-      taskId: this.taskId(),
-      expect: { status: TaskStatus.Open },
-    });
+  /** Holds the Task through DoneUndo and leaves at once; the send happens when its Undo window ends. */
+  protected done(event: MouseEvent): void {
+    const task = this.task();
+
+    if (this.actionsBusy() || task === undefined) {
+      return;
+    }
+
+    this.clearMessages();
+    this.leaving.set(true);
+    this.doneUndo.complete(task, DoneOrigin.Button);
+
+    if (event.detail === 0) {
+      this.doneUndo.requestFocus();
+    }
+
+    this.leave();
   }
 
   protected async drop(): Promise<void> {
@@ -969,7 +642,7 @@ export class TaskEditor {
     this.model.set(mixDraft(useStored, draft, stored));
   }
 
-  /** Sends a Done or Drop; Applied leaves the editor, anything else stays with its message. */
+  /** Sends a Drop; Applied leaves the editor, anything else stays with its message. */
   private async leaveWith(command: Command): Promise<void> {
     if (this.actionsBusy()) {
       return;

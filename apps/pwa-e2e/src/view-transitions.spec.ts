@@ -238,6 +238,24 @@ test("goes back from the editor's Done without a morph", async ({ page }) => {
   expect(withName(pop.newNames, 'task-title')).toEqual([]);
 });
 
+test("captures the Undo bar on the editor's Done Pop", async ({ page }) => {
+  await seedTask(page, { title: 'Send the report', important: false, estimateMinutes: 25 });
+  await page.reload();
+
+  let before = await recordCount(page);
+  await page.locator('article.asys-top-pick').getByRole('button', { name: 'Open' }).click();
+  await expect(page.locator('h1.task-editor__title')).toBeVisible();
+  await lastSettled(page, before);
+
+  before = await recordCount(page);
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(page).toHaveURL(/\/now$/);
+  const pop = await lastSettled(page, before);
+
+  expect(pop.kind).toBe('pop');
+  expect(withName(pop.newNames, 'shell-undo')).toHaveLength(1);
+});
+
 test("swaps from the editor to Settings with the browser's own cross-fade", async ({ page }) => {
   await seedTask(page, { title: 'Send the report', important: false, estimateMinutes: 25 });
   await page.reload();

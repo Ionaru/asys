@@ -7,7 +7,7 @@ import {
 } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { CommandTag, type Command, type Instant } from '@asys/domain';
+import { CommandTag, type Command, type CompleteTask, type Instant } from '@asys/domain';
 
 import { CommandOutcomeTag, type CommandOutcome } from '../api/data-api';
 import { LAST_REPORTED_ZONE_KEY } from '../auth/session';
@@ -136,6 +136,10 @@ const track = (promise: Promise<unknown>): { done: boolean } => {
 const applied = (seq: number): object => ({ _tag: 'Applied', seq });
 
 const completeTask: Command = { _tag: CommandTag.CompleteTask, taskId: 't1' };
+
+const holdA: CompleteTask = { _tag: CommandTag.CompleteTask, taskId: 'A' };
+
+const holdB: CompleteTask = { _tag: CommandTag.CompleteTask, taskId: 'B' };
 
 describe('DataStore', () => {
   let store: DataStore;
@@ -2145,6 +2149,239 @@ describe('DataStore', () => {
 
       expect(store.now()).not.toBeNull();
       expect(store.now()?.ranked.map((ranked) => ranked.task.id)).toEqual(['t2']);
+    });
+  });
+
+  describe('hold and release', () => {
+    const rankedIds = (): readonly string[] =>
+      store.now()?.ranked.map((ranked) => ranked.task.id) ?? [];
+
+    const stateIds = (): readonly string[] => store.state()?.tasks.map((t) => t.id) ?? [];
+
+    const statusOf = (id: string): string | undefined =>
+      store.state()?.tasks.find((t) => t.id === id)?.status;
+
+    const withAB = { tasks: [aTask('A'), aTask('B')] };
+
+    it('starts with no held keys', () => {
+      expect(store.heldKeys().size).toBe(0);
+    });
+
+    it('hides the Task from state and Now, and release restores it', async () => {
+      await begin(12, withAB);
+      expect(stateIds()).toEqual(['A', 'B']);
+      expect(rankedIds()).toContain('A');
+
+      store.hold(holdA, 'hold-a');
+
+      expect(stateIds()).toEqual(['B']);
+      expect(rankedIds()).not.toContain('A');
+      expect(rankedIds()).toContain('B');
+      expect(store.heldKeys()).toEqual(new Set(['hold-a']));
+
+      store.release('hold-a');
+
+      expect(stateIds()).toEqual(['A', 'B']);
+      expect(rankedIds()).toContain('A');
+      expect(store.heldKeys().size).toBe(0);
+    });
+
+    it('drops an Inbox Task from the Inbox count while held', async () => {
+      await begin(12, {
+        tasks: [aTask('A', { important: null }), aTask('B', { important: null })],
+      });
+      expect(store.inboxCount()).toBe(2);
+
+      store.hold(holdA, 'hold-a');
+
+      expect(store.inboxCount()).toBe(1);
+      store.release('hold-a');
+      expect(store.inboxCount()).toBe(2);
+    });
+
+    it('lets a second hold with the same key replace the first', async () => {
+      await begin(12, withAB);
+
+      store.hold(holdA, 'hold-a');
+      store.hold(holdB, 'hold-a');
+
+      expect(store.heldKeys()).toEqual(new Set(['hold-a']));
+      expect(stateIds()).toEqual(['A']);
+    });
+
+    it('holds several keys at once', async () => {
+      await begin(12, withAB);
+
+      store.hold(holdA, 'hold-a');
+      store.hold(holdB, 'hold-b');
+
+      expect(store.heldKeys()).toEqual(new Set(['hold-a', 'hold-b']));
+      expect(stateIds()).toEqual([]);
+    });
+
+    it('ignores release of an unknown key and keeps the same heldKeys object', async () => {
+      await begin(12, withAB);
+      store.hold(holdA, 'hold-a');
+      const before = store.heldKeys();
+
+      store.release('nope');
+
+      expect(store.heldKeys()).toBe(before);
+      expect(stateIds()).toEqual(['B']);
+    });
+
+    it('keeps a hold made before the first snapshot and applies it once state arrives', async () => {
+      store.hold(holdA, 'hold-a');
+      expect(store.state()).toBeNull();
+      expect(store.heldKeys()).toEqual(new Set(['hold-a']));
+
+      await begin(12, withAB);
+
+      expect(stateIds()).toEqual(['B']);
+      expect(store.heldKeys()).toEqual(new Set(['hold-a']));
+    });
+
+    it('prunes a hold made before the first snapshot when it no longer applies', async () => {
+      store.hold(holdA, 'hold-a');
+
+      await begin(12, { tasks: [aTask('A', { status: 'done', closedAt: T0 }), aTask('B')] });
+
+      expect(store.heldKeys().size).toBe(0);
+      expect(statusOf('A')).toBe('done');
+    });
+
+    describe('poll', () => {
+      it('keeps the hold while a poll still has the Task Open', async () => {
+        await begin(12, withAB);
+        store.hold(holdA, 'hold-a');
+
+        await advance(POLL_INTERVAL_MS);
+        await respond(http.expectOne('/v1/changes?after=12'), changesBody(13, [putTask(13, 'B')]));
+
+        expect(store.heldKeys()).toEqual(new Set(['hold-a']));
+        expect(stateIds()).toEqual(['B']);
+      });
+
+      it('drops the hold when a poll brings the Done change, and the Task stays gone', async () => {
+        await begin(12, withAB);
+        store.hold(holdA, 'hold-a');
+
+        await advance(POLL_INTERVAL_MS);
+        await respond(
+          http.expectOne('/v1/changes?after=12'),
+          changesBody(13, [putTask(13, 'A', { status: 'done', closedAt: T0 })]),
+        );
+
+        expect(store.heldKeys().size).toBe(0);
+        expect(stateIds()).toEqual(['B']);
+      });
+
+      it('drops only the hold that no longer applies', async () => {
+        await begin(12, withAB);
+        store.hold(holdA, 'hold-a');
+        store.hold(holdB, 'hold-b');
+
+        await advance(POLL_INTERVAL_MS);
+        await respond(
+          http.expectOne('/v1/changes?after=12'),
+          changesBody(13, [putTask(13, 'A', { status: 'done', closedAt: T0 })]),
+        );
+
+        expect(store.heldKeys()).toEqual(new Set(['hold-b']));
+        expect(stateIds()).toEqual([]);
+      });
+
+      it('keeps the hold after an Applied send whose follow-up poll failed', async () => {
+        await begin(12, withAB);
+        store.hold(holdA, 'hold-a');
+        const result = store.send(holdA, 'hold-a');
+        await respond(http.expectOne('/v1/commands'), applied(13));
+
+        await networkError(http.expectOne('/v1/changes?after=12'));
+
+        expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 13 });
+        expect(store.awaitingSync()).toEqual(new Set(['A']));
+        expect(store.heldKeys()).toEqual(new Set(['hold-a']));
+        expect(stateIds()).toEqual(['B']);
+        expect(rankedIds()).not.toContain('A');
+      });
+
+      it('drops the hold once the next poll after a failed follow-up brings the Done change', async () => {
+        await begin(12, withAB);
+        store.hold(holdA, 'hold-a');
+        const result = store.send(holdA, 'hold-a');
+        await respond(http.expectOne('/v1/commands'), applied(13));
+        await networkError(http.expectOne('/v1/changes?after=12'));
+        await result;
+
+        await advance(POLL_INTERVAL_MS);
+        await respond(
+          http.expectOne('/v1/changes?after=12'),
+          changesBody(13, [putTask(13, 'A', { status: 'done', closedAt: T0 })]),
+        );
+
+        expect(store.heldKeys().size).toBe(0);
+        expect(store.awaitingSync().size).toBe(0);
+        expect(stateIds()).toEqual(['B']);
+      });
+    });
+
+    describe('snapshot', () => {
+      const toSnapshot = async (): Promise<void> => {
+        await advance(POLL_INTERVAL_MS);
+        await respond(http.expectOne('/v1/changes?after=12'), expired(12), 410);
+      };
+
+      it('keeps the hold when the snapshot still has the Task Open', async () => {
+        await begin(12, withAB);
+        store.hold(holdA, 'hold-a');
+        await toSnapshot();
+
+        await respond(http.expectOne('/v1/snapshot'), snapshotBody(40, withAB));
+
+        expect(store.heldKeys()).toEqual(new Set(['hold-a']));
+        expect(stateIds()).toEqual(['B']);
+      });
+
+      it('drops the hold when the snapshot shows the Task Done', async () => {
+        await begin(12, withAB);
+        store.hold(holdA, 'hold-a');
+        await toSnapshot();
+
+        await respond(
+          http.expectOne('/v1/snapshot'),
+          snapshotBody(40, {
+            tasks: [aTask('A', { status: 'done', closedAt: T0 }), aTask('B')],
+          }),
+        );
+
+        expect(store.heldKeys().size).toBe(0);
+        expect(statusOf('A')).toBe('done');
+      });
+
+      it('drops the hold when the snapshot no longer has the Task', async () => {
+        await begin(12, withAB);
+        store.hold(holdA, 'hold-a');
+        await toSnapshot();
+
+        await respond(http.expectOne('/v1/snapshot'), snapshotBody(40, { tasks: [aTask('B')] }));
+
+        expect(store.heldKeys().size).toBe(0);
+      });
+    });
+
+    describe('stop', () => {
+      it('empties heldKeys and state', async () => {
+        await begin(12, withAB);
+        store.hold(holdA, 'hold-a');
+        store.hold(holdB, 'hold-b');
+        expect(store.heldKeys().size).toBe(2);
+
+        store.stop();
+
+        expect(store.heldKeys().size).toBe(0);
+        expect(store.state()).toBeNull();
+      });
     });
   });
 });

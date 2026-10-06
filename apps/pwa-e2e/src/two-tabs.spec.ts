@@ -8,6 +8,8 @@ test('A Done Task closed in another tab leaves a Review item in the Inbox', asyn
   context,
 }) => {
   await seedTask(page, { title: 'Pay the invoice', important: true, estimateMinutes: 25 });
+  // page2 shares page's browser context, and so its clock. The clock is installed before the first reload.
+  await page.clock.install();
   await page.reload();
 
   let release: () => void = () => undefined;
@@ -26,7 +28,11 @@ test('A Done Task closed in another tab leaves a Review item in the Inbox', asyn
   }
 
   await page.getByRole('button', { name: 'Done', exact: true }).click();
-  await expect(page.locator('.now__status')).toHaveText('“Pay the invoice” is Done.');
+  await expect(page.locator('.shell__status')).toHaveText('“Pay the invoice” is Done.');
+  // The Done is held for 5 s. Sending it is the window ending.
+  const firstSent = page.waitForResponse('**/v1/commands');
+  await page.clock.fastForward(5_000);
+  expect((await firstSent).status()).toBe(200);
 
   // The answer is read in the route, not with response.text(): under CPU load Chromium can hold no
   // body for the XHR by the time DevTools asks ("No data found for resource with given identifier").
@@ -40,8 +46,13 @@ test('A Done Task closed in another tab leaves a Review item in the Inbox', asyn
     await route.fulfill({ response });
   });
   await page2.getByRole('button', { name: 'Done', exact: true }).click();
+  await page2.clock.fastForward(5_000);
   expect(await commandAnswer).toContain('NotApplicable');
+  // The bar shows the notice once the send has settled, and settling waits for the gated sync.
   release();
+  await expect(page2.locator('.asys-undobar')).toContainText(
+    'That no longer applied, so it waits in the Inbox as a Review item.',
+  );
 
   await page2
     .getByRole('navigation', { name: 'Primary' })

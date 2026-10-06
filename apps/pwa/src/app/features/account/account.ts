@@ -15,7 +15,9 @@ import { CeremonyResultTag, PasskeyFailure } from '@ionaru/effect-passkeys/clien
 import { AuthApi, AuthError, AuthResultTag, type Passkey } from '../../core/api/auth-api';
 import { PasskeyCeremony } from '../../core/api/passkey-ceremony';
 import { Session } from '../../core/auth/session';
+import { CaptureQueue } from '../../core/data/capture-queue';
 import { DataStore } from '../../core/data/data-store';
+import { DoneUndo } from '../../core/data/done-undo';
 import { AppUpdate } from '../../core/platform/app-update';
 import { Clock } from '../../core/platform/clock';
 import { DeviceZone } from '../../core/platform/device-zone';
@@ -84,297 +86,8 @@ const hasUnusualCharacters = (value: string): boolean => {
 @Component({
   selector: 'asys-account',
   imports: [Button, FormField, FormRoot, TextField],
-  template: `
-    <div class="account">
-      <header class="account__block">
-        <h1 class="account__title">Account</h1>
-        <p class="account__reason">{{ session.me()?.name }}</p>
-      </header>
-
-      <section class="account__block">
-        <h2 #passkeysHeading class="account__heading" tabindex="-1">Passkeys</h2>
-        @if (passkeys.hasValue()) {
-          <ul class="account__list">
-            @for (row of rows(); track row.passkey.credentialId) {
-              <li class="account__row">
-                <span class="account__strong">{{ row.passkey.name }}</span>
-                <span class="account__reason">Created {{ row.created }}</span>
-                <span class="account__reason">
-                  {{ row.lastUsed === null ? 'Never used' : 'Last used ' + row.lastUsed }}
-                </span>
-                @if (confirmingRemoval() === row.passkey.credentialId) {
-                  <div class="account__confirm" animate.enter="asys-enter">
-                    <p class="account__body">
-                      Remove {{ row.passkey.name }}? You cannot sign in with it afterwards.
-                    </p>
-                    <div class="account__actions">
-                      <button
-                        asys-button
-                        type="button"
-                        [variant]="Variant.Danger"
-                        [size]="Size.Small"
-                        [disabled]="removing()"
-                        (click)="remove(row.passkey.credentialId)"
-                      >
-                        Remove passkey
-                      </button>
-                      <button
-                        asys-button
-                        type="button"
-                        [variant]="Variant.Quiet"
-                        [size]="Size.Small"
-                        (click)="confirmingRemoval.set(null)"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                } @else {
-                  <div>
-                    <button
-                      asys-button
-                      type="button"
-                      [variant]="Variant.Quiet"
-                      [size]="Size.Small"
-                      (click)="confirmingRemoval.set(row.passkey.credentialId)"
-                    >
-                      Remove<span class="asys-visually-hidden"> {{ row.passkey.name }}</span>
-                    </button>
-                  </div>
-                }
-              </li>
-            }
-          </ul>
-        } @else if (passkeys.isLoading()) {
-          <p class="account__reason">Loading your passkeys…</p>
-        } @else {
-          <p class="account__reason">Could not load your passkeys.</p>
-          <div>
-            <button
-              asys-button
-              type="button"
-              [variant]="Variant.Quiet"
-              [size]="Size.Small"
-              (click)="reload()"
-            >
-              Try again
-            </button>
-          </div>
-        }
-        @if (removeMessage(); as text) {
-          <p class="account__message" role="alert">{{ text }}</p>
-        }
-        <form class="account__block" [formRoot]="addForm">
-          <asys-text-field
-            [formField]="addForm.name"
-            label="Name for the new passkey"
-            hint="Optional. For example the device it is on."
-          />
-          <div>
-            <button
-              asys-button
-              type="submit"
-              [variant]="Variant.Secondary"
-              [disabled]="addOptions() === null || adding()"
-            >
-              Add a passkey
-            </button>
-          </div>
-        </form>
-        @if (shownAddMessage(); as text) {
-          <p class="account__message" role="alert">{{ text }}</p>
-        }
-        @if (addRef.error() !== null && addRef.error() !== AuthError.Unauthorized) {
-          <div>
-            <button
-              asys-button
-              type="button"
-              [variant]="Variant.Quiet"
-              [size]="Size.Small"
-              (click)="addRef.discard()"
-            >
-              Try again
-            </button>
-          </div>
-        }
-        @if (added()) {
-          <p class="account__body" role="status">Passkey added.</p>
-        }
-      </section>
-
-      <section class="account__block">
-        <h2 class="account__heading">Recovery codes</h2>
-        <p class="account__body">
-          Recovery codes left: <span class="asys-num">{{ session.me()?.recoveryCodesLeft }}</span>
-        </p>
-        @if (codes().length > 0) {
-          <div class="account__block" animate.enter="asys-enter">
-            <ol class="account__codes asys-num">
-              @for (code of codes(); track $index) {
-                <li>{{ code }}</li>
-              }
-            </ol>
-            <p class="account__body">These codes are shown only now. Keep them somewhere safe.</p>
-            <div class="account__actions">
-              <button asys-button type="button" [variant]="Variant.Secondary" (click)="copy()">
-                Copy
-              </button>
-              <button asys-button type="button" [variant]="Variant.Primary" (click)="hideCodes()">
-                Done
-              </button>
-            </div>
-            @if (copyStatus(); as text) {
-              <p class="account__body" role="status">{{ text }}</p>
-            }
-          </div>
-        } @else if (confirmingCodes()) {
-          <div class="account__block" animate.enter="asys-enter">
-            <p class="account__body">
-              New codes replace all your current codes and sign you out on your other devices.
-            </p>
-            <div class="account__actions">
-              <button
-                asys-button
-                type="button"
-                [variant]="Variant.Danger"
-                [disabled]="regenerating()"
-                (click)="makeCodes()"
-              >
-                Make new codes
-              </button>
-              <button
-                asys-button
-                type="button"
-                [variant]="Variant.Quiet"
-                (click)="confirmingCodes.set(false)"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        } @else {
-          <div>
-            <button
-              asys-button
-              type="button"
-              [variant]="Variant.Secondary"
-              (click)="confirmingCodes.set(true)"
-            >
-              Make new recovery codes
-            </button>
-          </div>
-        }
-        @if (codesMessage(); as text) {
-          <p class="account__message" role="alert">{{ text }}</p>
-        }
-      </section>
-
-      <section class="account__block">
-        <h2 class="account__heading">Sign out</h2>
-        <div>
-          <button
-            asys-button
-            type="button"
-            [variant]="Variant.Secondary"
-            [disabled]="signingOut()"
-            (click)="signOut()"
-          >
-            Sign out
-          </button>
-        </div>
-        @if (signOutMessage(); as text) {
-          <p class="account__message" role="alert">{{ text }}</p>
-        }
-      </section>
-    </div>
-  `,
-  styles: `
-    .account,
-    .account__block,
-    .account__confirm {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-4);
-    }
-
-    .account {
-      padding-block-end: var(--space-5);
-      gap: var(--space-6);
-    }
-
-    .account__block {
-      gap: var(--space-2);
-    }
-
-    .account__title,
-    .account__heading,
-    .account__body,
-    .account__reason,
-    .account__message {
-      margin: 0;
-    }
-
-    .account__title {
-      font-size: var(--font-size-title);
-      line-height: var(--line-height-title);
-    }
-
-    .account__heading {
-      font-size: var(--font-size-heading);
-      line-height: var(--line-height-heading);
-    }
-
-    .account__body,
-    .account__codes {
-      font-size: var(--font-size-body);
-      line-height: var(--line-height-body);
-    }
-
-    .account__strong {
-      font-size: var(--font-size-body-strong);
-      line-height: var(--line-height-body-strong);
-      font-weight: 600;
-    }
-
-    .account__reason {
-      color: var(--ink-muted);
-      font-size: var(--font-size-reason);
-      line-height: var(--line-height-reason);
-    }
-
-    .account__message {
-      color: var(--danger);
-      font-size: var(--font-size-body);
-      line-height: var(--line-height-body);
-    }
-
-    .account__list,
-    .account__codes {
-      margin: 0;
-      padding: 0;
-    }
-
-    .account__list {
-      list-style: none;
-    }
-
-    .account__codes {
-      padding-inline-start: var(--space-6);
-    }
-
-    .account__row {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-1);
-      padding-block: var(--space-2);
-    }
-
-    .account__actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-2);
-    }
-  `,
+  templateUrl: './account.component.html',
+  styleUrl: './account.css',
 })
 export class Account {
   private readonly authApi = inject(AuthApi);
@@ -388,6 +101,10 @@ export class Account {
   private readonly clock = inject(Clock);
 
   private readonly deviceZone = inject(DeviceZone);
+
+  private readonly doneUndo = inject(DoneUndo);
+
+  private readonly captureQueue = inject(CaptureQueue);
 
   protected readonly session = inject(Session);
 
@@ -659,6 +376,9 @@ export class Account {
     this.signingOut.set(true);
 
     try {
+      await this.doneUndo.flush();
+      await this.captureQueue.drain();
+
       const result = await this.authApi.signOut();
 
       if (result._tag === AuthResultTag.Ok || result.error === AuthError.Unauthorized) {

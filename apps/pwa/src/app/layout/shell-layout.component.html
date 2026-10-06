@@ -1,0 +1,64 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
+<header class="shell__header">
+  <a asys-button routerLink="/settings" [variant]="Variant.Quiet" [size]="Size.Small">Settings</a>
+</header>
+<main
+  #main
+  class="asys-page shell__page"
+  [class.shell__page--pill]="onCapturePath() && !open()"
+  [class.shell__page--bar]="onCapturePath() && open()"
+>
+  <router-outlet />
+</main>
+<p class="asys-visually-hidden shell__status" role="status">
+  @for (notice of notices(); track notice.seq) {
+    <span>{{ notice.text }}</span>
+  }
+</p>
+@if (undoView(); as v) {
+  <asys-undo-bar
+    class="shell__undo"
+    animate.enter="asys-rise"
+    (animate.leave)="leave($event)"
+    [variant]="v.variant"
+    [title]="v.title"
+    [detail]="v.detail"
+    [canRetry]="v.canRetry"
+    (undo)="doneUndo.undo()"
+    (retry)="retryDone($event)"
+    (dismiss)="dismissDone($event)"
+    (escape)="focusMain()"
+    (pointerInside)="inside(PauseReason.Pointer, $event)"
+    (focusInside)="barFocus($event)"
+  />
+}
+@if (onCapturePath()) {
+  @if (open()) {
+    <asys-quick-add
+      class="shell__quickadd"
+      animate.enter="asys-rise"
+      (animate.leave)="leave($event)"
+      [(value)]="text"
+      [message]="captureQueue.message()"
+      [failures]="captureQueue.failed()"
+      (add)="add($event)"
+      (retry)="captureQueue.retry($event)"
+      (discard)="captureQueue.discard($event)"
+      (close)="close()"
+    />
+  } @else {
+    <button
+      asys-capture-button
+      #pill
+      class="shell__capture"
+      animate.enter="asys-appear"
+      (animate.leave)="leave($event)"
+      [count]="captureQueue.failed().length"
+      (click)="openQuickAdd()"
+    ></button>
+  }
+}
+<asys-bottom-nav
+  class="shell__nav"
+  [inboxCount]="dataStore.state() === null ? null : dataStore.inboxCount()"
+/>

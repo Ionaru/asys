@@ -680,6 +680,53 @@ A `test.describe` with `reducedMotion: 'no-preference'` repeats the Done and exp
 
 **Check:** `node scripts/check-spdx.mts`, `pnpm exec nx format:check --all`, and a grep for the em-dash character (U+2014) over the changed files finds nothing.
 
+## Built on 2026-10-06
+
+All twelve units were built in order, with units 1 and 2 built as one and units 3 and 4 built as one. Each unit's source and its tests were written separately from one contract, every new test was seen to fail on an assertion by breaking what it covers, and each unit was reviewed adversarially before the next began.
+
+### Departures from the plan
+
+- **Units 1 and 2, and units 3 and 4, were built together.** Removing QuickAdd's `busy` input breaks the shell's `[busy]` binding, which unit 2 owns. Units 3 and 4 both change `shell-layout.ts` and `styles.css`.
+- **The Inbox route is lazy-loaded.** After unit 5 the initial bundle reached 505.92 kB, over the 500 kB warning. On 2026-10-06 the maintainer chose to load Inbox lazily, as slice 1's known limits foresaw. `/inbox` now has a `loadComponent`, and its 18.65 kB chunk left the initial bundle.
+- **`held-state.ts` calls `completeTask`, not `applyCommand`.** A hold is always a CompleteTask, and `applyCommand`'s switch pulled every domain command handler into the eager bundle (6.9 kB). The result is the same.
+- **Try again and Discard move focus to the field** before their row goes, so focus never falls to the body and the keyboard stays up.
+- **The pill's label carries its own trailing space** in an interpolation (`'Capture '` while rows exist), so its accessible name is exactly "Capture 1 not captured" whatever the formatter does to the template.
+- **Pause reasons are cleared whenever no bar shows,** and `pause` is ignored then. A bar that is removed never reports `pointerleave` or `focusout`, so a stale reason would freeze the next window.
+- **The status region keys each notice by its `seq`** (`@for (notice of notices(); track notice.seq)`), so every notice is a new node and an identical second one is read again. Emptying the region and refilling it in `afterNextRender` happens inside one synchronous change-detection pass, so the accessibility tree would never see the empty state.
+- **The shell guards focus in the Undo bar.** Whenever the bar's layout changes or the bar goes while focus is in it, the shell checks after the render: focus that fell to the body (or onto the leaving bar) moves to the bar's first button while a bar shows, otherwise to the page as Escape does, and a Focus pause that no `focusout` will end is resumed. Dismiss and Try again emit `{ keyboard: event.detail === 0 }`, and after a pointer activation the guard never moves focus, because Chrome focuses a tapped button and a move to the first title would scroll a long list to the top. A failure that replaces a held Done while keyboard focus is on Undo therefore lands on the failure's first button.
+- **A ranked row that collapses while it holds focus hands focus to the top pick,** which shows the same Task. Escape in the bar during a Done's exit focuses the promoted row just before it leaves.
+- **The Undo bar's host keeps its own `display: flex`.** `.shell__undo` sets no `display`, because its emulated selector would win over the bar's and stack Undo under the text. The Done text has `flex: 1 1 0`, so a long title ellipsises instead of pushing Undo to a second line.
+- **The Inbox badge pops only on a rise between two known counts.** `BottomNav.inboxCount` is `number | null`, and the shell passes null until the store has state, so the first count after load never pops, and the badge carries `animate.enter` only once the counter has moved. The template reads the counter with `@let` above the badge's `@if`, so the lazy `linkedSignal` also sees a count of 0 and a capture into an empty Inbox pops.
+- **Now ends a running exit before it takes its sequence number,** so a Done that interrupts an exit keeps its own later steps. The `undone` effect ignores a value from before Now was created, and the exit's 100 ms stagger is the named constant `EXIT_DELAY_MS`.
+- **`shell-layout.spec.ts` replaces `DoneUndo` through `TestBed.overrideComponent`,** because `TestBed.overrideProvider` does not reach a component-level provider (fact 11).
+- **Component files.** The `angular-component-files` rule arrived during the build. The eight components this work changed that have 100 lines or more (the bottom nav, quick add, the top pick, the Undo bar, the shell, Now, Account and the editor) moved their templates to `<name>.component.html` and their styles to `<name>.css`, unchanged apart from indentation. The bottom nav moved only its styles.
+- **e2e.** One `page.clock.install()` covers both pages of two-tabs, which share a browser context. "Done survives an immediate reload" reloads a second time when the reloaded page still shows the Task, because the keepalive POST and the new page's snapshot can race; repeated runs hit that once. `motion-off.spec.ts` counts the view transitions that ran (their `ready` resolved), not the calls, because Angular starts one on every navigation and the handler skips it.
+
+### Verification (2026-10-06)
+
+- **Proving the tests can fail.** Each unit's planned behaviours were broken one at a time, and the new tests failed on assertions: nine for units 1 and 2 (among them the aria-disabled Add, the mousedown guard, ordered sends, the same key after Failed, a fresh command after KeyReused and `drain`), eight for units 3 and 4 (among them `tabInView`'s edges, the ghost's removal after a rejected play, the badge re-creation and the marked leave), seven for unit 5, four for unit 6, sixteen for unit 7 (with listener removal and the pause clearing on a hidden page and on `flush`), nine for unit 8 and fourteen for unit 9 (with the exit takeover). The review additions failed the same way: the focus return in quick add, the ghost's start box, the keyed status node, the focus guard (six behaviours, among them the pointer mark, the resumed Focus pause and the effect order after an Undo) and the collapsing row's focus. The badge's first-load pop is invisible to jsdom, so `capture.spec.ts` records each new badge's animations a frame after it is inserted: with the badge popping on every creation it failed on `[1]` against `[0]`.
+- **Gate.** `nx run-many -t lint typecheck build test --skip-nx-cache` passed for all seven projects: 1924 PWA tests in 66 files before the final review fixes and 1957 after them, 502 server, 676 domain (90 todo), 260 contract and 158 effect-passkeys. `tsc -p scripts/tsconfig.json`, `nx run server:openapi`, `nx format:check --all`, `check-spdx`, `check-licenses` and `palettes --check` passed. `reuse lint` was not available locally; CI runs it. The literal-timing grep finds nothing in `apps/pwa/src`.
+- **Bundle (unit 11).** The initial total went from 489.98 kB at the base to 493.92 kB after units 1 and 2, 497.37 kB after units 3 and 4, and 499.04 kB after unit 5. With Inbox lazy it fell to 467.35 kB, then rose to 467.51 kB after unit 6, 471.87 kB after unit 7, 476.12 kB after unit 8 480.21 kB after unit 9 and 481.58 kB after the final review fixes (130.72 kB transferred), with no budget warning. Minified with esbuild, the new component styles are 0.88 kB for the Undo bar, 1.55 kB for quick add, 1.56 kB for the top pick and 1.33 kB for the shell, all under the 4 kB warning.
+- **End-to-end.** The dev-stack suite passed with 39 tests after the final review fixes (38 before the badge check), and `motion-off.spec.ts` passed ten runs in a row. The image suite, run on an image rebuilt after those fixes, passed with 41 tests, the image-only specs included.
+
+### Facts checked while building
+
+1. to 6. On the device: open, after a deploy.
+7. Not observable cheaply in the e2e. `expand` ignores every row but the displaced one either way.
+8. Not measured. It needs a slowed playback or the device.
+9. TalkBack: open.
+10. `app.routes.spec.ts` stays green with the real `DoneUndo` and `CaptureQueue`: confirmed.
+11. `TestBed.overrideProvider` does not replace `ShellLayout`'s component-level `DoneUndo`; `TestBed.overrideComponent` does.
+12. `document.activeViewTransition` exists in the bundled Chromium (`typeof` is "object").
+13. Not observed in the e2e.
+14. A Playwright reload fires `pagehide`, then `visibilitychange` to hidden, and the server applied exactly one CompleteTask (the snapshot's `seq` rose by one). Playwright's request events never see the keepalive POST.
+15. See Bundle.
+
+### Known limits
+
+- Facts 1 to 6, 8, 9 and 13 need the installed PWA on a phone.
+- The design-system note of unit 12 waits for the maintainer's go-ahead.
+
 ## Out of scope
 
 - **An optimistic Inbox count** for queued captures, unless fact to check 4 shows the lag.

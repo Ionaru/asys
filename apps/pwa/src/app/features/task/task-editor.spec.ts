@@ -21,6 +21,7 @@ import {
 
 import { CommandOutcomeTag, type CommandOutcome } from '../../core/api/data-api';
 import { DataStore, SyncStatus } from '../../core/data/data-store';
+import { DoneOrigin, DoneUndo, type DoneUndone, type PendingDone } from '../../core/data/done-undo';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
 import { Ids } from '../../core/platform/ids';
@@ -184,10 +185,22 @@ const stubs = (options: SetupOptions) => {
   let counter = 0;
   const next = vi.fn<() => string>(() => `key-${++counter}`);
   const handleError = vi.fn<(error: unknown) => void>();
+  // As a hold would: the Task disappears from the state at once.
+  const complete = vi.fn<(held: Task, origin: DoneOrigin) => void>((held) => {
+    state.update((current) => (current === null ? current : withoutTask(current, held.id)));
+  });
+  const requestFocus = vi.fn<() => void>();
+  const doneUndo = {
+    complete,
+    requestFocus,
+    pending: signal<PendingDone | null>(null),
+    undone: signal<DoneUndone | null>(null),
+  };
 
   return {
     state,
     handleError,
+    doneUndo,
     status,
     awaitingSync,
     sends,
@@ -196,6 +209,7 @@ const stubs = (options: SetupOptions) => {
     next,
     providers: [
       { provide: DataStore, useValue: { state, status, awaitingSync, send, refresh } },
+      { provide: DoneUndo, useValue: doneUndo },
       { provide: Clock, useValue: { now: signal(T0) } },
       { provide: Ids, useValue: { next } },
       { provide: ErrorHandler, useValue: { handleError } },
@@ -242,6 +256,11 @@ const setup = async (options: SetupOptions = {}) => {
   };
   const click = async (el: HTMLElement | null | undefined): Promise<void> => {
     must(el).click();
+    await settle();
+  };
+  // A pointer press: `click()` has detail 0, which counts as a keyboard activation.
+  const press = async (el: HTMLElement | null | undefined): Promise<void> => {
+    must(el).dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
     await settle();
   };
   const heading = (): HTMLElement => must(root().querySelector('h1.task-editor__title'));
@@ -367,6 +386,7 @@ const setup = async (options: SetupOptions = {}) => {
     text,
     settle,
     click,
+    press,
     heading,
     statusLine,
     button,
@@ -832,33 +852,30 @@ describe('TaskEditor', () => {
       expect(must(saveButton()).disabled).toBe(true);
     });
 
-    it('never shows the missing line while a Done is on its way, then navigates', async () => {
-      const { text, heading, button, click, update, finish, navigate, send } = await setup();
+    it('never shows the missing line once a Done is held, and navigates at once', async () => {
+      const { text, heading, button, press, update, navigate, send, doneUndo } = await setup();
 
-      await click(button('Done'));
+      await press(button('Done'));
 
-      expect(sent(send, 0)).toEqual({
-        _tag: CommandTag.CompleteTask,
-        taskId: 't1',
-        expect: { status: 'open' },
-      });
+      expect(doneUndo.complete).toHaveBeenCalledExactlyOnceWith(CALL, DoneOrigin.Button);
+      expect(send).not.toHaveBeenCalled();
+      expect(navigate).toHaveBeenCalledExactlyOnceWith('/now', { replaceUrl: true });
 
       await update(withoutTask(BASE, 't1'));
 
       expect(text()).not.toContain('no longer open');
       expect(heading().textContent?.trim()).toBe('Call Marit');
-      expect(must(button('Done')).disabled).toBe(true);
-      expect(navigate).not.toHaveBeenCalled();
-
-      await finish(0, APPLIED);
-
-      expect(navigate).toHaveBeenCalledExactlyOnceWith('/now', { replaceUrl: true });
     });
 
-    it('shows the missing line again when a Done or Drop that left was not Applied', async () => {
-      const { text, button, click, update, finish, statusLine } = await setup();
+    it('shows the missing line again when a Drop that left was not Applied', async () => {
+      const { root, text, button, click, update, finish, statusLine } = await setup();
 
-      await click(button('Done'));
+      await click(button('Drop'));
+      await click(
+        Array.from(root().querySelectorAll<HTMLButtonElement>('.asys-confirm button')).find(
+          (b) => text(b) === 'Drop',
+        ),
+      );
       await update(withoutTask(BASE, 't1'));
       await finish(0, NOT_APPLICABLE);
 
@@ -868,45 +885,70 @@ describe('TaskEditor', () => {
   });
 
   describe('Done, Drop and Log progress', () => {
-    it('Done sends CompleteTask with the key and goes to Now when there is no history', async () => {
-      const { send, button, click, finish, navigate, back } = await setup();
+    it('Done holds the Task and goes to Now at once when there is no history', async () => {
+      const { doneUndo, send, button, press, navigate, back } = await setup();
 
-      await click(button('Done'));
+      await press(button('Done'));
 
-      expect(send).toHaveBeenCalledExactlyOnceWith(
-        { _tag: CommandTag.CompleteTask, taskId: 't1', expect: { status: 'open' } },
-        'key-1',
-      );
-
-      await finish(0, APPLIED, withTask(BASE, 't1', { status: TaskStatus.Done, version: 2 }));
-
+      expect(doneUndo.complete).toHaveBeenCalledExactlyOnceWith(CALL, DoneOrigin.Button);
+      expect(send).not.toHaveBeenCalled();
       expect(navigate).toHaveBeenCalledExactlyOnceWith('/now', { replaceUrl: true });
       expect(back).not.toHaveBeenCalled();
     });
 
-    it('goes back when the router has a previous navigation', async () => {
-      const { button, click, finish, navigate, back } = await setup({ withHistory: true });
+    it('Done goes back at once when the router has a previous navigation', async () => {
+      const { doneUndo, send, button, press, navigate, back } = await setup({ withHistory: true });
 
-      await click(button('Done'));
-      await finish(0, APPLIED, withoutTask(BASE, 't1'));
+      await press(button('Done'));
 
+      expect(doneUndo.complete).toHaveBeenCalledExactlyOnceWith(CALL, DoneOrigin.Button);
+      expect(send).not.toHaveBeenCalled();
       expect(back).toHaveBeenCalledTimes(1);
       expect(navigate).not.toHaveBeenCalled();
     });
 
-    it('keeps the screen with the message and enables the actions again when Done is not Applied', async () => {
-      const { button, click, finish, statusLine, navigate } = await setup();
+    it('a pointer Done does not ask the Undo bar for focus', async () => {
+      const { doneUndo, button, press } = await setup();
+
+      await press(button('Done'));
+
+      expect(doneUndo.requestFocus).not.toHaveBeenCalled();
+    });
+
+    it('a keyboard Done asks the Undo bar for focus, between holding the Task and leaving', async () => {
+      const { doneUndo, button, click, navigate } = await setup();
 
       await click(button('Done'));
+
+      expect(doneUndo.requestFocus).toHaveBeenCalledTimes(1);
+
+      const order = (fn: { mock: { invocationCallOrder: number[] } }): number =>
+        must(fn.mock.invocationCallOrder[0]);
+
+      expect(order(doneUndo.complete)).toBeLessThan(order(doneUndo.requestFocus));
+      expect(order(doneUndo.requestFocus)).toBeLessThan(order(navigate));
+    });
+
+    it('Done disables Done, Drop and Log progress and shows no message', async () => {
+      const { button, press, statusLine, send } = await setup();
+
+      await press(button('Done'));
 
       expect(must(button('Done')).disabled).toBe(true);
       expect(must(button('Drop')).disabled).toBe(true);
       expect(must(button('Log progress')).disabled).toBe(true);
+      expect(statusLine().textContent?.trim()).toBe('');
+      expect(send).not.toHaveBeenCalled();
+    });
 
-      await finish(0, FAILED);
+    it('Done holds nothing while the Task waits for the server', async () => {
+      const { doneUndo, button, press, awaitingSync, settle, navigate } = await setup();
 
-      expect(statusLine().textContent?.trim()).toBe(outcomeMessage(FAILED));
-      expect(must(button('Done')).disabled).toBe(false);
+      awaitingSync.set(new Set(['t1']));
+      await settle();
+      await press(button('Done'));
+
+      expect(doneUndo.complete).not.toHaveBeenCalled();
       expect(navigate).not.toHaveBeenCalled();
     });
 
@@ -1108,31 +1150,29 @@ describe('TaskEditor', () => {
       expect(line.textContent?.trim()).toBe('');
     });
 
-    it('Done does not navigate or go back', async () => {
-      const { fixture, sends, handleError, navigate, back, button, click } = await setup();
+    it('Done navigates once even when destroyed right after', async () => {
+      const { fixture, handleError, navigate, back, button, press } = await setup();
 
-      await click(button('Done'));
+      await press(button('Done'));
       fixture.destroy();
-      must(sends[0]).resolve(APPLIED);
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(navigate).not.toHaveBeenCalled();
+      expect(navigate).toHaveBeenCalledExactlyOnceWith('/now', { replaceUrl: true });
       expect(back).not.toHaveBeenCalled();
       expect(handleError).not.toHaveBeenCalled();
     });
 
-    it('Done does not go back when the router has history', async () => {
-      const { fixture, sends, handleError, navigate, back, button, click } = await setup({
+    it('Done goes back once even when destroyed right after, when the router has history', async () => {
+      const { fixture, handleError, navigate, back, button, press } = await setup({
         withHistory: true,
       });
 
-      await click(button('Done'));
+      await press(button('Done'));
       fixture.destroy();
-      must(sends[0]).resolve(APPLIED);
       await new Promise((resolve) => setTimeout(resolve, 0));
 
+      expect(back).toHaveBeenCalledTimes(1);
       expect(navigate).not.toHaveBeenCalled();
-      expect(back).not.toHaveBeenCalled();
       expect(handleError).not.toHaveBeenCalled();
     });
 

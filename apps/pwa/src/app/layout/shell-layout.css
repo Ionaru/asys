@@ -1,0 +1,68 @@
+/* SPDX-License-Identifier: EUPL-1.2 */
+:host {
+  --shell-nav-height: 56px;
+  --shell-undo-height: 0px;
+}
+
+.shell__header {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--space-2) var(--space-4);
+}
+
+.shell__page {
+  padding-bottom: calc(
+    var(--shell-nav-height) + var(--shell-undo-height) + var(--space-4) +
+      env(safe-area-inset-bottom)
+  );
+}
+
+.shell__page--pill {
+  padding-bottom: calc(
+    var(--shell-nav-height) + var(--shell-undo-height) + var(--space-4) +
+      env(safe-area-inset-bottom) + 56px + var(--space-3)
+  );
+}
+
+.shell__page--bar {
+  padding-bottom: calc(
+    var(--shell-nav-height) + var(--shell-undo-height) + var(--space-4) +
+      env(safe-area-inset-bottom) + var(--tap-target) + 3 * var(--space-3) + var(--space-2) +
+      var(--space-1) + 2 * var(--line-height-reason)
+  );
+}
+
+.shell__capture {
+  position: fixed;
+  right: var(--space-4);
+  bottom: calc(
+    var(--shell-nav-height) + var(--shell-undo-height) + var(--space-3) +
+      env(safe-area-inset-bottom)
+  );
+}
+
+.shell__quickadd {
+  position: fixed;
+  inset-inline: 0;
+  bottom: calc(var(--shell-nav-height) + var(--shell-undo-height) + env(safe-area-inset-bottom));
+  display: block;
+}
+
+.shell__undo {
+  position: fixed;
+  inset-inline: 0;
+  bottom: calc(var(--shell-nav-height) + env(safe-area-inset-bottom));
+}
+
+:host-context([data-theme='drive']) .shell__undo {
+  bottom: env(safe-area-inset-bottom);
+}
+
+.shell__nav {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  display: block;
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--surface);
+}

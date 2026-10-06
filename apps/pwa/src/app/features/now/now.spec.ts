@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: EUPL-1.2
-import { computed, ErrorHandler, signal } from '@angular/core';
+import { computed, ErrorHandler, signal, type AnimationCallbackEvent } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router, type UrlTree } from '@angular/router';
 import {
   CommandTag,
-  NotApplicableReason,
   pick,
   RejectedReason,
   TaskKind,
@@ -18,8 +17,10 @@ import {
 import { CommandOutcomeTag, type CommandOutcome } from '../../core/api/data-api';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { DataStore, SyncStatus } from '../../core/data/data-store';
+import { DoneOrigin, DoneUndo, type DoneUndone, type PendingDone } from '../../core/data/done-undo';
 import { Clock } from '../../core/platform/clock';
 import { Ids } from '../../core/platform/ids';
+import { Motion, MotionDuration, MotionEasing } from '../../core/platform/motion';
 import { TaskMorph } from '../../core/platform/task-morph';
 import { Now } from './now';
 
@@ -126,10 +127,61 @@ const deferred = <T>() => {
   return { promise, resolve };
 };
 
+const without = (state: DomainState, ...ids: string[]): DomainState => ({
+  ...state,
+  tasks: state.tasks.filter((t) => !ids.includes(t.id)),
+});
+
+const EXIT_KEYFRAMES = [
+  { translate: '0 0', opacity: 1 },
+  { translate: '100% 0', opacity: 0 },
+];
+
+const RISE_KEYFRAMES = [
+  { opacity: 0, translate: '0 8px' },
+  { opacity: 1, translate: '0 0' },
+];
+
+interface Play {
+  readonly el: Element;
+  readonly keyframes: unknown;
+  readonly options: unknown;
+  /** The title the card showed, and the inline opacity it had, when the play started. */
+  readonly title: string | null;
+  readonly opacity: string | null;
+}
+
+/** The handlers of Now that jsdom never reaches through the template. */
+interface NowInternals {
+  done(task: Task, origin?: DoneOrigin, keyboard?: boolean): unknown;
+  expand(event: AnimationCallbackEvent, id: string): unknown;
+  collapse(event: AnimationCallbackEvent): unknown;
+}
+
 interface SetupOptions {
   readonly state?: DomainState | null;
   readonly status?: SyncStatus;
+  /** What `Motion.allowed()` answers; false unless a case needs the exit phase. */
+  readonly allowed?: boolean;
+  /** Whether `Motion.play` stays pending until `motion.release()`. */
+  readonly hold?: boolean;
+  /** The value of `DoneUndo.undone` when Now is created. */
+  readonly undone?: DoneUndone | null;
 }
+
+const fakeAnimationEvent = (height = 56) => {
+  const target = document.createElement('li');
+
+  Object.defineProperty(target, 'offsetHeight', { configurable: true, value: height });
+
+  const animationComplete = vi.fn();
+
+  return {
+    target,
+    animationComplete,
+    event: { target, animationComplete } as unknown as AnimationCallbackEvent,
+  };
+};
 
 const setup = async (options: SetupOptions = {}) => {
   const state = signal<DomainState | null>(options.state === undefined ? FULL : options.state);
@@ -153,11 +205,55 @@ const setup = async (options: SetupOptions = {}) => {
   let counter = 0;
   const next = vi.fn<() => string>(() => `key-${++counter}`);
   const handleError = vi.fn<(error: unknown) => void>();
+  const pending = signal<PendingDone | null>(null);
+  const undone = signal<DoneUndone | null>(options.undone ?? null);
+  // As a hold would: the Task disappears from the state at once.
+  const complete = vi.fn<(task: Task, origin: DoneOrigin) => void>((done) => {
+    state.update((s) => (s === null ? s : without(s, done.id)));
+  });
+  const requestFocus = vi.fn<() => void>();
+  const doneUndo = { complete, requestFocus, pending, undone };
+  const plays: Play[] = [];
+  const held: ReturnType<typeof deferred<void>>[] = [];
+  let holding = options.hold ?? false;
+  const play = vi.fn((el: Element, keyframes: unknown, playOptions: unknown): Promise<void> => {
+    plays.push({
+      el,
+      keyframes,
+      options: playOptions,
+      title: el.querySelector('.asys-top-pick__title')?.textContent?.trim() ?? null,
+      opacity: el instanceof HTMLElement ? el.style.opacity : null,
+    });
+
+    if (!holding) {
+      return Promise.resolve();
+    }
+
+    const d = deferred<void>();
+
+    held.push(d);
+
+    return d.promise;
+  });
+  const motion = {
+    plays,
+    play,
+    /** Resolves every pending play, and lets later ones resolve at once. */
+    release: (): void => {
+      holding = false;
+      held.splice(0).forEach((d) => d.resolve());
+    },
+  };
 
   TestBed.configureTestingModule({
     providers: [
       provideRouter([]),
       { provide: DataStore, useValue: { state, status, awaitingSync, now, send, refresh } },
+      { provide: DoneUndo, useValue: doneUndo },
+      {
+        provide: Motion,
+        useValue: { allowed: () => options.allowed ?? false, reduced: signal(false), play },
+      },
       { provide: Clock, useValue: { now: clockNow } },
       { provide: Ids, useValue: { next } },
       { provide: ErrorHandler, useValue: { handleError } },
@@ -189,6 +285,13 @@ const setup = async (options: SetupOptions = {}) => {
     must(el).click();
     await settle();
   };
+  // A pointer press: `click()` has detail 0, which counts as a keyboard activation.
+  const press = async (el: HTMLElement | undefined): Promise<void> => {
+    must(el).dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    await settle();
+  };
+  const article = (): HTMLElement => must(root().querySelector('.asys-top-pick'));
+  const internals = (): NowInternals => fixture.componentInstance as unknown as NowInternals;
   const form = (): HTMLFormElement | null => root().querySelector('asys-log-progress-form form');
   const formInput = (): HTMLInputElement | null =>
     root().querySelector('asys-log-progress-form input');
@@ -218,6 +321,11 @@ const setup = async (options: SetupOptions = {}) => {
     refresh,
     next,
     handleError,
+    doneUndo,
+    motion,
+    internals,
+    article,
+    press,
     root,
     text,
     settle,
@@ -235,13 +343,6 @@ const setup = async (options: SetupOptions = {}) => {
     waitingHeader,
   };
 };
-
-const without = (state: DomainState, ...ids: string[]): DomainState => ({
-  ...state,
-  tasks: state.tasks.filter((t) => !ids.includes(t.id)),
-});
-
-const doneTask = (t: Task): Task => ({ ...t, status: TaskStatus.Done, closedAt: T0 });
 
 describe('Now', () => {
   afterEach(() => {
@@ -432,13 +533,16 @@ describe('Now', () => {
       expect(topButton('Done')?.disabled).toBe(false);
     });
 
-    it('sends nothing for Done', async () => {
-      const { topButton, awaitingSync, send, click } = await setup();
+    it('sends and holds nothing for Done', async () => {
+      const { doneUndo, internals, topButton, awaitingSync, send, press, settle } = await setup();
 
       awaitingSync.set(new Set(['invoice']));
-      await click(topButton('Done'));
+      await press(topButton('Done'));
+      await internals().done(INVOICE, DoneOrigin.Button, false);
+      await settle();
 
       expect(send).not.toHaveBeenCalled();
+      expect(doneUndo.complete).not.toHaveBeenCalled();
     });
 
     it('shows the note before the Log progress form', async () => {
@@ -684,158 +788,583 @@ describe('Now', () => {
   });
 
   describe('Done', () => {
-    const DONE: Command = {
-      _tag: CommandTag.CompleteTask,
-      taskId: 'invoice',
-      expect: { status: TaskStatus.Open },
-    };
+    it('hands the Task to DoneUndo as a Button Done and sends nothing itself', async () => {
+      const { doneUndo, send, topButton, press } = await setup();
 
-    it('sends the command with the key from the attempts and disables the actions meanwhile', async () => {
-      const { send, topButton, click } = await setup();
+      await press(topButton('Done'));
 
-      await click(topButton('Done'));
-
-      expect(send).toHaveBeenCalledExactlyOnceWith(DONE, 'key-1');
-      expect(topButton('Done')?.disabled).toBe(true);
-      expect(topButton('Log progress')?.disabled).toBe(true);
+      expect(doneUndo.complete).toHaveBeenCalledExactlyOnceWith(INVOICE, DoneOrigin.Button);
+      expect(doneUndo.requestFocus).not.toHaveBeenCalled();
+      expect(send).not.toHaveBeenCalled();
     });
 
-    it('sends nothing for a second Done while the first is pending', async () => {
-      const { send, topButton, click } = await setup();
+    it('shows a check and Done in place of the actions while the exit is playing', async () => {
+      const { doneUndo, motion, topPick, topTitle, topButton, press } = await setup({
+        allowed: true,
+        hold: true,
+      });
 
-      await click(topButton('Done'));
-      await click(topButton('Done'));
+      await press(topButton('Done'));
 
-      expect(send).toHaveBeenCalledTimes(1);
+      expect(doneUndo.complete).toHaveBeenCalledTimes(1);
+      expect(topPick()).not.toBeNull();
+      expect(topTitle().textContent?.trim()).toBe('Pay the invoice');
+      expect(must(topPick()).querySelector('.asys-top-pick__done')?.textContent?.trim()).toBe(
+        'Done',
+      );
+      expect(topButton('Done')).toBeUndefined();
+      expect(topButton('Log progress')).toBeUndefined();
+
+      motion.release();
     });
 
-    it('announces the Task as Done and moves focus to the next top pick', async () => {
-      const { state, sends, statusLine, topTitle, topButton, click, settle } = await setup();
+    it('marks the leaving card inert and with data-leaving, and only while it leaves', async () => {
+      const { motion, topPick, topButton, press, settle } = await setup({
+        allowed: true,
+        hold: true,
+      });
 
-      await click(topButton('Done'));
-      must(sends[0]).resolve(APPLIED);
-      state.update((s) => ({
-        ...must(s),
-        tasks: must(s).tasks.map((t) => (t.id === 'invoice' ? doneTask(t) : t)),
-      }));
+      expect(must(topPick()).hasAttribute('inert')).toBe(false);
+      expect(must(topPick()).hasAttribute('data-leaving')).toBe(false);
+
+      await press(topButton('Done'));
+
+      expect(must(topPick()).hasAttribute('inert')).toBe(true);
+      expect(must(topPick()).hasAttribute('data-leaving')).toBe(true);
+
+      motion.release();
       await settle();
 
-      expect(statusLine().textContent?.trim()).toBe('\u201cPay the invoice\u201d is Done.');
+      expect(must(topPick()).hasAttribute('inert')).toBe(false);
+      expect(must(topPick()).hasAttribute('data-leaving')).toBe(false);
+    });
+
+    it('keeps the promoted Task as a row while the old card leaves, and shows it once only', async () => {
+      const { motion, rows, topButton, press, settle } = await setup({
+        allowed: true,
+        hold: true,
+      });
+
+      await press(topButton('Done'));
+
+      expect(rows().map((a) => a.getAttribute('href'))).toEqual([
+        '/tasks/dentist',
+        '/tasks/plants',
+      ]);
+
+      motion.release();
+      await settle();
+
+      expect(rows().map((a) => a.getAttribute('href'))).toEqual(['/tasks/plants']);
+    });
+
+    it('plays the exit on the card after 100 ms, then the rise on the new content', async () => {
+      const { motion, article, topTitle, topButton, press } = await setup({ allowed: true });
+      const card = article();
+
+      await press(topButton('Done'));
+
+      const [exit, rise] = motion.plays;
+
+      expect(motion.plays).toHaveLength(2);
+      expect(must(exit).el).toBe(card);
+      expect(must(exit).keyframes).toEqual(EXIT_KEYFRAMES);
+      expect(must(exit).options).toEqual({
+        duration: MotionDuration.Quick,
+        easing: MotionEasing.In,
+        delay: 100,
+      });
+      expect(must(exit).title).toBe('Pay the invoice');
+      expect(must(rise).el).toBe(card);
+      expect(must(rise).keyframes).toEqual(RISE_KEYFRAMES);
+      expect(must(rise).options).toEqual({
+        duration: MotionDuration.Moderate,
+        easing: MotionEasing.Out,
+      });
+      // The new content is rendered, and hidden until the rise starts.
+      expect(must(rise).title).toBe('Call the dentist');
+      expect(must(rise).opacity).toBe('0');
+      expect(topTitle().textContent?.trim()).toBe('Call the dentist');
+      expect(card.style.opacity).toBe('');
+    });
+
+    it('moves focus to the new top pick title once the exit is over, and clears the status line', async () => {
+      const { statusLine, topTitle, topButton, press } = await setup({ allowed: true });
+
+      await press(topButton('Done'));
+
+      expect(statusLine().textContent?.trim()).toBe('');
       expect(topTitle().textContent?.trim()).toBe('Call the dentist');
       expect(document.activeElement).toBe(topTitle());
     });
 
-    it('does nothing when the screen is destroyed while the send is pending', async () => {
-      const { fixture, sends, statusLine, handleError, topButton, click } = await setup();
-      const line = statusLine();
+    it('still hands over to the next top pick when motion is not allowed', async () => {
+      const { doneUndo, topTitle, topButton, press } = await setup({ allowed: false });
 
-      await click(topButton('Done'));
+      await press(topButton('Done'));
+
+      expect(doneUndo.complete).toHaveBeenCalledTimes(1);
+      expect(topTitle().textContent?.trim()).toBe('Call the dentist');
+      expect(document.activeElement).toBe(topTitle());
+    });
+
+    it('leaves focus on the Undo bar for a keyboard Done and asks for it once', async () => {
+      const { doneUndo, topTitle, topButton, settle } = await setup({ allowed: true });
+
+      must(topButton('Done')).click();
+      await settle();
+
+      expect(doneUndo.complete).toHaveBeenCalledExactlyOnceWith(INVOICE, DoneOrigin.Button);
+      expect(doneUndo.requestFocus).toHaveBeenCalledTimes(1);
+      expect(topTitle().textContent?.trim()).toBe('Call the dentist');
+      expect(document.activeElement).not.toBe(topTitle());
+    });
+
+    it('does nothing for a second Done of the Task that is leaving', async () => {
+      const { doneUndo, motion, internals, topButton, press } = await setup({
+        allowed: true,
+        hold: true,
+      });
+
+      await press(topButton('Done'));
+      await internals().done(INVOICE, DoneOrigin.Button, false);
+
+      expect(doneUndo.complete).toHaveBeenCalledTimes(1);
+
+      motion.release();
+    });
+
+    it('takes over from a running exit when a new Done arrives, and shows the next top pick', async () => {
+      const { doneUndo, motion, internals, topPick, topTitle, topButton, press, settle } =
+        await setup({ allowed: true, hold: true });
+
+      await press(topButton('Done'));
+      const second = internals().done(DENTIST, DoneOrigin.Button, false);
+      motion.release();
+      await second;
+      await settle();
+
+      expect(doneUndo.complete).toHaveBeenCalledTimes(2);
+      expect(must(topPick()).hasAttribute('data-leaving')).toBe(false);
+      expect(must(topPick()).hasAttribute('inert')).toBe(false);
+      expect(topTitle().textContent?.trim()).toBe('Send the report');
+      expect(topPick()?.querySelector('.asys-top-pick__done')).toBeNull();
+      expect(
+        motion.plays.some((p) => JSON.stringify(p.keyframes) === JSON.stringify(RISE_KEYFRAMES)),
+      ).toBe(true);
+    });
+
+    it('takes over from a running exit for a Swipe, rising the next content and moving focus', async () => {
+      const { motion, internals, topPick, topTitle, topButton, press, settle } = await setup({
+        allowed: true,
+        hold: true,
+      });
+
+      await press(topButton('Done'));
+      await internals().done(DENTIST, DoneOrigin.Swipe, false);
+      motion.release();
+      await settle();
+
+      expect(must(topPick()).hasAttribute('data-leaving')).toBe(false);
+      expect(must(topPick()).hasAttribute('inert')).toBe(false);
+      expect(topTitle().textContent?.trim()).toBe('Send the report');
+      expect(
+        motion.plays.some((p) => JSON.stringify(p.keyframes) === JSON.stringify(RISE_KEYFRAMES)),
+      ).toBe(true);
+      expect(document.activeElement).toBe(topTitle());
+    });
+
+    it('shows the Task again, not leaving, when it is undone during its exit, and the exit then does nothing more', async () => {
+      const { state, doneUndo, motion, topPick, topTitle, topButton, press, settle } = await setup({
+        allowed: true,
+        hold: true,
+      });
+
+      await press(topButton('Done'));
+      state.set(FULL);
+      doneUndo.undone.set({ taskId: 'invoice', seq: 1 });
+      await settle();
+
+      expect(topTitle().textContent?.trim()).toBe('Pay the invoice');
+      expect(must(topPick()).hasAttribute('data-leaving')).toBe(false);
+      expect(topPick()?.querySelector('.asys-top-pick__done')).toBeNull();
+
+      const played = motion.plays.length;
+
+      motion.release();
+      await settle();
+
+      expect(motion.plays).toHaveLength(played);
+      expect(topTitle().textContent?.trim()).toBe('Pay the invoice');
+      expect(must(topPick()).hasAttribute('data-leaving')).toBe(false);
+      expect(must(topPick()).hasAttribute('inert')).toBe(false);
+    });
+
+    it('does nothing for a Done of the Task that DoneUndo already holds', async () => {
+      const { doneUndo, internals, settle } = await setup();
+
+      doneUndo.pending.set({
+        taskId: 'invoice',
+        title: 'Pay the invoice',
+        origin: DoneOrigin.Button,
+      });
+      await internals().done(INVOICE, DoneOrigin.Button, false);
+      await settle();
+
+      expect(doneUndo.complete).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when the screen is destroyed while the exit is playing', async () => {
+      const { fixture, motion, handleError, doneUndo, topButton, press } = await setup({
+        allowed: true,
+        hold: true,
+      });
+
+      await press(topButton('Done'));
       fixture.destroy();
-      must(sends[0]).resolve(APPLIED);
+      motion.release();
       await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(handleError).not.toHaveBeenCalled();
-      expect(line.textContent?.trim()).toBe('');
+      expect(doneUndo.requestFocus).not.toHaveBeenCalled();
+      // Only the exit was played: no rise starts on a destroyed screen.
+      expect(motion.plays).toHaveLength(1);
     });
 
-    it('moves focus to the heading when no Task is ranked any more', async () => {
-      const { state, sends, statusLine, heading, topPick, topButton, click, settle } = await setup({
+    it('keeps the card while the exit plays and moves focus to the heading when no Task is ranked any more', async () => {
+      const { motion, root, heading, topPick, topButton, press, settle } = await setup({
         state: domainState([INVOICE]),
+        allowed: true,
+        hold: true,
       });
 
-      await click(topButton('Done'));
-      must(sends[0]).resolve(APPLIED);
-      state.set(domainState([doneTask(INVOICE)]));
+      await press(topButton('Done'));
+
+      expect(topPick()).not.toBeNull();
+      expect(root().querySelector('.asys-top-pick__done')).not.toBeNull();
+      expect(root().textContent).not.toContain('Nothing to do right now.');
+
+      motion.release();
       await settle();
 
-      expect(statusLine().textContent?.trim()).toBe('\u201cPay the invoice\u201d is Done.');
       expect(topPick()).toBeNull();
+      expect(root().querySelector('p.now__text')?.textContent?.trim()).toBe(
+        'Nothing to do right now.',
+      );
+      expect(document.activeElement).toBe(heading());
+      // There is no card to rise: only the exit was played.
+      expect(motion.plays).toHaveLength(1);
+    });
+
+    it('clears an earlier Log progress message', async () => {
+      const { sends, statusLine, topButton, press, click, typeIntoForm, formButton, settle } =
+        await setup();
+
+      await click(topButton('Log progress'));
+      await typeIntoForm('15');
+      await click(formButton('Save'));
+      must(sends[0]).resolve(FAILED);
+      await settle();
+
+      expect(statusLine().textContent?.trim()).not.toBe('');
+
+      await press(topButton('Done'));
+
+      expect(statusLine().textContent?.trim()).toBe('');
+    });
+
+    it('shows a released Task as the top pick again, with Done enabled, and moves no focus', async () => {
+      const { state, heading, topTitle, topButton, press, settle } = await setup({
+        allowed: true,
+      });
+
+      await press(topButton('Done'));
+
+      expect(topTitle().textContent?.trim()).toBe('Call the dentist');
+
+      heading().focus();
+      state.set(FULL);
+      await settle();
+
+      expect(topTitle().textContent?.trim()).toBe('Pay the invoice');
+      expect(topButton('Done')?.disabled).toBe(false);
       expect(document.activeElement).toBe(heading());
     });
 
-    it('clears an earlier message when the next Done starts', async () => {
-      const { sends, statusLine, topButton, click, settle } = await setup();
+    describe('on a ranked row', () => {
+      it('holds that Task and leaves the card, focus and motion alone', async () => {
+        const { doneUndo, motion, internals, heading, topPick, topTitle, now, settle } =
+          await setup({ allowed: true });
+        const plants = must(now().ranked[2]).task;
 
-      await click(topButton('Done'));
-      must(sends[0]).resolve(FAILED);
-      await settle();
+        heading().focus();
+        await internals().done(plants, DoneOrigin.Button, false);
+        await settle();
 
-      expect(statusLine().textContent?.trim()).not.toBe('');
-
-      await click(topButton('Done'));
-
-      expect(statusLine().textContent?.trim()).toBe('');
-    });
-
-    it('shows the message of a Failed outcome and keeps the Task as top pick', async () => {
-      const { sends, statusLine, topTitle, topButton, click, settle } = await setup();
-
-      await click(topButton('Done'));
-      must(sends[0]).resolve(FAILED);
-      await settle();
-
-      expect(statusLine().textContent?.trim()).toBe(outcomeMessage(FAILED));
-      expect(statusLine().textContent?.trim()).not.toBe('');
-      expect(topTitle().textContent?.trim()).toBe('Pay the invoice');
-      expect(topButton('Done')?.disabled).toBe(false);
-    });
-
-    it('retries a Failed Done with the same command and the same key', async () => {
-      const { send, sends, topButton, click, settle } = await setup();
-
-      await click(topButton('Done'));
-      must(sends[0]).resolve(FAILED);
-      await settle();
-      await click(topButton('Done'));
-
-      expect(send).toHaveBeenCalledTimes(2);
-      expect(send.mock.calls[1]).toEqual([DONE, 'key-1']);
-    });
-
-    it('uses a new key for a new Done after the first one was settled without failing', async () => {
-      const { send, sends, topButton, click, settle } = await setup();
-
-      await click(topButton('Done'));
-      must(sends[0]).resolve({
-        _tag: CommandOutcomeTag.Rejected,
-        reason: RejectedReason.NotFound,
+        expect(doneUndo.complete).toHaveBeenCalledExactlyOnceWith(PLANTS, DoneOrigin.Button);
+        expect(topTitle().textContent?.trim()).toBe('Pay the invoice');
+        expect(must(topPick()).hasAttribute('data-leaving')).toBe(false);
+        expect(topPick()?.querySelector('.asys-top-pick__done')).toBeNull();
+        expect(motion.plays).toEqual([]);
+        expect(document.activeElement).toBe(heading());
       });
-      await settle();
-      await click(topButton('Done'));
-
-      expect(must(send.mock.calls[1])[1]).toBe('key-2');
     });
 
-    it.each<[string, CommandOutcome]>([
-      [
-        'NotApplicable',
-        {
-          _tag: CommandOutcomeTag.NotApplicable,
-          reason: NotApplicableReason.NotOpen,
-          reviewItemId: 'r1',
-        },
-      ],
-      ['Rejected', { _tag: CommandOutcomeTag.Rejected, reason: RejectedReason.NotFound }],
-      ['KeyReused', { _tag: CommandOutcomeTag.KeyReused }],
-    ])('shows the outcome message for %s', async (_name, outcome) => {
-      const { sends, statusLine, topButton, click, settle } = await setup();
+    describe('as a Swipe', () => {
+      it('skips the exit and rises the next content at once', async () => {
+        const { doneUndo, motion, internals, article, root, topTitle, now, settle } = await setup({
+          allowed: true,
+          hold: true,
+        });
+        const card = article();
+        const invoice = must(now().ranked[0]).task;
 
-      await click(topButton('Done'));
-      must(sends[0]).resolve(outcome);
-      await settle();
+        await internals().done(invoice, DoneOrigin.Swipe, false);
+        await settle();
 
-      expect(outcomeMessage(outcome)).not.toBeNull();
-      expect(statusLine().textContent?.trim()).toBe(outcomeMessage(outcome));
+        expect(doneUndo.complete).toHaveBeenCalledExactlyOnceWith(INVOICE, DoneOrigin.Swipe);
+        expect(root().querySelector('.asys-top-pick__done')).toBeNull();
+        expect(topTitle().textContent?.trim()).toBe('Call the dentist');
+        expect(motion.plays).toHaveLength(1);
+        expect(must(motion.plays[0]).el).toBe(card);
+        expect(must(motion.plays[0]).keyframes).toEqual(RISE_KEYFRAMES);
+        expect(card.style.opacity).toBe('');
+        expect(document.activeElement).toBe(topTitle());
+
+        motion.release();
+      });
     });
 
-    it('shows nothing for SignedOut', async () => {
-      const { sends, statusLine, topButton, click, settle } = await setup();
+    describe('the row handlers', () => {
+      it('collapse always plays the collapse and completes the animation', async () => {
+        const { motion, internals } = await setup({ allowed: true });
+        const { event, target, animationComplete } = fakeAnimationEvent(64);
 
-      await click(topButton('Done'));
-      must(sends[0]).resolve({ _tag: CommandOutcomeTag.SignedOut });
+        await internals().collapse(event);
+
+        expect(motion.plays).toHaveLength(1);
+        expect(must(motion.plays[0]).el).toBe(target);
+        expect(must(motion.plays[0]).keyframes).toEqual([
+          { height: '64px', overflow: 'clip' },
+          { height: '0px', overflow: 'clip' },
+        ]);
+        expect(animationComplete).toHaveBeenCalledTimes(1);
+      });
+
+      it('expand plays nothing before any Undo', async () => {
+        const { motion, internals } = await setup({ allowed: true });
+
+        await internals().expand(fakeAnimationEvent().event, 'dentist');
+        await internals().expand(fakeAnimationEvent().event, 'plants');
+
+        expect(motion.plays).toEqual([]);
+      });
+
+      describe('collapse and focus', () => {
+        const eventFor = (target: Element) => {
+          const animationComplete = vi.fn();
+
+          return {
+            animationComplete,
+            event: { target, animationComplete } as unknown as AnimationCallbackEvent,
+          };
+        };
+        const rowOf = (link: HTMLAnchorElement | undefined): HTMLElement =>
+          must(must(link).closest('li'));
+
+        it('moves focus to the top pick title when the collapsing row holds focus', async () => {
+          const { motion, internals, rows, topTitle, settle } = await setup({ allowed: true });
+          const row = rowOf(rows()[0]);
+
+          must(rows()[0]).focus();
+
+          expect(document.activeElement).toBe(rows()[0]);
+
+          const { event, animationComplete } = eventFor(row);
+
+          await internals().collapse(event);
+          await settle();
+
+          expect(document.activeElement).toBe(topTitle());
+          expect(topTitle().textContent?.trim()).toBe('Pay the invoice');
+          // The collapse itself still runs and still completes.
+          expect(motion.plays).toHaveLength(1);
+          expect(must(motion.plays[0]).el).toBe(row);
+          expect(animationComplete).toHaveBeenCalledTimes(1);
+        });
+
+        it('moves focus to the top pick title when the focus is deeper inside the collapsing row', async () => {
+          const { internals, topTitle, settle } = await setup({ allowed: true });
+          const row = document.createElement('li');
+          const button = document.createElement('button');
+
+          row.appendChild(button);
+          document.body.appendChild(row);
+          button.focus();
+
+          await internals().collapse(eventFor(row).event);
+          await settle();
+
+          expect(document.activeElement).toBe(topTitle());
+        });
+
+        it('moves focus to the h1 when the collapsing row holds focus and no card is displayed', async () => {
+          const { internals, heading, topPick, settle } = await setup({
+            allowed: true,
+            state: domainState([]),
+          });
+          const row = document.createElement('li');
+          const button = document.createElement('button');
+
+          row.appendChild(button);
+          document.body.appendChild(row);
+          button.focus();
+
+          expect(topPick()).toBeNull();
+
+          await internals().collapse(eventFor(row).event);
+          await settle();
+
+          expect(document.activeElement).toBe(heading());
+        });
+
+        it('moves nothing when the focus is elsewhere in the page', async () => {
+          const { internals, rows, heading, settle } = await setup({ allowed: true });
+
+          heading().focus();
+          await internals().collapse(eventFor(rowOf(rows()[0])).event);
+          await settle();
+
+          expect(document.activeElement).toBe(heading());
+        });
+
+        it('moves nothing when another row holds focus', async () => {
+          const { internals, rows, settle } = await setup({ allowed: true });
+          const other = must(rows()[1]);
+
+          other.focus();
+          await internals().collapse(eventFor(rowOf(rows()[0])).event);
+          await settle();
+
+          expect(document.activeElement).toBe(other);
+        });
+
+        it('moves nothing when nothing has focus', async () => {
+          const { internals, rows, settle } = await setup({ allowed: true });
+
+          await internals().collapse(eventFor(rowOf(rows()[0])).event);
+          await settle();
+
+          expect(document.activeElement).toBe(document.body);
+        });
+      });
+    });
+  });
+
+  describe('Undo', () => {
+    it('plays the rise on the card for the Task that comes back', async () => {
+      const { state, doneUndo, motion, article, topButton, press, settle } = await setup({
+        allowed: true,
+      });
+      const card = article();
+
+      await press(topButton('Done'));
+      motion.plays.length = 0;
+      state.set(FULL);
+      doneUndo.undone.set({ taskId: 'invoice', seq: 1 });
       await settle();
 
-      expect(statusLine().textContent?.trim()).toBe('');
+      expect(motion.plays).toHaveLength(1);
+      expect(must(motion.plays[0]).el).toBe(card);
+      expect(must(motion.plays[0]).keyframes).toEqual(RISE_KEYFRAMES);
+      expect(must(motion.plays[0]).options).toEqual({
+        duration: MotionDuration.Moderate,
+        easing: MotionEasing.Out,
+      });
+      expect(must(motion.plays[0]).title).toBe('Pay the invoice');
+    });
+
+    it('ignores an Undo from before Now was created, and reacts to a later one', async () => {
+      const { doneUndo, motion, article, settle } = await setup({
+        allowed: true,
+        undone: { taskId: 'invoice', seq: 1 },
+      });
+      const card = article();
+
+      await settle();
+
+      expect(motion.plays).toEqual([]);
+
+      doneUndo.undone.set({ taskId: 'invoice', seq: 2 });
+      await settle();
+
+      expect(motion.plays).toHaveLength(1);
+      expect(must(motion.plays[0]).el).toBe(card);
+      expect(must(motion.plays[0]).keyframes).toEqual(RISE_KEYFRAMES);
+    });
+
+    it('plays no rise when the restored Task is not the one on the card', async () => {
+      const { doneUndo, motion, settle } = await setup({ allowed: true });
+
+      doneUndo.undone.set({ taskId: 'plants', seq: 1 });
+      await settle();
+
+      expect(motion.plays).toEqual([]);
+    });
+
+    it('expands only the row of the Task that the Done promoted, and only once', async () => {
+      const { state, doneUndo, motion, internals, topButton, press, settle } = await setup({
+        allowed: true,
+      });
+
+      await press(topButton('Done'));
+      motion.plays.length = 0;
+      state.set(FULL);
+      doneUndo.undone.set({ taskId: 'invoice', seq: 1 });
+      await settle();
+      motion.plays.length = 0;
+
+      const plants = fakeAnimationEvent(40);
+      const dentist = fakeAnimationEvent(56);
+      const again = fakeAnimationEvent(56);
+
+      await internals().expand(plants.event, 'plants');
+      await internals().expand(dentist.event, 'dentist');
+      await internals().expand(again.event, 'dentist');
+
+      expect(motion.plays).toHaveLength(1);
+      expect(must(motion.plays[0]).el).toBe(dentist.target);
+      expect(must(motion.plays[0]).keyframes).toEqual([
+        { height: '0px', overflow: 'clip' },
+        { height: '56px', overflow: 'clip' },
+      ]);
+      expect(must(motion.plays[0]).options).toEqual({
+        duration: MotionDuration.Moderate,
+        easing: MotionEasing.Out,
+      });
+      expect(dentist.animationComplete).toHaveBeenCalledTimes(1);
+    });
+
+    it('expands the row of a ranked Task that was held and comes back, without a card rise', async () => {
+      const { state, doneUndo, motion, internals, now, settle } = await setup({ allowed: true });
+      const dentist = must(now().ranked[1]).task;
+
+      await internals().done(dentist, DoneOrigin.Button, false);
+      await settle();
+      state.set(FULL);
+      doneUndo.undone.set({ taskId: 'dentist', seq: 1 });
+      await settle();
+
+      expect(motion.plays).toEqual([]);
+
+      const plants = fakeAnimationEvent();
+      const row = fakeAnimationEvent(48);
+
+      await internals().expand(plants.event, 'plants');
+      await internals().expand(row.event, 'dentist');
+
+      expect(motion.plays).toHaveLength(1);
+      expect(must(motion.plays[0]).el).toBe(row.target);
     });
   });
 
@@ -993,20 +1522,19 @@ describe('Now', () => {
       expect(document.activeElement).toBe(topButton('Log progress'));
     });
 
-    it('sends nothing from the form while a Done is pending', async () => {
-      const { send, topButton, click, typeIntoForm, form, formButton, settle } = await setup();
+    it('closes the form when Done is pressed while it is open, and sends nothing', async () => {
+      const { doneUndo, send, topButton, press, form, settle } = await setup();
 
-      await click(topButton('Log progress'));
-      await click(topButton('Done'));
-      await typeIntoForm('15');
+      await press(topButton('Log progress'));
 
-      expect(formButton('Save')?.disabled).toBe(true);
+      expect(form()).not.toBeNull();
 
-      must(form()).dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      await press(topButton('Done'));
       await settle();
 
-      expect(send).toHaveBeenCalledTimes(1);
-      expect((must(send.mock.calls[0])[0] as Command)._tag).toBe(CommandTag.CompleteTask);
+      expect(doneUndo.complete).toHaveBeenCalledTimes(1);
+      expect(form()).toBeNull();
+      expect(send).not.toHaveBeenCalled();
     });
 
     it('sends nothing from the form while the Task awaits the server', async () => {

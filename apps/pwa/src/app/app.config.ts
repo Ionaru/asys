@@ -11,6 +11,7 @@ import { provideRouter, withComponentInputBinding, withViewTransitions } from '@
 import { provideServiceWorker } from '@angular/service-worker';
 
 import { routes } from './app.routes';
+import { keepaliveInterceptor } from './core/api/keepalive';
 import { Session } from './core/auth/session';
 import { unauthorizedInterceptor } from './core/auth/unauthorized.interceptor';
 import { Theme } from './core/platform/theme';
@@ -24,7 +25,7 @@ export const appConfig: ApplicationConfig = {
       withComponentInputBinding(),
       withViewTransitions({ skipInitialTransition: true, onViewTransitionCreated }),
     ),
-    provideHttpClient(withInterceptors([unauthorizedInterceptor])),
+    provideHttpClient(withInterceptors([unauthorizedInterceptor, keepaliveInterceptor])),
     provideAppInitializer(() => {
       inject(Session).check();
     }),

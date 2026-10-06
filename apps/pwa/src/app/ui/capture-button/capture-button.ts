@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: EUPL-1.2
-import { Component, ViewEncapsulation } from '@angular/core';
+import { Component, input, ViewEncapsulation } from '@angular/core';
 
 /** The Capture pill that opens quick add. */
 @Component({
   selector: 'button[asys-capture-button]',
-  template: 'Capture',
+  template: `<span class="asys-capture__label">{{ count() > 0 ? 'Capture ' : 'Capture' }}</span>
+    @if (count() > 0) {
+      <span class="asys-capture__badge"
+        >{{ count() }}<span class="asys-visually-hidden"> not captured</span></span
+      >
+    }`,
   encapsulation: ViewEncapsulation.None,
   host: {
     class: 'asys-capture',
@@ -29,6 +34,21 @@ import { Component, ViewEncapsulation } from '@angular/core';
       font-weight: 600;
     }
 
+    .asys-capture__badge {
+      min-width: calc(var(--line-height-label) + var(--space-1));
+      padding: 0 var(--space-1);
+      border-radius: var(--radius-sm);
+      background: var(--ink);
+      color: var(--paper);
+      text-align: center;
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+      font-size: var(--font-size-label);
+      line-height: var(--line-height-label);
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
     .asys-capture:active {
       opacity: 0.85;
     }
@@ -38,4 +58,6 @@ import { Component, ViewEncapsulation } from '@angular/core';
     }
   `,
 })
-export class CaptureButton {}
+export class CaptureButton {
+  readonly count = input<number>(0);
+}
