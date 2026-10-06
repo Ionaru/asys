@@ -23,7 +23,8 @@ Lint bans runtime imports of `@asys/contract`, `effect` and `@ionaru/effect-pass
 ## Component conventions
 
 - Use signals throughout: `input()`, `output()`, `model()`, `viewChild()`, and `inject()` fields. Never `@Input`, `@Output`, `NgModule` or `ngModel`.
-- Write templates and styles inline. Forms use Signal Forms (`@angular/forms/signals`), and shared controls implement `FormValueControl<T>` (`ui/text-field`, `ui/segmented`).
+- Write templates and styles inline until the component's `.ts` file reaches 100 lines, then move them to `<name>.component.html` and `<name>.css` as the `angular-component-files` rule (`.agents/rules/`) says.
+- Forms use Signal Forms (`@angular/forms/signals`), and shared controls implement `FormValueControl<T>` (`ui/text-field`, `ui/segmented`).
 - **`ui` components:**
   - Use the selector `asys-<name>` and `ViewEncapsulation.None`.
   - The host class has the `asys-` prefix, with BEM elements and `--modifier` classes. Bind them in `host: {}` (see `ui/quadrant-chip`).
@@ -39,7 +40,7 @@ Lint bans runtime imports of `@asys/contract`, `effect` and `@ionaru/effect-pass
 - **Accessibility:**
   - Errors read "Error:" with `aria-invalid` and `aria-describedby`, never colour alone.
   - Quadrants differ in lightness or form, never hue alone.
-  - The bottom nav's 56px height is repeated in `bottom-nav.ts`, `capture-button.ts` and `shell-layout.ts`, so change all three.
+  - The bottom nav's 56px height is repeated in the styles of `ui/bottom-nav`, `ui/capture-button` and `layout/shell-layout`, so change all three.
 
 ## Recipes
 

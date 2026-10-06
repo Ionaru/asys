@@ -69,7 +69,7 @@ These fail lint, a test or a CI check when broken.
 - **Contract lockstep** (`libs/contract/src/lib/*.test-d.ts`): a schema's `Type` equals the plain domain type. PWA screens are kept in line by `apps/pwa/src/app/core/api/wire.ts` (`SHAPES`) and exhaustive `switch`es.
 - **Licences** (`scripts/check-spdx.mts`, `reuse lint`, `scripts/check-licenses.mts`):
   - Every file that has comment syntax carries an `SPDX-License-Identifier` line in its first five lines. The ID is MPL-2.0 under `libs/domain/` and `libs/contract/`, MIT under `libs/effect-passkeys/`, and EUPL-1.2 everywhere else.
-  - The forms are `// ...` (TS), `/* ... */` (CSS), `<!-- ... -->` (Markdown, HTML), `# ...` (YAML) and `-- ...` (SQL). A `SKILL.md` carries it as a YAML comment on line 2, inside the frontmatter, because the frontmatter must start on line 1.
+  - The forms are `// ...` (TS), `/* ... */` (CSS), `<!-- ... -->` (Markdown, HTML), `# ...` (YAML) and `-- ...` (SQL). A `SKILL.md` or a rule file carries it as a YAML comment on line 2, inside the frontmatter, because the frontmatter must start on line 1.
   - JSON is exempt. A generated Drizzle `migration.sql` needs the header added by hand.
   - Production dependencies must be MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC or 0BSD (ADR 0011).
 - **Generated files**, never edited by hand:
@@ -96,7 +96,8 @@ These fail lint, a test or a CI check when broken.
   - Nothing user-supplied reaches a log line, an error message or a span attribute. Telemetry attributes are allowlisted in `apps/server/src/telemetry/scrub.ts`, and SQL text carries only bound parameters.
 - **Migrations** only go forward. Each one must keep working with the previous release's code, because a rollback runs the previous image on the migrated database.
 - **PWA:**
-  - Components use signals (`input()`, `output()`, `model()`, `inject()`), inline templates and styles, and Signal Forms. They are zoneless, with OnPush by default.
+  - Components use signals (`input()`, `output()`, `model()`, `inject()`) and Signal Forms. They are zoneless, with OnPush by default.
+  - Templates and styles start inline and move to files of their own once a component's `.ts` file reaches 100 lines. Follow the `angular-component-files` rule.
   - Colours, spacing and type come only from token CSS variables.
   - Test seams are services overridden in TestBed, because the builder refuses `vi.mock` of relative imports.
   - Use `building-pwa-ui`.
@@ -129,3 +130,9 @@ The task recipes live in `.agents/skills/<name>/SKILL.md`, each linked from `.cl
 - `writing-e2e-specs`: a Playwright spec in `apps/pwa-e2e`.
 - `adding-a-dependency`: a new package or an upgrade.
 - `planning-a-slice-piece`: planning, building and closing a piece of a slice plan.
+
+## Path-scoped rules
+
+Conventions for one kind of file live in `.agents/rules/<name>.md`, each linked from `.claude/rules/`. The `paths` globs in a rule's frontmatter name the files it covers, and Claude Code loads the rule when it works on a matching file. Any other agent reads the rule before it touches those files:
+
+- `angular-component-files`: when a component's template and styles move out of its `.ts` file (`apps/pwa/src/app`).

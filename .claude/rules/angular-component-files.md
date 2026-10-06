@@ -1,0 +1,1 @@
+../../.agents/rules/angular-component-files.md
