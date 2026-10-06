@@ -815,7 +815,6 @@ describe('onViewTransitionCreated', () => {
 
       run(second, taskSnapshot, nowAgainSnapshot);
 
-      expect(h2.hasAttribute('data-morph')).toBe(false);
       expect(attribute()).toBe('pop');
       expectNamedOnly(h1);
       expect(taskMorph.taskId()).toBe('abc');

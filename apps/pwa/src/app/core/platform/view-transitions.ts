@@ -113,8 +113,6 @@ export const onViewTransitionCreated = (info: ViewTransitionInfo): void => {
 
   // Whatever an earlier transition named, directly or through the TaskMorph bindings, is unnamed before this one
   // names anything: two elements with one name would make the browser skip this transition.
-  active?.named?.removeAttribute('data-morph');
-
   for (const el of document.querySelectorAll('[data-morph]')) {
     el.removeAttribute('data-morph');
   }
