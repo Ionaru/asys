@@ -1,5 +1,5 @@
 {
-  "$description": "The ASYS tokens that are the same in every theme and palette: font families, type styles, spacing, radii, the type scale and sizes. Copied from the ASYS design system artifact, which stays the source of truth.",
+  "$description": "The ASYS tokens that are the same in every theme and palette: font families, type styles, spacing, radii, the type scale, sizes, durations and easings. Copied from the ASYS design system artifact, which stays the source of truth. Its tokens.json has no motion family, so the durations and easings mirror its README's States and motion section.",
   "font-family": {
     "$type": "fontFamily",
     "font-sans": {
@@ -372,6 +372,38 @@
         "unit": "px"
       },
       "$description": "Minimum height of a Task row in a list. Fixed: rows grow with larger text, never shrink below this."
+    }
+  },
+  "duration": {
+    "$type": "duration",
+    "duration-quick": {
+      "$value": {
+        "value": 150,
+        "unit": "ms"
+      },
+      "$description": "Presses, sheets, small state changes, switching tabs."
+    },
+    "duration-moderate": {
+      "$value": {
+        "value": 250,
+        "unit": "ms"
+      },
+      "$description": "Things that move across the screen: page changes, a swipe settling, the capture flight, a gap closing."
+    }
+  },
+  "easing": {
+    "$type": "cubicBezier",
+    "ease-out": {
+      "$value": [0, 0, 0.58, 1],
+      "$description": "What arrives or responds. It is the CSS keyword's curve, so today's feel is unchanged."
+    },
+    "ease-in": {
+      "$value": [0.42, 0, 1, 1],
+      "$description": "What leaves."
+    },
+    "ease-emphasized": {
+      "$value": [0.2, 0, 0, 1],
+      "$description": "What moves across the screen."
     }
   }
 }

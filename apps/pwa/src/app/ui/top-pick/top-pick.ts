@@ -13,7 +13,14 @@ import { StatusBadge, StatusBadgeStatus } from '../status-badge/status-badge';
   encapsulation: ViewEncapsulation.None,
   template: `
     <article class="asys-top-pick">
-      <h2 class="asys-top-pick__title" tabindex="-1">{{ title() }}</h2>
+      <h2
+        class="asys-top-pick__title"
+        tabindex="-1"
+        [attr.data-task-id]="taskId()"
+        [attr.data-morph]="morph() ? '' : null"
+      >
+        {{ title() }}
+      </h2>
       <p class="asys-top-pick__reason">{{ reason() }}</p>
       <div class="asys-top-pick__meta">
         @if (overdue()) {
@@ -143,6 +150,10 @@ export class TopPick {
   readonly quadrant = input.required<Quadrant>();
 
   readonly estimate = input.required<string>();
+
+  readonly taskId = input<string | null>(null);
+
+  readonly morph = input<boolean>(false);
 
   readonly overdue = input<boolean>(false);
 

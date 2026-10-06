@@ -8,6 +8,7 @@ import { CommandTag, RejectedReason, type Command } from '@asys/domain';
 import { CommandOutcomeTag, type CommandOutcome } from '../core/api/data-api';
 import { DataStore } from '../core/data/data-store';
 import { Ids } from '../core/platform/ids';
+import { TAB_PATHS } from '../core/platform/tabs';
 import { ShellLayout } from './shell-layout';
 
 @Component({ template: '' })
@@ -189,6 +190,15 @@ describe('ShellLayout', () => {
       const { pill } = await setup('/now?x=1');
 
       expect(pill()).not.toBeNull();
+    });
+
+    it('takes the tabs from TAB_PATHS, which lists the bottom nav links in their order', async () => {
+      const { root } = await setup();
+      const links = Array.from(
+        root().querySelectorAll<HTMLAnchorElement>('nav[aria-label="Primary"] a'),
+      ).map((a) => a.getAttribute('href'));
+
+      expect(links).toEqual(TAB_PATHS);
     });
   });
 

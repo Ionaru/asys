@@ -24,7 +24,12 @@ export enum PickerRowVariant {
   },
   template: `
     <span class="asys-picker-row__main">
-      <span class="asys-picker-row__title"><ng-content /></span>
+      <span
+        class="asys-picker-row__title"
+        [attr.data-task-id]="taskId()"
+        [attr.data-morph]="morph() ? '' : null"
+        ><ng-content
+      /></span>
       <span class="asys-picker-row__reason">
         @if (overdue()) {
           <asys-status-badge [status]="Statuses.Overdue" />
@@ -59,7 +64,7 @@ export enum PickerRowVariant {
       text-align: left;
       text-decoration: none;
       cursor: pointer;
-      transition: background-color 150ms ease-out;
+      transition: background-color var(--duration-quick) var(--ease-out);
     }
 
     .asys-picker-row:active {
@@ -154,6 +159,10 @@ export class PickerRow {
   readonly estimate = input.required<string>();
 
   readonly quadrant = input<Quadrant | undefined>();
+
+  readonly taskId = input<string | null>(null);
+
+  readonly morph = input<boolean>(false);
 
   readonly overdue = input<boolean>(false);
 

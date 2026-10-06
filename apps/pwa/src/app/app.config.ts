@@ -7,18 +7,23 @@ import {
   provideAppInitializer,
   provideBrowserGlobalErrorListeners,
 } from '@angular/core';
-import { provideRouter, withComponentInputBinding } from '@angular/router';
+import { provideRouter, withComponentInputBinding, withViewTransitions } from '@angular/router';
 import { provideServiceWorker } from '@angular/service-worker';
 
 import { routes } from './app.routes';
 import { Session } from './core/auth/session';
 import { unauthorizedInterceptor } from './core/auth/unauthorized.interceptor';
 import { Theme } from './core/platform/theme';
+import { onViewTransitionCreated } from './core/platform/view-transitions';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
-    provideRouter(routes, withComponentInputBinding()),
+    provideRouter(
+      routes,
+      withComponentInputBinding(),
+      withViewTransitions({ skipInitialTransition: true, onViewTransitionCreated }),
+    ),
     provideHttpClient(withInterceptors([unauthorizedInterceptor])),
     provideAppInitializer(() => {
       inject(Session).check();

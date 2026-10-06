@@ -39,7 +39,7 @@ import { Component, input, model, ViewEncapsulation } from '@angular/core';
       border-radius: 0;
       text-align: left;
       cursor: pointer;
-      transition: background-color 150ms ease-out;
+      transition: background-color var(--duration-quick) var(--ease-out);
     }
 
     .asys-section-header:active {
@@ -68,7 +68,7 @@ import { Component, input, model, ViewEncapsulation } from '@angular/core';
       border-right: 2px solid var(--ink-muted);
       border-bottom: 2px solid var(--ink-muted);
       transform: rotate(-45deg);
-      transition: transform 150ms ease-out;
+      transition: transform var(--duration-quick) var(--ease-out);
     }
 
     .asys-section-header[aria-expanded='true'] .asys-section-header__chevron {

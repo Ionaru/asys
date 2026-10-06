@@ -24,6 +24,7 @@ import { DataStore, SyncStatus } from '../../core/data/data-store';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
 import { Ids } from '../../core/platform/ids';
+import { TaskMorph } from '../../core/platform/task-morph';
 import { TaskEditor } from './task-editor';
 import { TaskEditorRoute } from './task-editor-route';
 
@@ -1578,6 +1579,39 @@ describe('TaskEditor', () => {
 
       expect(blank.root().querySelector('.task-editor__captured')).toBeNull();
     });
+  });
+});
+
+describe('TaskEditor task title hooks', () => {
+  const marked = (root: () => HTMLElement): Element[] =>
+    Array.from(root().querySelectorAll('[data-morph]'));
+
+  it.each(['t1', 't2'])('puts the Task id %s on the heading as data-task-id', async (taskId) => {
+    const { root, heading } = await setup({ taskId });
+
+    expect(heading().getAttribute('data-task-id')).toBe(taskId);
+    expect(Array.from(root().querySelectorAll('[data-task-id]'))).toHaveLength(1);
+    expect(Array.from(root().querySelectorAll('[data-task-id]'))[0]).toBe(heading());
+  });
+
+  it('has data-morph on the heading while TaskMorph holds its id and drops it for another id', async () => {
+    const { root, heading, settle } = await setup();
+
+    expect(heading().hasAttribute('data-morph')).toBe(false);
+
+    TestBed.inject(TaskMorph).set('t1');
+    await settle();
+
+    expect(heading().hasAttribute('data-morph')).toBe(true);
+    expect(heading().getAttribute('data-morph')).toBe('');
+    expect(marked(root)).toHaveLength(1);
+    expect(marked(root)[0]).toBe(heading());
+
+    TestBed.inject(TaskMorph).set('def');
+    await settle();
+
+    expect(heading().hasAttribute('data-morph')).toBe(false);
+    expect(marked(root)).toEqual([]);
   });
 });
 

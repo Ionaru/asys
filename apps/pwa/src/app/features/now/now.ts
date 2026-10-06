@@ -30,6 +30,7 @@ import { CommandAttempts } from '../../core/data/command-attempts';
 import { DataStore, SyncStatus } from '../../core/data/data-store';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
+import { TaskMorph } from '../../core/platform/task-morph';
 import { Button, ButtonVariant } from '../../ui/button/button';
 import { LogProgressForm } from '../../ui/log-progress-form/log-progress-form';
 import { PickerRow, PickerRowVariant } from '../../ui/picker-row/picker-row';
@@ -54,6 +55,8 @@ const MIN_LOGGABLE_ESTIMATE = 2;
           [quadrant]="top.reason.quadrant"
           [overdue]="top.reason.overdue"
           [estimate]="estimateText(top.task)"
+          [taskId]="top.task.id"
+          [morph]="morphId() === top.task.id"
           [canLogProgress]="canLogProgress()"
           [actionsDisabled]="busy(top.task.id)"
           (done)="done(top.task)"
@@ -98,6 +101,8 @@ const MIN_LOGGABLE_ESTIMATE = 2;
                 [reason]="item.reasonText"
                 [estimate]="estimateText(item.task)"
                 [quadrant]="item.reason.quadrant"
+                [taskId]="item.task.id"
+                [morph]="morphId() === item.task.id"
                 [overdue]="item.reason.overdue"
                 [variant]="Rows.Ranked"
               >
@@ -122,6 +127,8 @@ const MIN_LOGGABLE_ESTIMATE = 2;
                   [routerLink]="['/tasks', item.task.id]"
                   [reason]="item.reasonText"
                   [estimate]="estimateText(item.task)"
+                  [taskId]="item.task.id"
+                  [morph]="morphId() === item.task.id"
                   [overdue]="overdue(item.task)"
                   [variant]="Rows.Waiting"
                 >
@@ -197,6 +204,8 @@ export class Now {
   protected readonly Variant = ButtonVariant;
 
   protected readonly Rows = PickerRowVariant;
+
+  protected readonly morphId = inject(TaskMorph).taskId;
 
   private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
 
