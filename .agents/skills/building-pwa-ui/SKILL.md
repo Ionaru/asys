@@ -63,7 +63,7 @@ Lint bans runtime imports of `@asys/contract`, `effect` and `@ionaru/effect-pass
 **Calling a new endpoint or Command:**
 
 1. Run `pnpm exec nx run pwa:api-client`.
-2. Add a method in `core/api/data-api.ts` or `auth-api.ts` that imports `generated/api/fn/<tag>/<op>`. These services never reject; they return the `HttpOutcome` and `CommandOutcome` unions.
+2. Add a method in `core/api/data-api.ts` or `auth-api.ts` that imports `generated/api/fn/<tag>/<op>` and calls it through the generated `Api` service as `this.api.invoke(<op>, params)`, wrapped in `callApi` (`run` in `AuthApi`). `invoke` rejects on an HTTP error, but these services never reject; they return the `HttpOutcome` and `CommandOutcome` unions. `provideApi()` in `app.config.ts` sets the root URL.
 3. Add a `SHAPES` entry in `wire.ts` for each new generated model that the PWA converts to a domain type with `fromWire` or `toWire`. Models with no domain type are used as generated.
 4. Fix the exhaustive switches in `core/data/command-subject.ts`, `outcome-message.ts` and `features/inbox/review-copy.ts`.
 5. Sending from a screen:

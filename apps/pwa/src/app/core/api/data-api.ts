@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: EUPL-1.2
-import { HttpClient, HttpContext, HttpErrorResponse } from '@angular/common/http';
+import { HttpContext, HttpErrorResponse } from '@angular/common/http';
 import { inject, Service } from '@angular/core';
 import {
   type Change,
@@ -8,8 +8,8 @@ import {
   NotApplicableReason,
   RejectedReason,
 } from '@asys/domain';
-import { firstValueFrom } from 'rxjs';
 
+import { Api } from '../../../generated/api/api';
 import { dataChanges } from '../../../generated/api/fn/data/data-changes';
 import { dataRunCommand } from '../../../generated/api/fn/data/data-run-command';
 import { dataSnapshot } from '../../../generated/api/fn/data/data-snapshot';
@@ -73,11 +73,11 @@ type CommandApplied = Extract<
 /** Reads the working-set data and submits commands. Never rejects, keeps no state. */
 @Service()
 export class DataApi {
-  private readonly http = inject(HttpClient);
+  private readonly api = inject(Api);
 
   /** `GET /v1/snapshot`. */
   async snapshot(): Promise<HttpOutcome<SnapshotData>> {
-    const outcome = await callApi(dataSnapshot(this.http, ''));
+    const outcome = await callApi(this.api.invoke(dataSnapshot));
 
     if (outcome._tag === HttpOutcomeTag.Failed) {
       return outcome;
@@ -91,7 +91,7 @@ export class DataApi {
 
   /** `GET /v1/changes?after=<after>`. */
   async changes(after: number): Promise<HttpOutcome<ChangesData>> {
-    const outcome = await callApi(dataChanges(this.http, '', { after: String(after) }));
+    const outcome = await callApi(this.api.invoke(dataChanges, { after: String(after) }));
 
     if (outcome._tag === HttpOutcomeTag.Failed) {
       return outcome;
@@ -114,16 +114,13 @@ export class DataApi {
   ): Promise<CommandOutcome> {
     try {
       const context = options?.keepalive ? new HttpContext().set(KEEPALIVE, true) : undefined;
-      const response = await firstValueFrom(
-        dataRunCommand(
-          this.http,
-          '',
-          { body: toWire<CommandWithKey>({ ...command, idempotencyKey }) },
-          context,
-        ),
+      const result = await this.api.invoke(
+        dataRunCommand,
+        { body: toWire<CommandWithKey>({ ...command, idempotencyKey }) },
+        context,
       );
 
-      return fromWire<CommandApplied>(response.body);
+      return fromWire<CommandApplied>(result);
     } catch (error) {
       if (error instanceof HttpErrorResponse) {
         return failureOutcome(error.status, error.error);

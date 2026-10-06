@@ -11,6 +11,7 @@ import {
   type Command,
 } from '@asys/domain';
 
+import { provideApiConfiguration } from '../../../generated/api/api-configuration';
 import { CommandOutcomeTag, DataApi } from './data-api';
 import { HttpOutcomeTag } from './http-outcome';
 import { KEEPALIVE } from './keepalive';
@@ -396,5 +397,51 @@ describe('DataApi', () => {
     } as object | null);
 
     expect((await second)._tag).toBe(HttpOutcomeTag.Ok);
+  });
+});
+
+describe('DataApi with a root URL', () => {
+  let api: DataApi;
+  let http: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideApiConfiguration('https://api.example.test'),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+      ],
+    });
+    api = TestBed.inject(DataApi);
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => {
+    http.verify();
+  });
+
+  it('snapshot gets the URL under the configured root', async () => {
+    const result = api.snapshot();
+
+    http.expectOne({ method: 'GET', url: 'https://api.example.test/v1/snapshot' }).flush({
+      seq: 1,
+      tasks: [],
+      blockers: [],
+      areas: [],
+      reviewItems: [],
+      settings,
+    } as object | null);
+
+    expect((await result)._tag).toBe(HttpOutcomeTag.Ok);
+  });
+
+  it('runCommand posts under the configured root', async () => {
+    const result = api.runCommand(capture, 'k1');
+
+    http
+      .expectOne({ method: 'POST', url: 'https://api.example.test/v1/commands' })
+      .flush({ _tag: 'Applied', seq: 7 } as object | null);
+
+    expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 7 });
   });
 });

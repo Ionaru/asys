@@ -2,7 +2,6 @@
   "$schema": "../../node_modules/ng-openapi-gen/ng-openapi-gen-schema.json",
   "input": "dist/apps/server/openapi.json",
   "output": "apps/pwa/src/generated/api",
-  "promises": false,
   "endOfLineStyle": "lf",
   "enumStyle": "upper",
   "ignoreUnusedModels": false,

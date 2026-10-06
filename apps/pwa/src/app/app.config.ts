@@ -12,6 +12,7 @@ import { provideServiceWorker } from '@angular/service-worker';
 
 import { routes } from './app.routes';
 import { keepaliveInterceptor } from './core/api/keepalive';
+import { provideApi } from './core/api/provide-api';
 import { Session } from './core/auth/session';
 import { unauthorizedInterceptor } from './core/auth/unauthorized.interceptor';
 import { Theme } from './core/platform/theme';
@@ -26,6 +27,7 @@ export const appConfig: ApplicationConfig = {
       withViewTransitions({ skipInitialTransition: true, onViewTransitionCreated }),
     ),
     provideHttpClient(withInterceptors([unauthorizedInterceptor, keepaliveInterceptor])),
+    provideApi(),
     provideAppInitializer(() => {
       inject(Session).check();
     }),

@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: EUPL-1.2
-import { HttpClient } from '@angular/common/http';
 import { inject, Service } from '@angular/core';
 import type {
   AuthenticationResponseJSON,
@@ -7,9 +6,8 @@ import type {
   PublicKeyCredentialRequestOptionsJSON,
   RegistrationResponseJSON,
 } from '@simplewebauthn/browser';
-import type { Observable } from 'rxjs';
 
-import type { StrictHttpResponse } from '../../../generated/api';
+import { Api } from '../../../generated/api/api';
 import { accountMe } from '../../../generated/api/fn/account/account-me';
 import { accountRegenerateRecoveryCodes } from '../../../generated/api/fn/account/account-regenerate-recovery-codes';
 import { accountSignOut } from '../../../generated/api/fn/account/account-sign-out';
@@ -121,14 +119,14 @@ const errorOf = (
 /** The passkey and account endpoints. Never rejects, keeps and logs nothing. */
 @Service()
 export class AuthApi {
-  private readonly http = inject(HttpClient);
+  private readonly api = inject(Api);
 
   /** `POST /v1/auth/register/options`. */
   registerOptions(
     token: string,
     name: string,
   ): Promise<AuthResult<CeremonyOptions<PublicKeyCredentialCreationOptionsJSON>>> {
-    return this.run(passkeysRegisterOptions(this.http, '', { body: { token, name } }));
+    return this.run(this.api.invoke(passkeysRegisterOptions, { body: { token, name } }));
   }
 
   /** `POST /v1/auth/register`. */
@@ -139,7 +137,7 @@ export class AuthApi {
     response: RegistrationResponseJSON,
   ): Promise<AuthResult<RecoveryCodes>> {
     return this.run(
-      passkeysRegister(this.http, '', {
+      this.api.invoke(passkeysRegister, {
         body: { token, timeZone, challengeId, response: toWire(response) },
       }),
     );
@@ -149,44 +147,44 @@ export class AuthApi {
   authenticateOptions(): Promise<
     AuthResult<CeremonyOptions<PublicKeyCredentialRequestOptionsJSON>>
   > {
-    return this.run(passkeysAuthenticateOptions(this.http, ''));
+    return this.run(this.api.invoke(passkeysAuthenticateOptions));
   }
 
   /** `POST /v1/auth/authenticate`. */
   authenticate(challengeId: string, response: AuthenticationResponseJSON): Promise<AuthResult<Me>> {
     return this.run(
-      passkeysAuthenticate(this.http, '', { body: { challengeId, response: toWire(response) } }),
+      this.api.invoke(passkeysAuthenticate, { body: { challengeId, response: toWire(response) } }),
     );
   }
 
   /** `POST /v1/auth/recover`. */
   recover(code: string): Promise<AuthResult<RecoverResult>> {
-    return this.run(authRecover(this.http, '', { body: { code } }));
+    return this.run(this.api.invoke(authRecover, { body: { code } }));
   }
 
   /** `GET /v1/auth/me`. */
   me(): Promise<AuthResult<Me>> {
-    return this.run(accountMe(this.http, ''));
+    return this.run(this.api.invoke(accountMe));
   }
 
   /** `POST /v1/auth/signout`. */
   signOut(): Promise<AuthResult<void>> {
-    return this.runVoid(accountSignOut(this.http, ''));
+    return this.runVoid(this.api.invoke(accountSignOut));
   }
 
   /** `POST /v1/auth/recovery-codes`. */
   regenerateRecoveryCodes(): Promise<AuthResult<RecoveryCodes>> {
-    return this.run(accountRegenerateRecoveryCodes(this.http, ''));
+    return this.run(this.api.invoke(accountRegenerateRecoveryCodes));
   }
 
   /** `GET /v1/auth/passkeys`. */
   passkeys(): Promise<AuthResult<readonly Passkey[]>> {
-    return this.run(passkeysList(this.http, ''));
+    return this.run(this.api.invoke(passkeysList));
   }
 
   /** `POST /v1/auth/passkeys/options`. */
   addOptions(): Promise<AuthResult<CeremonyOptions<PublicKeyCredentialCreationOptionsJSON>>> {
-    return this.run(passkeysAddOptions(this.http, ''));
+    return this.run(this.api.invoke(passkeysAddOptions));
   }
 
   /** `POST /v1/auth/passkeys`. */
@@ -196,7 +194,7 @@ export class AuthApi {
     name?: string,
   ): Promise<AuthResult<Passkey>> {
     return this.run(
-      passkeysAdd(this.http, '', {
+      this.api.invoke(passkeysAdd, {
         body: { challengeId, response: toWire(response), ...(name === undefined ? {} : { name }) },
       }),
       true,
@@ -205,13 +203,10 @@ export class AuthApi {
 
   /** `DELETE /v1/auth/passkeys/<credentialId>`. */
   removePasskey(credentialId: string): Promise<AuthResult<void>> {
-    return this.runVoid(passkeysRemove(this.http, '', { credentialId }), true);
+    return this.runVoid(this.api.invoke(passkeysRemove, { credentialId }), true);
   }
 
-  private async run<T>(
-    call: Observable<StrictHttpResponse<T>>,
-    bodylessUnauthorized = false,
-  ): Promise<AuthResult<T>> {
+  private async run<T>(call: Promise<T>, bodylessUnauthorized = false): Promise<AuthResult<T>> {
     const outcome = await callApi(call);
 
     if (outcome._tag === HttpOutcomeTag.Ok) {
@@ -221,12 +216,11 @@ export class AuthApi {
     return failed(errorOf(outcome.status, outcome.errorTag, bodylessUnauthorized));
   }
 
-  private async runVoid(
-    call: Observable<StrictHttpResponse<void>>,
-    bodylessUnauthorized = false,
-  ): Promise<AuthResult<void>> {
-    const result = await this.run(call, bodylessUnauthorized);
-
-    return result._tag === AuthResultTag.Ok ? { _tag: AuthResultTag.Ok, value: undefined } : result;
+  /** The generated void calls keep the text body of the response, so the value is dropped here. */
+  private runVoid(call: Promise<void>, bodylessUnauthorized = false): Promise<AuthResult<void>> {
+    return this.run(
+      call.then(() => undefined),
+      bodylessUnauthorized,
+    );
   }
 }

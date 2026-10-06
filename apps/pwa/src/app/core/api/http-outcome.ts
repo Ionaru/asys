@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { HttpErrorResponse } from '@angular/common/http';
-import { firstValueFrom, type Observable } from 'rxjs';
-
-import type { StrictHttpResponse } from '../../../generated/api';
 
 /** Whether a generated call succeeded. */
 export enum HttpOutcomeTag {
@@ -42,14 +39,10 @@ export const errorTagOf = (body: unknown): string | null => {
   return tagOfObject(body);
 };
 
-/** Runs a generated call once. Never rejects: every failure becomes `Failed`. */
-export const callApi = async <T>(
-  call: Observable<StrictHttpResponse<T>>,
-): Promise<HttpOutcome<T>> => {
+/** Awaits a generated call made through `Api.invoke`. Never rejects: every failure becomes `Failed`. */
+export const callApi = async <T>(call: Promise<T>): Promise<HttpOutcome<T>> => {
   try {
-    const response = await firstValueFrom(call);
-
-    return { _tag: HttpOutcomeTag.Ok, value: response.body };
+    return { _tag: HttpOutcomeTag.Ok, value: await call };
   } catch (error) {
     if (error instanceof HttpErrorResponse) {
       return {

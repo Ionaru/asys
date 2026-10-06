@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: EUPL-1.2
-import { HttpOutcomeTag, errorTagOf } from './http-outcome';
+import { HttpErrorResponse } from '@angular/common/http';
+
+import { HttpOutcomeTag, callApi, errorTagOf } from './http-outcome';
 
 describe('HttpOutcomeTag', () => {
   it('names the two outcomes', () => {
@@ -36,5 +38,60 @@ describe('errorTagOf', () => {
     ['a JSON string holding a bare string', '"Unauthorized"'],
   ])('gives null for %s', (_name, body) => {
     expect(errorTagOf(body)).toBeNull();
+  });
+});
+
+describe('callApi', () => {
+  it('turns a resolved promise into Ok with its value', async () => {
+    expect(await callApi(Promise.resolve({ recoveryCodesLeft: 3 }))).toEqual({
+      _tag: HttpOutcomeTag.Ok,
+      value: { recoveryCodesLeft: 3 },
+    });
+  });
+
+  it('turns a promise resolved with undefined into Ok with undefined', async () => {
+    expect(await callApi(Promise.resolve(undefined))).toStrictEqual({
+      _tag: HttpOutcomeTag.Ok,
+      value: undefined,
+    });
+  });
+
+  it.each([
+    [
+      'an object body',
+      new HttpErrorResponse({ status: 409, error: { _tag: 'PasskeyLastCredential' } }),
+      409,
+      'PasskeyLastCredential',
+    ],
+    [
+      'a JSON-string text body',
+      new HttpErrorResponse({ status: 401, error: '{"_tag":"Unauthorized"}' }),
+      401,
+      'Unauthorized',
+    ],
+    ['a null body', new HttpErrorResponse({ status: 500, error: null }), 500, null],
+    [
+      'a network failure',
+      new HttpErrorResponse({ status: 0, error: new ProgressEvent('error') }),
+      0,
+      null,
+    ],
+  ])('turns an HttpErrorResponse with %s into Failed', async (_name, error, status, errorTag) => {
+    const outcome = callApi(Promise.reject(error));
+
+    await expect(outcome).resolves.toEqual({ _tag: HttpOutcomeTag.Failed, status, errorTag });
+  });
+
+  it.each([
+    ['an Error', new Error('boom')],
+    ['a string', 'boom'],
+  ])('turns a rejection with %s into Failed with status 0', async (_name, reason) => {
+    const outcome = callApi(Promise.reject(reason));
+
+    await expect(outcome).resolves.toEqual({
+      _tag: HttpOutcomeTag.Failed,
+      status: 0,
+      errorTag: null,
+    });
   });
 });

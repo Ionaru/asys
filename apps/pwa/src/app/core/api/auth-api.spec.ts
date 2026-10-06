@@ -9,6 +9,7 @@ import type {
   RegistrationResponseJSON,
 } from '@simplewebauthn/browser';
 
+import { provideApiConfiguration } from '../../../generated/api/api-configuration';
 import { AuthApi, AuthError, AuthResultTag, type AuthResult } from './auth-api';
 
 const registrationResponse: RegistrationResponseJSON = {
@@ -445,6 +446,26 @@ describe('AuthApi', () => {
 
       expect(await result).toEqual(failed(AuthError.UnknownCredential));
     });
+
+    it('signOut returns undefined whatever text body a 200 carries', async () => {
+      const result = api.signOut();
+
+      http
+        .expectOne({ method: 'POST', url: '/v1/auth/signout' })
+        .flush('OK', { status: 200, statusText: 'OK' });
+
+      expect(await result).toStrictEqual(ok(undefined));
+    });
+
+    it('removePasskey returns undefined whatever text body a 200 carries', async () => {
+      const result = api.removePasskey('cred-1');
+
+      http
+        .expectOne({ method: 'DELETE', url: '/v1/auth/passkeys/cred-1' })
+        .flush('OK', { status: 200, statusText: 'OK' });
+
+      expect(await result).toStrictEqual(ok(undefined));
+    });
   });
 
   it('does not map on status alone: a 401 with another tag is not Unauthorized', async () => {
@@ -466,5 +487,46 @@ describe('AuthApi', () => {
     http.expectOne('/v1/auth/me').flush({ name: 'Ada', recoveryCodesLeft: 4 } as object | null);
 
     expect(await second).toEqual(ok({ name: 'Ada', recoveryCodesLeft: 4 }));
+  });
+});
+
+describe('AuthApi with a root URL', () => {
+  let api: AuthApi;
+  let http: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideApiConfiguration('https://api.example.test'),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+      ],
+    });
+    api = TestBed.inject(AuthApi);
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => {
+    http.verify();
+  });
+
+  it('me gets the URL under the configured root', async () => {
+    const result = api.me();
+
+    http
+      .expectOne({ method: 'GET', url: 'https://api.example.test/v1/auth/me' })
+      .flush({ name: 'Ada', recoveryCodesLeft: 4 } as object | null);
+
+    expect(await result).toEqual(ok({ name: 'Ada', recoveryCodesLeft: 4 }));
+  });
+
+  it('removePasskey deletes under the configured root', async () => {
+    const result = api.removePasskey('cred-1');
+
+    http
+      .expectOne({ method: 'DELETE', url: 'https://api.example.test/v1/auth/passkeys/cred-1' })
+      .flush('', { status: 204, statusText: 'No Content' });
+
+    expect(await result).toStrictEqual(ok(undefined));
   });
 });
