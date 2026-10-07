@@ -21,70 +21,70 @@ export const SESSION_CHECK_TIMEOUT_MS = 10_000;
 /** Whether someone is signed in, learned from `GET /v1/auth/me` (the session cookie is HttpOnly). */
 @Service()
 export class Session {
-  private readonly api = inject(AuthApi);
+  readonly #api = inject(AuthApi);
 
-  private readonly storage = inject(DeviceStorage);
+  readonly #storage = inject(DeviceStorage);
 
-  private readonly stateSignal = signal(SessionState.Unknown);
+  readonly #stateSignal = signal(SessionState.Unknown);
 
-  private readonly meSignal = signal<Me | null>(null);
+  readonly #meSignal = signal<Me | null>(null);
 
-  private inFlight: Promise<void> | null = null;
+  #inFlight: Promise<void> | null = null;
 
   /** Bumped by `signedIn()` and `signedOut()`; answers from an older generation are dropped. */
-  private generation = 0;
+  #generation = 0;
 
-  readonly state = this.stateSignal.asReadonly();
+  readonly state = this.#stateSignal.asReadonly();
 
-  readonly me = this.meSignal.asReadonly();
+  readonly me = this.#meSignal.asReadonly();
 
   /** Asks the server who is signed in. Never rejects; concurrent calls share one request. */
   check(): Promise<void> {
-    if (this.inFlight !== null) {
-      return this.inFlight;
+    if (this.#inFlight !== null) {
+      return this.#inFlight;
     }
 
-    const pending = this.ask().finally(() => {
-      if (this.inFlight === pending) {
-        this.inFlight = null;
+    const pending = this.#ask().finally(() => {
+      if (this.#inFlight === pending) {
+        this.#inFlight = null;
       }
     });
 
-    this.inFlight = pending;
+    this.#inFlight = pending;
 
     return pending;
   }
 
   /** Records a successful sign-up, sign-in or recovery. */
   async signedIn(me?: Me): Promise<void> {
-    this.generation += 1;
-    this.storage.remove(LAST_REPORTED_ZONE_KEY);
+    this.#generation += 1;
+    this.#storage.remove(LAST_REPORTED_ZONE_KEY);
 
     if (me === undefined) {
-      await this.ask();
+      await this.#ask();
 
       return;
     }
 
-    this.stateSignal.set(SessionState.SignedIn);
-    this.meSignal.set(me);
+    this.#stateSignal.set(SessionState.SignedIn);
+    this.#meSignal.set(me);
   }
 
   /** Records that the session is gone. Harmless to repeat. */
   signedOut(): void {
-    this.generation += 1;
-    this.stateSignal.set(SessionState.SignedOut);
-    this.meSignal.set(null);
-    this.storage.remove(LAST_REPORTED_ZONE_KEY);
+    this.#generation += 1;
+    this.#stateSignal.set(SessionState.SignedOut);
+    this.#meSignal.set(null);
+    this.#storage.remove(LAST_REPORTED_ZONE_KEY);
   }
 
-  private ask(): Promise<void> {
-    const generation = this.generation;
+  #ask(): Promise<void> {
+    const generation = this.#generation;
 
     return new Promise<void>((resolve) => {
       const timer = setTimeout(() => {
-        if (generation === this.generation) {
-          this.stateSignal.set(SessionState.Unreachable);
+        if (generation === this.#generation) {
+          this.#stateSignal.set(SessionState.Unreachable);
         }
 
         resolve();
@@ -93,34 +93,34 @@ export class Session {
       const settle = (result: AuthResult<Me>): void => {
         clearTimeout(timer);
 
-        if (generation === this.generation) {
-          this.apply(result);
+        if (generation === this.#generation) {
+          this.#apply(result);
         }
 
         resolve();
       };
 
-      this.api.me().then(settle, () => {
+      this.#api.me().then(settle, () => {
         settle({ _tag: AuthResultTag.Failed, error: AuthError.Unexpected });
       });
     });
   }
 
-  private apply(result: AuthResult<Me>): void {
+  #apply(result: AuthResult<Me>): void {
     if (result._tag === AuthResultTag.Ok) {
-      this.stateSignal.set(SessionState.SignedIn);
-      this.meSignal.set(result.value);
+      this.#stateSignal.set(SessionState.SignedIn);
+      this.#meSignal.set(result.value);
 
       return;
     }
 
     if (result.error === AuthError.Unauthorized) {
-      this.stateSignal.set(SessionState.SignedOut);
-      this.meSignal.set(null);
+      this.#stateSignal.set(SessionState.SignedOut);
+      this.#meSignal.set(null);
 
       return;
     }
 
-    this.stateSignal.set(SessionState.Unreachable);
+    this.#stateSignal.set(SessionState.Unreachable);
   }
 }

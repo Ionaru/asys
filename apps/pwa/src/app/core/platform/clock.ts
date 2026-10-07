@@ -8,42 +8,42 @@ const MINUTE_MS = 60_000;
 /** The current instant, refreshed on every minute boundary while the page is visible and when it becomes visible. */
 @Service()
 export class Clock {
-  private readonly document = inject(DOCUMENT);
+  readonly #document = inject(DOCUMENT);
 
-  private readonly nowSignal = signal<Instant>(Date.now() as Instant);
+  readonly #nowSignal = signal<Instant>(Date.now() as Instant);
 
-  readonly now = this.nowSignal.asReadonly();
+  readonly now = this.#nowSignal.asReadonly();
 
-  private timer: ReturnType<typeof setTimeout> | undefined;
+  #timer: ReturnType<typeof setTimeout> | undefined;
 
   constructor() {
     const onVisibility = (): void => {
-      if (this.document.visibilityState === 'visible') {
-        this.nowSignal.set(Date.now() as Instant);
-        this.schedule();
+      if (this.#document.visibilityState === 'visible') {
+        this.#nowSignal.set(Date.now() as Instant);
+        this.#schedule();
       } else {
         // Nothing hidden is seen, so a tick would only make DataStore rank every Task again.
-        clearTimeout(this.timer);
+        clearTimeout(this.#timer);
       }
     };
 
-    this.document.addEventListener('visibilitychange', onVisibility);
+    this.#document.addEventListener('visibilitychange', onVisibility);
     inject(DestroyRef).onDestroy(() => {
-      this.document.removeEventListener('visibilitychange', onVisibility);
-      clearTimeout(this.timer);
+      this.#document.removeEventListener('visibilitychange', onVisibility);
+      clearTimeout(this.#timer);
     });
 
-    if (this.document.visibilityState === 'visible') {
-      this.schedule();
+    if (this.#document.visibilityState === 'visible') {
+      this.#schedule();
     }
   }
 
-  private schedule(): void {
-    clearTimeout(this.timer);
-    this.timer = setTimeout(
+  #schedule(): void {
+    clearTimeout(this.#timer);
+    this.#timer = setTimeout(
       () => {
-        this.nowSignal.set(Date.now() as Instant);
-        this.schedule();
+        this.#nowSignal.set(Date.now() as Instant);
+        this.#schedule();
       },
       MINUTE_MS - (Date.now() % MINUTE_MS),
     );

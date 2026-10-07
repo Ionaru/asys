@@ -41,24 +41,24 @@ interface Attempt {
  */
 @Service({ autoProvided: false })
 export class CommandAttempts {
-  private readonly ids = inject(Ids);
+  readonly #ids = inject(Ids);
 
-  private readonly dataStore = inject(DataStore);
+  readonly #dataStore = inject(DataStore);
 
-  private readonly attempts = new Map<string, Attempt>();
+  readonly #attempts = new Map<string, Attempt>();
 
   /** The key for this command: the one it already has, else a new one from `Ids.next()`. */
   keyFor(command: Command): string {
     const canonical = canonicalJson(command);
-    const existing = this.attempts.get(canonical);
+    const existing = this.#attempts.get(canonical);
 
     if (existing !== undefined) {
       return existing.key;
     }
 
-    const key = this.ids.next();
+    const key = this.#ids.next();
 
-    this.attempts.set(canonical, { key, tag: command._tag, subject: commandSubject(command) });
+    this.#attempts.set(canonical, { key, tag: command._tag, subject: commandSubject(command) });
 
     return key;
   }
@@ -75,18 +75,18 @@ export class CommandAttempts {
 
     const subject = commandSubject(command);
 
-    this.attempts.delete(canonicalJson(command));
+    this.#attempts.delete(canonicalJson(command));
 
-    for (const [canonical, attempt] of this.attempts) {
+    for (const [canonical, attempt] of this.#attempts) {
       if (attempt.tag === command._tag && attempt.subject === subject) {
-        this.attempts.delete(canonical);
+        this.#attempts.delete(canonical);
       }
     }
   }
 
   /** Sends the command through `DataStore.send` with its key, then settles it with the outcome. */
   async send(command: Command): Promise<CommandOutcome> {
-    const outcome = await this.dataStore.send(command, this.keyFor(command));
+    const outcome = await this.#dataStore.send(command, this.keyFor(command));
 
     this.settle(command, outcome);
 

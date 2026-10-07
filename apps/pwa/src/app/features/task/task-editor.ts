@@ -105,23 +105,23 @@ export class TaskEditor {
 
   protected readonly dataStore = inject(DataStore);
 
-  private readonly clock = inject(Clock);
+  readonly #clock = inject(Clock);
 
-  private readonly ids = inject(Ids);
+  readonly #ids = inject(Ids);
 
-  private readonly taskMorph = inject(TaskMorph);
+  readonly #taskMorph = inject(TaskMorph);
 
-  private readonly attempts = inject(CommandAttempts);
+  readonly #attempts = inject(CommandAttempts);
 
-  private readonly doneUndo = inject(DoneUndo);
+  readonly #doneUndo = inject(DoneUndo);
 
-  private readonly router = inject(Router);
+  readonly #router = inject(Router);
 
-  private readonly location = inject(Location);
+  readonly #location = inject(Location);
 
-  private readonly injector = inject(Injector);
+  readonly #injector = inject(Injector);
 
-  private readonly destroyRef = inject(DestroyRef);
+  readonly #destroyRef = inject(DestroyRef);
 
   protected readonly Status = SyncStatus;
 
@@ -154,15 +154,15 @@ export class TaskEditor {
   protected readonly leaving = signal(false);
 
   /** Whether a Save, Done, Drop or Log progress send is in flight. */
-  private readonly actionPending = signal(false);
+  readonly #actionPending = signal(false);
 
-  private readonly removingIds = signal<ReadonlySet<string>>(NO_IDS);
+  readonly #removingIds = signal<ReadonlySet<string>>(NO_IDS);
 
   /** Whether an Add blocker send is in flight; only one runs at a time. */
-  private readonly adding = signal(false);
+  readonly #adding = signal(false);
 
   /** The AddBlocker commands still being tried, by blocker id, so a retry reuses its linkId. */
-  private readonly addCommands = new Map<string, AddBlocker>();
+  readonly #addCommands = new Map<string, AddBlocker>();
 
   protected readonly logOpen = signal(false);
 
@@ -172,7 +172,7 @@ export class TaskEditor {
 
   protected readonly filter = signal('');
 
-  private readonly task = computed<Task | undefined>(() =>
+  readonly #task = computed<Task | undefined>(() =>
     this.dataStore.state()?.tasks.find((task) => task.id === this.taskId()),
   );
 
@@ -183,7 +183,7 @@ export class TaskEditor {
   >({
     source: () => ({
       state: this.dataStore.state(),
-      task: this.task(),
+      task: this.#task(),
       leaving: this.leaving(),
     }),
     computation: (source, previous) => {
@@ -196,68 +196,68 @@ export class TaskEditor {
   });
 
   protected readonly headingText = linkedSignal<Task | undefined, string>({
-    source: () => this.task(),
+    source: () => this.#task(),
     computation: (task, previous) => task?.title ?? previous?.value ?? 'Task',
   });
 
   /** Whether the running view transition morphs this Task's title. */
-  protected readonly morph = computed(() => this.taskMorph.taskId() === this.taskId());
+  protected readonly morph = computed(() => this.#taskMorph.taskId() === this.taskId());
 
-  private readonly baseline = signal<TaskDraft | null>(null);
+  readonly #baseline = signal<TaskDraft | null>(null);
 
-  private readonly model = signal<TaskDraft>(EMPTY_DRAFT);
+  readonly #model = signal<TaskDraft>(EMPTY_DRAFT);
 
   /** The stored status when the baseline was first set. */
-  private expectedStatus: TaskStatus = TaskStatus.Open;
+  #expectedStatus: TaskStatus = TaskStatus.Open;
 
-  private readonly patch = computed(() => {
-    const baseline = this.baseline();
+  readonly #patch = computed(() => {
+    const baseline = this.#baseline();
 
-    return baseline === null ? {} : buildTaskPatch(baseline, this.model());
+    return baseline === null ? {} : buildTaskPatch(baseline, this.#model());
   });
 
-  protected readonly dirty = computed(() => Object.keys(this.patch()).length > 0);
+  protected readonly dirty = computed(() => Object.keys(this.#patch()).length > 0);
 
   /** The Task is missing and the form is dirty: the form stays visible but cannot change. */
-  private readonly readOnly = computed(
+  readonly #readOnly = computed(
     () => this.view() === null && this.dataStore.state() !== null && this.dirty(),
   );
 
-  protected readonly editForm = form(this.model, (path) => {
+  protected readonly editForm = form(this.#model, (path) => {
     validate(path.title, ({ value }) =>
       value().trim() === '' ? { kind: 'required', message: 'Needs a title' } : undefined,
     );
-    disabled(path, { when: () => this.readOnly() });
+    disabled(path, { when: () => this.#readOnly() });
   });
 
-  protected readonly needsTitle = computed(() => this.model().title.trim() === '');
+  protected readonly needsTitle = computed(() => this.#model().title.trim() === '');
 
   protected readonly needsEstimate = computed(() => {
-    const baseline = this.baseline();
+    const baseline = this.#baseline();
 
     return (
       baseline !== null &&
       baseline.estimateMinutes !== null &&
-      this.model().estimateMinutes === null
+      this.#model().estimateMinutes === null
     );
   });
 
   protected readonly needsImportance = computed(() => {
-    const baseline = this.baseline();
+    const baseline = this.#baseline();
 
-    return baseline !== null && baseline.important !== null && this.model().important === null;
+    return baseline !== null && baseline.important !== null && this.#model().important === null;
   });
 
   /** Whether Save, Done, Drop and Log progress are unavailable right now. */
   protected readonly actionsBusy = computed(
     () =>
-      this.actionPending() || this.leaving() || this.dataStore.awaitingSync().has(this.taskId()),
+      this.#actionPending() || this.leaving() || this.dataStore.awaitingSync().has(this.taskId()),
   );
 
   protected readonly canSave = computed(
     () =>
-      this.baseline() !== null &&
-      !this.readOnly() &&
+      this.#baseline() !== null &&
+      !this.#readOnly() &&
       this.dirty() &&
       !this.needsTitle() &&
       !this.needsEstimate() &&
@@ -274,12 +274,12 @@ export class TaskEditor {
     ];
   });
 
-  private readonly timeZone = computed(() => zoneOrUtc(this.view()?.state.settings.timeZone));
+  readonly #timeZone = computed(() => zoneOrUtc(this.view()?.state.settings.timeZone));
 
   protected readonly overdue = computed(() => {
     const view = this.view();
 
-    return view !== null && isOverdue(view.task, this.clock.now(), this.timeZone());
+    return view !== null && isOverdue(view.task, this.#clock.now(), this.#timeZone());
   });
 
   protected readonly blocked = computed(() => {
@@ -303,7 +303,7 @@ export class TaskEditor {
     }
 
     const { task, state } = view;
-    const zone = this.timeZone();
+    const zone = this.#timeZone();
     const effective = effectiveDue(task, state.tasks, state.links, zone);
     const own = task.due === null ? null : dueInstant(task.due, zone);
 
@@ -311,7 +311,7 @@ export class TaskEditor {
       return null;
     }
 
-    const now = this.clock.now();
+    const now = this.#clock.now();
     const start = latestStart(task, state.tasks, state.links, zone);
 
     return {
@@ -372,43 +372,43 @@ export class TaskEditor {
   });
 
   protected readonly addBusy = computed(
-    () => this.adding() || this.leaving() || this.dataStore.awaitingSync().has(this.taskId()),
+    () => this.#adding() || this.leaving() || this.dataStore.awaitingSync().has(this.taskId()),
   );
 
   constructor() {
     effect(() => {
-      const task = this.task();
+      const task = this.#task();
 
-      untracked(() => this.follow(task));
+      untracked(() => this.#follow(task));
     });
   }
 
   /** Whether this link's Remove is pending or waits for the server. */
   protected removeBusy(linkId: string): boolean {
     return (
-      this.leaving() || this.removingIds().has(linkId) || this.dataStore.awaitingSync().has(linkId)
+      this.leaving() || this.#removingIds().has(linkId) || this.dataStore.awaitingSync().has(linkId)
     );
   }
 
   protected async save(): Promise<void> {
-    const baseline = this.baseline();
+    const baseline = this.#baseline();
 
     if (baseline === null || !this.canSave()) {
       return;
     }
 
-    this.clearMessages();
+    this.#clearMessages();
 
-    const sent = this.model();
+    const sent = this.#model();
     const command: Command = {
       _tag: CommandTag.EditTask,
       taskId: this.taskId(),
       patch: buildTaskPatch(baseline, sent),
-      expect: { status: this.expectedStatus },
+      expect: { status: this.#expectedStatus },
     };
-    const outcome = await this.runAction(command);
+    const outcome = await this.#runAction(command);
 
-    if (this.destroyRef.destroyed) {
+    if (this.#destroyRef.destroyed) {
       return;
     }
 
@@ -417,15 +417,15 @@ export class TaskEditor {
       return;
     }
 
-    const task = this.task();
+    const task = this.#task();
 
     if (task !== undefined) {
       const stored = draftOf(task);
 
-      this.baseline.set(stored);
+      this.#baseline.set(stored);
 
       if (!this.dataStore.awaitingSync().has(task.id)) {
-        this.model.set(settleSaved(TASK_DRAFT_FIELDS, sent, this.model(), stored));
+        this.#model.set(settleSaved(TASK_DRAFT_FIELDS, sent, this.#model(), stored));
       }
     }
 
@@ -434,21 +434,21 @@ export class TaskEditor {
 
   /** Holds the Task through DoneUndo and leaves at once; the send happens when its Undo window ends. */
   protected done(event: MouseEvent): void {
-    const task = this.task();
+    const task = this.#task();
 
     if (this.actionsBusy() || task === undefined) {
       return;
     }
 
-    this.clearMessages();
+    this.#clearMessages();
     this.leaving.set(true);
-    this.doneUndo.complete(task, DoneOrigin.Button);
+    this.#doneUndo.complete(task, DoneOrigin.Button);
 
     if (event.detail === 0) {
-      this.doneUndo.requestFocus();
+      this.#doneUndo.requestFocus();
     }
 
-    this.leave();
+    this.#leave();
   }
 
   /** Sends a Drop; Applied leaves the editor, anything else stays with its message. */
@@ -457,21 +457,21 @@ export class TaskEditor {
       return;
     }
 
-    this.clearMessages();
+    this.#clearMessages();
     this.leaving.set(true);
 
-    const outcome = await this.runAction({
+    const outcome = await this.#runAction({
       _tag: CommandTag.DropTask,
       taskId: this.taskId(),
       expect: { status: TaskStatus.Open },
     });
 
-    if (this.destroyRef.destroyed) {
+    if (this.#destroyRef.destroyed) {
       return;
     }
 
     if (outcome._tag === CommandOutcomeTag.Applied) {
-      this.leave();
+      this.#leave();
       return;
     }
 
@@ -481,7 +481,7 @@ export class TaskEditor {
 
   protected cancelDrop(): void {
     this.confirmingDrop.set(false);
-    this.focusAfterRender(() => this.dropButton()?.nativeElement);
+    this.#focusAfterRender(() => this.dropButton()?.nativeElement);
   }
 
   protected async logProgress(minutes: number): Promise<void> {
@@ -489,16 +489,16 @@ export class TaskEditor {
       return;
     }
 
-    this.clearMessages();
+    this.#clearMessages();
 
-    const outcome = await this.runAction({
+    const outcome = await this.#runAction({
       _tag: CommandTag.LogProgress,
       taskId: this.taskId(),
       remainingMinutes: minutes,
       expect: { status: TaskStatus.Open },
     });
 
-    if (this.destroyRef.destroyed) {
+    if (this.#destroyRef.destroyed) {
       return;
     }
 
@@ -509,12 +509,12 @@ export class TaskEditor {
 
     this.statusLine.set(`Estimate is now ${formatMinutes(minutes)}.`);
     this.logOpen.set(false);
-    this.focusAfterRender(() => this.logButton()?.nativeElement);
+    this.#focusAfterRender(() => this.logButton()?.nativeElement);
   }
 
   protected cancelLogProgress(): void {
     this.logOpen.set(false);
-    this.focusAfterRender(() => this.logButton()?.nativeElement);
+    this.#focusAfterRender(() => this.logButton()?.nativeElement);
   }
 
   protected async removeBlocker(linkId: string): Promise<void> {
@@ -522,23 +522,23 @@ export class TaskEditor {
       return;
     }
 
-    this.clearMessages();
-    this.removingIds.update((ids) => new Set([...ids, linkId]));
+    this.#clearMessages();
+    this.#removingIds.update((ids) => new Set([...ids, linkId]));
 
     let outcome: CommandOutcome;
 
     try {
-      outcome = await this.attempts.send({ _tag: CommandTag.RemoveBlocker, linkId });
+      outcome = await this.#attempts.send({ _tag: CommandTag.RemoveBlocker, linkId });
     } finally {
-      this.removingIds.update((ids) => new Set([...ids].filter((id) => id !== linkId)));
+      this.#removingIds.update((ids) => new Set([...ids].filter((id) => id !== linkId)));
     }
 
-    if (this.destroyRef.destroyed) {
+    if (this.#destroyRef.destroyed) {
       return;
     }
 
     if (outcome._tag === CommandOutcomeTag.Applied) {
-      this.focusAfterRender(() => this.addBlockerButton()?.nativeElement);
+      this.#focusAfterRender(() => this.addBlockerButton()?.nativeElement);
     } else {
       this.statusLine.set(outcomeMessage(outcome) ?? '');
     }
@@ -549,32 +549,32 @@ export class TaskEditor {
       return;
     }
 
-    this.clearMessages();
+    this.#clearMessages();
 
-    const command: AddBlocker = this.addCommands.get(blockerId) ?? {
+    const command: AddBlocker = this.#addCommands.get(blockerId) ?? {
       _tag: CommandTag.AddBlocker,
-      linkId: this.ids.next(),
+      linkId: this.#ids.next(),
       taskId: this.taskId(),
       blockerId,
     };
 
-    this.addCommands.set(blockerId, command);
-    this.adding.set(true);
+    this.#addCommands.set(blockerId, command);
+    this.#adding.set(true);
 
     let outcome: CommandOutcome;
 
     try {
-      outcome = await this.attempts.send(command);
+      outcome = await this.#attempts.send(command);
     } finally {
-      this.adding.set(false);
+      this.#adding.set(false);
     }
 
-    if (this.destroyRef.destroyed) {
+    if (this.#destroyRef.destroyed) {
       return;
     }
 
     if (outcome._tag !== CommandOutcomeTag.Failed) {
-      this.addCommands.delete(blockerId);
+      this.#addCommands.delete(blockerId);
     }
 
     if (outcome._tag === CommandOutcomeTag.Applied) {
@@ -586,59 +586,59 @@ export class TaskEditor {
 
   protected closePicker(): void {
     this.pickerOpen.set(false);
-    this.focusAfterRender(() => this.addBlockerButton()?.nativeElement);
+    this.#focusAfterRender(() => this.addBlockerButton()?.nativeElement);
   }
 
   /** Sets the baseline when the Task first appears, then follows the store field by field. */
-  private follow(task: Task | undefined): void {
+  #follow(task: Task | undefined): void {
     if (task === undefined) {
       return;
     }
 
     const stored = draftOf(task);
-    const baseline = this.baseline();
+    const baseline = this.#baseline();
 
     if (baseline === null) {
-      this.expectedStatus = task.status;
-      this.baseline.set(stored);
-      this.model.set(stored);
+      this.#expectedStatus = task.status;
+      this.#baseline.set(stored);
+      this.#model.set(stored);
       return;
     }
 
-    const next = followStore(TASK_DRAFT_FIELDS, baseline, this.model(), stored);
+    const next = followStore(TASK_DRAFT_FIELDS, baseline, this.#model(), stored);
 
-    this.baseline.set(next.baseline);
-    this.model.set(next.draft);
+    this.#baseline.set(next.baseline);
+    this.#model.set(next.draft);
   }
 
-  private leave(): void {
-    if ((this.router.lastSuccessfulNavigation()?.previousNavigation ?? null) !== null) {
-      this.location.back();
+  #leave(): void {
+    if ((this.#router.lastSuccessfulNavigation()?.previousNavigation ?? null) !== null) {
+      this.#location.back();
     } else {
-      void this.router.navigateByUrl('/now', { replaceUrl: true });
+      void this.#router.navigateByUrl('/now', { replaceUrl: true });
     }
   }
 
   /** Sends a Save, Done, Drop or Log progress and marks it pending meanwhile. */
-  private async runAction(command: Command): Promise<CommandOutcome> {
-    this.actionPending.set(true);
+  async #runAction(command: Command): Promise<CommandOutcome> {
+    this.#actionPending.set(true);
 
     try {
-      return await this.attempts.send(command);
+      return await this.#attempts.send(command);
     } finally {
-      this.actionPending.set(false);
+      this.#actionPending.set(false);
     }
   }
 
-  private clearMessages(): void {
+  #clearMessages(): void {
     this.statusLine.set('');
     this.blockerMessage.set('');
   }
 
   /** After the next render, focuses the element, or the heading when it is gone. */
-  private focusAfterRender(target: () => HTMLElement | undefined): void {
+  #focusAfterRender(target: () => HTMLElement | undefined): void {
     afterNextRender(() => (target() ?? this.headingElement()?.nativeElement)?.focus(), {
-      injector: this.injector,
+      injector: this.#injector,
     });
   }
 }

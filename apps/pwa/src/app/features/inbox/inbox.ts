@@ -59,13 +59,13 @@ const areaChoices = (state: DomainState): readonly AreaChoice[] =>
 export class Inbox {
   protected readonly dataStore = inject(DataStore);
 
-  private readonly attempts = inject(CommandAttempts);
+  readonly #attempts = inject(CommandAttempts);
 
-  private readonly router = inject(Router);
+  readonly #router = inject(Router);
 
-  private readonly injector = inject(Injector);
+  readonly #injector = inject(Injector);
 
-  private readonly destroyRef = inject(DestroyRef);
+  readonly #destroyRef = inject(DestroyRef);
 
   protected readonly Status = SyncStatus;
 
@@ -84,14 +84,14 @@ export class Inbox {
   protected readonly statusLine = signal('');
 
   /** The ids of the Tasks with a Triage or Drop send in flight. */
-  private readonly pendingTaskIds = signal<ReadonlySet<string>>(NO_IDS);
+  readonly #pendingTaskIds = signal<ReadonlySet<string>>(NO_IDS);
 
   /** The ids of the Review items with a Dismiss send in flight. */
-  private readonly pendingReviewIds = signal<ReadonlySet<string>>(NO_IDS);
+  readonly #pendingReviewIds = signal<ReadonlySet<string>>(NO_IDS);
 
-  private readonly deferred = signal<ReadonlySet<string>>(NO_IDS);
+  readonly #deferred = signal<ReadonlySet<string>>(NO_IDS);
 
-  private readonly handledIds = signal<ReadonlySet<string>>(NO_IDS);
+  readonly #handledIds = signal<ReadonlySet<string>>(NO_IDS);
 
   protected readonly inbox = computed<readonly Task[]>(() => {
     const state = this.dataStore.state();
@@ -114,20 +114,20 @@ export class Inbox {
   });
 
   /** The deferred ids, or none when every Inbox Task is deferred, so the oldest comes back. */
-  private readonly effectiveDeferred = computed(() => {
-    const deferred = this.deferred();
+  readonly #effectiveDeferred = computed(() => {
+    const deferred = this.#deferred();
 
     return this.inbox().some((task) => !deferred.has(task.id)) ? deferred : NO_IDS;
   });
 
-  private readonly card = computed<Task | null>(() => {
-    const deferred = this.effectiveDeferred();
+  readonly #card = computed<Task | null>(() => {
+    const deferred = this.#effectiveDeferred();
 
     return this.inbox().find((task) => !deferred.has(task.id)) ?? null;
   });
 
   protected readonly cardTasks = computed<readonly Task[]>(() => {
-    const card = this.card();
+    const card = this.#card();
 
     return card === null ? [] : [card];
   });
@@ -136,32 +136,32 @@ export class Inbox {
   protected readonly handled = computed(() => {
     const inboxIds = new Set(this.inbox().map((task) => task.id));
 
-    return [...this.handledIds()].filter((id) => !inboxIds.has(id)).length;
+    return [...this.#handledIds()].filter((id) => !inboxIds.has(id)).length;
   });
 
   protected readonly draftState = linkedSignal<string | undefined, TriageDraft>({
-    source: () => this.card()?.id,
+    source: () => this.#card()?.id,
     computation: (id, previous) =>
       previous !== undefined && previous.source === id
         ? previous.value
-        : untracked(() => draftOf(this.card())),
+        : untracked(() => draftOf(this.#card())),
   });
 
   protected readonly cardBusy = computed(() => {
-    const id = this.card()?.id;
+    const id = this.#card()?.id;
 
     return (
-      id !== undefined && (this.pendingTaskIds().has(id) || this.dataStore.awaitingSync().has(id))
+      id !== undefined && (this.#pendingTaskIds().has(id) || this.dataStore.awaitingSync().has(id))
     );
   });
 
   /** Whether this Review item's Dismiss is pending or waits for the server. */
   protected reviewBusy(id: string): boolean {
-    return this.pendingReviewIds().has(id) || this.dataStore.awaitingSync().has(id);
+    return this.#pendingReviewIds().has(id) || this.dataStore.awaitingSync().has(id);
   }
 
   protected async triage(draft: TriageDraft): Promise<void> {
-    const task = this.card();
+    const task = this.#card();
 
     if (
       task === null ||
@@ -183,11 +183,11 @@ export class Inbox {
       ...(draft.areaId === task.areaId ? {} : { areaId: draft.areaId }),
     };
 
-    await this.runForCard(task.id, command);
+    await this.#runForCard(task.id, command);
   }
 
   protected async drop(): Promise<void> {
-    const task = this.card();
+    const task = this.#card();
 
     if (task === null || this.cardBusy()) {
       return;
@@ -201,16 +201,16 @@ export class Inbox {
       expect: { status: TaskStatus.Open },
     };
 
-    await this.runForCard(task.id, command);
+    await this.#runForCard(task.id, command);
   }
 
   protected later(taskId: string): void {
-    this.deferred.set(new Set([...this.effectiveDeferred(), taskId]));
-    this.focusCard();
+    this.#deferred.set(new Set([...this.#effectiveDeferred(), taskId]));
+    this.#focusCard();
   }
 
   protected edit(taskId: string): void {
-    void this.router.navigate(['/tasks', taskId]);
+    void this.#router.navigate(['/tasks', taskId]);
   }
 
   protected async dismiss(reviewItemId: string): Promise<void> {
@@ -223,17 +223,17 @@ export class Inbox {
     const index = this.reviewRows().findIndex((row) => row.item.id === reviewItemId);
     const command: Command = { _tag: CommandTag.ResolveReviewItem, reviewItemId };
 
-    this.pendingReviewIds.update((ids) => new Set([...ids, reviewItemId]));
+    this.#pendingReviewIds.update((ids) => new Set([...ids, reviewItemId]));
 
     let outcome: CommandOutcome;
 
     try {
-      outcome = await this.attempts.send(command);
+      outcome = await this.#attempts.send(command);
     } finally {
-      this.pendingReviewIds.update((ids) => new Set([...ids].filter((id) => id !== reviewItemId)));
+      this.#pendingReviewIds.update((ids) => new Set([...ids].filter((id) => id !== reviewItemId)));
     }
 
-    if (this.destroyRef.destroyed) {
+    if (this.#destroyRef.destroyed) {
       return;
     }
 
@@ -248,7 +248,7 @@ export class Inbox {
             next.focus();
           }
         },
-        { injector: this.injector },
+        { injector: this.#injector },
       );
     } else {
       this.statusLine.set(outcomeMessage(outcome) ?? '');
@@ -256,30 +256,30 @@ export class Inbox {
   }
 
   /** Sends a Triage or Drop for the card's Task and handles its outcome. */
-  private async runForCard(taskId: string, command: Command): Promise<void> {
-    this.pendingTaskIds.update((ids) => new Set([...ids, taskId]));
+  async #runForCard(taskId: string, command: Command): Promise<void> {
+    this.#pendingTaskIds.update((ids) => new Set([...ids, taskId]));
 
     let outcome: CommandOutcome;
 
     try {
-      outcome = await this.attempts.send(command);
+      outcome = await this.#attempts.send(command);
     } finally {
-      this.pendingTaskIds.update((ids) => new Set([...ids].filter((id) => id !== taskId)));
+      this.#pendingTaskIds.update((ids) => new Set([...ids].filter((id) => id !== taskId)));
     }
 
-    if (this.destroyRef.destroyed) {
+    if (this.#destroyRef.destroyed) {
       return;
     }
 
     if (outcome._tag === CommandOutcomeTag.Applied) {
-      this.handledIds.update((ids) => new Set([...ids, taskId]));
+      this.#handledIds.update((ids) => new Set([...ids, taskId]));
     }
 
     if (
       outcome._tag === CommandOutcomeTag.Applied ||
       outcome._tag === CommandOutcomeTag.NotApplicable
     ) {
-      this.focusCard();
+      this.#focusCard();
     }
 
     if (outcome._tag !== CommandOutcomeTag.Applied) {
@@ -288,7 +288,7 @@ export class Inbox {
   }
 
   /** After the next render, moves focus to the card's title, or to the heading when no card is left. */
-  private focusCard(): void {
+  #focusCard(): void {
     afterNextRender(
       () => {
         const card = this.triageCard();
@@ -299,7 +299,7 @@ export class Inbox {
           card.focusTitle();
         }
       },
-      { injector: this.injector },
+      { injector: this.#injector },
     );
   }
 }

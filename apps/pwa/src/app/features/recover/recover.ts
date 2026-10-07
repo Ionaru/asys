@@ -39,20 +39,20 @@ export const MAX_CODE_LENGTH = 64;
   `,
 })
 export class Recover {
-  private readonly authApi = inject(AuthApi);
+  readonly #authApi = inject(AuthApi);
 
-  private readonly session = inject(Session);
+  readonly #session = inject(Session);
 
-  private readonly router = inject(Router);
+  readonly #router = inject(Router);
 
-  private readonly injector = inject(Injector);
+  readonly #injector = inject(Injector);
 
   protected readonly Variant = ButtonVariant;
 
-  private readonly model = signal({ code: '' });
+  readonly #model = signal({ code: '' });
 
   protected readonly codeForm = form(
-    this.model,
+    this.#model,
     (path) => {
       validate(path.code, ({ value }) => {
         if (value().trim().length === 0) {
@@ -67,16 +67,16 @@ export class Recover {
     {
       submission: {
         action: async (field) => {
-          const result = await this.authApi.recover(field().value().code);
+          const result = await this.#authApi.recover(field().value().code);
 
           if (result._tag === AuthResultTag.Ok) {
-            await this.session.signedIn();
-            await this.router.navigateByUrl('/recovered');
+            await this.#session.signedIn();
+            await this.#router.navigateByUrl('/recovered');
 
             return undefined;
           }
 
-          afterNextRender(() => field.code().focusBoundControl(), { injector: this.injector });
+          afterNextRender(() => field.code().focusBoundControl(), { injector: this.#injector });
 
           return result.error === AuthError.SignInFailed
             ? {

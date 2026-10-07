@@ -68,11 +68,11 @@ export const isRetryable = (tag: CommandOutcomeTag): boolean =>
 /** Reads the working-set data and submits commands. Never rejects, keeps no state. */
 @Service()
 export class DataApi {
-  private readonly api = inject(Api);
+  readonly #api = inject(Api);
 
   /** `GET /v1/snapshot`. */
   async snapshot(): Promise<HttpOutcome<SnapshotData>> {
-    const outcome = await callApi(this.api.invoke(dataSnapshot));
+    const outcome = await callApi(this.#api.invoke(dataSnapshot));
 
     if (outcome._tag === HttpOutcomeTag.Failed) {
       return outcome;
@@ -86,7 +86,7 @@ export class DataApi {
 
   /** `GET /v1/changes?after=<after>`. */
   async changes(after: number): Promise<HttpOutcome<ChangesData>> {
-    const outcome = await callApi(this.api.invoke(dataChanges, { after: String(after) }));
+    const outcome = await callApi(this.#api.invoke(dataChanges, { after: String(after) }));
 
     if (outcome._tag === HttpOutcomeTag.Failed) {
       return outcome;
@@ -109,7 +109,7 @@ export class DataApi {
   ): Promise<CommandOutcome> {
     try {
       const context = options?.keepalive ? new HttpContext().set(KEEPALIVE, true) : undefined;
-      const result = await this.api.invoke(
+      const result = await this.#api.invoke(
         dataRunCommand,
         { body: toWire<CommandWithKey>({ ...command, idempotencyKey }) },
         context,

@@ -43,34 +43,34 @@ const messageForError = (error: AuthError): string => {
   styleUrl: './sign-in.css',
 })
 export class SignIn {
-  private readonly authApi = inject(AuthApi);
+  readonly #authApi = inject(AuthApi);
 
-  private readonly ceremony = inject(PasskeyCeremony);
+  readonly #ceremony = inject(PasskeyCeremony);
 
-  private readonly session = inject(Session);
+  readonly #session = inject(Session);
 
-  private readonly router = inject(Router);
+  readonly #router = inject(Router);
 
   protected readonly Variant = ButtonVariant;
 
   readonly returnUrl = input<string | undefined>();
 
-  private readonly ref = ceremonyOptions(() => this.authApi.authenticateOptions());
+  readonly #ref = ceremonyOptions(() => this.#authApi.authenticateOptions());
 
-  protected readonly options = this.ref.options;
+  protected readonly options = this.#ref.options;
 
-  protected readonly loadError = this.ref.error;
+  protected readonly loadError = this.#ref.error;
 
   protected readonly busy = signal(false);
 
-  private readonly message = signal<string | null>(null);
+  readonly #message = signal<string | null>(null);
 
   protected readonly shownMessage = computed(
-    () => this.message() ?? (this.loadError() === null ? null : GENERIC_MESSAGE),
+    () => this.#message() ?? (this.loadError() === null ? null : GENERIC_MESSAGE),
   );
 
   protected discard(): void {
-    this.ref.discard();
+    this.#ref.discard();
   }
 
   protected async signIn(): Promise<void> {
@@ -80,14 +80,14 @@ export class SignIn {
       return;
     }
 
-    this.message.set(null);
+    this.#message.set(null);
     this.busy.set(true);
 
     try {
-      const ceremony = await this.ceremony.use(current.options);
+      const ceremony = await this.#ceremony.use(current.options);
 
       if (ceremony._tag === CeremonyResultTag.Failed) {
-        this.message.set(
+        this.#message.set(
           ceremony.failure === PasskeyFailure.Cancelled
             ? null
             : messageForFailure(ceremony.failure),
@@ -96,17 +96,17 @@ export class SignIn {
         return;
       }
 
-      const result = await this.authApi.authenticate(current.challengeId, ceremony.response);
+      const result = await this.#authApi.authenticate(current.challengeId, ceremony.response);
 
       if (result._tag === AuthResultTag.Failed) {
-        this.message.set(messageForError(result.error));
-        this.ref.discard();
+        this.#message.set(messageForError(result.error));
+        this.#ref.discard();
 
         return;
       }
 
-      await this.session.signedIn(result.value);
-      await this.router.navigateByUrl(safeReturnUrl(this.returnUrl()));
+      await this.#session.signedIn(result.value);
+      await this.#router.navigateByUrl(safeReturnUrl(this.returnUrl()));
     } finally {
       this.busy.set(false);
     }

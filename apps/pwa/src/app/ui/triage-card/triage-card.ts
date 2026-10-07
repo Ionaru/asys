@@ -44,9 +44,9 @@ let nextId = 0;
   styleUrl: './triage-card.css',
 })
 export class TriageCard {
-  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  readonly #host = inject<ElementRef<HTMLElement>>(ElementRef);
 
-  private readonly injector = inject(Injector);
+  readonly #injector = inject(Injector);
 
   private readonly select = viewChild(SelectField);
 
@@ -122,16 +122,16 @@ export class TriageCard {
 
   /** Moves focus to the title. */
   focusTitle(): void {
-    this.host.nativeElement.querySelector<HTMLElement>('.asys-triage__title')?.focus();
+    this.#host.nativeElement.querySelector<HTMLElement>('.asys-triage__title')?.focus();
   }
 
   protected changeArea(): void {
     this.changingArea.set(true);
-    afterNextRender(() => this.select()?.focus(), { injector: this.injector });
+    afterNextRender(() => this.select()?.focus(), { injector: this.#injector });
   }
 
   protected cancelDrop(): void {
     this.confirmingDrop.set(false);
-    this.host.nativeElement.querySelector<HTMLElement>('.asys-triage__drop')?.focus();
+    this.#host.nativeElement.querySelector<HTMLElement>('.asys-triage__drop')?.focus();
   }
 }

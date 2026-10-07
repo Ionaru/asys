@@ -23,6 +23,7 @@ Lint bans runtime imports of `@asys/contract`, `effect` and `@ionaru/effect-pass
 ## Component conventions
 
 - Use signals throughout: `input()`, `output()`, `model()`, `viewChild()`, and `inject()` fields. Never `@Input`, `@Output`, `NgModule` or `ngModel`.
+- A member only the class uses is an ES private `#` field (`readonly #api = inject(DataApi)`). A member the template reads is `protected`, and a signal query is `private`, because Angular refuses a `#` name for either.
 - Write templates and styles inline until the component's `.ts` file reaches 100 lines, then move them to `<name>.component.html` and `<name>.css` as the `angular-component-files` rule (`.agents/rules/`) says.
 - Forms use Signal Forms (`@angular/forms/signals`), and shared controls implement `FormValueControl<T>` (`ui/text-field`, `ui/segmented`). They extend `FieldControl` (`ui/field-control`), which holds `hint`, `errors`, `touched`, `disabled`, `touch` and the error and hint ids.
 - **`ui` components:**

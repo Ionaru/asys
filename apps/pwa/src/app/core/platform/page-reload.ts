@@ -5,9 +5,9 @@ import { Service, inject } from '@angular/core';
 /** A seam over `location.reload()`, which jsdom cannot perform. */
 @Service()
 export class PageReload {
-  private readonly document = inject(DOCUMENT);
+  readonly #document = inject(DOCUMENT);
 
   reload(): void {
-    this.document.location.reload();
+    this.#document.location.reload();
   }
 }

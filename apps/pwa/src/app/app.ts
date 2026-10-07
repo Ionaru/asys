@@ -26,9 +26,9 @@ export class App {
 
   protected readonly appUpdate = inject(AppUpdate);
 
-  private readonly router = inject(Router);
+  readonly #router = inject(Router);
 
-  private readonly deviceZone = inject(DeviceZone);
+  readonly #deviceZone = inject(DeviceZone);
 
   protected readonly State = SessionState;
 
@@ -48,7 +48,9 @@ export class App {
     const stateZone = this.dataStore.state()?.settings.timeZone;
 
     const timeZone =
-      stateZone !== undefined && isValidTimeZone(stateZone) ? stateZone : this.deviceZone.current();
+      stateZone !== undefined && isValidTimeZone(stateZone)
+        ? stateZone
+        : this.#deviceZone.current();
 
     return new Intl.DateTimeFormat('en-GB', {
       hour: '2-digit',
@@ -84,7 +86,7 @@ export class App {
           }
 
           if (before === SessionState.SignedIn || before === SessionState.Unreachable) {
-            this.leave();
+            this.#leave();
           }
         }
       });
@@ -109,8 +111,8 @@ export class App {
     }
   }
 
-  private leave(): void {
-    const url = this.router.url;
+  #leave(): void {
+    const url = this.#router.url;
     const path = pathOf(url);
 
     if (SIGNED_OUT_PATHS.includes(path)) {
@@ -119,9 +121,9 @@ export class App {
 
     const tree =
       path === '/account'
-        ? this.router.createUrlTree(['/signin'])
-        : this.router.createUrlTree(['/signin'], { queryParams: { returnUrl: url } });
+        ? this.#router.createUrlTree(['/signin'])
+        : this.#router.createUrlTree(['/signin'], { queryParams: { returnUrl: url } });
 
-    void this.router.navigateByUrl(tree);
+    void this.#router.navigateByUrl(tree);
   }
 }

@@ -339,16 +339,16 @@ const stubResizeObserver = (present: boolean): ObserverInstance[] => {
 
     readonly disconnect = vi.fn();
 
-    private readonly callback: (entries: unknown[], observer: unknown) => void;
+    readonly #callback: (entries: unknown[], observer: unknown) => void;
 
     constructor(callback: (entries: unknown[], observer: unknown) => void) {
-      this.callback = callback;
+      this.#callback = callback;
       instances.push(this);
     }
 
     observe(target: Element): void {
       this.observed.push(target);
-      this.callback(
+      this.#callback(
         [
           {
             target,

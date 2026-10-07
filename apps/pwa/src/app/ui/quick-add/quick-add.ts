@@ -22,6 +22,8 @@ export interface QuickAddFailure {
   readonly canRetry: boolean;
 }
 
+let nextId = 0;
+
 /** The quick-add bar that captures a Task into the Inbox. */
 @Component({
   selector: 'asys-quick-add',
@@ -31,17 +33,15 @@ export interface QuickAddFailure {
   styleUrl: './quick-add.css',
 })
 export class QuickAdd {
-  private static nextId = 0;
+  readonly #host = inject<ElementRef<HTMLElement>>(ElementRef);
 
-  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
-
-  private readonly injector = inject(Injector);
+  readonly #injector = inject(Injector);
 
   protected readonly Variants = ButtonVariant;
 
   protected readonly Sizes = ButtonSize;
 
-  protected readonly inputId = `asys-quickadd-${QuickAdd.nextId++}-input`;
+  protected readonly inputId = `asys-quickadd-${nextId++}-input`;
 
   readonly value = model<string>('');
 
@@ -60,12 +60,12 @@ export class QuickAdd {
   protected readonly blank = computed(() => this.value().trim() === '');
 
   constructor() {
-    afterNextRender(() => this.focus(), { injector: this.injector });
+    afterNextRender(() => this.focus(), { injector: this.#injector });
   }
 
   /** Moves focus to the input. */
   focus(): void {
-    this.host.nativeElement.querySelector<HTMLElement>('.asys-quickadd__input')?.focus();
+    this.#host.nativeElement.querySelector<HTMLElement>('.asys-quickadd__input')?.focus();
   }
 
   /** The row goes away, so focus moves to the input first and the keyboard stays up. */

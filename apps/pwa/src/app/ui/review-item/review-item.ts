@@ -81,7 +81,7 @@ export interface ReviewItemAction {
   `,
 })
 export class ReviewItem {
-  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  readonly #host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   protected readonly Kinds = ReviewItemActionKind;
 
@@ -99,6 +99,6 @@ export class ReviewItem {
 
   /** Moves focus to the question. */
   focus(): void {
-    this.host.nativeElement.querySelector<HTMLElement>('.asys-review__question')?.focus();
+    this.#host.nativeElement.querySelector<HTMLElement>('.asys-review__question')?.focus();
   }
 }

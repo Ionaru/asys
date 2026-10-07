@@ -66,19 +66,19 @@ const messageForFailure = (failure: PasskeyFailure): string => {
   styleUrl: './sign-up.css',
 })
 export class SignUp {
-  private readonly authApi = inject(AuthApi);
+  readonly #authApi = inject(AuthApi);
 
-  private readonly ceremony = inject(PasskeyCeremony);
+  readonly #ceremony = inject(PasskeyCeremony);
 
-  private readonly session = inject(Session);
+  readonly #session = inject(Session);
 
-  private readonly appUpdate = inject(AppUpdate);
+  readonly #appUpdate = inject(AppUpdate);
 
-  private readonly deviceZone = inject(DeviceZone);
+  readonly #deviceZone = inject(DeviceZone);
 
-  private readonly router = inject(Router);
+  readonly #router = inject(Router);
 
-  private readonly destroyRef = inject(DestroyRef);
+  readonly #destroyRef = inject(DestroyRef);
 
   protected readonly Variant = ButtonVariant;
 
@@ -87,11 +87,11 @@ export class SignUp {
   private readonly title = viewChild<ElementRef<HTMLElement>>('title');
 
   /** The Sign-up token: a credential, kept in memory only. */
-  private token = '';
+  #token = '';
 
-  private held = false;
+  #held = false;
 
-  private signedInPromise: Promise<void> | null = null;
+  #signedInPromise: Promise<void> | null = null;
 
   protected readonly step = signal(SignUpStep.LinkInvalid);
 
@@ -101,7 +101,7 @@ export class SignUp {
 
   protected readonly busy = signal(false);
 
-  private readonly message = signal<string | null>(null);
+  readonly #message = signal<string | null>(null);
 
   protected readonly copyStatus = signal<string | null>(null);
 
@@ -116,10 +116,10 @@ export class SignUp {
     }
   });
 
-  private readonly model = signal({ name: '' });
+  readonly #model = signal({ name: '' });
 
   protected readonly nameForm = form(
-    this.model,
+    this.#model,
     (path) => {
       validate(path.name, ({ value }) => {
         const name = value();
@@ -144,17 +144,17 @@ export class SignUp {
     },
   );
 
-  private readonly ref = ceremonyOptions(
-    () => this.authApi.registerOptions(this.token, this.submittedName()),
+  readonly #ref = ceremonyOptions(
+    () => this.#authApi.registerOptions(this.#token, this.submittedName()),
     () => this.step() === SignUpStep.Passkey,
   );
 
-  protected readonly options = this.ref.options;
+  protected readonly options = this.#ref.options;
 
-  protected readonly loadError = this.ref.error;
+  protected readonly loadError = this.#ref.error;
 
   protected readonly shownMessage = computed(
-    () => this.message() ?? (this.loadError() === null ? null : GENERIC_MESSAGE),
+    () => this.#message() ?? (this.loadError() === null ? null : GENERIC_MESSAGE),
   );
 
   constructor() {
@@ -163,26 +163,26 @@ export class SignUp {
     if (hash !== '') {
       inject(Location).replaceState('/signup');
 
-      this.router.events
+      this.#router.events
         .pipe(
           filter((event) => event instanceof NavigationEnd),
           take(1),
           takeUntilDestroyed(),
         )
         .subscribe(() => {
-          if (this.router.url.includes('#')) {
-            void this.router.navigateByUrl('/signup', { replaceUrl: true });
+          if (this.#router.url.includes('#')) {
+            void this.#router.navigateByUrl('/signup', { replaceUrl: true });
           }
         });
     }
 
-    if (this.session.state() === SessionState.SignedIn) {
+    if (this.#session.state() === SessionState.SignedIn) {
       this.step.set(SignUpStep.AlreadySignedIn);
     } else {
       const token = new URLSearchParams(hash.replace(/^#/, '')).get('token');
 
       if (token !== null && TOKEN_PATTERN.test(token)) {
-        this.token = token;
+        this.#token = token;
         this.step.set(SignUpStep.Name);
       }
     }
@@ -207,18 +207,18 @@ export class SignUp {
       this.title()?.nativeElement.focus();
     });
 
-    this.destroyRef.onDestroy(() => {
+    this.#destroyRef.onDestroy(() => {
       this.codes.set([]);
 
-      if (this.held) {
-        this.held = false;
-        this.appUpdate.release();
+      if (this.#held) {
+        this.#held = false;
+        this.#appUpdate.release();
       }
     });
   }
 
   protected discard(): void {
-    this.ref.discard();
+    this.#ref.discard();
   }
 
   protected changeName(): void {
@@ -226,7 +226,7 @@ export class SignUp {
       return;
     }
 
-    this.message.set(null);
+    this.#message.set(null);
     this.step.set(SignUpStep.Name);
   }
 
@@ -237,32 +237,32 @@ export class SignUp {
       return;
     }
 
-    this.message.set(null);
+    this.#message.set(null);
     this.busy.set(true);
 
     try {
-      const created = await this.ceremony.create(current.options);
+      const created = await this.#ceremony.create(current.options);
 
-      if (this.destroyRef.destroyed) {
+      if (this.#destroyRef.destroyed) {
         return;
       }
 
       if (created._tag === CeremonyResultTag.Failed) {
-        this.message.set(messageForFailure(created.failure));
+        this.#message.set(messageForFailure(created.failure));
 
         return;
       }
 
-      const result = await this.authApi.register(
-        this.token,
-        this.deviceZone.current() ?? 'UTC',
+      const result = await this.#authApi.register(
+        this.#token,
+        this.#deviceZone.current() ?? 'UTC',
         current.challengeId,
         created.response,
       );
 
-      if (this.destroyRef.destroyed) {
+      if (this.#destroyRef.destroyed) {
         if (result._tag === AuthResultTag.Ok) {
-          void this.session.signedIn();
+          void this.#session.signedIn();
         }
 
         return;
@@ -271,14 +271,14 @@ export class SignUp {
       if (result._tag === AuthResultTag.Ok) {
         this.codes.set(result.value.recoveryCodes);
         this.step.set(SignUpStep.Codes);
-        this.appUpdate.hold();
-        this.held = true;
-        this.signedInPromise = this.session.signedIn();
+        this.#appUpdate.hold();
+        this.#held = true;
+        this.#signedInPromise = this.#session.signedIn();
 
         return;
       }
 
-      this.ref.discard();
+      this.#ref.discard();
 
       switch (result.error) {
         case AuthError.SignUpLinkInvalid:
@@ -286,16 +286,16 @@ export class SignUp {
           break;
         case AuthError.ChallengeInvalid:
         case AuthError.VerificationFailed:
-          this.message.set(TRY_AGAIN_MESSAGE);
+          this.#message.set(TRY_AGAIN_MESSAGE);
           break;
         case AuthError.AlreadyRegistered:
-          this.message.set(ALREADY_REGISTERED_MESSAGE);
+          this.#message.set(ALREADY_REGISTERED_MESSAGE);
           break;
         default:
-          this.message.set(GENERIC_MESSAGE);
+          this.#message.set(GENERIC_MESSAGE);
       }
     } finally {
-      if (!this.destroyRef.destroyed) {
+      if (!this.#destroyRef.destroyed) {
         this.busy.set(false);
       }
     }
@@ -311,7 +311,7 @@ export class SignUp {
   }
 
   protected async finish(): Promise<void> {
-    await this.signedInPromise;
-    await this.router.navigateByUrl('/now');
+    await this.#signedInPromise;
+    await this.#router.navigateByUrl('/now');
   }
 }

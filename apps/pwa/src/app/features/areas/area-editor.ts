@@ -207,17 +207,17 @@ export class AreaEditor {
 
   protected readonly dataStore = inject(DataStore);
 
-  private readonly ids = inject(Ids);
+  readonly #ids = inject(Ids);
 
-  private readonly attempts = inject(CommandAttempts);
+  readonly #attempts = inject(CommandAttempts);
 
-  private readonly router = inject(Router);
+  readonly #router = inject(Router);
 
-  private readonly injector = inject(Injector);
+  readonly #injector = inject(Injector);
 
-  private readonly destroyRef = inject(DestroyRef);
+  readonly #destroyRef = inject(DestroyRef);
 
-  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  readonly #host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   protected readonly Status = SyncStatus;
 
@@ -227,17 +227,17 @@ export class AreaEditor {
 
   protected readonly edges = EDGES;
 
-  private readonly idPrefix = `asys-area-editor-${nextId++}`;
+  readonly #idPrefix = `asys-area-editor-${nextId++}`;
 
   protected readonly statusLine = signal('');
 
   /** Whether a Save or Create send is in flight. */
-  private readonly sending = signal(false);
+  readonly #sending = signal(false);
 
   /** The CreateArea still being tried after Failed, so a retry reuses its areaId. */
-  private readonly pendingCreate = signal<CreateArea | null>(null);
+  readonly #pendingCreate = signal<CreateArea | null>(null);
 
-  private readonly baseline = signal<AreaDraft | null>(null);
+  readonly #baseline = signal<AreaDraft | null>(null);
 
   protected readonly draft = signal<AreaDraft>(EMPTY_DRAFT);
 
@@ -265,7 +265,7 @@ export class AreaEditor {
     }),
   );
 
-  private readonly hasErrors = computed(() =>
+  readonly #hasErrors = computed(() =>
     this.dayViews().some((day) => day.overlap || day.rows.some((row) => row.error !== null)),
   );
 
@@ -273,15 +273,15 @@ export class AreaEditor {
 
   protected readonly noHours = computed(() => this.draft().days.every((rows) => rows.length === 0));
 
-  private readonly patch = computed(() => {
-    const baseline = this.baseline();
+  readonly #patch = computed(() => {
+    const baseline = this.#baseline();
 
     return baseline === null ? {} : buildAreaPatch(baseline, this.draft());
   });
 
   /** Whether this Area, or the one being created, waits for the server after an applied command. */
   protected readonly awaiting = computed(() => {
-    const id = this.areaId() ?? this.pendingCreate()?.areaId ?? null;
+    const id = this.areaId() ?? this.#pendingCreate()?.areaId ?? null;
 
     return id !== null && this.dataStore.awaitingSync().has(id);
   });
@@ -289,44 +289,44 @@ export class AreaEditor {
   protected readonly canSubmit = computed(
     () =>
       !this.needsName() &&
-      !this.hasErrors() &&
-      !this.sending() &&
+      !this.#hasErrors() &&
+      !this.#sending() &&
       !this.awaiting() &&
       (this.areaId() === null ||
-        (this.baseline() !== null && Object.keys(this.patch()).length > 0)),
+        (this.#baseline() !== null && Object.keys(this.#patch()).length > 0)),
   );
 
   constructor() {
     effect(() => {
       const area = this.area();
 
-      untracked(() => this.follow(area));
+      untracked(() => this.#follow(area));
     });
   }
 
   /** The id of a row's time input. */
   protected inputId(day: number, row: number, edge: RowEdge): string {
-    return `${this.idPrefix}-${day}-${row}-${edge}`;
+    return `${this.#idPrefix}-${day}-${row}-${edge}`;
   }
 
   /** The id of a row's error line. */
   protected errorId(day: number, row: number): string {
-    return `${this.idPrefix}-${day}-${row}-error`;
+    return `${this.#idPrefix}-${day}-${row}-error`;
   }
 
   /** The id of a day's overlap line. */
   protected overlapId(day: number): string {
-    return `${this.idPrefix}-${day}-overlap`;
+    return `${this.#idPrefix}-${day}-overlap`;
   }
 
   /** The id of a row's Remove button. */
   protected removeId(day: number, row: number): string {
-    return `${this.idPrefix}-${day}-${row}-remove`;
+    return `${this.#idPrefix}-${day}-${row}-remove`;
   }
 
   /** The id of a day's Add hours button. */
   protected addId(day: number): string {
-    return `${this.idPrefix}-${day}-add`;
+    return `${this.#idPrefix}-${day}-add`;
   }
 
   /** The error lines that describe a row's inputs, or null when there are none. */
@@ -351,19 +351,19 @@ export class AreaEditor {
   protected setTime(day: number, row: number, edge: RowEdge, value: string): void {
     const time = value.slice(0, TIME_LENGTH);
 
-    this.updateDay(day, (rows) =>
+    this.#updateDay(day, (rows) =>
       rows.map((current, index) => (index === row ? { ...current, [edge]: time } : current)),
     );
   }
 
   protected addRow(day: number): void {
-    this.updateDay(day, (rows) => [...rows, NEW_ROW]);
+    this.#updateDay(day, (rows) => [...rows, NEW_ROW]);
   }
 
   protected removeRow(day: number, row: number): void {
     const remaining = (this.draft().days[day]?.length ?? 1) - 1;
 
-    this.updateDay(day, (rows) => rows.filter((_, index) => index !== row));
+    this.#updateDay(day, (rows) => rows.filter((_, index) => index !== row));
     afterNextRender(
       () => {
         const target =
@@ -371,9 +371,9 @@ export class AreaEditor {
             ? this.addId(day)
             : this.removeId(day, row < remaining ? row : remaining - 1);
 
-        this.host.nativeElement.querySelector<HTMLElement>(`#${target}`)?.focus();
+        this.#host.nativeElement.querySelector<HTMLElement>(`#${target}`)?.focus();
       },
-      { injector: this.injector },
+      { injector: this.#injector },
     );
   }
 
@@ -383,13 +383,13 @@ export class AreaEditor {
     }
 
     if (this.areaId() === null) {
-      await this.create();
+      await this.#create();
     } else {
-      await this.save();
+      await this.#save();
     }
   }
 
-  private async create(): Promise<void> {
+  async #create(): Promise<void> {
     const draft = this.draft();
     const activeHours = hoursOf(draft.days);
 
@@ -398,54 +398,54 @@ export class AreaEditor {
     }
 
     const name = draft.name.trim();
-    const pending = this.pendingCreate();
+    const pending = this.#pendingCreate();
     const command: CreateArea =
       pending !== null && pending.name === name && sameHours(pending.activeHours, activeHours)
         ? pending
         : {
             _tag: CommandTag.CreateArea,
-            areaId: pending?.areaId ?? this.ids.next(),
+            areaId: pending?.areaId ?? this.#ids.next(),
             name,
             activeHours,
             defaultPrivacy: null,
           };
 
-    this.pendingCreate.set(command);
+    this.#pendingCreate.set(command);
 
-    const outcome = await this.runAction(command);
+    const outcome = await this.#runAction(command);
 
-    if (this.destroyRef.destroyed) {
+    if (this.#destroyRef.destroyed) {
       return;
     }
 
     if (outcome._tag !== CommandOutcomeTag.Failed) {
-      this.pendingCreate.set(null);
+      this.#pendingCreate.set(null);
     }
 
     if (outcome._tag === CommandOutcomeTag.Applied) {
-      void this.router.navigateByUrl(`/settings/areas/${command.areaId}`, { replaceUrl: true });
+      void this.#router.navigateByUrl(`/settings/areas/${command.areaId}`, { replaceUrl: true });
       return;
     }
 
     this.statusLine.set(outcomeMessage(outcome) ?? '');
   }
 
-  private async save(): Promise<void> {
+  async #save(): Promise<void> {
     const areaId = this.areaId();
-    const baseline = this.baseline();
+    const baseline = this.#baseline();
 
     if (areaId === null || baseline === null) {
       return;
     }
 
     const sent = this.draft();
-    const outcome = await this.runAction({
+    const outcome = await this.#runAction({
       _tag: CommandTag.UpdateArea,
       areaId,
       patch: buildAreaPatch(baseline, sent),
     });
 
-    if (this.destroyRef.destroyed) {
+    if (this.#destroyRef.destroyed) {
       return;
     }
 
@@ -459,7 +459,7 @@ export class AreaEditor {
     if (area !== undefined) {
       const stored = draftOf(area);
 
-      this.baseline.set(stored);
+      this.#baseline.set(stored);
 
       if (!this.dataStore.awaitingSync().has(area.id)) {
         this.draft.set(settleSaved(AREA_DRAFT_FIELDS, sent, this.draft(), stored));
@@ -470,27 +470,27 @@ export class AreaEditor {
   }
 
   /** Sets the baseline when the Area first appears, then follows the store field by field. */
-  private follow(area: Area | undefined): void {
+  #follow(area: Area | undefined): void {
     if (area === undefined) {
       return;
     }
 
     const stored = draftOf(area);
-    const baseline = this.baseline();
+    const baseline = this.#baseline();
 
     if (baseline === null) {
-      this.baseline.set(stored);
+      this.#baseline.set(stored);
       this.draft.set(stored);
       return;
     }
 
     const next = followStore(AREA_DRAFT_FIELDS, baseline, this.draft(), stored);
 
-    this.baseline.set(next.baseline);
+    this.#baseline.set(next.baseline);
     this.draft.set(next.draft);
   }
 
-  private updateDay(day: number, change: (rows: readonly TimeRow[]) => readonly TimeRow[]): void {
+  #updateDay(day: number, change: (rows: readonly TimeRow[]) => readonly TimeRow[]): void {
     this.draft.update((draft) => ({
       ...draft,
       days: draft.days.map((rows, index) => (index === day ? change(rows) : rows)),
@@ -498,14 +498,14 @@ export class AreaEditor {
   }
 
   /** Sends a Save or Create through its attempt and marks it pending meanwhile. */
-  private async runAction(command: Command): Promise<CommandOutcome> {
+  async #runAction(command: Command): Promise<CommandOutcome> {
     this.statusLine.set('');
-    this.sending.set(true);
+    this.#sending.set(true);
 
     try {
-      return await this.attempts.send(command);
+      return await this.#attempts.send(command);
     } finally {
-      this.sending.set(false);
+      this.#sending.set(false);
     }
   }
 }

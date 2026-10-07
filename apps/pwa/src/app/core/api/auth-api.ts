@@ -118,14 +118,14 @@ const errorOf = (
 /** The passkey and account endpoints. Never rejects, keeps and logs nothing. */
 @Service()
 export class AuthApi {
-  private readonly api = inject(Api);
+  readonly #api = inject(Api);
 
   /** `POST /v1/auth/register/options`. */
   registerOptions(
     token: string,
     name: string,
   ): Promise<AuthResult<CeremonyOptions<PublicKeyCredentialCreationOptionsJSON>>> {
-    return this.run(this.api.invoke(passkeysRegisterOptions, { body: { token, name } }));
+    return this.#run(this.#api.invoke(passkeysRegisterOptions, { body: { token, name } }));
   }
 
   /** `POST /v1/auth/register`. */
@@ -135,8 +135,8 @@ export class AuthApi {
     challengeId: string,
     response: RegistrationResponseJSON,
   ): Promise<AuthResult<RecoveryCodes>> {
-    return this.run(
-      this.api.invoke(passkeysRegister, {
+    return this.#run(
+      this.#api.invoke(passkeysRegister, {
         body: { token, timeZone, challengeId, response: toWire(response) },
       }),
     );
@@ -146,44 +146,44 @@ export class AuthApi {
   authenticateOptions(): Promise<
     AuthResult<CeremonyOptions<PublicKeyCredentialRequestOptionsJSON>>
   > {
-    return this.run(this.api.invoke(passkeysAuthenticateOptions));
+    return this.#run(this.#api.invoke(passkeysAuthenticateOptions));
   }
 
   /** `POST /v1/auth/authenticate`. */
   authenticate(challengeId: string, response: AuthenticationResponseJSON): Promise<AuthResult<Me>> {
-    return this.run(
-      this.api.invoke(passkeysAuthenticate, { body: { challengeId, response: toWire(response) } }),
+    return this.#run(
+      this.#api.invoke(passkeysAuthenticate, { body: { challengeId, response: toWire(response) } }),
     );
   }
 
   /** `POST /v1/auth/recover`. */
   recover(code: string): Promise<AuthResult<RecoverResult>> {
-    return this.run(this.api.invoke(authRecover, { body: { code } }));
+    return this.#run(this.#api.invoke(authRecover, { body: { code } }));
   }
 
   /** `GET /v1/auth/me`. */
   me(): Promise<AuthResult<Me>> {
-    return this.run(this.api.invoke(accountMe));
+    return this.#run(this.#api.invoke(accountMe));
   }
 
   /** `POST /v1/auth/signout`. */
   signOut(): Promise<AuthResult<void>> {
-    return this.runVoid(this.api.invoke(accountSignOut));
+    return this.#runVoid(this.#api.invoke(accountSignOut));
   }
 
   /** `POST /v1/auth/recovery-codes`. */
   regenerateRecoveryCodes(): Promise<AuthResult<RecoveryCodes>> {
-    return this.run(this.api.invoke(accountRegenerateRecoveryCodes));
+    return this.#run(this.#api.invoke(accountRegenerateRecoveryCodes));
   }
 
   /** `GET /v1/auth/passkeys`. */
   passkeys(): Promise<AuthResult<readonly Passkey[]>> {
-    return this.run(this.api.invoke(passkeysList));
+    return this.#run(this.#api.invoke(passkeysList));
   }
 
   /** `POST /v1/auth/passkeys/options`. */
   addOptions(): Promise<AuthResult<CeremonyOptions<PublicKeyCredentialCreationOptionsJSON>>> {
-    return this.run(this.api.invoke(passkeysAddOptions));
+    return this.#run(this.#api.invoke(passkeysAddOptions));
   }
 
   /** `POST /v1/auth/passkeys`. */
@@ -192,8 +192,8 @@ export class AuthApi {
     response: RegistrationResponseJSON,
     name?: string,
   ): Promise<AuthResult<Passkey>> {
-    return this.run(
-      this.api.invoke(passkeysAdd, {
+    return this.#run(
+      this.#api.invoke(passkeysAdd, {
         body: { challengeId, response: toWire(response), ...(name === undefined ? {} : { name }) },
       }),
       true,
@@ -202,10 +202,10 @@ export class AuthApi {
 
   /** `DELETE /v1/auth/passkeys/<credentialId>`. */
   removePasskey(credentialId: string): Promise<AuthResult<void>> {
-    return this.runVoid(this.api.invoke(passkeysRemove, { credentialId }), true);
+    return this.#runVoid(this.#api.invoke(passkeysRemove, { credentialId }), true);
   }
 
-  private async run<T>(call: Promise<T>, bodylessUnauthorized = false): Promise<AuthResult<T>> {
+  async #run<T>(call: Promise<T>, bodylessUnauthorized = false): Promise<AuthResult<T>> {
     const outcome = await callApi(call);
 
     if (outcome._tag === HttpOutcomeTag.Ok) {
@@ -216,8 +216,8 @@ export class AuthApi {
   }
 
   /** The generated void calls keep the text body of the response, so the value is dropped here. */
-  private runVoid(call: Promise<void>, bodylessUnauthorized = false): Promise<AuthResult<void>> {
-    return this.run(
+  #runVoid(call: Promise<void>, bodylessUnauthorized = false): Promise<AuthResult<void>> {
+    return this.#run(
       call.then(() => undefined),
       bodylessUnauthorized,
     );

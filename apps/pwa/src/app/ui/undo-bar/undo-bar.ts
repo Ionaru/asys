@@ -28,7 +28,7 @@ export enum UndoBarVariant {
   styleUrl: './undo-bar.css',
 })
 export class UndoBar {
-  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  readonly #host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   protected readonly Variant = UndoBarVariant;
 
@@ -58,13 +58,13 @@ export class UndoBar {
 
   /** Moves focus to the first button. */
   focusAction(): void {
-    this.host.nativeElement.querySelector<HTMLElement>('button')?.focus();
+    this.#host.nativeElement.querySelector<HTMLElement>('button')?.focus();
   }
 
   protected leaveFocus(event: FocusEvent): void {
     const next = event.relatedTarget;
 
-    if (!(next instanceof Node) || !this.host.nativeElement.contains(next)) {
+    if (!(next instanceof Node) || !this.#host.nativeElement.contains(next)) {
       this.focusInside.emit(false);
     }
   }

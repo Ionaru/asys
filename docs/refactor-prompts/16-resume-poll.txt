@@ -2,11 +2,11 @@ SPDX-License-Identifier: EUPL-1.2
 
 Make `DataStore` ignore a focus or visibilitychange that arrives while a poll started by the other of those two listeners is still in flight, so resuming the app sends one poll instead of two.
 
-Why: returning to the app usually fires `visibilitychange` then `focus`. The first starts `GET /v1/changes`; the second finds `inFlight`, sets `followUpPending`, and `settle()` then starts a second poll at once that can hardly return anything new. That is one redundant request per resume: small, so weigh it against touching a well-pinned state machine. Only `onFocus` calls `checkZone`, so there is no second zone check to remove.
+Why: returning to the app usually fires `visibilitychange` then `focus`. The first starts `GET /v1/changes`; the second finds `#inFlight`, sets `#followUpPending`, and `#settle()` then starts a second poll at once that can hardly return anything new. That is one redundant request per resume: small, so weigh it against touching a well-pinned state machine. Only `#onFocus` calls `#checkZone`, so there is no second zone check to remove.
 
-Current state: `apps/pwa/src/app/core/data/data-store.ts` has `onFocus`, `onOnline` and `onVisibilityChange`, all calling the private `trigger()`, which sets `followUpPending` when `inFlight`. `settle()` runs the follow-up when visible or forced. `send` (through `syncPast`, which sets `forcedFollowUp`) and `refresh()` deliberately rely on that follow-up.
+Current state: `apps/pwa/src/app/core/data/data-store.ts` has `#onFocus`, `#onOnline` and `#onVisibilityChange`, all calling the private `#trigger()`, which sets `#followUpPending` when `#inFlight`. `#settle()` runs the follow-up when visible or forced. `send` (through `#syncPast`, which sets `#forcedFollowUp`) and `refresh()` deliberately rely on that follow-up.
 
-Change: let the focus and visibilitychange listeners pass a resume marker to `trigger`. A private flag records that the request in flight was started by such a listener; it is cleared when the request settles and on `stop()`. While it is set, a focus or visibilitychange queues no follow-up. Everything else keeps the generic follow-up: timer polls, `refresh()`, sends, the snapshot from `start()`, and `online`. No new file and no clock.
+Change: let the focus and visibilitychange listeners pass a resume marker to `#trigger`. A private flag records that the request in flight was started by such a listener; it is cleared when the request settles and on `stop()`. While it is set, a focus or visibilitychange queues no follow-up. Everything else keeps the generic follow-up: timer polls, `refresh()`, sends, the snapshot from `start()`, and `online`. No new file and no clock.
 
 Must stay identical: a trigger during a timer poll or snapshot queues exactly one follow-up; a focus while hidden is dropped; `visibilitychange` to hidden starts nothing; sends and `refresh()` still queue a follow-up; a 401 and `stop()` drop it; the zone check still runs on every focus.
 
@@ -20,6 +20,6 @@ Checks: `pnpm exec nx run-many -t lint typecheck test build -p pwa` and `pnpm ex
 
 Docs: the data store paragraph in `docs/slice-1-plan.md` ("exactly one follow-up"), with a dated note on the new rule.
 
-Out of scope: the poll interval, `checkZone`, DoneUndo, sync after a send.
+Out of scope: the poll interval, `#checkZone`, DoneUndo, sync after a send.
 
 Do not commit unless I ask.
