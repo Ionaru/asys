@@ -2,10 +2,9 @@
 import { computed, inject, type Signal, Service, signal } from '@angular/core';
 import { CommandTag, type Command } from '@asys/domain';
 
-import { CommandOutcomeTag } from '../api/data-api';
+import { CommandOutcomeTag, isRetryable } from '../api/data-api';
 import { Ids } from '../platform/ids';
 import { CommandAttempts } from './command-attempts';
-import { DataStore } from './data-store';
 import { outcomeMessage } from './outcome-message';
 
 type CaptureCommand = Extract<Command, { readonly _tag: CommandTag.CaptureTask }>;
@@ -32,8 +31,6 @@ const CAPTURED = 'Captured. It waits in the Inbox.';
  */
 @Service({ autoProvided: false })
 export class CaptureQueue {
-  private readonly store = inject(DataStore);
-
   private readonly attempts = inject(CommandAttempts);
 
   private readonly ids = inject(Ids);
@@ -122,8 +119,7 @@ export class CaptureQueue {
       id: command.taskId,
       text: command.title,
       message,
-      canRetry:
-        outcomeTag === CommandOutcomeTag.Failed || outcomeTag === CommandOutcomeTag.KeyReused,
+      canRetry: isRetryable(outcomeTag),
     };
 
     this.entries.update((entries) => [...entries, { command, outcomeTag, capture }]);
@@ -138,9 +134,7 @@ export class CaptureQueue {
         command !== undefined;
         command = this.waiting.shift()
       ) {
-        const outcome = await this.store.send(command, this.attempts.keyFor(command));
-
-        this.attempts.settle(command, outcome);
+        const outcome = await this.attempts.send(command);
 
         if (outcome._tag === CommandOutcomeTag.Applied) {
           this.statusMessage.set(CAPTURED);

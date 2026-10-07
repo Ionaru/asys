@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: EUPL-1.2
-import { HttpContext, HttpErrorResponse } from '@angular/common/http';
+import { HttpContext, HttpErrorResponse, HttpStatusCode } from '@angular/common/http';
 import { inject, Service } from '@angular/core';
 import {
   type Change,
@@ -15,7 +15,13 @@ import { dataRunCommand } from '../../../generated/api/fn/data/data-run-command'
 import { dataSnapshot } from '../../../generated/api/fn/data/data-snapshot';
 import { callApi, errorTagOf, HttpOutcomeTag, type HttpOutcome } from './http-outcome';
 import { KEEPALIVE } from './keepalive';
-import { fromWire, toWire } from './wire';
+import {
+  type CommandResultWire,
+  type CommandWithKey,
+  fromWire,
+  toWire,
+  type WithSeq,
+} from './wire';
 
 /** The server state at a sequence number. */
 export interface SnapshotData {
@@ -55,20 +61,9 @@ export type CommandOutcome =
   | { readonly _tag: CommandOutcomeTag.SignedOut }
   | { readonly _tag: CommandOutcomeTag.Failed; readonly status: number };
 
-const HTTP_UNAUTHORIZED = 401;
-
-const HTTP_CONFLICT = 409;
-
-const HTTP_UNPROCESSABLE = 422;
-
-type WithSeq<T> = T & { readonly seq: number };
-
-type CommandWithKey = Command & { readonly idempotencyKey: string };
-
-type CommandApplied = Extract<
-  CommandOutcome,
-  { readonly _tag: CommandOutcomeTag.Applied | CommandOutcomeTag.NotApplicable }
->;
+/** Whether sending the command again may still apply it: after Failed with its key, after KeyReused with a new one. */
+export const isRetryable = (tag: CommandOutcomeTag): boolean =>
+  tag === CommandOutcomeTag.Failed || tag === CommandOutcomeTag.KeyReused;
 
 /** Reads the working-set data and submits commands. Never rejects, keeps no state. */
 @Service()
@@ -120,7 +115,7 @@ export class DataApi {
         context,
       );
 
-      return fromWire<CommandApplied>(result);
+      return fromWire<CommandResultWire>(result);
     } catch (error) {
       if (error instanceof HttpErrorResponse) {
         return failureOutcome(error.status, error.error);
@@ -137,15 +132,15 @@ const isRejectedReason = (value: unknown): value is RejectedReason =>
 const failureOutcome = (status: number, body: unknown): CommandOutcome => {
   const errorTag = errorTagOf(body);
 
-  if (status === HTTP_UNAUTHORIZED && errorTag === 'Unauthorized') {
+  if (status === HttpStatusCode.Unauthorized && errorTag === 'Unauthorized') {
     return { _tag: CommandOutcomeTag.SignedOut };
   }
 
-  if (status === HTTP_CONFLICT && errorTag === 'IdempotencyKeyReused') {
+  if (status === HttpStatusCode.Conflict && errorTag === 'IdempotencyKeyReused') {
     return { _tag: CommandOutcomeTag.KeyReused };
   }
 
-  if (status === HTTP_UNPROCESSABLE && errorTag === 'CommandRejected') {
+  if (status === HttpStatusCode.UnprocessableEntity && errorTag === 'CommandRejected') {
     const reason =
       typeof body === 'object' && body !== null && 'reason' in body ? body.reason : null;
 

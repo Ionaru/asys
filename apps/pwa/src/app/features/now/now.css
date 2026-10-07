@@ -16,13 +16,6 @@
   margin: 0;
 }
 
-.now__sync {
-  margin: 0;
-  font-size: var(--font-size-reason);
-  line-height: var(--line-height-reason);
-  color: var(--ink-muted);
-}
-
 .now__list {
   margin: var(--space-4) 0 0;
   padding: 0;

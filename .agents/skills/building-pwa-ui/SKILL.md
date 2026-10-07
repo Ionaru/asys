@@ -24,7 +24,7 @@ Lint bans runtime imports of `@asys/contract`, `effect` and `@ionaru/effect-pass
 
 - Use signals throughout: `input()`, `output()`, `model()`, `viewChild()`, and `inject()` fields. Never `@Input`, `@Output`, `NgModule` or `ngModel`.
 - Write templates and styles inline until the component's `.ts` file reaches 100 lines, then move them to `<name>.component.html` and `<name>.css` as the `angular-component-files` rule (`.agents/rules/`) says.
-- Forms use Signal Forms (`@angular/forms/signals`), and shared controls implement `FormValueControl<T>` (`ui/text-field`, `ui/segmented`).
+- Forms use Signal Forms (`@angular/forms/signals`), and shared controls implement `FormValueControl<T>` (`ui/text-field`, `ui/segmented`). They extend `FieldControl` (`ui/field-control`), which holds `hint`, `errors`, `touched`, `disabled`, `touch` and the error and hint ids.
 - **`ui` components:**
   - Use the selector `asys-<name>` and `ViewEncapsulation.None`.
   - The host class has the `asys-` prefix, with BEM elements and `--modifier` classes. Bind them in `host: {}` (see `ui/quadrant-chip`).
@@ -54,11 +54,12 @@ Lint bans runtime imports of `@asys/contract`, `effect` and `@ionaru/effect-pass
 **Screen and route:**
 
 1. Create `features/<name>/<name>.ts` and its spec, with `providers: [CommandAttempts]` when it sends Commands.
-2. Add the route in `app.routes.ts`: `loadComponent` and `title: '<Name> · ASYS'`, under `ShellLayout` with `data: { level }` unless it is an auth screen. The level is 0 for a tab or a screen of its own, otherwise one more than the screen it opens from. `app.routes.spec.ts` fails without it, and the level decides Push, Pop or Swap.
-3. Add the title row to `app.routes.spec.ts`.
-4. For a primary tab, update `ui/bottom-nav` and `TAB_PATHS` in `core/platform/tabs.ts`: it gives view transitions the tab order and shows Capture on the tabs, and `shell-layout.spec.ts` fails when it and the bottom nav disagree. For an auth screen, add the path to `AUTH_PATHS` in `app.ts` (the sign-out redirect), and to `AUTH_PATHS` and `AUTH_SEGMENTS` in `core/auth/safe-return-url.ts` with a case in its spec. Use `signedOutGuard` on the route. A screen shown just after sign-in (like `recovered`) goes only in `safe-return-url.ts`, without `signedOutGuard`.
-5. An id-keyed editor gets a `<name>-route.ts` wrapper (see `task-editor-route.ts`).
-6. Add an e2e spec for the user-facing flow (`writing-e2e-specs`).
+2. A screen that reads `DataStore.state()` shows `<asys-load-state>` (`ui/load-state`) while there is none, bound to `dataStore.status() === SyncStatus.Failed` and `dataStore.refresh()`.
+3. Add the route in `app.routes.ts`: `loadComponent` and `title: '<Name> · ASYS'`, under `ShellLayout` with `data: { level }` unless it is an auth screen. The level is 0 for a tab or a screen of its own, otherwise one more than the screen it opens from. `app.routes.spec.ts` fails without it, and the level decides Push, Pop or Swap.
+4. Add the title row to `app.routes.spec.ts`.
+5. For a primary tab, update `ui/bottom-nav` and `TAB_PATHS` in `core/platform/tabs.ts`: it gives view transitions the tab order and shows Capture on the tabs, and `shell-layout.spec.ts` fails when it and the bottom nav disagree. For an auth screen, add the path to `SIGNED_OUT_PATHS` in `core/auth/safe-return-url.ts`, which the sign-out redirect in `app.ts` also reads, with a case in its spec. Use `signedOutGuard` on the route. A screen shown just after sign-in (like `recovered`) goes in that file's `AUTH_PATHS` instead, without `signedOutGuard`.
+6. An id-keyed editor gets a `<name>-route.ts` wrapper (see `task-editor-route.ts`). An editor that follows the store while the person edits uses `followStore` and `settleSaved` from `core/data/draft-follow.ts`.
+7. Add an e2e spec for the user-facing flow (`writing-e2e-specs`).
 
 **Calling a new endpoint or Command:**
 
@@ -67,9 +68,9 @@ Lint bans runtime imports of `@asys/contract`, `effect` and `@ionaru/effect-pass
 3. Add a `SHAPES` entry in `wire.ts` for each new generated model that the PWA converts to a domain type with `fromWire` or `toWire`. Models with no domain type are used as generated.
 4. Fix the exhaustive switches in `core/data/command-subject.ts`, `outcome-message.ts` and `features/inbox/review-copy.ts`.
 5. Sending from a screen:
-   - Get a key from `CommandAttempts.keyFor(command)`, send with `DataStore.send(command, key)`, then call `attempts.settle(...)` and show `outcomeMessage(outcome)`.
+   - Send with `CommandAttempts.send(command)`, which takes the command's key from `keyFor`, sends through `DataStore.send` and settles the attempt. Then show `outcomeMessage(outcome)`.
    - After every await, check `destroyRef.destroyed`.
-   - Disable the control while a send is pending or `awaitingSync()` holds its subject.
+   - Disable the control while a send is pending or `awaitingSync()` holds its subject, and show `<p asys-sync-note>` (`ui/sync-note`) while it holds.
    - A Done goes through `DoneUndo.complete(task, origin)` instead: it holds the Task for the Undo window and owns the key and the send. Quick add goes through `CaptureQueue.submit(text)`. Both are provided by the shell. Quick add's Add is `aria-disabled` while the field is empty, never `disabled`, so a tap never takes focus from the field.
    - There is no offline queue yet, except the in-memory held Done and `CaptureQueue`, which do not survive a reload; that comes in slice 4. Offline, a send fails with "cannot reach the server".
 

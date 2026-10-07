@@ -3,7 +3,8 @@ import { RejectedReason } from '@asys/domain';
 
 import { CommandOutcomeTag, type CommandOutcome } from '../api/data-api';
 
-const GENERIC = 'Something went wrong. Try again.';
+/** The sentence for a failure with nothing more specific to say. */
+export const GENERIC_MESSAGE = 'Something went wrong. Try again.';
 
 const rejectedMessage = (reason: RejectedReason): string => {
   switch (reason) {
@@ -38,7 +39,7 @@ const rejectedMessage = (reason: RejectedReason): string => {
     case RejectedReason.DuplicateId:
     case RejectedReason.InvalidNotes:
     case RejectedReason.InvalidPrivacy:
-      return GENERIC;
+      return GENERIC_MESSAGE;
   }
 };
 
@@ -53,8 +54,8 @@ export const outcomeMessage = (outcome: CommandOutcome): string | null => {
     case CommandOutcomeTag.Rejected:
       return rejectedMessage(outcome.reason);
     case CommandOutcomeTag.KeyReused:
-      return GENERIC;
+      return GENERIC_MESSAGE;
     case CommandOutcomeTag.Failed:
-      return outcome.status === 0 ? 'ASYS cannot reach the server. Try again.' : GENERIC;
+      return outcome.status === 0 ? 'ASYS cannot reach the server. Try again.' : GENERIC_MESSAGE;
   }
 };

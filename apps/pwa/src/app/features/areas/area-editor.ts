@@ -30,9 +30,12 @@ import {
 import { CommandOutcomeTag, type CommandOutcome } from '../../core/api/data-api';
 import { CommandAttempts } from '../../core/data/command-attempts';
 import { DataStore, SyncStatus } from '../../core/data/data-store';
+import { type DraftFields, followStore, settleSaved } from '../../core/data/draft-follow';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { Ids } from '../../core/platform/ids';
 import { Button, ButtonSize, ButtonVariant } from '../../ui/button/button';
+import { LoadState } from '../../ui/load-state/load-state';
+import { SyncNote } from '../../ui/sync-note/sync-note';
 import { TextField } from '../../ui/text-field/text-field';
 
 /** One row of Active hours as the time inputs hold it. */
@@ -47,17 +50,17 @@ interface AreaDraft {
   readonly days: readonly (readonly TimeRow[])[];
 }
 
-/** The fields the editor patches and follows one by one. */
-enum DraftField {
-  Name = 'name',
-  Hours = 'hours',
-}
-
 /** Which time of a row an input edits. */
 enum RowEdge {
   Start = 'start',
   End = 'end',
 }
+
+/** A row's two time inputs, in order. */
+const EDGES = [
+  { edge: RowEdge.Start, label: 'From' },
+  { edge: RowEdge.End, label: 'To' },
+] as const;
 
 const WEEKDAYS = [
   { weekday: IsoWeekday.Monday, name: 'Monday' },
@@ -169,18 +172,12 @@ const sameRows = (
   );
 };
 
-const sameField = (field: DraftField, a: AreaDraft, b: AreaDraft): boolean =>
-  field === DraftField.Name ? a.name.trim() === b.name.trim() : sameRows(a.days, b.days);
-
-/** A draft taking the stored value for each field `useStored` names, and its own value for the others. */
-const mixDraft = (
-  useStored: (field: DraftField) => boolean,
-  own: AreaDraft,
-  stored: AreaDraft,
-): AreaDraft => ({
-  name: useStored(DraftField.Name) ? stored.name : own.name,
-  days: useStored(DraftField.Hours) ? stored.days : own.days,
-});
+/** The fields of an Area draft that follow the store. */
+const AREA_DRAFT_FIELDS: DraftFields<AreaDraft> = {
+  keys: ['name', 'days'],
+  same: (key, a, b) =>
+    key === 'name' ? a.name.trim() === b.name.trim() : sameRows(a.days, b.days),
+};
 
 /** The fields of `draft` that differ from `baseline`, as an UpdateArea patch. */
 const buildAreaPatch = (baseline: AreaDraft, draft: AreaDraft): AreaPatch => {
@@ -199,198 +196,10 @@ const buildAreaPatch = (baseline: AreaDraft, draft: AreaDraft): AreaPatch => {
 /** Edits an Area's name and its Active hours per weekday, or creates a new Area. */
 @Component({
   selector: 'asys-area-editor',
-  imports: [Button, RouterLink, TextField],
+  imports: [Button, LoadState, RouterLink, SyncNote, TextField],
   providers: [CommandAttempts],
-  template: `
-    <h1 class="area-editor__title">{{ heading() }}</h1>
-    <p class="area-editor__status" role="status">{{ statusLine() }}</p>
-    @if (dataStore.state() === null) {
-      @if (dataStore.status() === Status.Failed) {
-        <p role="alert">ASYS could not load your Tasks.</p>
-        <button asys-button type="button" [variant]="Variant.Quiet" (click)="dataStore.refresh()">
-          Try again
-        </button>
-      } @else {
-        <p>Loading…</p>
-      }
-    } @else if (areaId() === null || area() !== undefined) {
-      <div class="area-editor__form">
-        <asys-text-field label="Name" [value]="draft().name" (valueChange)="setName($event)" />
-        <p class="area-editor__hint">An end of 00:00 means the end of the day.</p>
-        @for (day of dayViews(); track day.index) {
-          <fieldset class="area-editor__day">
-            <legend class="asys-field__label">{{ day.name }}</legend>
-            @for (row of day.rows; track $index; let rowIndex = $index) {
-              <div class="area-editor__row">
-                <div class="area-editor__time">
-                  <label class="asys-field__label" [for]="inputId(day.index, rowIndex, Edge.Start)">
-                    From
-                  </label>
-                  <input
-                    #fromInput
-                    class="asys-field__input"
-                    type="time"
-                    [id]="inputId(day.index, rowIndex, Edge.Start)"
-                    [value]="row.start"
-                    [attr.aria-invalid]="row.error !== null || day.overlap ? 'true' : null"
-                    [attr.aria-describedby]="
-                      describedBy(day.index, rowIndex, row.error !== null, day.overlap)
-                    "
-                    (input)="setTime(day.index, rowIndex, Edge.Start, fromInput.value)"
-                  />
-                </div>
-                <div class="area-editor__time">
-                  <label class="asys-field__label" [for]="inputId(day.index, rowIndex, Edge.End)">
-                    To
-                  </label>
-                  <input
-                    #toInput
-                    class="asys-field__input"
-                    type="time"
-                    [id]="inputId(day.index, rowIndex, Edge.End)"
-                    [value]="row.end"
-                    [attr.aria-invalid]="row.error !== null || day.overlap ? 'true' : null"
-                    [attr.aria-describedby]="
-                      describedBy(day.index, rowIndex, row.error !== null, day.overlap)
-                    "
-                    (input)="setTime(day.index, rowIndex, Edge.End, toInput.value)"
-                  />
-                </div>
-                <button
-                  asys-button
-                  type="button"
-                  [id]="removeId(day.index, rowIndex)"
-                  [variant]="Variant.Quiet"
-                  [size]="Size.Small"
-                  (click)="removeRow(day.index, rowIndex)"
-                >
-                  Remove
-                </button>
-              </div>
-              @if (row.error !== null) {
-                <p class="asys-field__error" [id]="errorId(day.index, rowIndex)">
-                  <span class="asys-field__error-word">Error:</span> {{ row.error }}
-                </p>
-              }
-            }
-            @if (day.overlap) {
-              <p class="asys-field__error" [id]="overlapId(day.index)">
-                <span class="asys-field__error-word">Error:</span> Hours overlap
-              </p>
-            }
-            <div class="asys-button-group">
-              <button
-                asys-button
-                type="button"
-                [id]="addId(day.index)"
-                [variant]="Variant.Quiet"
-                [size]="Size.Small"
-                (click)="addRow(day.index)"
-              >
-                Add hours
-              </button>
-            </div>
-          </fieldset>
-        }
-        @if (noHours()) {
-          <p class="area-editor__note">Tasks in this Area never show in Now.</p>
-        }
-        <div class="asys-button-group">
-          <button
-            asys-button
-            type="button"
-            [variant]="Variant.Primary"
-            [disabled]="!canSubmit()"
-            (click)="submit()"
-          >
-            {{ areaId() === null ? 'Create' : 'Save' }}
-          </button>
-          @if (needsName()) {
-            <p class="area-editor__reason">Needs a name</p>
-          }
-        </div>
-        @if (awaiting()) {
-          <p class="area-editor__sync">Saved. Waiting for the server.</p>
-        }
-      </div>
-    } @else if (awaiting()) {
-      <p class="area-editor__sync">Saved. Waiting for the server.</p>
-    } @else {
-      <p class="area-editor__text">This Area no longer exists.</p>
-      <p class="area-editor__text">
-        <a class="area-editor__link" routerLink="/settings/areas">Go to Areas</a>
-      </p>
-    }
-  `,
-  styles: `
-    .area-editor__title {
-      margin: 0 0 var(--space-3);
-      font-size: var(--font-size-title);
-      line-height: var(--line-height-title);
-      font-weight: 700;
-    }
-
-    .area-editor__status {
-      margin: 0 0 var(--space-3);
-      font-size: var(--font-size-body);
-      line-height: var(--line-height-body);
-    }
-
-    .area-editor__status:empty {
-      margin: 0;
-    }
-
-    .area-editor__form {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-4);
-    }
-
-    .area-editor__day {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2);
-      margin: 0;
-      padding: 0;
-      border: 0;
-      min-width: 0;
-    }
-
-    .area-editor__row {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: flex-end;
-      gap: var(--space-2) var(--space-3);
-    }
-
-    .area-editor__time {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-1);
-    }
-
-    .area-editor__hint,
-    .area-editor__note,
-    .area-editor__reason,
-    .area-editor__sync {
-      margin: 0;
-      font-size: var(--font-size-reason);
-      line-height: var(--line-height-reason);
-      color: var(--ink-muted);
-    }
-
-    .area-editor__link {
-      display: inline-flex;
-      align-items: center;
-      min-height: var(--tap-target);
-    }
-
-    .area-editor__text {
-      margin: 0 0 var(--space-3);
-      font-size: var(--font-size-body);
-      line-height: var(--line-height-body);
-    }
-  `,
+  templateUrl: './area-editor.component.html',
+  styleUrl: './area-editor.css',
 })
 export class AreaEditor {
   /** The Area's id; null means a new Area. */
@@ -416,7 +225,7 @@ export class AreaEditor {
 
   protected readonly Size = ButtonSize;
 
-  protected readonly Edge = RowEdge;
+  protected readonly edges = EDGES;
 
   private readonly idPrefix = `asys-area-editor-${nextId++}`;
 
@@ -543,13 +352,7 @@ export class AreaEditor {
     const time = value.slice(0, TIME_LENGTH);
 
     this.updateDay(day, (rows) =>
-      rows.map((current, index) =>
-        index !== row
-          ? current
-          : edge === RowEdge.Start
-            ? { ...current, start: time }
-            : { ...current, end: time },
-      ),
+      rows.map((current, index) => (index === row ? { ...current, [edge]: time } : current)),
     );
   }
 
@@ -659,9 +462,7 @@ export class AreaEditor {
       this.baseline.set(stored);
 
       if (!this.dataStore.awaitingSync().has(area.id)) {
-        const draft = this.draft();
-
-        this.draft.set(mixDraft((field) => sameField(field, draft, sent), draft, stored));
+        this.draft.set(settleSaved(AREA_DRAFT_FIELDS, sent, this.draft(), stored));
       }
     }
 
@@ -683,12 +484,10 @@ export class AreaEditor {
       return;
     }
 
-    const draft = this.draft();
-    const useStored = (field: DraftField): boolean =>
-      sameField(field, draft, baseline) || sameField(field, draft, stored);
+    const next = followStore(AREA_DRAFT_FIELDS, baseline, this.draft(), stored);
 
-    this.baseline.set(mixDraft(useStored, baseline, stored));
-    this.draft.set(mixDraft(useStored, draft, stored));
+    this.baseline.set(next.baseline);
+    this.draft.set(next.draft);
   }
 
   private updateDay(day: number, change: (rows: readonly TimeRow[]) => readonly TimeRow[]): void {
@@ -698,18 +497,13 @@ export class AreaEditor {
     }));
   }
 
-  /** Sends a Save or Create with its attempt key and marks it pending meanwhile. */
+  /** Sends a Save or Create through its attempt and marks it pending meanwhile. */
   private async runAction(command: Command): Promise<CommandOutcome> {
     this.statusLine.set('');
     this.sending.set(true);
 
     try {
-      const key = this.attempts.keyFor(command);
-      const outcome = await this.dataStore.send(command, key);
-
-      this.attempts.settle(command, outcome);
-
-      return outcome;
+      return await this.attempts.send(command);
     } finally {
       this.sending.set(false);
     }

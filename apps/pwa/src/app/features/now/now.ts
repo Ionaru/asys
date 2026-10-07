@@ -22,7 +22,6 @@ import {
   formatMinutes,
   inboxTasks,
   isOverdue,
-  isValidTimeZone,
   type RankedTask,
   type Task,
   TaskStatus,
@@ -30,20 +29,19 @@ import {
 
 import { CommandOutcomeTag, type CommandOutcome } from '../../core/api/data-api';
 import { CommandAttempts } from '../../core/data/command-attempts';
-import { DataStore, SyncStatus } from '../../core/data/data-store';
+import { DataStore, SyncStatus, zoneOrUtc } from '../../core/data/data-store';
 import { DoneOrigin, DoneUndo } from '../../core/data/done-undo';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
 import { Motion, MotionDuration, MotionEasing } from '../../core/platform/motion';
 import { TaskMorph } from '../../core/platform/task-morph';
-import { Button, ButtonVariant } from '../../ui/button/button';
-import { LogProgressForm } from '../../ui/log-progress-form/log-progress-form';
+import { LoadState } from '../../ui/load-state/load-state';
+import { canLogProgress, LogProgressForm } from '../../ui/log-progress-form/log-progress-form';
 import { PickerRow, PickerRowVariant } from '../../ui/picker-row/picker-row';
 import { SectionHeader } from '../../ui/section-header/section-header';
+import { SyncNote } from '../../ui/sync-note/sync-note';
 import { TopPick } from '../../ui/top-pick/top-pick';
 import { collapseRow, expandRow } from './row-motion';
-
-const MIN_LOGGABLE_ESTIMATE = 2;
 
 /** Staggers the exit of a Done card after its check starts drawing. */
 const EXIT_DELAY_MS = 100;
@@ -61,7 +59,7 @@ const RISE_KEYFRAMES: Keyframe[] = [
 /** What to do now: the top pick with its actions, the other ranked Tasks, and the ones that wait. */
 @Component({
   selector: 'app-now',
-  imports: [Button, LogProgressForm, PickerRow, RouterLink, SectionHeader, TopPick],
+  imports: [LoadState, LogProgressForm, PickerRow, RouterLink, SectionHeader, SyncNote, TopPick],
   providers: [CommandAttempts],
   templateUrl: './now.component.html',
   styleUrl: './now.css',
@@ -87,8 +85,6 @@ export class Now {
 
   protected readonly Status = SyncStatus;
 
-  protected readonly Variant = ButtonVariant;
-
   protected readonly Rows = PickerRowVariant;
 
   protected readonly Origins = DoneOrigin;
@@ -107,7 +103,7 @@ export class Now {
 
   protected readonly statusLine = signal('');
 
-  /** The Task ids with a Done or Log progress send in flight. */
+  /** The Task ids with a Log progress send in flight. */
   private readonly pendingIds = signal<ReadonlySet<string>>(new Set());
 
   /** Whether focus is inside the open Log progress form, tracked from its focus events. */
@@ -150,15 +146,7 @@ export class Now {
 
   protected readonly storedEstimate = computed(() => this.topTask()?.estimateMinutes ?? null);
 
-  protected readonly canLogProgress = computed(() => {
-    const task = this.topTask();
-    return (
-      task !== undefined &&
-      task.status === TaskStatus.Open &&
-      task.estimateMinutes !== null &&
-      task.estimateMinutes >= MIN_LOGGABLE_ESTIMATE
-    );
-  });
+  protected readonly canLogProgress = computed(() => canLogProgress(this.topTask()));
 
   /** The Task the Log progress form is open for; any change of the top pick closes it. */
   private readonly logProgressFor = linkedSignal<string | null, string | null>({
@@ -176,10 +164,7 @@ export class Now {
     return state === null ? 0 : inboxTasks(state).length;
   });
 
-  private readonly timeZone = computed(() => {
-    const zone = this.dataStore.state()?.settings.timeZone ?? 'UTC';
-    return isValidTimeZone(zone) ? zone : 'UTC';
-  });
+  private readonly timeZone = computed(() => zoneOrUtc(this.dataStore.state()?.settings.timeZone));
 
   constructor() {
     effect(() => {
@@ -337,14 +322,11 @@ export class Now {
     }
   }
 
-  /** Sends the command with its attempt key and marks the Task pending meanwhile. */
+  /** Sends the command through its attempt and marks the Task pending meanwhile. */
   private async run(taskId: string, command: Command): Promise<CommandOutcome> {
-    const key = this.attempts.keyFor(command);
     this.pendingIds.update((ids) => new Set([...ids, taskId]));
     try {
-      const outcome = await this.dataStore.send(command, key);
-      this.attempts.settle(command, outcome);
-      return outcome;
+      return await this.attempts.send(command);
     } finally {
       this.pendingIds.update((ids) => new Set([...ids].filter((id) => id !== taskId)));
     }

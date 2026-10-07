@@ -10,7 +10,7 @@ import {
   signal,
   ViewEncapsulation,
 } from '@angular/core';
-import { formatMinutes } from '@asys/domain';
+import { formatMinutes, type Task, TaskStatus } from '@asys/domain';
 
 import { Button, ButtonVariant } from '../button/button';
 
@@ -18,42 +18,22 @@ let nextId = 0;
 
 const WHOLE_MINUTES = /^\d+$/;
 
+/** The time still needed is at least 1 minute and less than the Estimate, so the Estimate must be 2 or more. */
+const MIN_LOGGABLE_ESTIMATE = 2;
+
+/** Whether progress can be logged on the Task: it is open and its Estimate leaves room below it. */
+export const canLogProgress = (task: Task | undefined): boolean =>
+  task !== undefined &&
+  task.status === TaskStatus.Open &&
+  task.estimateMinutes !== null &&
+  task.estimateMinutes >= MIN_LOGGABLE_ESTIMATE;
+
 /** The inline form that lowers a Task's Estimate to the time still needed. */
 @Component({
   selector: 'asys-log-progress-form',
   imports: [Button],
   encapsulation: ViewEncapsulation.None,
-  template: `
-    <form class="asys-progress" (submit)="submit($event)" (keydown.escape)="cancel.emit()">
-      <label class="asys-field__label" [for]="inputId">Time still needed</label>
-      <input
-        #control
-        class="asys-field__input"
-        type="text"
-        inputmode="numeric"
-        autocomplete="off"
-        [id]="inputId"
-        [attr.aria-invalid]="error() ? 'true' : null"
-        [attr.aria-describedby]="messageId"
-      />
-      @if (error()) {
-        <p class="asys-field__error" [id]="messageId">
-          <span class="asys-field__error-word">Error:</span>
-          Use whole minutes from 1 to {{ estimateMinutes() - 1 }}.
-        </p>
-      } @else {
-        <p class="asys-field__hint" [id]="messageId">Whole minutes, less than {{ formatted() }}.</p>
-      }
-      <div class="asys-button-group">
-        <button asys-button type="submit" [variant]="Variants.Primary" [disabled]="busy()">
-          Save
-        </button>
-        <button asys-button type="button" [variant]="Variants.Quiet" (click)="cancel.emit()">
-          Cancel
-        </button>
-      </div>
-    </form>
-  `,
+  templateUrl: './log-progress-form.component.html',
   styles: `
     .asys-progress {
       display: flex;

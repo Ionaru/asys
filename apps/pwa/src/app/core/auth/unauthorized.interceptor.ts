@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: EUPL-1.2
-import { HttpErrorResponse, type HttpInterceptorFn, type HttpRequest } from '@angular/common/http';
+import {
+  HttpErrorResponse,
+  type HttpInterceptorFn,
+  type HttpRequest,
+  HttpStatusCode,
+} from '@angular/common/http';
 import { inject } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
 
 import { errorTagOf } from '../api/http-outcome';
 import { Session } from './session';
-
-const HTTP_UNAUTHORIZED = 401;
 
 const PASSKEYS_PATH = '/v1/auth/passkeys';
 
@@ -35,7 +38,7 @@ export const unauthorizedInterceptor: HttpInterceptorFn = (request, next) => {
 
   return next(request).pipe(
     catchError((error: unknown) => {
-      if (error instanceof HttpErrorResponse && error.status === HTTP_UNAUTHORIZED) {
+      if (error instanceof HttpErrorResponse && error.status === HttpStatusCode.Unauthorized) {
         const tag = errorTagOf(error.error);
 
         if (tag === 'Unauthorized' || (tag === null && isPasskeyWrite(request))) {

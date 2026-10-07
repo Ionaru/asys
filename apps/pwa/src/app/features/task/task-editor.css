@@ -25,12 +25,15 @@
 
 .task-editor__line,
 .task-editor__reason,
-.task-editor__sync,
 .task-editor__blocker-message {
   margin: 0 0 var(--space-2);
   font-size: var(--font-size-reason);
   line-height: var(--line-height-reason);
   color: var(--ink-muted);
+}
+
+.task-editor__sync {
+  margin: 0 0 var(--space-2);
 }
 
 .task-editor__reason,

@@ -23,7 +23,6 @@ import {
   blocks,
   type Command,
   CommandTag,
-  type DateSpec,
   type DomainState,
   dueInstant,
   effectiveDue,
@@ -32,17 +31,16 @@ import {
   isBlocked,
   isInInbox,
   isOverdue,
-  isValidTimeZone,
   latestStart,
-  sameDateSpec,
   type Task,
   TaskStatus,
 } from '@asys/domain';
 
 import { CommandOutcomeTag, type CommandOutcome } from '../../core/api/data-api';
 import { CommandAttempts } from '../../core/data/command-attempts';
-import { DataStore, SyncStatus } from '../../core/data/data-store';
+import { DataStore, SyncStatus, zoneOrUtc } from '../../core/data/data-store';
 import { DoneOrigin, DoneUndo } from '../../core/data/done-undo';
+import { followStore, settleSaved } from '../../core/data/draft-follow';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
 import { Ids } from '../../core/platform/ids';
@@ -51,14 +49,15 @@ import { Button, ButtonSize, ButtonVariant } from '../../ui/button/button';
 import { DateSpecField } from '../../ui/date-spec-field/date-spec-field';
 import { EstimateField } from '../../ui/estimate-field/estimate-field';
 import { InlineConfirm } from '../../ui/inline-confirm/inline-confirm';
-import { LogProgressForm } from '../../ui/log-progress-form/log-progress-form';
+import { LoadState } from '../../ui/load-state/load-state';
+import { canLogProgress, LogProgressForm } from '../../ui/log-progress-form/log-progress-form';
 import { Segmented } from '../../ui/segmented/segmented';
 import { type SelectOption, SelectField } from '../../ui/select-field/select-field';
 import { StatusBadge, StatusBadgeStatus } from '../../ui/status-badge/status-badge';
+import { SyncNote } from '../../ui/sync-note/sync-note';
 import { TextField } from '../../ui/text-field/text-field';
-import { buildTaskPatch, draftOf, type TaskDraft } from './task-patch';
-
-const MIN_LOGGABLE_ESTIMATE = 2;
+import { byAreaName } from '../areas/area-order';
+import { buildTaskPatch, draftOf, TASK_DRAFT_FIELDS, type TaskDraft } from './task-patch';
 
 const NO_IDS: ReadonlySet<string> = new Set();
 
@@ -72,36 +71,11 @@ const EMPTY_DRAFT: TaskDraft = {
   due: null,
 };
 
-type DraftKey = keyof TaskDraft;
-
 /** The stored Task and the state it was read from, as the editor renders them. */
 interface EditorView {
   readonly state: DomainState;
   readonly task: Task;
 }
-
-const compareCodeUnits = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
-
-const sameSpec = (a: DateSpec | null, b: DateSpec | null): boolean =>
-  a === null || b === null ? a === b : sameDateSpec(a, b);
-
-const sameField = (key: DraftKey, a: TaskDraft, b: TaskDraft): boolean =>
-  key === 'availableFrom' || key === 'due' ? sameSpec(a[key], b[key]) : a[key] === b[key];
-
-/** A draft taking the stored value for each field `useStored` names, and its own value for the others. */
-const mixDraft = (
-  useStored: (key: DraftKey) => boolean,
-  own: TaskDraft,
-  stored: TaskDraft,
-): TaskDraft => ({
-  title: useStored('title') ? stored.title : own.title,
-  notes: useStored('notes') ? stored.notes : own.notes,
-  areaId: useStored('areaId') ? stored.areaId : own.areaId,
-  important: useStored('important') ? stored.important : own.important,
-  estimateMinutes: useStored('estimateMinutes') ? stored.estimateMinutes : own.estimateMinutes,
-  availableFrom: useStored('availableFrom') ? stored.availableFrom : own.availableFrom,
-  due: useStored('due') ? stored.due : own.due,
-});
 
 /** Edits every field of one Task, shows its derived state, and runs its actions and blocker links. */
 @Component({
@@ -112,12 +86,14 @@ const mixDraft = (
     EstimateField,
     FormField,
     InlineConfirm,
+    LoadState,
     LogProgressForm,
     NgTemplateOutlet,
     RouterLink,
     Segmented,
     SelectField,
     StatusBadge,
+    SyncNote,
     TextField,
   ],
   providers: [CommandAttempts],
@@ -182,7 +158,8 @@ export class TaskEditor {
 
   private readonly removingIds = signal<ReadonlySet<string>>(NO_IDS);
 
-  private readonly addingIds = signal<ReadonlySet<string>>(NO_IDS);
+  /** Whether an Add blocker send is in flight; only one runs at a time. */
+  private readonly adding = signal(false);
 
   /** The AddBlocker commands still being tried, by blocker id, so a retry reuses its linkId. */
   private readonly addCommands = new Map<string, AddBlocker>();
@@ -250,13 +227,7 @@ export class TaskEditor {
     validate(path.title, ({ value }) =>
       value().trim() === '' ? { kind: 'required', message: 'Needs a title' } : undefined,
     );
-    disabled(path.title, { when: () => this.readOnly() });
-    disabled(path.notes, { when: () => this.readOnly() });
-    disabled(path.areaId, { when: () => this.readOnly() });
-    disabled(path.important, { when: () => this.readOnly() });
-    disabled(path.estimateMinutes, { when: () => this.readOnly() });
-    disabled(path.availableFrom, { when: () => this.readOnly() });
-    disabled(path.due, { when: () => this.readOnly() });
+    disabled(path, { when: () => this.readOnly() });
   });
 
   protected readonly needsTitle = computed(() => this.model().title.trim() === '');
@@ -295,9 +266,7 @@ export class TaskEditor {
   );
 
   protected readonly areaOptions = computed<readonly SelectOption[]>(() => {
-    const areas = [...(this.dataStore.state()?.areas ?? [])].sort(
-      (a, b) => compareCodeUnits(a.name, b.name) || compareCodeUnits(a.id, b.id),
-    );
+    const areas = [...(this.dataStore.state()?.areas ?? [])].sort(byAreaName);
 
     return [
       { value: '', label: 'No Area' },
@@ -305,11 +274,7 @@ export class TaskEditor {
     ];
   });
 
-  private readonly timeZone = computed(() => {
-    const zone = this.view()?.state.settings.timeZone ?? 'UTC';
-
-    return isValidTimeZone(zone) ? zone : 'UTC';
-  });
+  private readonly timeZone = computed(() => zoneOrUtc(this.view()?.state.settings.timeZone));
 
   protected readonly overdue = computed(() => {
     const view = this.view();
@@ -367,16 +332,7 @@ export class TaskEditor {
     return text !== '' && text !== task.title ? task.captureText : null;
   });
 
-  protected readonly canLogProgress = computed(() => {
-    const task = this.view()?.task;
-
-    return (
-      task !== undefined &&
-      task.status === TaskStatus.Open &&
-      task.estimateMinutes !== null &&
-      task.estimateMinutes >= MIN_LOGGABLE_ESTIMATE
-    );
-  });
+  protected readonly canLogProgress = computed(() => canLogProgress(this.view()?.task));
 
   protected readonly blockedBy = computed(() => {
     const view = this.view();
@@ -416,10 +372,7 @@ export class TaskEditor {
   });
 
   protected readonly addBusy = computed(
-    () =>
-      this.addingIds().size > 0 ||
-      this.leaving() ||
-      this.dataStore.awaitingSync().has(this.taskId()),
+    () => this.adding() || this.leaving() || this.dataStore.awaitingSync().has(this.taskId()),
   );
 
   constructor() {
@@ -472,9 +425,7 @@ export class TaskEditor {
       this.baseline.set(stored);
 
       if (!this.dataStore.awaitingSync().has(task.id)) {
-        const draft = this.model();
-
-        this.model.set(mixDraft((key) => sameField(key, draft, sent), draft, stored));
+        this.model.set(settleSaved(TASK_DRAFT_FIELDS, sent, this.model(), stored));
       }
     }
 
@@ -500,12 +451,32 @@ export class TaskEditor {
     this.leave();
   }
 
+  /** Sends a Drop; Applied leaves the editor, anything else stays with its message. */
   protected async drop(): Promise<void> {
-    await this.leaveWith({
+    if (this.actionsBusy()) {
+      return;
+    }
+
+    this.clearMessages();
+    this.leaving.set(true);
+
+    const outcome = await this.runAction({
       _tag: CommandTag.DropTask,
       taskId: this.taskId(),
       expect: { status: TaskStatus.Open },
     });
+
+    if (this.destroyRef.destroyed) {
+      return;
+    }
+
+    if (outcome._tag === CommandOutcomeTag.Applied) {
+      this.leave();
+      return;
+    }
+
+    this.leaving.set(false);
+    this.statusLine.set(outcomeMessage(outcome) ?? '');
   }
 
   protected cancelDrop(): void {
@@ -557,7 +528,7 @@ export class TaskEditor {
     let outcome: CommandOutcome;
 
     try {
-      outcome = await this.send({ _tag: CommandTag.RemoveBlocker, linkId });
+      outcome = await this.attempts.send({ _tag: CommandTag.RemoveBlocker, linkId });
     } finally {
       this.removingIds.update((ids) => new Set([...ids].filter((id) => id !== linkId)));
     }
@@ -588,14 +559,14 @@ export class TaskEditor {
     };
 
     this.addCommands.set(blockerId, command);
-    this.addingIds.update((ids) => new Set([...ids, blockerId]));
+    this.adding.set(true);
 
     let outcome: CommandOutcome;
 
     try {
-      outcome = await this.send(command);
+      outcome = await this.attempts.send(command);
     } finally {
-      this.addingIds.update((ids) => new Set([...ids].filter((id) => id !== blockerId)));
+      this.adding.set(false);
     }
 
     if (this.destroyRef.destroyed) {
@@ -634,36 +605,10 @@ export class TaskEditor {
       return;
     }
 
-    const draft = this.model();
-    const useStored = (key: DraftKey): boolean =>
-      sameField(key, draft, baseline) || sameField(key, draft, stored);
+    const next = followStore(TASK_DRAFT_FIELDS, baseline, this.model(), stored);
 
-    this.baseline.set(mixDraft(useStored, baseline, stored));
-    this.model.set(mixDraft(useStored, draft, stored));
-  }
-
-  /** Sends a Drop; Applied leaves the editor, anything else stays with its message. */
-  private async leaveWith(command: Command): Promise<void> {
-    if (this.actionsBusy()) {
-      return;
-    }
-
-    this.clearMessages();
-    this.leaving.set(true);
-
-    const outcome = await this.runAction(command);
-
-    if (this.destroyRef.destroyed) {
-      return;
-    }
-
-    if (outcome._tag === CommandOutcomeTag.Applied) {
-      this.leave();
-      return;
-    }
-
-    this.leaving.set(false);
-    this.statusLine.set(outcomeMessage(outcome) ?? '');
+    this.baseline.set(next.baseline);
+    this.model.set(next.draft);
   }
 
   private leave(): void {
@@ -679,20 +624,10 @@ export class TaskEditor {
     this.actionPending.set(true);
 
     try {
-      return await this.send(command);
+      return await this.attempts.send(command);
     } finally {
       this.actionPending.set(false);
     }
-  }
-
-  /** Sends the command with its attempt key. */
-  private async send(command: Command): Promise<CommandOutcome> {
-    const key = this.attempts.keyFor(command);
-    const outcome = await this.dataStore.send(command, key);
-
-    this.attempts.settle(command, outcome);
-
-    return outcome;
   }
 
   private clearMessages(): void {

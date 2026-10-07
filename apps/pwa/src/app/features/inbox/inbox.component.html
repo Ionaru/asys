@@ -1,0 +1,58 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
+<h1 #heading class="inbox__title" tabindex="-1">Inbox</h1>
+<p class="inbox__status" role="status">{{ statusLine() }}</p>
+@if (dataStore.state() !== null) {
+  @if (reviewRows().length > 0) {
+    <ul class="inbox__reviews">
+      @for (row of reviewRows(); track row.item.id) {
+        <li>
+          <asys-review-item
+            [question]="row.copy.question"
+            [reason]="row.copy.reason"
+            [actions]="dismissActions"
+            [busy]="reviewBusy(row.item.id)"
+            (decide)="dismiss(row.item.id)"
+          >
+            @if (row.copy.taskId !== null) {
+              <a
+                asys-button
+                [variant]="Variant.Quiet"
+                [size]="Size.Small"
+                [routerLink]="['/tasks', row.copy.taskId]"
+              >
+                Open Task
+              </a>
+            }
+          </asys-review-item>
+          @if (dataStore.awaitingSync().has(row.item.id)) {
+            <p asys-sync-note class="inbox__sync"></p>
+          }
+        </li>
+      }
+    </ul>
+  }
+  @for (task of cardTasks(); track task.id) {
+    <asys-triage-card
+      [position]="handled() + 1"
+      [total]="handled() + inbox().length"
+      [title]="task.title"
+      [rawText]="task.captureText"
+      [areas]="areas()"
+      [(draft)]="draftState"
+      [busy]="cardBusy()"
+      [canLater]="inbox().length > 1"
+      (triage)="triage($event)"
+      (dropTask)="drop()"
+      (later)="later(task.id)"
+      (edit)="edit(task.id)"
+    />
+    @if (dataStore.awaitingSync().has(task.id)) {
+      <p asys-sync-note class="inbox__sync"></p>
+    }
+  }
+  @if (reviewRows().length === 0 && inbox().length === 0) {
+    <p class="inbox__text">Nothing waits here.</p>
+  }
+} @else {
+  <asys-load-state [failed]="dataStore.status() === Status.Failed" (retry)="dataStore.refresh()" />
+}

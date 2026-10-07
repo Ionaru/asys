@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { DOCUMENT } from '@angular/common';
+import { HttpStatusCode } from '@angular/common/http';
 import { computed, inject, Service, signal, type Signal } from '@angular/core';
 import {
   applyChanges,
@@ -22,6 +23,7 @@ import { LAST_REPORTED_ZONE_KEY } from '../auth/session';
 import { Clock } from '../platform/clock';
 import { DeviceStorage } from '../platform/device-storage';
 import { DeviceZone } from '../platform/device-zone';
+import { Ids } from '../platform/ids';
 import { commandSubject, SETTINGS_SUBJECT } from './command-subject';
 import { applyHolds, type Hold, isStillHeld } from './held-state';
 import { zoneToReport } from './zone-to-report';
@@ -38,9 +40,9 @@ export enum SyncStatus {
 /** How long after a request settles the next poll starts. */
 export const POLL_INTERVAL_MS = 15_000;
 
-const HTTP_UNAUTHORIZED = 401;
-
-const HTTP_GONE = 410;
+/** The account's time zone when it is one this device knows, else UTC. */
+export const zoneOrUtc = (zone: string | undefined): string =>
+  zone !== undefined && isValidTimeZone(zone) ? zone : 'UTC';
 
 /** What a settled request looked like, for the rules that decide what comes next. */
 interface Settled {
@@ -51,11 +53,12 @@ interface Settled {
 
 const isExpired = (settled: Settled): boolean =>
   !settled.isSnapshot &&
-  settled.failure?.status === HTTP_GONE &&
+  settled.failure?.status === HttpStatusCode.Gone &&
   settled.failure.errorTag === 'ChangesExpired';
 
 const isUnauthorized = (settled: Settled): boolean =>
-  settled.failure?.status === HTTP_UNAUTHORIZED && settled.failure.errorTag === 'Unauthorized';
+  settled.failure?.status === HttpStatusCode.Unauthorized &&
+  settled.failure.errorTag === 'Unauthorized';
 
 const isApplied = (outcome: CommandOutcome): boolean =>
   outcome._tag === CommandOutcomeTag.Applied || outcome._tag === CommandOutcomeTag.NotApplicable;
@@ -75,6 +78,7 @@ export class DataStore {
   private readonly deviceZone = inject(DeviceZone);
   private readonly storage = inject(DeviceStorage);
   private readonly document = inject(DOCUMENT);
+  private readonly ids = inject(Ids);
 
   private readonly statusSignal = signal<SyncStatus>(SyncStatus.Idle);
   private readonly stateSignal = signal<DomainState | null>(null);
@@ -109,9 +113,7 @@ export class DataStore {
       return null;
     }
 
-    const settings = isValidTimeZone(state.settings.timeZone)
-      ? state.settings
-      : { ...state.settings, timeZone: 'UTC' };
+    const settings = { ...state.settings, timeZone: zoneOrUtc(state.settings.timeZone) };
 
     return pick(state.tasks, state.links, state.areas, settings, this.clock.now());
   });
@@ -226,10 +228,7 @@ export class DataStore {
   }
 
   /** Submits a command and resolves its outcome; an Applied or NotApplicable outcome resolves only after the store has synced past it. */
-  async send(
-    command: Command,
-    idempotencyKey: string = crypto.randomUUID(),
-  ): Promise<CommandOutcome> {
+  async send(command: Command, idempotencyKey: string = this.ids.next()): Promise<CommandOutcome> {
     const generation = this.generation;
     const wasStarted = this.started;
     const outcome = await this.api.runCommand(command, idempotencyKey);
@@ -255,7 +254,7 @@ export class DataStore {
 
       const outcome = await this.api.runCommand(
         { _tag: CommandTag.SetTimeZone, timeZone: zone },
-        crypto.randomUUID(),
+        this.ids.next(),
       );
 
       if (!wasStarted || !this.isLive(outcome, generation)) {
@@ -576,7 +575,7 @@ export class DataStore {
 
     this.zoneReport = this.runOnly(
       { _tag: CommandTag.SetTimeZone, timeZone: report },
-      crypto.randomUUID(),
+      this.ids.next(),
     ).then((outcome) => {
       if (generation !== this.generation) {
         return;

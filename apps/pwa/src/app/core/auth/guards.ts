@@ -2,11 +2,10 @@
 import { inject } from '@angular/core';
 import { Router, type CanActivateFn } from '@angular/router';
 
+import { pathOf } from '../platform/url-path';
 import { Session, SessionState } from './session';
 
 const SIGN_UP_PATH = '/signup';
-
-const pathOf = (url: string): string => url.split(/[?#]/, 1)[0] ?? url;
 
 /** Lets signed-in (or unreachable, so offline works) visitors in; sends the rest to sign-in. */
 export const signedInGuard: CanActivateFn = async (_route, state) => {

@@ -16,7 +16,6 @@ import { CommandTag, type Command } from '@asys/domain';
 
 import { CommandOutcomeTag } from '../../core/api/data-api';
 import { CommandAttempts } from '../../core/data/command-attempts';
-import { DataStore } from '../../core/data/data-store';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { sharedCapture } from '../../core/data/shared-capture';
 import { Ids } from '../../core/platform/ids';
@@ -28,63 +27,8 @@ import { TextField } from '../../ui/text-field/text-field';
   selector: 'app-capture',
   imports: [RouterLink, Button, TextField],
   providers: [CommandAttempts],
-  template: `
-    <h1 class="capture__title">Capture</h1>
-    <form class="capture__form" (submit)="add($event)">
-      <asys-text-field label="Title" [value]="field()" (valueChange)="field.set($event)" />
-      <button asys-button type="submit" [variant]="Variant.Primary" [disabled]="!canAdd()">
-        Add
-      </button>
-    </form>
-    <div class="capture__status" role="status">
-      @if (confirmation(); as captured) {
-        <p class="capture__text">Captured “{{ captured }}”. It waits in the Inbox until Triage.</p>
-        <p class="capture__links">
-          <a routerLink="/inbox">Open the Inbox</a>
-          <a routerLink="/now">Go to Now</a>
-        </p>
-      } @else if (message(); as text) {
-        <p class="capture__text">{{ text }}</p>
-      }
-    </div>
-  `,
-  styles: `
-    .capture__title {
-      margin: 0 0 var(--space-3);
-      font-size: var(--font-size-title);
-      line-height: var(--line-height-title);
-      font-weight: 700;
-    }
-
-    .capture__form {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: var(--space-3);
-      margin: 0 0 var(--space-3);
-    }
-
-    .capture__text {
-      margin: 0 0 var(--space-2);
-      font-size: var(--font-size-body);
-      line-height: var(--line-height-body);
-    }
-
-    .capture__links {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-4);
-      margin: 0;
-      font-size: var(--font-size-body);
-      line-height: var(--line-height-body);
-    }
-
-    .capture__links a {
-      display: inline-flex;
-      align-items: center;
-      min-height: var(--tap-target);
-    }
-  `,
+  templateUrl: './capture.component.html',
+  styleUrl: './capture.css',
 })
 export class Capture {
   private readonly router = inject(Router);
@@ -92,8 +36,6 @@ export class Capture {
   private readonly ids = inject(Ids);
 
   private readonly attempts = inject(CommandAttempts);
-
-  private readonly dataStore = inject(DataStore);
 
   private readonly injector = inject(Injector);
 
@@ -141,9 +83,8 @@ export class Capture {
     this.confirmation.set(null);
     this.busy.set(true);
 
-    const outcome = await this.dataStore.send(command, this.attempts.keyFor(command));
+    const outcome = await this.attempts.send(command);
 
-    this.attempts.settle(command, outcome);
     this.busy.set(false);
 
     if (this.destroyRef.destroyed) {

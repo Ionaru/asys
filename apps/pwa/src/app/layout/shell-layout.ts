@@ -22,6 +22,7 @@ import { DataStore } from '../core/data/data-store';
 import { DoneUndo, PauseReason } from '../core/data/done-undo';
 import { Motion } from '../core/platform/motion';
 import { TAB_PATHS } from '../core/platform/tabs';
+import { pathOf } from '../core/platform/url-path';
 import { BottomNav } from '../ui/bottom-nav/bottom-nav';
 import { Button, ButtonSize, ButtonVariant } from '../ui/button/button';
 import { CaptureButton } from '../ui/capture-button/capture-button';
@@ -78,10 +79,9 @@ export class ShellLayout {
       return false;
     }
 
-    const url = this.router.serializeUrl(navigation.finalUrl ?? navigation.extractedUrl);
-    const path = url.split(/[?#]/)[0];
-
-    return TAB_PATHS.includes(path);
+    return TAB_PATHS.includes(
+      pathOf(this.router.serializeUrl(navigation.finalUrl ?? navigation.extractedUrl)),
+    );
   });
 
   protected readonly open = linkedSignal<boolean, boolean>({

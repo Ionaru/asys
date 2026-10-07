@@ -5,6 +5,7 @@ import type { Command } from '@asys/domain';
 import { CommandOutcomeTag, type CommandOutcome } from '../api/data-api';
 import { Ids } from '../platform/ids';
 import { commandSubject } from './command-subject';
+import { DataStore } from './data-store';
 
 const sortKeys = (value: unknown): unknown => {
   if (Array.isArray(value)) {
@@ -41,6 +42,8 @@ interface Attempt {
 @Service({ autoProvided: false })
 export class CommandAttempts {
   private readonly ids = inject(Ids);
+
+  private readonly dataStore = inject(DataStore);
 
   private readonly attempts = new Map<string, Attempt>();
 
@@ -79,5 +82,14 @@ export class CommandAttempts {
         this.attempts.delete(canonical);
       }
     }
+  }
+
+  /** Sends the command through `DataStore.send` with its key, then settles it with the outcome. */
+  async send(command: Command): Promise<CommandOutcome> {
+    const outcome = await this.dataStore.send(command, this.keyFor(command));
+
+    this.settle(command, outcome);
+
+    return outcome;
   }
 }

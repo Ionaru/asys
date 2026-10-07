@@ -29,8 +29,11 @@ import { CommandAttempts } from '../../core/data/command-attempts';
 import { DataStore, SyncStatus } from '../../core/data/data-store';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { Button, ButtonSize, ButtonVariant } from '../../ui/button/button';
+import { LoadState } from '../../ui/load-state/load-state';
 import { ReviewItem, ReviewItemActionKind } from '../../ui/review-item/review-item';
+import { SyncNote } from '../../ui/sync-note/sync-note';
 import { type AreaChoice, TriageCard, type TriageDraft } from '../../ui/triage-card/triage-card';
+import { byAreaName } from '../areas/area-order';
 import { reviewCopy } from './review-copy';
 
 const NO_IDS: ReadonlySet<string> = new Set();
@@ -42,120 +45,16 @@ const draftOf = (task: Task | null): TriageDraft =>
     ? EMPTY_DRAFT
     : { important: task.important, estimateMinutes: task.estimateMinutes, areaId: task.areaId };
 
-const compareCodeUnits = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
-
 const areaChoices = (state: DomainState): readonly AreaChoice[] =>
-  state.areas
-    .map((area) => ({ id: area.id, name: area.name }))
-    .sort((a, b) => compareCodeUnits(a.name, b.name) || compareCodeUnits(a.id, b.id));
+  state.areas.map((area) => ({ id: area.id, name: area.name })).sort(byAreaName);
 
 /** Where captured Tasks wait for Triage, and where ASYS asks for decisions. */
 @Component({
   selector: 'app-inbox',
-  imports: [Button, ReviewItem, RouterLink, TriageCard],
+  imports: [Button, LoadState, ReviewItem, RouterLink, SyncNote, TriageCard],
   providers: [CommandAttempts],
-  template: `
-    <h1 #heading class="inbox__title" tabindex="-1">Inbox</h1>
-    <p class="inbox__status" role="status">{{ statusLine() }}</p>
-    @if (dataStore.state() !== null) {
-      @if (reviewRows().length > 0) {
-        <ul class="inbox__reviews">
-          @for (row of reviewRows(); track row.item.id) {
-            <li>
-              <asys-review-item
-                [question]="row.copy.question"
-                [reason]="row.copy.reason"
-                [actions]="dismissActions"
-                [busy]="reviewBusy(row.item.id)"
-                (decide)="dismiss(row.item.id)"
-              >
-                @if (row.copy.taskId !== null) {
-                  <a
-                    asys-button
-                    [variant]="Variant.Quiet"
-                    [size]="Size.Small"
-                    [routerLink]="['/tasks', row.copy.taskId]"
-                  >
-                    Open Task
-                  </a>
-                }
-              </asys-review-item>
-              @if (dataStore.awaitingSync().has(row.item.id)) {
-                <p class="inbox__sync">Saved. Waiting for the server.</p>
-              }
-            </li>
-          }
-        </ul>
-      }
-      @for (task of cardTasks(); track task.id) {
-        <asys-triage-card
-          [position]="handled() + 1"
-          [total]="handled() + inbox().length"
-          [title]="task.title"
-          [rawText]="task.captureText"
-          [areas]="areas()"
-          [draft]="draftState()"
-          (draftChange)="setDraft($event)"
-          [busy]="cardBusy()"
-          [canLater]="inbox().length > 1"
-          (triage)="triage($event)"
-          (dropTask)="drop()"
-          (later)="later(task.id)"
-          (edit)="edit(task.id)"
-        />
-        @if (dataStore.awaitingSync().has(task.id)) {
-          <p class="inbox__sync">Saved. Waiting for the server.</p>
-        }
-      }
-      @if (reviewRows().length === 0 && inbox().length === 0) {
-        <p class="inbox__text">Nothing waits here.</p>
-      }
-    } @else if (dataStore.status() === Status.Failed) {
-      <p role="alert">ASYS could not load your Tasks.</p>
-      <button asys-button type="button" [variant]="Variant.Quiet" (click)="dataStore.refresh()">
-        Try again
-      </button>
-    } @else {
-      <p>Loading…</p>
-    }
-  `,
-  styles: `
-    .inbox__title {
-      margin: 0 0 var(--space-3);
-      font-size: var(--font-size-title);
-      line-height: var(--line-height-title);
-      font-weight: 700;
-    }
-
-    .inbox__status {
-      margin: 0 0 var(--space-3);
-      font-size: var(--font-size-body);
-      line-height: var(--line-height-body);
-    }
-
-    .inbox__status:empty {
-      margin: 0;
-    }
-
-    .inbox__reviews {
-      margin: 0 0 var(--space-4);
-      padding: 0;
-      list-style: none;
-    }
-
-    .inbox__sync {
-      margin: var(--space-2) 0 0;
-      font-size: var(--font-size-reason);
-      line-height: var(--line-height-reason);
-      color: var(--ink-muted);
-    }
-
-    .inbox__text {
-      margin: 0 0 var(--space-2);
-      font-size: var(--font-size-body);
-      line-height: var(--line-height-body);
-    }
-  `,
+  templateUrl: './inbox.component.html',
+  styleUrl: './inbox.css',
 })
 export class Inbox {
   protected readonly dataStore = inject(DataStore);
@@ -240,17 +139,13 @@ export class Inbox {
     return [...this.handledIds()].filter((id) => !inboxIds.has(id)).length;
   });
 
-  private readonly draftState = linkedSignal<string | undefined, TriageDraft>({
+  protected readonly draftState = linkedSignal<string | undefined, TriageDraft>({
     source: () => this.card()?.id,
     computation: (id, previous) =>
       previous !== undefined && previous.source === id
         ? previous.value
         : untracked(() => draftOf(this.card())),
   });
-
-  protected setDraft(value: TriageDraft): void {
-    this.draftState.set(value);
-  }
 
   protected readonly cardBusy = computed(() => {
     const id = this.card()?.id;
@@ -327,15 +222,13 @@ export class Inbox {
 
     const index = this.reviewRows().findIndex((row) => row.item.id === reviewItemId);
     const command: Command = { _tag: CommandTag.ResolveReviewItem, reviewItemId };
-    const key = this.attempts.keyFor(command);
 
     this.pendingReviewIds.update((ids) => new Set([...ids, reviewItemId]));
 
     let outcome: CommandOutcome;
 
     try {
-      outcome = await this.dataStore.send(command, key);
-      this.attempts.settle(command, outcome);
+      outcome = await this.attempts.send(command);
     } finally {
       this.pendingReviewIds.update((ids) => new Set([...ids].filter((id) => id !== reviewItemId)));
     }
@@ -364,15 +257,12 @@ export class Inbox {
 
   /** Sends a Triage or Drop for the card's Task and handles its outcome. */
   private async runForCard(taskId: string, command: Command): Promise<void> {
-    const key = this.attempts.keyFor(command);
-
     this.pendingTaskIds.update((ids) => new Set([...ids, taskId]));
 
     let outcome: CommandOutcome;
 
     try {
-      outcome = await this.dataStore.send(command, key);
-      this.attempts.settle(command, outcome);
+      outcome = await this.attempts.send(command);
     } finally {
       this.pendingTaskIds.update((ids) => new Set([...ids].filter((id) => id !== taskId)));
     }

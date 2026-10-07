@@ -1,0 +1,12 @@
+/* SPDX-License-Identifier: EUPL-1.2 */
+.app-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--sunken);
+  color: var(--ink);
+  font-size: var(--font-size-reason);
+  line-height: var(--line-height-reason);
+}

@@ -1,0 +1,33 @@
+/* SPDX-License-Identifier: EUPL-1.2 */
+.inbox__title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
+  font-weight: 700;
+}
+
+.inbox__status {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+}
+
+.inbox__status:empty {
+  margin: 0;
+}
+
+.inbox__reviews {
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  list-style: none;
+}
+
+.inbox__sync {
+  margin: var(--space-2) 0 0;
+}
+
+.inbox__text {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+}

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: EUPL-1.2
+import { HttpStatusCode } from '@angular/common/http';
 import { inject, Service } from '@angular/core';
 import type {
   AuthenticationResponseJSON,
@@ -79,8 +80,6 @@ export interface Passkey {
   readonly backedUp: boolean;
 }
 
-const HTTP_UNAUTHORIZED = 401;
-
 const ERROR_BY_TAG: Readonly<Record<string, AuthError>> = {
   SignUpLinkInvalid: AuthError.SignUpLinkInvalid,
   PasskeyChallengeInvalid: AuthError.ChallengeInvalid,
@@ -109,7 +108,7 @@ const errorOf = (
     return AuthError.Network;
   }
 
-  if (bodylessUnauthorized && status === HTTP_UNAUTHORIZED && errorTag === null) {
+  if (bodylessUnauthorized && status === HttpStatusCode.Unauthorized && errorTag === null) {
     return AuthError.Unauthorized;
   }
 

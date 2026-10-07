@@ -1,0 +1,24 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
+<main class="asys-page sign-in">
+  <h1 class="sign-in__title">Sign in</h1>
+  <p class="sign-in__body">Use the passkey you made for ASYS.</p>
+  <button
+    asys-button
+    type="button"
+    [block]="true"
+    [variant]="Variant.Primary"
+    [disabled]="options() === null || busy()"
+    (click)="signIn()"
+  >
+    Sign in with passkey
+  </button>
+  @if (shownMessage(); as text) {
+    <p class="sign-in__message" role="alert">{{ text }}</p>
+  }
+  @if (loadError() !== null) {
+    <button asys-button type="button" [variant]="Variant.Quiet" (click)="discard()">
+      Try again
+    </button>
+  }
+  <a asys-button routerLink="/recover" [variant]="Variant.Quiet">Use a recovery code</a>
+</main>

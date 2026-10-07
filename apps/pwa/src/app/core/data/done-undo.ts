@@ -3,7 +3,7 @@ import { DOCUMENT } from '@angular/common';
 import { DestroyRef, inject, type Signal, Service, signal } from '@angular/core';
 import { CommandTag, type CompleteTask, TaskStatus, type Task } from '@asys/domain';
 
-import { CommandOutcomeTag, DataApi, type CommandOutcome } from '../api/data-api';
+import { CommandOutcomeTag, DataApi, isRetryable, type CommandOutcome } from '../api/data-api';
 import { Haptics } from '../platform/haptics';
 import { CommandAttempts } from './command-attempts';
 import { DataStore } from './data-store';
@@ -75,6 +75,8 @@ export class DoneUndo {
 
   private readonly document = inject(DOCUMENT);
 
+  private readonly destroyRef = inject(DestroyRef);
+
   private readonly view = this.document.defaultView;
 
   private readonly pendingSignal = signal<PendingDone | null>(null);
@@ -105,8 +107,6 @@ export class DoneUndo {
 
   private undoneSeq = 0;
 
-  private destroyed = false;
-
   readonly pending: Signal<PendingDone | null> = this.pendingSignal.asReadonly();
 
   readonly failure: Signal<DoneFailure | null> = this.failureSignal.asReadonly();
@@ -121,8 +121,7 @@ export class DoneUndo {
     this.document.addEventListener('visibilitychange', this.onVisibilityChange);
     this.view?.addEventListener('pagehide', this.onPageHide);
 
-    inject(DestroyRef).onDestroy(() => {
-      this.destroyed = true;
+    this.destroyRef.onDestroy(() => {
       this.document.removeEventListener('visibilitychange', this.onVisibilityChange);
       this.view?.removeEventListener('pagehide', this.onPageHide);
 
@@ -185,12 +184,7 @@ export class DoneUndo {
 
   /** Sends a pending Done at once and resolves when every send in flight has been handled. */
   flush(): Promise<void> {
-    const held = this.take();
-
-    if (held !== null) {
-      void this.dispatch(held, false);
-      this.clearPausesWhenIdle();
-    }
+    this.sendHeld(false);
 
     if (this.inflight.size === 0) {
       return Promise.resolve();
@@ -239,31 +233,27 @@ export class DoneUndo {
 
   private readonly onVisibilityChange = (): void => {
     if (this.document.visibilityState === 'hidden') {
-      this.sendNowWithKeepalive();
+      this.sendHeld(true);
     }
   };
 
   private readonly onPageHide = (): void => {
-    this.sendNowWithKeepalive();
+    this.sendHeld(true);
   };
 
-  private sendNowWithKeepalive(): void {
+  private readonly onWindowEnd = (): void => {
+    this.sendHeld(false);
+  };
+
+  /** Sends the pending Done now, if there is one; with `keepalive`, the request outlives the page. */
+  private sendHeld(keepalive: boolean): void {
     const held = this.take();
 
     if (held !== null) {
-      void this.dispatch(held, true);
+      void this.dispatch(held, keepalive);
       this.clearPausesWhenIdle();
     }
   }
-
-  private readonly onWindowEnd = (): void => {
-    const held = this.take();
-
-    if (held !== null) {
-      void this.dispatch(held, false);
-      this.clearPausesWhenIdle();
-    }
-  };
 
   /** Stops the timer and empties the slot; the caller sends or releases what it got. */
   private take(): Held | null {
@@ -286,7 +276,7 @@ export class DoneUndo {
   /** Runs the timer only while a Done is pending, no pause reason holds and no failure displaces the bar. */
   private syncTimer(): void {
     const shouldRun =
-      !this.destroyed &&
+      !this.destroyRef.destroyed &&
       this.held !== null &&
       this.paused.size === 0 &&
       this.failureSignal() === null;
@@ -338,33 +328,23 @@ export class DoneUndo {
 
     this.dataStore.release(held.key);
 
-    if (outcome._tag === CommandOutcomeTag.SignedOut || this.destroyed) {
+    if (outcome._tag === CommandOutcomeTag.SignedOut || this.destroyRef.destroyed) {
       return;
     }
 
     const message = outcomeMessage(outcome) ?? '';
     const title = held.task.title;
+    const closedElsewhere = outcome._tag === CommandOutcomeTag.NotApplicable;
 
-    if (outcome._tag === CommandOutcomeTag.NotApplicable) {
-      this.failureSignal.set({
-        taskId: held.task.id,
-        title,
-        message,
-        canRetry: false,
-        closedElsewhere: true,
-      });
-      this.announce(message);
-    } else {
-      this.failureSignal.set({
-        taskId: held.task.id,
-        title,
-        message,
-        canRetry:
-          outcome._tag === CommandOutcomeTag.Failed || outcome._tag === CommandOutcomeTag.KeyReused,
-        closedElsewhere: false,
-      });
-      this.announce(`“${title}” is not Done. ${message}`);
-    }
+    this.failureSignal.set({
+      taskId: held.task.id,
+      title,
+      message,
+      canRetry: isRetryable(outcome._tag),
+      closedElsewhere,
+    });
+    // Closed elsewhere, the Task may well be Done, so the title line is left out.
+    this.announce(closedElsewhere ? message : `“${title}” is not Done. ${message}`);
 
     this.failedTask = held.task;
     this.syncTimer();

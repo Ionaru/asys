@@ -1,0 +1,88 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
+<main class="asys-page sign-up">
+  <h1 #title class="sign-up__title" tabindex="-1">{{ heading() }}</h1>
+  @switch (step()) {
+    @case (Step.Name) {
+      <form class="sign-up__block" animate.enter="asys-enter" [formRoot]="nameForm">
+        <asys-text-field
+          [formField]="nameForm.name"
+          label="Name"
+          hint="How ASYS addresses you."
+          autocomplete="name"
+        />
+        <button asys-button type="submit" [block]="true" [variant]="Variant.Primary">
+          Continue
+        </button>
+      </form>
+    }
+    @case (Step.Passkey) {
+      <div class="sign-up__block" animate.enter="asys-enter">
+        <p class="sign-up__body">Next, create a passkey for {{ submittedName() }}.</p>
+        <button
+          asys-button
+          type="button"
+          [block]="true"
+          [variant]="Variant.Primary"
+          [disabled]="options() === null || busy()"
+          (click)="createPasskey()"
+        >
+          Create passkey
+        </button>
+        <button
+          asys-button
+          type="button"
+          [variant]="Variant.Quiet"
+          [disabled]="busy()"
+          (click)="changeName()"
+        >
+          Change name
+        </button>
+        @if (shownMessage(); as text) {
+          <p class="sign-up__message" role="alert">{{ text }}</p>
+        }
+        @if (loadError() !== null) {
+          <button asys-button type="button" [variant]="Variant.Quiet" (click)="discard()">
+            Try again
+          </button>
+        }
+      </div>
+    }
+    @case (Step.Codes) {
+      <div class="sign-up__block" animate.enter="asys-enter">
+        <ol class="sign-up__codes asys-num">
+          @for (code of codes(); track $index) {
+            <li>{{ code }}</li>
+          }
+        </ol>
+        <p class="sign-up__body">These codes are shown only now. Keep them somewhere safe.</p>
+        <button asys-button type="button" [variant]="Variant.Secondary" (click)="copy()">
+          Copy
+        </button>
+        @if (copyStatus(); as text) {
+          <p class="sign-up__body" role="status">{{ text }}</p>
+        }
+        <button
+          asys-button
+          type="button"
+          [block]="true"
+          [variant]="Variant.Primary"
+          (click)="finish()"
+        >
+          Continue
+        </button>
+      </div>
+    }
+    @case (Step.LinkInvalid) {
+      <div class="sign-up__block" animate.enter="asys-enter">
+        <p class="sign-up__body">Open the Sign-up link again.</p>
+        <a asys-button routerLink="/signin" [variant]="Variant.Quiet">Sign in instead</a>
+      </div>
+    }
+    @case (Step.AlreadySignedIn) {
+      <div class="sign-up__block" animate.enter="asys-enter">
+        <p class="sign-up__body">You are already signed in.</p>
+        <a asys-button routerLink="/now" [variant]="Variant.Quiet">Go to Now</a>
+      </div>
+    }
+  }
+</main>

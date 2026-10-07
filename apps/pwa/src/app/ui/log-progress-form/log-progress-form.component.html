@@ -1,0 +1,28 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
+<form class="asys-progress" (submit)="submit($event)" (keydown.escape)="cancel.emit()">
+  <label class="asys-field__label" [for]="inputId">Time still needed</label>
+  <input
+    #control
+    class="asys-field__input"
+    type="text"
+    inputmode="numeric"
+    autocomplete="off"
+    [id]="inputId"
+    [attr.aria-invalid]="error() ? 'true' : null"
+    [attr.aria-describedby]="messageId"
+  />
+  @if (error()) {
+    <p class="asys-field__error" [id]="messageId">
+      <span class="asys-field__error-word">Error:</span>
+      Use whole minutes from 1 to {{ estimateMinutes() - 1 }}.
+    </p>
+  } @else {
+    <p class="asys-field__hint" [id]="messageId">Whole minutes, less than {{ formatted() }}.</p>
+  }
+  <div class="asys-button-group">
+    <button asys-button type="submit" [variant]="Variants.Primary" [disabled]="busy()">Save</button>
+    <button asys-button type="button" [variant]="Variants.Quiet" (click)="cancel.emit()">
+      Cancel
+    </button>
+  </div>
+</form>

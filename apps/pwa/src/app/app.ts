@@ -4,65 +4,20 @@ import { Component, DestroyRef, computed, effect, inject, untracked } from '@ang
 import { Router, RouterOutlet } from '@angular/router';
 import { isValidTimeZone } from '@asys/domain';
 
+import { SIGNED_OUT_PATHS } from './core/auth/safe-return-url';
 import { Session, SessionState } from './core/auth/session';
 import { DataStore, SyncStatus } from './core/data/data-store';
 import { AppUpdate } from './core/platform/app-update';
 import { DeviceZone } from './core/platform/device-zone';
+import { pathOf } from './core/platform/url-path';
 import { Button, ButtonSize, ButtonVariant } from './ui/button/button';
-
-const AUTH_PATHS: readonly string[] = ['/signin', '/signup', '/recover'];
-
-const pathOf = (url: string): string => url.split(/[?#]/, 1)[0] ?? url;
 
 /** The root: update prompt, connection banners, the data store's lifecycle and the sign-out redirect. */
 @Component({
   selector: 'app-root',
   imports: [RouterOutlet, Button],
-  template: `
-    @if (appUpdate.prompt()) {
-      <div class="app-banner" role="status" animate.enter="asys-enter" animate.leave="asys-leave">
-        <span>A new version of ASYS is ready.</span>
-        <button
-          asys-button
-          type="button"
-          [variant]="Variant.Secondary"
-          [size]="Size.Small"
-          (click)="appUpdate.reload()"
-        >
-          Reload
-        </button>
-      </div>
-    }
-    @if (session.state() === State.Unreachable) {
-      <div class="app-banner" role="status" animate.enter="asys-enter" animate.leave="asys-leave">
-        ASYS cannot reach the server.
-      </div>
-    }
-    @if (dataStore.status() === SyncStatus.Stale) {
-      <div class="app-banner" role="status" animate.enter="asys-enter" animate.leave="asys-leave">
-        @if (syncedTime(); as time) {
-          Showing what was loaded at <span class="asys-num">{{ time }}</span
-          >. Trying again.
-        } @else {
-          Showing what was loaded earlier. Trying again.
-        }
-      </div>
-    }
-    <router-outlet />
-  `,
-  styles: `
-    .app-banner {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--space-3);
-      padding: var(--space-3) var(--space-4);
-      background: var(--sunken);
-      color: var(--ink);
-      font-size: var(--font-size-reason);
-      line-height: var(--line-height-reason);
-    }
-  `,
+  templateUrl: './app.component.html',
+  styleUrl: './app.css',
 })
 export class App {
   protected readonly session = inject(Session);
@@ -158,7 +113,7 @@ export class App {
     const url = this.router.url;
     const path = pathOf(url);
 
-    if (AUTH_PATHS.includes(path)) {
+    if (SIGNED_OUT_PATHS.includes(path)) {
       return;
     }
 

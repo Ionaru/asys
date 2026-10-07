@@ -18,16 +18,15 @@ import { Session } from '../../core/auth/session';
 import { CaptureQueue } from '../../core/data/capture-queue';
 import { DataStore } from '../../core/data/data-store';
 import { DoneUndo } from '../../core/data/done-undo';
+import { GENERIC_MESSAGE } from '../../core/data/outcome-message';
 import { AppUpdate } from '../../core/platform/app-update';
 import { Clock } from '../../core/platform/clock';
 import { DeviceZone } from '../../core/platform/device-zone';
 import { Button, ButtonSize, ButtonVariant } from '../../ui/button/button';
 import { TextField } from '../../ui/text-field/text-field';
 import { ceremonyOptions } from '../auth/ceremony-options';
-
-const GENERIC_MESSAGE = 'Something went wrong. Try again.';
-
-const MAX_NAME_LENGTH = 100;
+import { nameError } from '../auth/name-rule';
+import { MISCONFIGURED_MESSAGE, TRY_AGAIN_MESSAGE } from '../auth/passkey-messages';
 
 const messageForFailure = (failure: PasskeyFailure): string | null => {
   switch (failure) {
@@ -38,7 +37,7 @@ const messageForFailure = (failure: PasskeyFailure): string | null => {
     case PasskeyFailure.Unsupported:
       return 'This browser or device cannot create a passkey.';
     case PasskeyFailure.Misconfigured:
-      return 'ASYS cannot use passkeys at this address. Open ASYS at its usual address.';
+      return MISCONFIGURED_MESSAGE;
     default:
       return GENERIC_MESSAGE;
   }
@@ -48,7 +47,7 @@ const messageForAddError = (error: AuthError): string | null => {
   switch (error) {
     case AuthError.ChallengeInvalid:
     case AuthError.VerificationFailed:
-      return 'Try again.';
+      return TRY_AGAIN_MESSAGE;
     case AuthError.AlreadyRegistered:
       return 'This device already has a passkey for ASYS.';
     case AuthError.Unauthorized:
@@ -56,30 +55,6 @@ const messageForAddError = (error: AuthError): string | null => {
     default:
       return GENERIC_MESSAGE;
   }
-};
-
-const hasUnusualCharacters = (value: string): boolean => {
-  if (value.includes('\u0000')) {
-    return true;
-  }
-
-  for (let index = 0; index < value.length; index += 1) {
-    const unit = value.charCodeAt(index);
-
-    if (unit >= 0xd800 && unit <= 0xdbff) {
-      const next = value.charCodeAt(index + 1);
-
-      if (next >= 0xdc00 && next <= 0xdfff) {
-        index += 1;
-      } else {
-        return true;
-      }
-    } else if (unit >= 0xdc00 && unit <= 0xdfff) {
-      return true;
-    }
-  }
-
-  return false;
 };
 
 /** The account screen: passkeys, recovery codes and sign out. */
@@ -105,6 +80,8 @@ export class Account {
   private readonly doneUndo = inject(DoneUndo);
 
   private readonly captureQueue = inject(CaptureQueue);
+
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly session = inject(Session);
 
@@ -178,17 +155,7 @@ export class Account {
       validate(path.name, ({ value }) => {
         const name = value();
 
-        if (name.trim().length === 0) {
-          return undefined;
-        }
-
-        if (name.length > MAX_NAME_LENGTH) {
-          return { kind: 'max_length', message: 'Use at most 100 characters' };
-        }
-
-        return hasUnusualCharacters(name)
-          ? { kind: 'unusual_characters', message: 'Remove the unusual characters' }
-          : undefined;
+        return name.trim().length === 0 ? undefined : nameError(name);
       });
     },
     {
@@ -217,15 +184,12 @@ export class Account {
 
   private held = false;
 
-  private destroyed = false;
-
   protected readonly signingOut = signal(false);
 
   protected readonly signOutMessage = signal<string | null>(null);
 
   constructor() {
-    inject(DestroyRef).onDestroy(() => {
-      this.destroyed = true;
+    this.destroyRef.onDestroy(() => {
       this.codes.set([]);
       this.releaseHold();
     });
@@ -323,7 +287,7 @@ export class Account {
     try {
       const result = await this.authApi.regenerateRecoveryCodes();
 
-      if (this.destroyed) {
+      if (this.destroyRef.destroyed) {
         return;
       }
 
@@ -346,7 +310,7 @@ export class Account {
 
       await this.session.check();
     } finally {
-      if (!this.destroyed) {
+      if (!this.destroyRef.destroyed) {
         this.regenerating.set(false);
       }
     }

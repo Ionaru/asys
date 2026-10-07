@@ -1,0 +1,80 @@
+/* SPDX-License-Identifier: EUPL-1.2 */
+.asys-triage {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  color: var(--ink);
+}
+
+.asys-triage__progress {
+  margin: 0 0 var(--space-2);
+  color: var(--ink-muted);
+  font-size: var(--font-size-reason);
+  line-height: var(--line-height-reason);
+  font-weight: 400;
+}
+
+.asys-triage__title {
+  margin: 0;
+  font-size: var(--font-size-display);
+  line-height: var(--line-height-display);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.asys-triage__raw {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-3);
+  background: var(--sunken);
+  border-radius: var(--radius-md);
+  color: var(--ink-muted);
+  font-size: var(--font-size-reason);
+  line-height: var(--line-height-reason);
+  font-weight: 400;
+  white-space: pre-wrap;
+}
+
+.asys-triage .asys-segmented,
+.asys-triage .asys-estimate,
+.asys-triage asys-select-field {
+  display: block;
+  margin-top: var(--space-4);
+}
+
+.asys-triage__area {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  color: var(--ink-muted);
+  font-size: var(--font-size-reason);
+  line-height: var(--line-height-reason);
+  font-weight: 400;
+}
+
+.asys-triage__area strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.asys-triage__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.asys-triage__reason {
+  flex: 1 1 100%;
+  order: 3;
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--font-size-reason);
+  line-height: var(--line-height-reason);
+  font-weight: 400;
+}

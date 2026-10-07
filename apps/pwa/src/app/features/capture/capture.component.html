@@ -1,0 +1,17 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
+<h1 class="capture__title">Capture</h1>
+<form class="capture__form" (submit)="add($event)">
+  <asys-text-field label="Title" [value]="field()" (valueChange)="field.set($event)" />
+  <button asys-button type="submit" [variant]="Variant.Primary" [disabled]="!canAdd()">Add</button>
+</form>
+<div class="capture__status" role="status">
+  @if (confirmation(); as captured) {
+    <p class="capture__text">Captured “{{ captured }}”. It waits in the Inbox until Triage.</p>
+    <p class="capture__links">
+      <a routerLink="/inbox">Open the Inbox</a>
+      <a routerLink="/now">Go to Now</a>
+    </p>
+  } @else if (message(); as text) {
+    <p class="capture__text">{{ text }}</p>
+  }
+</div>

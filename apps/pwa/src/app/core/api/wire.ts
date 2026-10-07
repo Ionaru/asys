@@ -40,13 +40,17 @@ export type Equals<A, B> =
 
 type Same<G, D> = Equals<Wire<G>, Wire<D>>;
 
-type WithSeq<T> = T & { readonly seq: number };
+/** A value with the sequence number it was read at. */
+export type WithSeq<T> = T & { readonly seq: number };
+
+/** A command as `data.runCommand` takes it. */
+export type CommandWithKey = Command & { readonly idempotencyKey: string };
 
 /** The Snapshot as the PWA holds it: `blockers` is renamed to `links`. */
 type SnapshotState = Omit<Gen.Snapshot, 'blockers'> & { readonly links: Gen.Snapshot['blockers'] };
 
 /** What `data.runCommand` answers with 200: the Applied and NotApplicable members of CommandOutcome. */
-type CommandResultWire = Extract<
+export type CommandResultWire = Extract<
   CommandOutcome,
   { readonly _tag: CommandOutcomeTag.Applied | CommandOutcomeTag.NotApplicable }
 >;
@@ -64,7 +68,7 @@ export const SHAPES: {
   readonly settings: Same<Gen.Settings, Settings>;
   readonly snapshot: Same<SnapshotState, WithSeq<DomainState>>;
   readonly changeEntry: Same<Gen.ChangeEntry, WithSeq<Change>>;
-  readonly command: Same<Gen.Command, Command & { readonly idempotencyKey: string }>;
+  readonly command: Same<Gen.Command, CommandWithKey>;
   readonly commandResult: Same<Gen.CommandResult, CommandResultWire>;
   readonly me: Same<Gen.Me, Me>;
 } = {

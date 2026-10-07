@@ -511,12 +511,12 @@ describe('Now', () => {
     it('shows Saved. Waiting for the server. in the top pick and disables its actions', async () => {
       const { topPick, topButton, awaitingSync, settle } = await setup();
 
-      expect(must(topPick()).querySelector('.now__sync')).toBeNull();
+      expect(must(topPick()).querySelector('p[asys-sync-note]')).toBeNull();
 
       awaitingSync.set(new Set(['invoice']));
       await settle();
 
-      expect(must(topPick()).querySelector('p.now__sync')?.textContent?.trim()).toBe(
+      expect(must(topPick()).querySelector('p[asys-sync-note]')?.textContent?.trim()).toBe(
         'Saved. Waiting for the server.',
       );
       expect(topButton('Done')?.disabled).toBe(true);
@@ -529,7 +529,7 @@ describe('Now', () => {
       awaitingSync.set(new Set(['dentist']));
       await settle();
 
-      expect(must(topPick()).querySelector('.now__sync')).toBeNull();
+      expect(must(topPick()).querySelector('p[asys-sync-note]')).toBeNull();
       expect(topButton('Done')?.disabled).toBe(false);
     });
 
@@ -552,7 +552,7 @@ describe('Now', () => {
       awaitingSync.set(new Set(['invoice']));
       await settle();
 
-      const note = must(must(topPick()).querySelector('.now__sync'));
+      const note = must(must(topPick()).querySelector('p[asys-sync-note]'));
       const form = must(must(topPick()).querySelector('asys-log-progress-form'));
 
       expect(note.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

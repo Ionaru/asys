@@ -89,7 +89,7 @@
     }
   }
   @if (dataStore.awaitingSync().has(taskId())) {
-    <p class="task-editor__sync">Saved. Waiting for the server.</p>
+    <p asys-sync-note class="task-editor__sync"></p>
   }
   <section class="task-editor__section">
     <h2 class="task-editor__subtitle">Blocked by</h2>
@@ -170,14 +170,7 @@
     }
   </section>
 } @else if (dataStore.state() === null) {
-  @if (dataStore.status() === Status.Failed) {
-    <p role="alert">ASYS could not load your Tasks.</p>
-    <button asys-button type="button" [variant]="Variant.Quiet" (click)="dataStore.refresh()">
-      Try again
-    </button>
-  } @else {
-    <p>Loading…</p>
-  }
+  <asys-load-state [failed]="dataStore.status() === Status.Failed" (retry)="dataStore.refresh()" />
 } @else if (!leaving()) {
   <p class="task-editor__missing">This Task is no longer open.</p>
   <p class="task-editor__text"><a class="task-editor__link" routerLink="/now">Go to Now</a></p>

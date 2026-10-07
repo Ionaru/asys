@@ -1,0 +1,53 @@
+/* SPDX-License-Identifier: EUPL-1.2 */
+.asys-segmented {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.asys-segmented__legend {
+  padding: 0;
+  margin: 0 0 var(--space-2);
+  color: var(--ink);
+  font-size: var(--font-size-label);
+  line-height: var(--line-height-label);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.asys-segmented__options {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.asys-segmented__option {
+  flex: 1 1 0;
+  min-height: var(--tap-target);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-body-strong);
+  line-height: var(--line-height-body-strong);
+  font-weight: 600;
+  transition: background var(--duration-quick) var(--ease-out);
+}
+
+.asys-segmented__option[aria-pressed='true'] {
+  background: var(--signal-soft);
+  color: var(--on-signal-soft);
+  border-color: var(--signal);
+}
+
+.asys-segmented__option:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+[data-theme='drive'] .asys-segmented__option {
+  min-height: var(--tap-target-drive);
+}

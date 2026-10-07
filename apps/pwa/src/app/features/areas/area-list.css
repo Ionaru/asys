@@ -1,0 +1,48 @@
+/* SPDX-License-Identifier: EUPL-1.2 */
+.area-list__title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
+  font-weight: 700;
+}
+
+.area-list__status:empty {
+  margin: 0;
+}
+
+.area-list__list {
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.area-list__link {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: var(--row-min);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.area-list__name {
+  font-size: var(--font-size-body-strong);
+  line-height: var(--line-height-body-strong);
+  font-weight: 600;
+}
+
+.area-list__summary {
+  font-size: var(--font-size-reason);
+  line-height: var(--line-height-reason);
+  color: var(--ink-muted);
+}
+
+.area-list__text {
+  margin: 0 0 var(--space-4);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+}

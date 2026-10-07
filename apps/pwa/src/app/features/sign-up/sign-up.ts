@@ -21,11 +21,14 @@ import { CeremonyResultTag, PasskeyFailure } from '@ionaru/effect-passkeys/clien
 import { AuthApi, AuthError, AuthResultTag } from '../../core/api/auth-api';
 import { PasskeyCeremony } from '../../core/api/passkey-ceremony';
 import { Session, SessionState } from '../../core/auth/session';
+import { GENERIC_MESSAGE } from '../../core/data/outcome-message';
 import { AppUpdate } from '../../core/platform/app-update';
 import { DeviceZone } from '../../core/platform/device-zone';
 import { Button, ButtonVariant } from '../../ui/button/button';
 import { TextField } from '../../ui/text-field/text-field';
 import { ceremonyOptions } from '../auth/ceremony-options';
+import { nameError } from '../auth/name-rule';
+import { MISCONFIGURED_MESSAGE, TRY_AGAIN_MESSAGE } from '../auth/passkey-messages';
 
 /** The screens of the sign-up flow. */
 export enum SignUpStep {
@@ -36,13 +39,9 @@ export enum SignUpStep {
   AlreadySignedIn = 'already_signed_in',
 }
 
-const GENERIC_MESSAGE = 'Something went wrong. Try again.';
-
 const ALREADY_REGISTERED_MESSAGE = 'This device already has a passkey for ASYS. Sign in instead.';
 
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
-
-const MAX_NAME_LENGTH = 100;
 
 const messageForFailure = (failure: PasskeyFailure): string => {
   switch (failure) {
@@ -51,7 +50,7 @@ const messageForFailure = (failure: PasskeyFailure): string => {
     case PasskeyFailure.Unsupported:
       return 'This browser or device cannot create a passkey. Try another browser or device.';
     case PasskeyFailure.Misconfigured:
-      return 'ASYS cannot use passkeys at this address. Open ASYS at its usual address.';
+      return MISCONFIGURED_MESSAGE;
     case PasskeyFailure.AlreadyRegistered:
       return ALREADY_REGISTERED_MESSAGE;
     default:
@@ -59,159 +58,12 @@ const messageForFailure = (failure: PasskeyFailure): string => {
   }
 };
 
-const hasUnusualCharacters = (value: string): boolean => {
-  if (value.includes('\u0000')) {
-    return true;
-  }
-
-  for (let index = 0; index < value.length; index += 1) {
-    const unit = value.charCodeAt(index);
-
-    if (unit >= 0xd800 && unit <= 0xdbff) {
-      const next = value.charCodeAt(index + 1);
-
-      if (next >= 0xdc00 && next <= 0xdfff) {
-        index += 1;
-      } else {
-        return true;
-      }
-    } else if (unit >= 0xdc00 && unit <= 0xdfff) {
-      return true;
-    }
-  }
-
-  return false;
-};
-
 /** Signs up a new User from a Sign-up link: name, passkey, recovery codes. */
 @Component({
   selector: 'asys-sign-up',
   imports: [Button, FormField, FormRoot, RouterLink, TextField],
-  template: `
-    <main class="asys-page sign-up">
-      <h1 #title class="sign-up__title" tabindex="-1">{{ heading() }}</h1>
-      @switch (step()) {
-        @case (Step.Name) {
-          <form class="sign-up__block" animate.enter="asys-enter" [formRoot]="nameForm">
-            <asys-text-field
-              [formField]="nameForm.name"
-              label="Name"
-              hint="How ASYS addresses you."
-              autocomplete="name"
-            />
-            <button asys-button type="submit" [block]="true" [variant]="Variant.Primary">
-              Continue
-            </button>
-          </form>
-        }
-        @case (Step.Passkey) {
-          <div class="sign-up__block" animate.enter="asys-enter">
-            <p class="sign-up__body">Next, create a passkey for {{ submittedName() }}.</p>
-            <button
-              asys-button
-              type="button"
-              [block]="true"
-              [variant]="Variant.Primary"
-              [disabled]="options() === null || busy()"
-              (click)="createPasskey()"
-            >
-              Create passkey
-            </button>
-            <button
-              asys-button
-              type="button"
-              [variant]="Variant.Quiet"
-              [disabled]="busy()"
-              (click)="changeName()"
-            >
-              Change name
-            </button>
-            @if (shownMessage(); as text) {
-              <p class="sign-up__message" role="alert">{{ text }}</p>
-            }
-            @if (loadError() !== null) {
-              <button asys-button type="button" [variant]="Variant.Quiet" (click)="discard()">
-                Try again
-              </button>
-            }
-          </div>
-        }
-        @case (Step.Codes) {
-          <div class="sign-up__block" animate.enter="asys-enter">
-            <ol class="sign-up__codes asys-num">
-              @for (code of codes(); track $index) {
-                <li>{{ code }}</li>
-              }
-            </ol>
-            <p class="sign-up__body">These codes are shown only now. Keep them somewhere safe.</p>
-            <button asys-button type="button" [variant]="Variant.Secondary" (click)="copy()">
-              Copy
-            </button>
-            @if (copyStatus(); as text) {
-              <p class="sign-up__body" role="status">{{ text }}</p>
-            }
-            <button
-              asys-button
-              type="button"
-              [block]="true"
-              [variant]="Variant.Primary"
-              (click)="finish()"
-            >
-              Continue
-            </button>
-          </div>
-        }
-        @case (Step.LinkInvalid) {
-          <div class="sign-up__block" animate.enter="asys-enter">
-            <p class="sign-up__body">Open the Sign-up link again.</p>
-            <a asys-button routerLink="/signin" [variant]="Variant.Quiet">Sign in instead</a>
-          </div>
-        }
-        @case (Step.AlreadySignedIn) {
-          <div class="sign-up__block" animate.enter="asys-enter">
-            <p class="sign-up__body">You are already signed in.</p>
-            <a asys-button routerLink="/now" [variant]="Variant.Quiet">Go to Now</a>
-          </div>
-        }
-      }
-    </main>
-  `,
-  styles: `
-    .sign-up,
-    .sign-up__block {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-4);
-    }
-
-    .sign-up {
-      padding-block-end: var(--space-5);
-    }
-
-    .sign-up__title {
-      margin: 0;
-      font-size: var(--font-size-title);
-      line-height: var(--line-height-title);
-    }
-
-    .sign-up__body,
-    .sign-up__message {
-      margin: 0;
-      font-size: var(--font-size-body);
-      line-height: var(--line-height-body);
-    }
-
-    .sign-up__message {
-      color: var(--danger);
-    }
-
-    .sign-up__codes {
-      margin: 0;
-      padding-inline-start: var(--space-6);
-      font-size: var(--font-size-body);
-      line-height: var(--line-height-body);
-    }
-  `,
+  templateUrl: './sign-up.component.html',
+  styleUrl: './sign-up.css',
 })
 export class SignUp {
   private readonly authApi = inject(AuthApi);
@@ -226,6 +78,8 @@ export class SignUp {
 
   private readonly router = inject(Router);
 
+  private readonly destroyRef = inject(DestroyRef);
+
   protected readonly Variant = ButtonVariant;
 
   protected readonly Step = SignUpStep;
@@ -236,8 +90,6 @@ export class SignUp {
   private token = '';
 
   private held = false;
-
-  private destroyed = false;
 
   private signedInPromise: Promise<void> | null = null;
 
@@ -272,17 +124,9 @@ export class SignUp {
       validate(path.name, ({ value }) => {
         const name = value();
 
-        if (name.trim().length === 0) {
-          return { kind: 'required', message: 'Enter your name' };
-        }
-
-        if (name.length > MAX_NAME_LENGTH) {
-          return { kind: 'max_length', message: 'Use at most 100 characters' };
-        }
-
-        return hasUnusualCharacters(name)
-          ? { kind: 'unusual_characters', message: 'Remove the unusual characters' }
-          : undefined;
+        return name.trim().length === 0
+          ? { kind: 'required', message: 'Enter your name' }
+          : nameError(name);
       });
     },
     {
@@ -363,8 +207,7 @@ export class SignUp {
       this.title()?.nativeElement.focus();
     });
 
-    inject(DestroyRef).onDestroy(() => {
-      this.destroyed = true;
+    this.destroyRef.onDestroy(() => {
       this.codes.set([]);
 
       if (this.held) {
@@ -400,7 +243,7 @@ export class SignUp {
     try {
       const created = await this.ceremony.create(current.options);
 
-      if (this.destroyed) {
+      if (this.destroyRef.destroyed) {
         return;
       }
 
@@ -417,7 +260,7 @@ export class SignUp {
         created.response,
       );
 
-      if (this.destroyed) {
+      if (this.destroyRef.destroyed) {
         if (result._tag === AuthResultTag.Ok) {
           void this.session.signedIn();
         }
@@ -443,7 +286,7 @@ export class SignUp {
           break;
         case AuthError.ChallengeInvalid:
         case AuthError.VerificationFailed:
-          this.message.set('Try again.');
+          this.message.set(TRY_AGAIN_MESSAGE);
           break;
         case AuthError.AlreadyRegistered:
           this.message.set(ALREADY_REGISTERED_MESSAGE);
@@ -452,7 +295,7 @@ export class SignUp {
           this.message.set(GENERIC_MESSAGE);
       }
     } finally {
-      if (!this.destroyed) {
+      if (!this.destroyRef.destroyed) {
         this.busy.set(false);
       }
     }

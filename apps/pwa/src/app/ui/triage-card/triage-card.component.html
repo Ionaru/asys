@@ -1,0 +1,88 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
+<article class="asys-triage">
+  <p class="asys-triage__progress">{{ position() }} of {{ total() }}</p>
+  <h2 class="asys-triage__title" tabindex="-1">{{ title() }}</h2>
+  @if (showRaw()) {
+    <p class="asys-triage__raw">{{ rawText() }}</p>
+  }
+  <asys-segmented
+    legend="Importance"
+    trueLabel="Important"
+    falseLabel="Not important"
+    [disabled]="busy()"
+    [value]="draft().important"
+    (valueChange)="draft.set({ ...draft(), important: $event })"
+  />
+  <asys-estimate-field
+    legend="Estimate"
+    [disabled]="busy()"
+    [value]="draft().estimateMinutes"
+    (valueChange)="draft.set({ ...draft(), estimateMinutes: $event })"
+  />
+  <div class="asys-triage__area">
+    <span>
+      Area: <strong>{{ areaName() }}</strong>
+    </span>
+    @if (!changingArea()) {
+      <button
+        asys-button
+        type="button"
+        [variant]="Variants.Quiet"
+        [size]="Sizes.Small"
+        [disabled]="busy()"
+        (click)="changeArea()"
+      >
+        Change
+      </button>
+    }
+  </div>
+  @if (changingArea()) {
+    <asys-select-field
+      label="Area"
+      [options]="areaOptions()"
+      [disabled]="busy()"
+      [value]="draft().areaId ?? ''"
+      (valueChange)="draft.set({ ...draft(), areaId: $event === '' ? null : $event })"
+    />
+  }
+  <div class="asys-triage__footer">
+    <button
+      asys-button
+      type="button"
+      [variant]="Variants.Primary"
+      [disabled]="incomplete() || busy()"
+      [attr.aria-describedby]="reason() === null ? null : reasonId"
+      (click)="triage.emit(draft())"
+    >
+      Triage
+    </button>
+    @if (canLater()) {
+      <button asys-button type="button" [variant]="Variants.Quiet" (click)="later.emit()">
+        Later
+      </button>
+    }
+    <button asys-button type="button" [variant]="Variants.Quiet" (click)="edit.emit()">Edit</button>
+    <button
+      asys-button
+      type="button"
+      class="asys-triage__drop"
+      [variant]="Variants.Quiet"
+      [disabled]="busy()"
+      (click)="confirmingDrop.set(true)"
+    >
+      Drop
+    </button>
+    @if (reason(); as text) {
+      <p class="asys-triage__reason" [id]="reasonId">{{ text }}</p>
+    }
+  </div>
+  @if (confirmingDrop()) {
+    <asys-inline-confirm
+      [message]="dropMessage()"
+      confirmLabel="Drop"
+      [busy]="busy()"
+      (confirm)="dropTask.emit()"
+      (cancel)="cancelDrop()"
+    />
+  }
+</article>

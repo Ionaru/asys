@@ -5,7 +5,7 @@ import type { Instant } from '@asys/domain';
 
 const MINUTE_MS = 60_000;
 
-/** The current instant, refreshed on every minute boundary and when the page becomes visible. */
+/** The current instant, refreshed on every minute boundary while the page is visible and when it becomes visible. */
 @Service()
 export class Clock {
   private readonly document = inject(DOCUMENT);
@@ -21,6 +21,9 @@ export class Clock {
       if (this.document.visibilityState === 'visible') {
         this.nowSignal.set(Date.now() as Instant);
         this.schedule();
+      } else {
+        // Nothing hidden is seen, so a tick would only make DataStore rank every Task again.
+        clearTimeout(this.timer);
       }
     };
 
@@ -30,7 +33,9 @@ export class Clock {
       clearTimeout(this.timer);
     });
 
-    this.schedule();
+    if (this.document.visibilityState === 'visible') {
+      this.schedule();
+    }
   }
 
   private schedule(): void {

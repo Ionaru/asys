@@ -1,0 +1,31 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
+@if (appUpdate.prompt()) {
+  <div class="app-banner" role="status" animate.enter="asys-enter" animate.leave="asys-leave">
+    <span>A new version of ASYS is ready.</span>
+    <button
+      asys-button
+      type="button"
+      [variant]="Variant.Secondary"
+      [size]="Size.Small"
+      (click)="appUpdate.reload()"
+    >
+      Reload
+    </button>
+  </div>
+}
+@if (session.state() === State.Unreachable) {
+  <div class="app-banner" role="status" animate.enter="asys-enter" animate.leave="asys-leave">
+    ASYS cannot reach the server.
+  </div>
+}
+@if (dataStore.status() === SyncStatus.Stale) {
+  <div class="app-banner" role="status" animate.enter="asys-enter" animate.leave="asys-leave">
+    @if (syncedTime(); as time) {
+      Showing what was loaded at <span class="asys-num">{{ time }}</span
+      >. Trying again.
+    } @else {
+      Showing what was loaded earlier. Trying again.
+    }
+  </div>
+}
+<router-outlet />

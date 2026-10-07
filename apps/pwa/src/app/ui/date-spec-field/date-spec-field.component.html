@@ -1,0 +1,59 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
+<fieldset
+  class="asys-date-spec"
+  [class.asys-field--error]="showError()"
+  [class.asys-field--disabled]="disabled()"
+>
+  <legend class="asys-field__label">{{ legend() }}</legend>
+  <div class="asys-date-spec__row">
+    <div class="asys-date-spec__part">
+      <label class="asys-field__label" [for]="dateId">Date</label>
+      <input
+        #dateInput
+        class="asys-field__input"
+        type="date"
+        [id]="dateId"
+        [value]="value()?.date ?? ''"
+        [disabled]="disabled()"
+        [attr.aria-invalid]="showError() ? 'true' : null"
+        [attr.aria-describedby]="messageId()"
+        (input)="setDate(dateInput.value)"
+        (blur)="touch.emit()"
+      />
+    </div>
+    <div class="asys-date-spec__part">
+      <label class="asys-field__label" [for]="timeId">Time</label>
+      <input
+        #timeInput
+        class="asys-field__input"
+        type="time"
+        [id]="timeId"
+        [value]="value()?.time ?? ''"
+        [disabled]="disabled() || value() === null"
+        [attr.aria-invalid]="showError() ? 'true' : null"
+        [attr.aria-describedby]="messageId()"
+        (input)="setTime(timeInput.value)"
+        (blur)="touch.emit()"
+      />
+    </div>
+    @if (value() !== null) {
+      <button
+        asys-button
+        type="button"
+        [variant]="Variant.Quiet"
+        [size]="Size.Small"
+        [disabled]="disabled()"
+        (click)="clear()"
+      >
+        Clear
+      </button>
+    }
+  </div>
+  @if (showError()) {
+    <p class="asys-field__error" [id]="messageParagraphId">
+      <span class="asys-field__error-word">Error:</span> {{ message() }}
+    </p>
+  } @else if (hint()) {
+    <p class="asys-field__hint" [id]="messageParagraphId">{{ hint() }}</p>
+  }
+</fieldset>

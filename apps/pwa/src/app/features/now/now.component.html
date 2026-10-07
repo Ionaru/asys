@@ -21,7 +21,7 @@
       (open)="open(top.task.id)"
     >
       @if (dataStore.awaitingSync().has(top.task.id)) {
-        <p class="now__sync">Saved. Waiting for the server.</p>
+        <p asys-sync-note></p>
       }
       @if (formOpen() && storedEstimate(); as estimate) {
         <asys-log-progress-form
@@ -96,11 +96,6 @@
       </ul>
     }
   }
-} @else if (dataStore.status() === Status.Failed) {
-  <p role="alert">ASYS could not load your Tasks.</p>
-  <button asys-button type="button" [variant]="Variant.Quiet" (click)="dataStore.refresh()">
-    Try again
-  </button>
 } @else {
-  <p>Loading…</p>
+  <asys-load-state [failed]="dataStore.status() === Status.Failed" (retry)="dataStore.refresh()" />
 }

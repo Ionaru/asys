@@ -1,11 +1,17 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { DefaultUrlSerializer } from '@angular/router';
 
+import { pathOf } from '../platform/url-path';
+
 const DEFAULT_URL = '/now';
 
-const AUTH_PATHS: readonly string[] = ['/signin', '/signup', '/recover', '/recovered'];
+/** The screens a signed-out visitor uses to get in; a sign-out leaves them be. */
+export const SIGNED_OUT_PATHS: readonly string[] = ['/signin', '/signup', '/recover'];
 
-const AUTH_SEGMENTS: readonly string[] = ['signin', 'signup', 'recover', 'recovered'];
+/** Those screens and the one shown just after sign-in: never a place to return to. */
+const AUTH_PATHS: readonly string[] = [...SIGNED_OUT_PATHS, '/recovered'];
+
+const AUTH_SEGMENTS: readonly string[] = AUTH_PATHS.map((path) => path.slice(1));
 
 // eslint-disable-next-line no-control-regex
 const UNSAFE_CHARACTERS = /[\\\u0000-\u001f\u007f]/;
@@ -20,7 +26,7 @@ export const safeReturnUrl = (value: string | null | undefined): string => {
     return DEFAULT_URL;
   }
 
-  const path = value.split(/[?#]/, 1)[0] ?? value;
+  const path = pathOf(value);
 
   if (AUTH_PATHS.some((authPath) => path === authPath || path.startsWith(`${authPath}/`))) {
     return DEFAULT_URL;

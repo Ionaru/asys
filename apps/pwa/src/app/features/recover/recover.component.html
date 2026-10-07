@@ -1,0 +1,16 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
+<main class="asys-page recover">
+  <h1 class="recover__title">Use a recovery code</h1>
+  <form class="recover__form" [formRoot]="codeForm">
+    <asys-text-field
+      [formField]="codeForm.code"
+      label="Recovery code"
+      hint="One of the codes you saved when you signed up."
+      autocomplete="off"
+      [spellcheck]="false"
+      autocapitalize="none"
+    />
+    <button asys-button type="submit" [block]="true" [variant]="Variant.Primary">Sign in</button>
+  </form>
+  <a asys-button routerLink="/signin" [variant]="Variant.Quiet">Sign in with a passkey instead</a>
+</main>

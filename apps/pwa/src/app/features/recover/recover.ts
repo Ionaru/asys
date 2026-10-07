@@ -5,6 +5,7 @@ import { Router, RouterLink } from '@angular/router';
 
 import { AuthApi, AuthError, AuthResultTag } from '../../core/api/auth-api';
 import { Session } from '../../core/auth/session';
+import { GENERIC_MESSAGE } from '../../core/data/outcome-message';
 import { Button, ButtonVariant } from '../../ui/button/button';
 import { TextField } from '../../ui/text-field/text-field';
 
@@ -15,27 +16,7 @@ export const MAX_CODE_LENGTH = 64;
 @Component({
   selector: 'asys-recover',
   imports: [Button, FormField, FormRoot, RouterLink, TextField],
-  template: `
-    <main class="asys-page recover">
-      <h1 class="recover__title">Use a recovery code</h1>
-      <form class="recover__form" [formRoot]="codeForm">
-        <asys-text-field
-          [formField]="codeForm.code"
-          label="Recovery code"
-          hint="One of the codes you saved when you signed up."
-          autocomplete="off"
-          [spellcheck]="false"
-          autocapitalize="none"
-        />
-        <button asys-button type="submit" [block]="true" [variant]="Variant.Primary">
-          Sign in
-        </button>
-      </form>
-      <a asys-button routerLink="/signin" [variant]="Variant.Quiet"
-        >Sign in with a passkey instead</a
-      >
-    </main>
-  `,
+  templateUrl: './recover.component.html',
   styles: `
     .recover {
       display: flex;
@@ -54,12 +35,6 @@ export const MAX_CODE_LENGTH = 64;
       margin: 0;
       font-size: var(--font-size-title);
       line-height: var(--line-height-title);
-    }
-
-    .recover__body {
-      margin: 0;
-      font-size: var(--font-size-body);
-      line-height: var(--line-height-body);
     }
   `,
 })
@@ -112,7 +87,7 @@ export class Recover {
             : {
                 fieldTree: field.code,
                 kind: 'unexpected',
-                message: 'Something went wrong. Try again.',
+                message: GENERIC_MESSAGE,
               };
         },
         onInvalid: (field) => {

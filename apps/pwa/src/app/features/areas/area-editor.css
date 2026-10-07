@@ -1,0 +1,67 @@
+/* SPDX-License-Identifier: EUPL-1.2 */
+.area-editor__title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
+  font-weight: 700;
+}
+
+.area-editor__status {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+}
+
+.area-editor__status:empty {
+  margin: 0;
+}
+
+.area-editor__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.area-editor__day {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.area-editor__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2) var(--space-3);
+}
+
+.area-editor__time {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.area-editor__hint,
+.area-editor__note,
+.area-editor__reason {
+  margin: 0;
+  font-size: var(--font-size-reason);
+  line-height: var(--line-height-reason);
+  color: var(--ink-muted);
+}
+
+.area-editor__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-target);
+}
+
+.area-editor__text {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+}

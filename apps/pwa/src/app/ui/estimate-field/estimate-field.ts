@@ -8,13 +8,14 @@ import {
   Injector,
   input,
   model,
-  output,
   signal,
   viewChild,
   ViewEncapsulation,
 } from '@angular/core';
-import type { FormValueControl, ValidationError } from '@angular/forms/signals';
+import type { FormValueControl } from '@angular/forms/signals';
 import { formatMinutes } from '@asys/domain';
+
+import { FieldControl } from '../field-control/field-control';
 
 let nextId = 0;
 
@@ -28,146 +29,13 @@ const OTHER_ERROR = 'Use whole minutes from 1 to 100000.';
 @Component({
   selector: 'asys-estimate-field',
   encapsulation: ViewEncapsulation.None,
-  template: `
-    <fieldset class="asys-estimate">
-      <legend class="asys-estimate__legend">{{ legend() }}</legend>
-      <div class="asys-estimate__chips">
-        @for (chip of chips; track chip.minutes) {
-          <button
-            #chipButton
-            type="button"
-            class="asys-estimate__chip asys-estimate__chip--num"
-            [disabled]="disabled()"
-            [attr.aria-pressed]="value() === chip.minutes ? 'true' : 'false'"
-            [attr.aria-describedby]="messageId()"
-            (click)="pick(chip.minutes)"
-            (blur)="touch.emit()"
-          >
-            {{ chip.label }}
-          </button>
-        }
-        <button
-          type="button"
-          class="asys-estimate__chip"
-          [disabled]="disabled()"
-          [attr.aria-pressed]="otherShown() ? 'true' : 'false'"
-          [attr.aria-describedby]="messageId()"
-          (click)="openOther()"
-          (blur)="touch.emit()"
-        >
-          Other
-        </button>
-      </div>
-      @if (otherShown()) {
-        <div class="asys-field asys-estimate__other" [class.asys-field--error]="showError()">
-          <label class="asys-field__label" [for]="otherId">Minutes</label>
-          <input
-            #otherInput
-            class="asys-field__input"
-            type="text"
-            inputmode="numeric"
-            [id]="otherId"
-            [value]="otherText()"
-            [disabled]="disabled()"
-            [attr.aria-invalid]="showError() ? 'true' : null"
-            [attr.aria-describedby]="messageId()"
-            (input)="typeOther(otherInput.value)"
-            (blur)="touch.emit()"
-          />
-        </div>
-      }
-      @if (showError()) {
-        <p class="asys-field__error" [id]="messageParagraphId">
-          <span class="asys-field__error-word">Error:</span> {{ message() }}
-        </p>
-      } @else if (hint()) {
-        <p class="asys-field__hint" [id]="messageParagraphId">{{ hint() }}</p>
-      }
-    </fieldset>
-  `,
-  styles: `
-    .asys-estimate {
-      margin: 0;
-      padding: 0;
-      border: 0;
-      min-width: 0;
-    }
-
-    .asys-estimate__legend {
-      padding: 0;
-      margin: 0 0 var(--space-2);
-      color: var(--ink);
-      font-size: var(--font-size-label);
-      line-height: var(--line-height-label);
-      font-weight: 700;
-      letter-spacing: 0.02em;
-    }
-
-    .asys-estimate__chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-2);
-    }
-
-    .asys-estimate__chip {
-      min-height: var(--tap-target);
-      min-width: var(--tap-target);
-      padding: var(--space-2) var(--space-3);
-      background: var(--surface);
-      color: var(--ink);
-      border: 1px solid var(--line-strong);
-      border-radius: var(--radius-md);
-      cursor: pointer;
-      font-family: var(--font-sans);
-      font-size: var(--font-size-body-strong);
-      line-height: var(--line-height-body-strong);
-      font-weight: 600;
-      transition: background var(--duration-quick) var(--ease-out);
-    }
-
-    .asys-estimate__chip--num {
-      font-family: var(--font-mono);
-      font-variant-numeric: tabular-nums;
-      font-size: var(--font-size-time);
-      line-height: var(--line-height-time);
-      font-weight: 500;
-    }
-
-    .asys-estimate__chip[aria-pressed='true'],
-    .asys-estimate__chip.is-selected {
-      background: var(--signal-soft);
-      color: var(--on-signal-soft);
-      border-color: var(--signal);
-    }
-
-    .asys-estimate__chip:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-
-    .asys-estimate__other {
-      margin-top: var(--space-3);
-    }
-
-    [data-theme='drive'] .asys-estimate__chip {
-      min-height: var(--tap-target-drive);
-    }
-  `,
+  templateUrl: './estimate-field.component.html',
+  styleUrl: './estimate-field.css',
 })
-export class EstimateField implements FormValueControl<number | null> {
+export class EstimateField extends FieldControl implements FormValueControl<number | null> {
   readonly value = model<number | null>(null);
 
   readonly legend = input<string>('Estimate');
-
-  readonly hint = input<string | undefined>();
-
-  readonly errors = input<readonly ValidationError.WithOptionalFieldTree[]>([]);
-
-  readonly touched = input<boolean>(false);
-
-  readonly disabled = input<boolean>(false);
-
-  readonly touch = output<void>();
 
   protected readonly chips = CHIP_MINUTES.map((minutes) => ({
     minutes,
@@ -176,7 +44,7 @@ export class EstimateField implements FormValueControl<number | null> {
 
   protected readonly otherId = `asys-estimate-${nextId}-other`;
 
-  protected readonly messageParagraphId = `asys-estimate-${nextId++}-message`;
+  protected override readonly messageParagraphId = `asys-estimate-${nextId++}-message`;
 
   private readonly injector = inject(Injector);
 
@@ -202,16 +70,12 @@ export class EstimateField implements FormValueControl<number | null> {
     return custom === null ? this.typed() : String(custom);
   });
 
-  protected readonly showError = computed(
+  protected override readonly showError = computed(
     () => this.localError() || (this.touched() && this.errors().length > 0),
   );
 
-  protected readonly message = computed(() =>
+  protected override readonly message = computed(() =>
     this.localError() ? OTHER_ERROR : (this.errors()[0]?.message ?? 'Check this value'),
-  );
-
-  protected readonly messageId = computed(() =>
-    this.showError() || this.hint() ? this.messageParagraphId : null,
   );
 
   protected pick(minutes: number): void {

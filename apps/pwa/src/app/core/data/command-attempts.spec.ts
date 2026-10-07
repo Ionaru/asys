@@ -11,6 +11,7 @@ import {
 import { CommandOutcomeTag, type CommandOutcome } from '../api/data-api';
 import { Ids } from '../platform/ids';
 import { CommandAttempts } from './command-attempts';
+import { DataStore } from './data-store';
 
 const A: Command = { _tag: CommandTag.CompleteTask, taskId: 'a' };
 
@@ -23,12 +24,18 @@ const FAILED: CommandOutcome = { _tag: CommandOutcomeTag.Failed, status: 0 };
 describe('CommandAttempts', () => {
   let attempts: CommandAttempts;
   let next: ReturnType<typeof vi.fn<() => string>>;
+  let send: ReturnType<typeof vi.fn<(command: Command, key: string) => Promise<CommandOutcome>>>;
 
   beforeEach(() => {
     next = vi.fn<() => string>();
     next.mockReturnValueOnce('k1').mockReturnValueOnce('k2').mockReturnValueOnce('k3');
+    send = vi.fn<(command: Command, key: string) => Promise<CommandOutcome>>();
     TestBed.configureTestingModule({
-      providers: [CommandAttempts, { provide: Ids, useValue: { next } }],
+      providers: [
+        CommandAttempts,
+        { provide: Ids, useValue: { next } },
+        { provide: DataStore, useValue: { send } },
+      ],
     });
     attempts = TestBed.inject(CommandAttempts);
   });
@@ -162,6 +169,26 @@ describe('CommandAttempts', () => {
 
     expect(attempts.keyFor(withUndefined)).toBe('k1');
     expect(attempts.keyFor(without)).toBe('k1');
+  });
+
+  it('send sends the command with its key and resolves the outcome', async () => {
+    send.mockResolvedValue(APPLIED);
+
+    await expect(attempts.send(A)).resolves.toBe(APPLIED);
+    expect(send).toHaveBeenCalledExactlyOnceWith(A, 'k1');
+  });
+
+  it('send settles the attempt: the key survives Failed and is gone after Applied', async () => {
+    send
+      .mockResolvedValueOnce(FAILED)
+      .mockResolvedValueOnce(APPLIED)
+      .mockResolvedValueOnce(APPLIED);
+
+    await attempts.send(A);
+    await attempts.send(A);
+    await attempts.send(A);
+
+    expect(send.mock.calls.map(([, key]) => key)).toEqual(['k1', 'k1', 'k2']);
   });
 
   it('gives commands that differ in one field different keys', () => {
