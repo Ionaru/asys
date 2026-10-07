@@ -1,0 +1,23 @@
+SPDX-License-Identifier: EUPL-1.2
+
+Make the passkey add and remove endpoints answer a revoked session with the tagged `Unauthorized` body, then delete the PWA's body-less 401 special case.
+
+Why: the server answers an empty 401 on those two routes, so the PWA recognises them by request shape. `apps/pwa/src/app/core/auth/unauthorized.interceptor.ts` has `PASSKEYS_PATH`, its own URL-based `pathOf` and `isPasskeyWrite` (POST `/v1/auth/passkeys`, DELETE `/v1/auth/passkeys/:id`), and `core/api/auth-api.ts` threads `bodylessUnauthorized` through `run`, `runVoid` and `errorOf` (passed as `true` by `addPasskey` and `removePasskey`). Move or rename a route and revocation handling silently stops working.
+
+Root cause: `PasskeyUnitOfWorkLive` in `apps/server/src/auth/unit-of-work.ts` re-checks the session under the counter lock (`requireLiveRequestSession`, which runs `requireLiveSession` from `auth/sessions.ts` with `Effect.orDie`), so `HttpApiError.Unauthorized` becomes a defect, because `PasskeyUnitOfWork.run` in `libs/effect-passkeys/src/server/unit-of-work.ts` returns the effect's own error type and cannot carry a host error. The defect still answers as an empty 401. The endpoints in `libs/effect-passkeys/src/api/group.ts` already carry the session middleware, whose error is `HttpApiError.Unauthorized` (`libs/contract/src/lib/auth.ts`). `docs/slice-1-plan.md` records this in the Sessions bullet 'Re-check under the lock' (piece 4b) and in 'The 401 rule' (piece 5).
+
+Change: pick a seam, for example letting `makePasskeyHandlers` map a host-declared failure out of the unit of work into the endpoint's error channel, or catching that defect in `apps/server/src/http/passkeys.ts`. Then remove `isPasskeyWrite`, `PASSKEYS_PATH`, the interceptor's `pathOf`, the flag and the body-less branch of `errorOf`.
+
+Must stay identical: a tagged `Unauthorized` 401 signs out; `SignInFailed` and `PasskeyVerificationFailed` 401s do not; nothing is written and the transaction rolls back when the session is revoked; no user data in logs. A cached PWA of the previous release already signs out on the tagged body. After a rollback, the new PWA would not sign out on the old server's empty 401 until its next request; say whether that is acceptable.
+
+Ask before you start: (1) Which seam: a library change (unpublished, so breaking is allowed; files keep the MIT SPDX line) or server only? (2) Should a body-less 401 ever sign the PWA out after this? (3) If `nx run server:openapi` or `pnpm exec nx run pwa:api-client` changes anything, review the diff with me.
+
+Read first: `extending-the-server`, `libs/effect-passkeys/README.md`. Pinned by `apps/server/src/http/passkeys.spec.ts` ('answers an empty 401 and keeps both passkeys when the session is revoked while the removal waits for the owner lock', which will expect the tagged body), `apps/server/src/auth/unit-of-work.spec.ts` (`diedUnauthorized`), `unauthorized.interceptor.spec.ts` (delete the two body-less passkey cases, keep 'another request') and `core/api/auth-api.spec.ts` (the `revocable` field and 'maps a body-less 401 to Unauthorized'). Add an add-passkey twin of the removal race; prove it fails by restoring the defect.
+
+Checks: stop `nx serve server`, then `pnpm exec nx run-many -t test --skip-nx-cache` (database up and migrated), `pnpm exec nx run-many -t lint typecheck build`, `pnpm exec nx run server:openapi`, `pnpm exec nx format:check --all`, `node scripts/check-spdx.mts`.
+
+Docs: the library README's endpoint table, and both slice plan notes.
+
+Out of scope: other 401 sources, Account messages.
+
+Do not commit unless I ask.

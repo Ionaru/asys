@@ -1,0 +1,25 @@
+SPDX-License-Identifier: EUPL-1.2
+
+Make `Motion.play` unable to reject and add one `Motion.leave` helper for leaving nodes, so decorative motion can never leave a node stuck.
+
+Why: four sites guard decorative motion by hand: `leaveMarked` (`apps/pwa/src/app/layout/shell-motion.ts`), `playHeight` in `features/now/row-motion.ts` (behind `collapseRow` and `expandRow`), `flyCapture` (`layout/capture-flight.ts`) and `playRise` in `features/now/now.ts`. Unguarded is the Done exit in `Now.done()` (near line 278). If it rejected, `done()` would reject unhandled and `leaving()` would never clear, so the top pick would keep `inert` and `data-leaving`. `leaveMarked` and `collapseRow` also each repeat "set `data-leaving`, play, call `animationComplete()` in a finally". A non-Abort rejection is rare: this is consistency, not a live fix.
+
+Current state: `Motion.play` (`core/platform/motion.ts`) resolves on an AbortError and rethrows anything else, including a throw from `el.animate`. `core/platform/motion.spec.ts` pins "rejects with the same error when finished rejects with any other error". `docs/view-transitions-plan.md` (near lines 52 and 335) records that contract, `docs/capture-and-done-animations-plan.md` (near lines 361 and 555) specifies `leaveMarked` and `collapseRow`, and the `building-pwa-ui` skill (near line 40) names both.
+
+Change: `play` catches every error and resolves. Add `Motion.leave(event: AnimationCallbackEvent, keyframes, options)`: it sets `data-leaving` on `event.target`, awaits `play`, and calls `event.animationComplete()` in a `finally`. `leaveMarked` and `collapseRow` become thin calls to it (`collapseRow` still measures `offsetHeight` first); `playHeight`, `flyCapture` and `playRise` lose their catch (`ghost.remove()` stays in a finally).
+
+Must stay identical: motion not allowed resolves at once and still calls `animationComplete`; `data-leaving` is set before the animation starts; `animationComplete` runs exactly once, after play; the ghost is removed afterwards; the order of exit, rise and focus in `Now.done`.
+
+Ask before you start: (1) swallow silently, or also log, since a bad keyframe is a programming error that silence hides? (2) `leave` as a `Motion` method (the fake Motions in `now.spec.ts`, `row-motion.spec.ts`, `shell-motion.spec.ts` and `shell-layout.spec.ts` then need it) or an exported function taking the Motion? (3) Should `expandRow` get a matching enter helper, or only lose its catch?
+
+Read `building-pwa-ui` first. No ADR governs this.
+
+Specs: the `motion.spec.ts` rejection case becomes "resolves"; add one where `animate` throws. The "when play rejects" cases in `shell-motion.spec.ts`, `row-motion.spec.ts` (collapse and expand) and `capture-flight.spec.ts` use a fake play that rejects, which the new contract rules out: move them to `leave` tests or delete them. Add a `now.spec.ts` case for the Done exit with the real `Motion`, `Element.prototype.animate` stubbed to throw and the `--duration-quick` and `--ease-in` tokens set on the root (as `motion.spec.ts` does; otherwise the real Motion resolves at once in jsdom), proving `leaving()` clears and the card is not inert. Prove the new cases fail with the rethrow restored.
+
+Checks: `pnpm exec nx run-many -t lint`, `pnpm exec nx run-many -t typecheck`, `pnpm exec nx test pwa`, `pnpm exec nx build pwa`, `pnpm exec nx format:check --all`, then `pnpm exec nx e2e pwa-e2e` (now, capture, motion-off and view-transitions specs).
+
+Docs: the skill line and both plan passages above.
+
+Out of scope: CSS `animate.enter` and `animate.leave` classes, view transitions, `TaskMorph`, the swipe plan.
+
+Do not commit unless I ask.

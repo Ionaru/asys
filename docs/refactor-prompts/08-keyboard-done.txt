@@ -1,0 +1,25 @@
+SPDX-License-Identifier: EUPL-1.2
+
+Add one helper that says whether a click was keyboard-activated, and optionally decide in one place when a keyboard Done moves focus to the Undo bar.
+
+Why: `$event.detail === 0` (Enter or Space) is spelled out in five places: `apps/pwa/src/app/ui/top-pick/top-pick.component.html` (Done), `ui/undo-bar/undo-bar.component.html` (Try again and two Dismiss buttons) and `TaskEditor.done(event)` in `features/task/task-editor.ts` (near line 447). The shape `{ readonly keyboard: boolean }` is repeated in the `done` output of `top-pick.ts`, the `retry` and `dismiss` outputs of `undo-bar.ts`, and `retryDone` and `dismissDone` in `layout/shell-layout.ts`. The pairing "`DoneUndo.complete`, then `requestFocus()` when keyboard" lives in `Now.done` and `TaskEditor.done`.
+
+Current state: `Now.done(task, origin, keyboard)` uses the boolean twice: to call `doneUndo.requestFocus()` after `complete` (only in the branch for the displayed top pick with `DoneOrigin.Button` and a card element), and for `riseAfterRender(seq, !keyboard)`. Today its only caller is the top pick's Done (`now.component.html`); the other branches are reached by a ranked Task that is not displayed, by `DoneOrigin.Swipe` (pointer-only, so never keyboard) or with no card element.
+
+Change: add `ui/activation/activation.ts` (the ui layer, importable by ui, features and layout) with `interface Activation { readonly keyboard: boolean }` and `activationOf(event: MouseEvent): Activation`. Templates cannot call imports, so each component exposes it as a `protected readonly` field. Replace the five comparisons and the repeated types. Optionally give `DoneUndo.complete(task, origin, options?: { keyboard?: boolean })` the focus request, after its early return for an already-held Task.
+
+Must stay identical: a pointer Done never requests focus; a keyboard Done requests it exactly once, after `complete` and before the editor navigates away; Now's rise focus rule; Try again and Dismiss still set `pointerActivated` in the shell.
+
+Ask before you start: (1) fold the focus request into `DoneUndo.complete`, or add only the helper? Folding would make a keyboard Done in Now's other branches request focus, which no UI reaches today. (2) Is a shared `Activation` type wanted, or only the predicate?
+
+Read `building-pwa-ui` first. No ADR governs this.
+
+Specs: `now.spec.ts` (near lines 796 and 917, `complete` asserted `toHaveBeenCalledExactlyOnceWith(INVOICE, DoneOrigin.Button)` beside the `requestFocus` checks), `task-editor.spec.ts` (near lines 910 to 929, pointer and keyboard Done), `done-undo.spec.ts` (the `requestFocus` block), `top-pick.spec.ts`, `undo-bar.spec.ts` (near lines 225 to 250), `shell-layout.spec.ts`. If folded, the `now.spec.ts` and `task-editor.spec.ts` assertions change to the new argument. Add `activation.spec.ts` (detail 0 is keyboard, 1 and 2 are not) and, if folded, `done-undo.spec.ts` cases: focus raised once with the option, not without it, not on the early return. Prove them by inverting the comparison.
+
+Checks: `pnpm exec nx run-many -t lint`, `pnpm exec nx run-many -t typecheck`, `pnpm exec nx test pwa`, `pnpm exec nx build pwa` (it checks templates), `pnpm exec nx format:check --all`, `node scripts/check-spdx.mts`, and `pnpm exec nx e2e pwa-e2e` (`now.spec.ts` "Enter on Done moves focus to Undo, and Escape to the next title", `editor.spec.ts`).
+
+Docs: the `detail: 0` note in the `building-pwa-ui` skill (near line 90); optionally `docs/capture-and-done-animations-plan.md` near lines 178 and 526.
+
+Out of scope: the swipe itself, the Undo bar's focus handling, Now's rise.
+
+Do not commit unless I ask.

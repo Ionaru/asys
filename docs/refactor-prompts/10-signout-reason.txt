@@ -1,0 +1,23 @@
+SPDX-License-Identifier: EUPL-1.2
+
+Let `Session.signedOut()` carry why the session ended, so `App.leave()` stops special-casing the Account route.
+
+Why: `App.leave()` in `apps/pwa/src/app/app.ts` drops `returnUrl` when `pathOf(url) === '/account'`, because Account's own Sign out should land on a plain `/signin`. That couples the root to one screen's route, and it also applies to a revoked session: if another device makes new recovery codes while Account is open, the User signs in again and lands on Now, not Account. The only callers of `signedOut()` are `Account.signOut()` and `unauthorizedInterceptor` (`core/auth/unauthorized.interceptor.ts`); `Session.apply()` also sets SignedOut on a 401 from `me()`.
+
+Change: add an enum (for example `SignOutReason { Chosen = 'chosen', Revoked = 'revoked' }`) in `core/auth/session.ts`. `signedOut(reason)` and the Unauthorized branch of `apply()` record it before the state changes, readable by `App` (a field or signal on `Session`). `Account.signOut()` passes Chosen, the interceptor and `apply()` pass Revoked. `leave()` omits `returnUrl` for Chosen and keeps it otherwise, with no path test beyond `SIGNED_OUT_PATHS`.
+
+Watch the double call: when the server answers Account's sign-out with a tagged 401, the interceptor records Revoked and then `Account.signOut()` records Chosen, and both can land before `App`'s effect runs. Today that lands on `/signin` without `returnUrl`; keep it so and pin it with a spec.
+
+Must stay identical: no redirect from `SIGNED_OUT_PATHS`; `returnUrl` for `/now` and every screen but Account; Unknown to SignedOut does not navigate; the generation logic in `Session`; `signedOut()` stays harmless to repeat.
+
+Ask before you start: (1) Deliberate behaviour change: a revoked session on `/account` will now carry `returnUrl=/account`. Accept? (2) When reasons conflict before the redirect, last call wins or Chosen wins? (3) A required argument, or a default of Revoked?
+
+Read first: `building-pwa-ui`, `writing-e2e-specs`. Pinned by `app.spec.ts` ('navigates from /account to /signin without a return URL', which will change or split), `core/auth/session.spec.ts` (the `signedOut` describe, 'is harmless when called twice'), `features/account/account.spec.ts` (expects `signedOut` called once) and `core/auth/unauthorized.interceptor.spec.ts`. Add: App specs for Chosen and Revoked on `/account` and for the double call; Session specs recording the reason; prove one fails by ignoring the reason. Add a Playwright spec in `apps/pwa-e2e/src/auth.spec.ts` that signs out from Account and lands on `/signin` without `returnUrl`; no e2e covers sign-out today.
+
+Checks: `pnpm exec nx run-many -t lint typecheck test build -p pwa`, `pnpm exec nx format:check --all`, `node scripts/check-spdx.mts`, `pnpm exec nx e2e pwa-e2e` (database up, ports 3100 and 4300 free) and `pnpm exec nx run pwa-e2e:e2e-image` from the README recipe.
+
+Docs: add the reason rule to the 'Session and routes' note in `docs/slice-1-plan.md` (piece 5), which does not mention the Account exception today.
+
+Out of scope: the server, guards, `safeReturnUrl`, and deriving 'on a tab' (`ShellLayout.onCapturePath`, `TAB_PATHS`, `ui/bottom-nav`) from route data.
+
+Do not commit unless I ask.

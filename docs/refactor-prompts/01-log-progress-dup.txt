@@ -1,0 +1,25 @@
+SPDX-License-Identifier: EUPL-1.2
+
+Share the Log progress command and its confirmation sentence between Now and the Task editor.
+
+Why: `Now.saveProgress` (`apps/pwa/src/app/features/now/now.ts`, near line 297) and `TaskEditor.logProgress` (`features/task/task-editor.ts`, near line 487) each build the same `{ _tag: CommandTag.LogProgress, taskId, remainingMinutes, expect: { status: TaskStatus.Open } }` literal and set the same status line `` `Estimate is now ${formatMinutes(minutes)}.` ``. Two copies of a wire shape and a user-visible sentence drift when one gains a field or the wording changes. Separately, `canLogProgress` (`ui/log-progress-form/log-progress-form.ts`) hand-mirrors the `logProgress` precondition in `libs/domain/src/lib/commands/task-commands.ts` (near line 207): open, Estimate not null, remaining at least 1 and below the Estimate, hence `MIN_LOGGABLE_ESTIMATE = 2`. The `changing-a-domain-rule` skill says the PWA calls the rules and never re-implements them. `canLogProgress` has no spec of its own; `now.spec.ts` and `task-editor.spec.ts` ("shows Log progress only for an Estimate of at least 2 minutes", near line 1035) exercise it through the button.
+
+Current state: the two methods differ only in where the id comes from (`logProgressFor()` versus `taskId()`), how the command is sent (Now's `run` marks the Task pending; the editor's `runAction`) and what happens after Applied (Now closes the form and focuses the top pick; the editor closes it and focuses the Log progress button).
+
+Change: beside `canLogProgress` in `ui/log-progress-form/log-progress-form.ts` (the ui layer may import `@asys/domain`), export `logProgressCommand(taskId, minutes): LogProgress` and `estimateNowText(minutes): string`. Both callers use them; sending, pending state and focus stay where they are. Add direct `canLogProgress` cases to `log-progress-form.spec.ts`.
+
+Optional second step: move `canLogProgress(task)` into `libs/domain/src/lib/commands/task-commands.ts` next to `logProgress` (re-exported through `export *`), with a spec showing it agrees with `logProgress` at Estimates 1, 2, 3 and the maximum, and have the PWA import it.
+
+Must stay identical: the command's wire shape, the sentence (pinned near line 1083 of `task-editor.spec.ts` as "Estimate is now 10 min." and near line 1442 of `now.spec.ts` as "Estimate is now 15 min."), when the button shows, pending and focus behaviour.
+
+Ask before you start: (1) do the domain move? It adds a public export to `@asys/domain`. (2) If so, does a new predicate that derives nothing new count as a rule change needing a `RULES_VERSION` bump and a `libs/domain/CHANGELOG.md` section (ADR 0003), or only an API addition? (3) Should the helper pair live in `ui/log-progress-form` or a feature-level file?
+
+Read `building-pwa-ui` first, and `changing-a-domain-rule` for the domain step.
+
+Checks: `pnpm exec nx run-many -t lint`, `pnpm exec nx run-many -t typecheck`, `pnpm exec nx test pwa` (and `pnpm exec nx test domain` for the domain step), `pnpm exec nx build pwa`, `pnpm exec nx format:check --all`. No new e2e is needed: the unit specs pin both sentences, and `apps/pwa-e2e/src/editor.spec.ts` (near line 90) checks Now's.
+
+Docs: for the domain step, the domain CHANGELOG if the answer to (2) is yes; otherwise none.
+
+Out of scope: the Done flow, the form component itself, the server.
+
+Do not commit unless I ask.

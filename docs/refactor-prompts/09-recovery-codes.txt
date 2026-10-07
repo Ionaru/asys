@@ -1,0 +1,23 @@
+SPDX-License-Identifier: EUPL-1.2
+
+Extract the shown-once recovery code handling that Sign-up and Account both implement into one shared helper, and decide with me whether to share the markup too.
+
+Why: `features/sign-up/sign-up.ts` and `features/account/account.ts` each keep a `held` flag around `AppUpdate.hold()` and `release()`, clear `codes` in `destroyRef.onDestroy`, carry the same `copy()` ('Copied.' and 'Could not copy. Select the codes instead.'), and render the same `<ol class="... asys-num">` plus 'These codes are shown only now. Keep them somewhere safe.' with near-identical list CSS (`.sign-up__codes` in `sign-up.css`, `.account__codes` in `account.css`). A fix to one (a missed release, say) would not reach the other. `account.spec.ts` has five tests, all about sign-out, so Account's half is unpinned.
+
+Current state: Sign-up sets `codes` and `step`, then calls `hold()` before `session.signedIn()` in `createPasskey`, and releases only on destroy. Account's `makeCodes` holds only `if (!this.held)`, resets `copyStatus` for each new set, and `hideCodes()` clears, resets and releases through `releaseHold()`. Layouts differ: Sign-up shows list, sentence, Copy, status, Continue; Account shows list, sentence, Copy and Done side by side, then status.
+
+Change: add a helper in `features/auth/` (for example `recovery-codes.ts`), called in the injection context and injecting `DestroyRef` and `AppUpdate` the way `ceremonyOptions` in `features/auth/ceremony-options.ts` does. It owns `codes`, `copyStatus`, `show(codes)` (sets, resets the status, holds once), `hide()`, `copy()`, and clears and releases on destroy. Both screens use it. If I agree, also add `ui/recovery-codes` (presentational, `asys-` host class, `ViewEncapsulation.None`, tokens only) for the list and sentence, with the actions projected by each screen.
+
+Must stay identical: Sign-up holds before `signedIn()`; at most one hold and exactly one release per hold; codes cleared on destroy; both copy messages; `role="status"` on the copy status; the `asys-num` class (`sign-up.spec.ts` selects `ol.asys-num`). Resetting the status on `show` is no change for Sign-up, which shows one set.
+
+Ask before you start: (1) Logic only, or also a shared component? (2) Keep each layout with projected actions, or unify them?
+
+Read first: `building-pwa-ui`, `writing-e2e-specs` and the `angular-component-files` rule. Pinned by `sign-up.spec.ts` ('Ok holds the update prompt before it records the sign-in', the codes step and destroy describes). The e2e `page` fixture in `apps/pwa-e2e/src/support/fixtures.ts` (near line 96) waits on `ol.sign-up__codes` for every spec, so keep that class or update the fixture in the same change. Add: a helper spec (hold once over two `show` calls, release on `hide` and on destroy, both copy outcomes) and Account specs for the same; prove each fails by dropping the release or the clear.
+
+Checks: `pnpm exec nx run-many -t lint typecheck test build -p pwa`, `pnpm exec nx format:check --all`, `node scripts/check-spdx.mts`, `pnpm exec nx e2e pwa-e2e` (database up, ports 3100 and 4300 free), and `pnpm exec nx run pwa-e2e:e2e-image` from the README recipe.
+
+Docs: none expected.
+
+Out of scope: server recovery codes, `Session`, other screens, `AppUpdate` semantics.
+
+Do not commit unless I ask.

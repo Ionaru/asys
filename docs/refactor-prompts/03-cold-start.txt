@@ -1,0 +1,25 @@
+SPDX-License-Identifier: EUPL-1.2
+
+Start `GET /v1/snapshot` next to `Session.check()` on a cold start and let `DataStore.start()` adopt that request, discarding it when the session ends SignedOut or Unreachable.
+
+Why: on every signed-in launch the two requests run one after the other. The `provideAppInitializer` in `apps/pwa/src/app/app.config.ts` only calls `Session.check()`; `signedInGuard` (`core/auth/guards.ts`) awaits it; `App` (`app.ts`, the session effect) calls `dataStore.start()` only once the state is SignedIn. Nothing in the snapshot request depends on the `/me` body. Cost: one extra round trip before the first Now render, on every launch.
+
+Current state: `DataStore.start()` adds its listeners and calls the private `requestSnapshot(true)`, which sets Loading and calls `DataApi.snapshot()`. `Session.ask()` has a 10 s timeout (`SESSION_CHECK_TIMEOUT_MS`) and sets Unreachable. `DataStore.stop()` bumps `generation` so late responses are dropped. `unauthorizedInterceptor` calls `Session.signedOut()` on a 401 `Unauthorized`, which bumps the Session generation, so a pending `/me` answer is then dropped.
+
+Change: add `DataStore.preload()`, which issues `api.snapshot()` once and keeps the promise with the current generation; `start()` adopts it instead of a new request when present; `discardPreload()` drops it. Call `preload()` from an app initialiser beside the session check, under the rule chosen below. `App`'s session effect calls `discardPreload()` on SignedOut and Unreachable, whether or not the store started. Loading is still set at `start()`.
+
+Must stay identical: a signed-in launch ends on Now with the same state; a signed-out launch ends on `/signin` with no store state; Unreachable starts nothing; a sign-in later in the session fetches a fresh snapshot; `stop()` drops late answers; the 10 s check timeout.
+
+Ask before you start: (1) Preload on every cold start, only when the landing path is not in `SIGNED_OUT_PATHS` (`core/auth/safe-return-url.ts`), or only when a device-storage hint says the last session was signed in? Without one, signed-out visitors send a wasted snapshot whose 401 signs them out before `/me` answers. (2) A slow 401 from a preload could sign out someone who has just signed in: should the preload skip the interceptor, or should `signedOut` ignore a 401 from an older Session generation? (3) Does Unreachable discard the preload (recommended), so the later SignedIn starts a fresh request?
+
+Read first: `building-pwa-ui` and `writing-e2e-specs` in `.agents/skills/`. No ADR governs it.
+
+Tests: `data-store.spec.ts` (`start` describe) gains adopt, discard and a stale preload after `stop()`. `app.spec.ts` pins the start and stop effect; its `DataStore` fake gains `discardPreload`, with cases for SignedOut and Unreachable. Add a Playwright spec that holds `/v1/auth/me` with `page.route` and asserts `/v1/snapshot` was already requested, plus a launch with the session cookie cleared that lands on `/signin`. Prove it can fail by removing the initialiser call.
+
+Checks: `pnpm exec nx run-many -t lint typecheck test build -p pwa`, `pnpm exec nx format:check --all`, then `pnpm exec nx e2e pwa-e2e`, since passkeys need Playwright.
+
+Docs: the Session and data store paragraphs in `docs/slice-1-plan.md` ("asks `GET /v1/auth/me` at startup", "Only the shell starts and stops the store"), with a dated Facts checked note.
+
+Out of scope: the server, the service worker and the poll rules.
+
+Do not commit unless I ask.

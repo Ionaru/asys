@@ -1,0 +1,21 @@
+SPDX-License-Identifier: EUPL-1.2
+
+Make one helper decide that `AuthError.Unauthorized` shows no message on the Account screen, and use it at every Account failure site.
+
+Why: in `features/account/account.ts` each failure path must remember that Unauthorized means 'signed out, the redirect is coming, show nothing'. Today that is written five times: the `AuthError.Unauthorized` case in `messageForAddError`, the check inside the `shownAddMessage` computed, `remove()` (`result.error !== AuthError.Unauthorized`), `makeCodes()` (the same), and the add 'Try again' condition in `account.component.html` (`addRef.error() !== AuthError.Unauthorized`, the reason the class exposes `AuthError`). A later path that forgets it shows 'Something went wrong. Try again.' while the page leaves. `signOut()` also names Unauthorized, with a different meaning (treated as success), so leave it.
+
+Change: add `messageForAuthError(error, overrides?)` in `features/auth/` (beside `passkey-messages.ts`), returning `null` for Unauthorized, the caller's override for that error when there is one (LastPasskey in `remove()`; ChallengeInvalid, VerificationFailed to `TRY_AGAIN_MESSAGE` and AlreadyRegistered in add), otherwise `GENERIC_MESSAGE` (`core/data/outcome-message.ts`). Replace the four `.ts` sites with it, and give the template a computed (for example `addLoadFailed`) instead of comparing the error inline.
+
+Must stay identical: every message string; no alert and no 'Try again' button on Unauthorized; a Cancelled ceremony still shows nothing (`messageForFailure`, untouched); the passkeys list loader, where any failure shows 'Could not load your passkeys.' with Try again.
+
+Ask before you start: (1) Should Sign-up, Sign-in and Recover use the helper too? They run signed out and have their own wording, so I expect no. (2) Should the passkeys list loader also show nothing on Unauthorized? Today it shows the load error with Try again, which would be a deliberate change.
+
+Read first: `building-pwa-ui`. Today `account.spec.ts` has five specs, all about sign-out, so nothing pins the Unauthorized paths; `core/api/auth-api.spec.ts` pins the mapping to `AuthError.Unauthorized`. Add: a spec for the helper covering every `AuthError` value; Account specs, one per site, where the overridden `AuthApi` fails with Unauthorized and no alert or Try again renders (add, remove, regenerate, add options load), plus one each for a Network failure showing `GENERIC_MESSAGE`. Prove one fails by returning `GENERIC_MESSAGE` for Unauthorized.
+
+Checks: `pnpm exec nx run-many -t lint typecheck test build -p pwa` (build and test check templates), `pnpm exec nx format:check --all`, `node scripts/check-spdx.mts`.
+
+Docs: none expected.
+
+Out of scope: `Session`, the interceptor, `AuthApi` mapping, the 401 rule, passkey ceremony messages.
+
+Do not commit unless I ask.

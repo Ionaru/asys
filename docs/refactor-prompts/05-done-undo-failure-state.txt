@@ -1,0 +1,25 @@
+SPDX-License-Identifier: EUPL-1.2
+
+Hold DoneUndo's failed Task together with its failure in one signal, instead of a signal plus a separate field kept in step.
+
+Why: `DoneUndo` (`apps/pwa/src/app/core/data/done-undo.ts`) keeps `failureSignal` and the plain field `failedTask`, written together at three sites and read together once. `complete` clears both (near line 143), `dismiss` clears both (near line 209), and `handle` sets the signal and, after the announcement, `failedTask = held.task` (near line 349). `retry()` (near line 198) reads both and refuses unless `failureSignal()?.canRetry`. Nothing can observe the gap inside `handle`, because it runs synchronously, so this is not a bug: the cost is that every future write site must remember both, and a site that clears one would let `retry` act on a stale Task or refuse a live one.
+
+Current state: `DoneFailure` (taskId, title, message, canRetry, closedElsewhere) is public. The shell reads it in `layout/shell-layout.ts` (near line 108) to build the Undo bar. `done-undo.spec.ts` asserts `failure()` with `toEqual` at five places (near lines 479, 524, 541, 557, 726), and `shell-layout.spec.ts` builds a `NOT_DONE` fixture of that type. `failureSignal` is also read by `syncTimer`, `pause` and `clearPausesWhenIdle`.
+
+Change: replace the two with `private readonly failed = signal<{ readonly failure: DoneFailure; readonly task: Task } | null>(null)` and expose `readonly failure: Signal<DoneFailure | null> = computed(() => this.failed()?.failure ?? null)`. The computed returns the stored object, so a failure keeps one reference. `complete` and `dismiss` set `failed` to null, `handle` sets both parts in one write, `retry` reads `failed()` once, and the other reads of `failureSignal()` become `failed()`. The public `DoneFailure` interface is unchanged, so no spec or fixture changes.
+
+Must stay identical: every `failure()` value and when it becomes null; retry after Failed (same key) and after KeyReused (fresh key); no retry for Rejected or NotApplicable; the timer rules (a failure displaces the Undo window and never times out); notices and announcements.
+
+Ask before you start: keep `DoneFailure` public and unchanged with the Task held beside it internally (recommended), or add a `task` field to `DoneFailure`? The second changes the `toEqual` assertions and the shell fixture, and exposes the whole Task to the shell.
+
+Read `building-pwa-ui` (the `core/data` layer) first. No ADR governs this.
+
+Specs: `done-undo.spec.ts` should pass unchanged, in particular the `outcomes` block (near lines 458 to 615) and "a failure that arrives while another Done is pending" (near line 616). Add one case: after Failed and `dismiss()`, `retry()` holds nothing (`hold` called once, `pending()` null). Prove it can fail by making `dismiss` leave the new state set.
+
+Checks: `pnpm exec nx run-many -t lint`, `pnpm exec nx run-many -t typecheck`, `pnpm exec nx test pwa`, `pnpm exec nx build pwa`, `pnpm exec nx format:check --all`. No e2e is needed, because behaviour does not change.
+
+Docs: none.
+
+Out of scope: `held` and its timer, `DoneOrigin`, the Undo bar component, outcome messages.
+
+Do not commit unless I ask.

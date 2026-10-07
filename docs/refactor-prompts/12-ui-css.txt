@@ -1,0 +1,23 @@
+SPDX-License-Identifier: EUPL-1.2
+
+Move the CSS that screens and `ui` components repeat into shared classes in `apps/pwa/src/styles.css`, proved unchanged by one computed-style comparison.
+
+Why: one restyle today means many edits. The screen title rule (`margin: 0 0 var(--space-3)`, `--font-size-title`, `--line-height-title`, weight 700) is copied in eight places (`features/now/now.css`, `capture/capture.css`, `inbox/inbox.css`, `settings/settings.css`, `areas/area-list.css`, `areas/area-editor.css`, `task/task-editor.css`, inline in `today/today.ts`) and a flush variant in five (`sign-in.css`, `sign-up.css`, `account.css` through a grouped rule, inline in `recover/recover.ts` and `recovered/recovered.ts`). The status rule with its `:empty` reset is in now, inbox, settings, task-editor and area-editor. In `ui`, `.asys-num` is re-declared in six components (`bottom-nav` and `capture-button` `__badge`, `top-pick` and `picker-row` `__estimate`, `section-header` `__count`, `estimate-field` `__chip--num`), the count badge is 12 identical declarations in `.asys-bottomnav__badge` and `.asys-capture__badge`, and the fieldset reset is in `segmented.css`, `estimate-field.css`, `date-spec-field.ts` and `area-editor.css` (`.area-editor__day`).
+
+Change, in two phases. (1) Next to `.asys-page`, add a screen title class with a flush modifier, a status class with its `:empty` reset, a count badge class and a fieldset reset class (propose names); put `asys-num` on the six elements; apply the classes in templates and delete the copies. (2) Only if agreed: a shared legend, the segmented and estimate chip buttons, and the quadrant and status chip base.
+
+Must stay identical: computed margin, font, line height, weight, colour and `font-family` of every affected element at 375px and 1280px in light, dark and drive themes; template refs (`#heading`, `#title`), `tabindex` and `data-morph`. Trap: a `styles.css` rule and a `ViewEncapsulation.None` ui rule have equal specificity and component styles load later, so a component `font-family: var(--font-sans)` beats `.asys-num`. Remove the competing declaration or use `:where()`.
+
+Ask before you start: (1) Keep the feature and BEM classes as test hooks (recommended), or move specs to element and role selectors? (2) Do phase 2? Unified legends give the date-spec and Area editor legends `padding: 0` and a space-2 margin, a visible change. (3) Give the always-empty `area-list` status the shared class (an invisible font size change)? (4) Commit the comparison as a Playwright spec, or keep it throwaway? (5) Drop the 700, which `h1` already has?
+
+Read first: `building-pwa-ui`, `writing-e2e-specs` and the `angular-component-files` rule (a moved stylesheet stays a file). No ADR governs this.
+
+Tests: unit specs query `h1.now__title`, `p.now__status`, `h1.inbox__title`, `h1.task-editor__title`, `h1.capture__title` and the BEM classes in `bottom-nav.spec.ts`, `capture-button.spec.ts`, `estimate-field.spec.ts`, `segmented.spec.ts` and `date-spec-field.spec.ts` (`legend.asys-field__label`, which phase 2 changes). The e2e `editor.spec.ts` uses `.now__status`, and `capture.spec.ts` and `triage.spec.ts` use `.asys-bottomnav__badge`. jsdom unit tests do not prove computed CSS, so before editing record `getComputedStyle` per element in a Playwright run (the browser pane has no passkeys), compare afterwards, and prove the comparison fails by changing one margin.
+
+Checks: `pnpm exec nx run-many -t lint typecheck test build -p pwa pwa-e2e`, `pnpm exec nx format:check --all`, `node scripts/check-spdx.mts` for new files, `pnpm exec nx e2e pwa-e2e`.
+
+Docs: name the new classes in the Styling bullets of `.agents/skills/building-pwa-ui/SKILL.md`.
+
+Out of scope: `.account__heading`, the recovery code lists, the 56px nav height, tokens and any redesign.
+
+Do not commit unless I ask.

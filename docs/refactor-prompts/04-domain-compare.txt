@@ -1,0 +1,25 @@
+SPDX-License-Identifier: EUPL-1.2
+
+Export one UTF-16 code-unit string comparator from `libs/domain` and use it everywhere the repo copies it.
+
+Why: strings compare by code unit, never `localeCompare`, and the comparator `(a, b) => (a < b ? -1 : a > b ? 1 : 0)` exists six times: as a private `compareStrings` in `libs/domain/src/lib/picker/picker.ts`, `picker/waiting-text.ts`, `task/blockers.ts` and `working-set/inbox.ts`, inline in the `.sort(...)` of `blockedReasons` in `task/blocked.ts`, and as `compareCodeUnits` in `apps/pwa/src/app/features/areas/area-order.ts`. The `changing-a-domain-rule` skill carries a "change all five together" warning because of it. The drift risk is small, so this is a cheap tidy-up.
+
+Change: add one exported `compareCodeUnits` in a new `libs/domain/src/lib/compare.ts` (MPL-2.0 SPDX header, const arrow function, doc comment saying why not `localeCompare`), exported from `libs/domain/src/index.ts`. Replace the five domain copies with imports. In `area-order.ts`, import it from `@asys/domain` and keep `byAreaName` there; features may import the domain per the layer table in `building-pwa-ui`.
+
+Must stay identical: every ordering (Inbox Tasks and Review items, blocker ids in `BlockedBy`, blocker titles in the Waiting line, Picker tie-breaks by id, `blockerCandidates` in `task/blockers.ts`, and Area lists and choices sorted by `byAreaName` in `features/areas/area-list.ts`, `features/inbox/inbox.ts` and `features/task/task-editor.ts`).
+
+Ask before you start:
+- ADR 0003 asks for a minor version and a changelog for any rule change. Is a new public export with no rule change neutral, or does it bump `RULES_VERSION` with a CHANGELOG section?
+- Should `byAreaName` stay in the PWA, or move into the domain beside the comparator?
+
+Read first: `changing-a-domain-rule`, `building-pwa-ui`, ADR 0003 (`docs/adr/0003-core-add-ons-and-api.md`).
+
+Tests: these pin today's order and must not change: `picker.spec.ts` (near line 122), `waiting-text.spec.ts` (near line 79), `blocked.spec.ts` (near line 55), `working-set/inbox.spec.ts` (near line 36), `blockers.spec.ts`, and in the PWA `features/inbox/inbox.spec.ts` (near line 595) and `features/areas/area-list.spec.ts` (near line 87). Add `compare.spec.ts` covering equal strings, upper case before lower case, and an astral character (such as U+1F600, a surrogate pair) against a BMP character between U+E000 and U+FFFF (such as U+FF61), where code-unit order puts the astral one first and code-point order would not. Prove it can fail by swapping in `localeCompare`.
+
+Checks: `pnpm exec nx run-many -t lint typecheck test -p domain contract --skip-nx-cache`, `pnpm exec nx run-many -t typecheck build test -p pwa`, `pnpm exec nx format:check --all`, `node scripts/check-spdx.mts`.
+
+Docs: rewrite the code-unit bullet in `.agents/skills/changing-a-domain-rule/SKILL.md` (it lists the five copies) to name the export, and add `libs/domain/CHANGELOG.md` and `RULES_VERSION` changes only if you decide they are needed.
+
+Out of scope: the copy in `libs/effect-passkeys/src/server/ceremonies.ts` (near line 281), because lint lets `scope:passkeys` depend only on itself; the `localeCompare` sorts in server specs; the duplicated 'No Area' option lists in `task-editor.ts` and `ui/triage-card/triage-card.ts`; any other sort.
+
+Do not commit unless I ask.

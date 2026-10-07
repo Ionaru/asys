@@ -1,0 +1,25 @@
+SPDX-License-Identifier: EUPL-1.2
+
+Build the Area choices for a select in one place, so the Task editor and the triage card share the No Area option.
+
+Why: `TaskEditor.areaOptions` (`apps/pwa/src/app/features/task/task-editor.ts`, near line 268) and `TriageCard.areaOptions` (`ui/triage-card/triage-card.ts`, near line 99) each build `[{ value: '', label: 'No Area' }, ...areas.map(...)]`, and `TriageCard.areaName` (near line 93) repeats the label as its fallback. Three copies of a user-visible label drift when the wording changes, and slice 2's next Area select would make a fourth. The editor sorts with `byAreaName`, while the triage card relies on Inbox having sorted its `areas` input (`features/inbox/inbox.ts`, near line 49), so a new caller can also forget the sort.
+
+Current state: `SelectOption` is exported from `ui/select-field/select-field.ts`. `byAreaName` lives in `features/areas/area-order.ts`, which the ui layer may not import.
+
+Change: add `areaSelectOptions(areas)` and a `NO_AREA_LABEL` constant in the ui layer (for example `ui/select-field/area-options.ts`; check the layer table in `building-pwa-ui`). The helper takes `{ id, name }` pairs in the order given and returns No Area first. Use it in both components, and use the constant in `areaName`. Sorting stays with the callers.
+
+Must stay identical: the option order and labels in both selects, the empty value for No Area, and `areaName` for an empty or unknown id.
+
+Ask before you start: should the helper sort as well? That needs `byAreaName` (or its comparator) in a layer the ui may import, and would make the triage card's order independent of Inbox. If the shared domain code-unit comparator refactor has landed, it can sort with that.
+
+Read first: `building-pwa-ui`. No ADR governs it.
+
+Tests: `triage-card.spec.ts` ('offers No Area first, then the areas in order', the No Area fallback cases near line 264) and `task-editor.spec.ts` ('lists No Area, then the Areas by name, then id', near line 477) must pass unchanged. Add a spec for the helper: an empty list gives only No Area, and the given order is kept. Prove it can fail by dropping the first option.
+
+Checks: `pnpm exec nx run-many -t lint typecheck test build -p pwa`, `pnpm exec nx format:check --all`, `node scripts/check-spdx.mts` for the new file.
+
+Docs: none.
+
+Out of scope: the Area editor, the Area list, `byAreaName` itself.
+
+Do not commit unless I ask.

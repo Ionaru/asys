@@ -1,0 +1,28 @@
+SPDX-License-Identifier: EUPL-1.2
+
+Make `pick()` in `libs/domain/src/lib/picker/picker.ts` stop redoing per-call time zone work for every Task, with identical output.
+
+Why: an earlier review measured about 0.23 ms per Task with a Due, about 69 ms for 300 such Tasks on desktop (unverified; a phone is slower). `DataStore.now` in `apps/pwa/src/app/core/data/data-store.ts` (near line 109) reruns `pick` on the main thread on every minute tick, every state change and each Done hold or release, so it may cause jank on Now.
+
+Per Task today: `isUrgentAt` (`task/priority.ts`) calls `addCalendarDays(now, urgencyWindowDays, tz)` whenever the Task has a Latest start. `reasonText` (`picker/reason-text.ts`) and `waitingText` (`picker/waiting-text.ts`) call `formatClock` (`time/display.ts`) or `toLocalDateTime(now, tz)` (`time/zoned.ts`). `isOverdue` (`task/deadlines.ts`) recomputes `dueInstant`. `isWithinActiveHours` (`area/active-hours.ts`) calls `toLocalDateTime(now, tz)` for each Task with an Area. Every one of these runs `isValidTimeZone`, which constructs a `Temporal.ZonedDateTime`, several times per Task.
+
+Change: first measure with a throwaway script (not committed) over 300 Tasks; if it is under about 10 ms, stop and report. Then choose from: (a) memoise `isValidTimeZone` in `time/zoned.ts`, caching valid zones only, because the server (`apps/server/src/owners/create-owner.ts`) and the contract filter (`libs/contract/src/lib/auth.ts`) call it with user input and an unbounded cache of invalid strings would grow; (b) compute the urgency cutoff and the local `now` lazily once per `pick` and pass them to internal variants, keeping every exported signature (the PWA imports `isOverdue`, `formatClock` and `isValidTimeZone`); (c) evaluate Active hours once per Area. Keep the work lazy: today `pick` throws for an invalid zone only when a Task's Due, Available from or known Area needs a conversion, and for an invalid `urgencyWindowDays` only when a ranked Task has a Latest start.
+
+Must stay identical: the `PickResult` for every input, including order, reason texts across DST changes and in zones whose day starts at 01:00, and the errors thrown on invalid input. Before editing, save `JSON.stringify(pick(...))` for a seeded fast-check corpus across zones in the scratchpad, then diff afterwards.
+
+Ask before you start:
+- Is an output-identical optimisation outside ADR 0003's "any rule change", so no `RULES_VERSION` bump or CHANGELOG section?
+- Option (a) only, or also (b) and (c)?
+- Is module-level memo state acceptable in `libs/domain`?
+
+Read first: `changing-a-domain-rule` and ADR 0003 (`docs/adr/0003-core-add-ons-and-api.md`).
+
+Tests: `picker.spec.ts`, `reason-text.spec.ts`, `waiting-text.spec.ts`, `priority.spec.ts`, `deadlines.spec.ts`, `active-hours.spec.ts`, `zoned.spec.ts`, `display.spec.ts` and `libs/domain/src/scenarios/s*.spec.ts` pin behaviour and must not change. Add specs for those non-throwing cases and for an invalid zone still rejected after a valid one is cached, plus a fast-check property across zones. Prove one fails by computing the cutoff in UTC.
+
+Checks: `pnpm exec nx run-many -t lint typecheck test -p domain contract --skip-nx-cache`, `pnpm exec nx run-many -t typecheck build test -p pwa`, and for (a) `pnpm exec nx test server --skip-nx-cache` (database up and migrated, `nx serve server` stopped), plus `pnpm exec nx format:check --all`.
+
+Docs: `libs/domain/CHANGELOG.md` and `RULES_VERSION` only if you decide it is a rule change.
+
+Out of scope: `blockedReasons` scanning all links and Tasks per Task (it runs twice for a Waiting Task), `blockedText`, the server, and any rule change.
+
+Do not commit unless I ask.

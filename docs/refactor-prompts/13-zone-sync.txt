@@ -1,0 +1,25 @@
+SPDX-License-Identifier: EUPL-1.2
+
+Extract the time zone reconciliation out of `DataStore` into a `TimeZoneSync` service in `apps/pwa/src/app/core/data/time-zone-sync.ts`, so `DataStore` keeps only send, state, polling and refresh.
+
+Why: `core/data/data-store.ts` (595 lines) carries a second feature of roughly 90 lines: `zoneReport`, `zoneChoices`, `runOnly`, `checkZone` and `chooseTimeZone`, which is a near-copy of `send` with an extra await and a storage write. It imports `LAST_REPORTED_ZONE_KEY` from `core/auth/session.ts`, whose `signedIn` and `signedOut` clear that key, so one device-storage key is split between auth and data. `zoneChoices` exists only to suppress `checkZone` during a choice. About 440 of the 2387 lines of `data-store.spec.ts` (the `chooseTimeZone` and `time zone` describes) test it, plus scattered cases such as the older-poll zone check under `stop and generations`.
+
+Current state: `checkZone` runs after every successful snapshot, after a poll whose entries include a Settings change, and from `onFocus` while started. `Settings.chooseZone` calls `dataStore.chooseTimeZone(zone)`. `zoneToReport` (`core/data/zone-to-report.ts`) and `DeviceZone` (`core/platform/device-zone.ts`) are already separate.
+
+Change: a `TimeZoneSync` `@Service` with `start()`, `stop()` and `choose(zone)`, started and stopped by `App` (`app.ts`, the session effect) next to `dataStore.start()` and `stop()`. Move the key into a small `ReportedZone` service in `core/platform` (get, set, clear over `DeviceStorage`) used by both `Session` and `TimeZoneSync`, so data no longer imports auth. `DataStore` exposes only what the service needs. `Settings` calls `timeZoneSync.choose(zone)`.
+
+Must stay identical: it reports only when the device zone differs and was not already reported; it records the zone when it equals the server's; at most one SetTimeZone in flight; no automatic report while a choice runs; a choice waits for an automatic report in flight; an applied report triggers a poll; nothing is written after `stop()`; the key is cleared on sign-in and sign-out.
+
+Ask before you start: (1) How does the service learn of a snapshot, a Settings change and a focus? An `effect` on `state().settings.timeZone` fires only on change, which drops today's check on every snapshot; a hook from `DataStore` keeps today's timing (recommended). (2) May `choose` go through `DataStore.send`, which moves the device-zone storage write from before the poll wait to after it? (3) Now, or folded into slice 4's outbox rework of `DataStore`?
+
+Read first: `.agents/skills/building-pwa-ui/SKILL.md` (layer table). No ADR governs it.
+
+Tests: move the zone cases into a new `time-zone-sync.spec.ts`, keeping a thin `data-store.spec.ts` check that the hook fires. Update the `DataStore` fakes with `chooseTimeZone` in `settings.spec.ts` and `app.routes.spec.ts`, add a `TimeZoneSync` fake to `app.spec.ts` with start and stop cases, and move the key cases in `session.spec.ts`. Prove a moved test can fail by breaking the one-in-flight guard.
+
+Checks: `pnpm exec nx run-many -t lint typecheck test build -p pwa`, `pnpm exec nx format:check --all`, then `pnpm exec nx e2e pwa-e2e -- src/areas-settings.spec.ts` ("A chosen time zone is not switched back to the device zone on focus").
+
+Docs: the layer table row in `building-pwa-ui`, and the Time zone paragraph and the `runOnly` and `chooseTimeZone` bullets and decision in `docs/slice-1-plan.md`.
+
+Out of scope: polling changes, the outbox, and any server change.
+
+Do not commit unless I ask.
