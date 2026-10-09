@@ -48,7 +48,7 @@
         "components": [0.098, 0.1137, 0.1333],
         "hex": "#191d22"
       },
-      "$description": "Primary text and icons on paper, surface, sunken and signal-soft. The Do quadrant fill."
+      "$description": "Primary text and icons on paper, surface, sunken and signal-soft. Icons take the colour of the text they mark."
     },
     "ink-muted": {
       "$value": {
@@ -64,7 +64,7 @@
         "components": [0.1137, 0.3529, 0.5216],
         "hex": "#1d5a85"
       },
-      "$description": "The one action colour: the primary button, the selected tab, the Plan quadrant, links. As text (quiet buttons, links) it reads at 4.5:1 on paper and surface only, never on sunken; put on-signal text on a signal fill."
+      "$description": "The one action colour: the primary button, the selected tab, the Capture button, links, the Undo timer. As text (quiet buttons, links) it reads at 4.5:1 on paper and surface only, never on sunken; put on-signal text on a signal fill."
     },
     "on-signal": {
       "$value": {
@@ -96,7 +96,7 @@
         "components": [0.9412, 0.7059, 0.3529],
         "hex": "#f0b45a"
       },
-      "$description": "Marigold. Marks the present: the current-time pill in Today, the Delegate quadrant, the Voice only chip. Always a fill with on-now text or icons on it; never text, a hairline or a bare mark on paper (1.6:1 on light paper)."
+      "$description": "Marigold. Marks the present: the current-time pill in Today and the Voice only chip. Always a fill with on-now text or icons on it; never text, a hairline or a bare mark on paper (1.6:1 on light paper)."
     },
     "on-now": {
       "$value": {
@@ -144,7 +144,7 @@
         "components": [0.7373, 0.8627, 0.9686],
         "hex": "#bcdcf7"
       },
-      "$description": "Silent: the fill of the first Voice meter bar, the lightest step of the ramp. Too light to stand alone (1.3:1 on light surface): a filled bar always keeps a voice-3 edge."
+      "$description": "The light step of the Voice ramp. No longer drawn by a component (each Voice now has its own icon); kept for the Cover and for palettes.json. Too light to stand alone (1.3:1 on light surface)."
     },
     "voice-2": {
       "$value": {
@@ -152,7 +152,7 @@
         "components": [0.3765, 0.5961, 0.7725],
         "hex": "#6098c5"
       },
-      "$description": "Out loud: the second bar of the Voice meter (3:1 on surface)."
+      "$description": "The middle step of the Voice ramp (3:1 on surface). No longer drawn by a component; kept for the Cover and for palettes.json."
     },
     "voice-3": {
       "$value": {
@@ -160,7 +160,7 @@
         "components": [0.1137, 0.3529, 0.5216],
         "hex": "#1d5a85"
       },
-      "$description": "Closed door: the third bar of the Voice meter, the step that allows the most (3:1 on surface)."
+      "$description": "The strong step of the Voice ramp (3:1 on surface). No longer drawn by a component; kept for palettes.json."
     },
     "focus": {
       "$value": {
