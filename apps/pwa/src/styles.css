@@ -288,6 +288,24 @@ textarea.asys-field__input,
   view-transition-name: nav-mark;
 }
 
+/* Each glyph and the Inbox count have their own names, so the mark's snapshot holds only its pill and they stay
+   in place while it moves. */
+.asys-bottomnav__item:nth-child(1) .asys-bottomnav__icon svg {
+  view-transition-name: nav-glyph-1;
+}
+
+.asys-bottomnav__item:nth-child(2) .asys-bottomnav__icon svg {
+  view-transition-name: nav-glyph-2;
+}
+
+.asys-bottomnav__item:nth-child(3) .asys-bottomnav__icon svg {
+  view-transition-name: nav-glyph-3;
+}
+
+.asys-bottomnav__badge {
+  view-transition-name: nav-badge;
+}
+
 [data-morph] {
   view-transition-name: task-title;
 }
@@ -297,7 +315,7 @@ textarea.asys-field__input,
   view-transition-name: none !important;
 }
 
-/* The ladder: page auto, task-title 1, shell chrome 2, nav-mark 3. */
+/* The ladder: page auto, task-title 1, shell chrome 2, nav-mark 3, the nav's glyphs and count 4. */
 ::view-transition-group(task-title) {
   z-index: 1;
 }
@@ -310,6 +328,13 @@ textarea.asys-field__input,
 
 ::view-transition-group(nav-mark) {
   z-index: 3;
+}
+
+::view-transition-group(nav-glyph-1),
+::view-transition-group(nav-glyph-2),
+::view-transition-group(nav-glyph-3),
+::view-transition-group(nav-badge) {
+  z-index: 4;
 }
 
 ::view-transition-group(*) {
