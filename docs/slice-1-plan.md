@@ -795,7 +795,7 @@ Re-planned and built on 2026-10-04. The re-plan was reviewed adversarially by th
 - DateSpecField writes `''` back into a date input whose date became partial. Typing a date into an empty Date input works, because Chromium fires no `input` event until the date is complete. Editing one part of a filled date empties the field: the date, its Time and the Clear button all go. The Area editor's time inputs share the cause: clearing one part of a From or To empties the whole time and shows "Enter a time". `apps/pwa-e2e/src/known-limits.spec.ts` pins all three, so a fix flips those tests and this bullet together.
 - The Area editor keeps its inputs enabled while sending; only Save or Create is disabled. A missing Area offers "Go to Areas".
 - Areas cannot be deleted, because no command exists, and Privacy gets no UI until Stage 2.
-- The initial bundle is 617.00 kB (162.69 kB transferred) since the design system of 2026-10-09 brought icons, so its warning budget moved from 500 kB to 625 kB on 2026-10-09; the error stays at 1 MB. About 105 kB of the growth is the Font Awesome Angular component and its SVG core: the same icons drawn as inline SVG measured 500.47 kB. The next screens may need Inbox or the shared controls loaded lazily.
+- The initial bundle is 617.00 kB (162.69 kB transferred) since the design system of 2026-10-09 brought icons, so its warning budget moved from 500 kB to 625 kB on 2026-10-09; the error stays at 1 MB. About 105 kB of the growth is the Font Awesome Angular component and its SVG core: an Icon component that drew the same icon definitions as inline SVG measured 104.57 kB less. The next screens may need Inbox or the shared controls loaded lazily.
 
 ## Piece 7: deployment and phone check
 
