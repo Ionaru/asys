@@ -443,8 +443,12 @@ describe('Now', () => {
       expect(first.reasonText).toContain('Due');
       expect(first.reasonText).toContain('important');
       expect(
-        must(topPick()).querySelector('asys-quadrant-chip')?.textContent?.trim().toLowerCase(),
-      ).toBe(first.reason.quadrant);
+        must(topPick())
+          .querySelector('asys-quadrant-chip')
+          ?.textContent?.replace(/\s+/g, ' ')
+          .trim()
+          .toLowerCase(),
+      ).toBe(`quadrant: ${first.reason.quadrant}`);
       expect(must(topPick()).querySelector('.asys-top-pick__estimate')?.textContent?.trim()).toBe(
         '30 min',
       );
@@ -652,11 +656,19 @@ describe('Now', () => {
         '1 min',
       );
       expect(
-        must(rows()[0]).querySelector('asys-quadrant-chip')?.textContent?.trim().toLowerCase(),
-      ).toBe(must(dentist).reason.quadrant);
+        must(rows()[0])
+          .querySelector('asys-quadrant-chip')
+          ?.textContent?.replace(/\s+/g, ' ')
+          .trim()
+          .toLowerCase(),
+      ).toBe(`quadrant: ${must(dentist).reason.quadrant}`);
       expect(
-        must(rows()[1]).querySelector('asys-quadrant-chip')?.textContent?.trim().toLowerCase(),
-      ).toBe(must(plants).reason.quadrant);
+        must(rows()[1])
+          .querySelector('asys-quadrant-chip')
+          ?.textContent?.replace(/\s+/g, ' ')
+          .trim()
+          .toLowerCase(),
+      ).toBe(`quadrant: ${must(plants).reason.quadrant}`);
       expect(must(dentist).reason.quadrant).not.toBe(must(plants).reason.quadrant);
     });
 

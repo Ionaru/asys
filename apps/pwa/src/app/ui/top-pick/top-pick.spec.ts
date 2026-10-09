@@ -77,7 +77,9 @@ describe('TopPick', () => {
 
     expect(q('.asys-top-pick__title')?.textContent?.trim()).toBe('Call Marit');
     expect(q('.asys-top-pick__reason')?.textContent?.trim()).toBe('Due today');
-    expect(q('.asys-top-pick__meta asys-quadrant-chip')?.textContent?.trim()).toBe('Plan');
+    expect(
+      q('.asys-top-pick__meta asys-quadrant-chip')?.textContent?.replace(/\s+/g, ' ').trim(),
+    ).toBe('Quadrant: Plan');
     expect(q('.asys-top-pick__estimate')?.textContent?.trim()).toBe('25 min');
   });
 

@@ -34,6 +34,7 @@ import { type DraftFields, followStore, settleSaved } from '../../core/data/draf
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { Ids } from '../../core/platform/ids';
 import { Button, ButtonSize, ButtonVariant } from '../../ui/button/button';
+import { FieldError } from '../../ui/field-error/field-error';
 import { LoadState } from '../../ui/load-state/load-state';
 import { SyncNote } from '../../ui/sync-note/sync-note';
 import { TextField } from '../../ui/text-field/text-field';
@@ -196,7 +197,7 @@ const buildAreaPatch = (baseline: AreaDraft, draft: AreaDraft): AreaPatch => {
 /** Edits an Area's name and its Active hours per weekday, or creates a new Area. */
 @Component({
   selector: 'asys-area-editor',
-  imports: [Button, LoadState, RouterLink, SyncNote, TextField],
+  imports: [Button, FieldError, LoadState, RouterLink, SyncNote, TextField],
   providers: [CommandAttempts],
   templateUrl: './area-editor.component.html',
   styleUrl: './area-editor.css',

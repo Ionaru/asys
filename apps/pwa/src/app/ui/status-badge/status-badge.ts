@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { Component, computed, input, ViewEncapsulation } from '@angular/core';
 
+import { Icon, IconName } from '../icon/icon';
+
 /** The status a badge shows. */
 export enum StatusBadgeStatus {
   Overdue = 'overdue',
@@ -22,10 +24,21 @@ const STATUS_WORDS: Record<StatusBadgeStatus, string> = {
   [StatusBadgeStatus.Queued]: 'Queued',
 };
 
+const STATUS_ICONS: Record<StatusBadgeStatus, IconName> = {
+  [StatusBadgeStatus.Overdue]: IconName.CircleExclamation,
+  [StatusBadgeStatus.Blocked]: IconName.Ban,
+  [StatusBadgeStatus.Delegated]: IconName.User,
+  [StatusBadgeStatus.Done]: IconName.Check,
+  [StatusBadgeStatus.Dropped]: IconName.Xmark,
+  [StatusBadgeStatus.Skipped]: IconName.Forward,
+  [StatusBadgeStatus.Queued]: IconName.CloudArrowUp,
+};
+
 /** A small badge naming the status of a Task or an item. */
 @Component({
   selector: 'asys-status-badge',
-  template: '{{ word() }}',
+  imports: [Icon],
+  template: '<asys-icon [name]="icon()" />{{ word() }}',
   encapsulation: ViewEncapsulation.None,
   host: {
     class: 'asys-badge',
@@ -37,67 +50,7 @@ const STATUS_WORDS: Record<StatusBadgeStatus, string> = {
     '[class.asys-badge--skipped]': 'status() === Statuses.Skipped',
     '[class.asys-badge--queued]': 'status() === Statuses.Queued',
   },
-  styles: `
-    .asys-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-1);
-      min-height: calc(var(--line-height-label) + var(--space-2));
-      padding: 0 var(--space-2);
-      border: 1px solid transparent;
-      border-radius: var(--radius-sm);
-      background: transparent;
-      color: var(--ink-muted);
-      white-space: nowrap;
-      font-family: var(--font-sans);
-      font-size: var(--font-size-label);
-      line-height: var(--line-height-label);
-      font-weight: 700;
-      letter-spacing: 0.02em;
-    }
-
-    .asys-badge--overdue {
-      background: var(--danger-soft);
-      color: var(--on-danger-soft);
-    }
-
-    .asys-badge--blocked {
-      background: var(--sunken);
-      border-color: var(--line-strong);
-      color: var(--ink-muted);
-    }
-
-    .asys-badge--delegated {
-      background: var(--signal-soft);
-      color: var(--on-signal-soft);
-    }
-
-    .asys-badge--done::before {
-      content: '';
-      width: 4px;
-      height: 8px;
-      margin: 0 0 2px 1px;
-      border: solid currentColor;
-      border-width: 0 2px 2px 0;
-      transform: rotate(45deg);
-    }
-
-    .asys-badge--dropped {
-      color: var(--ink-muted);
-      text-decoration: line-through;
-    }
-
-    .asys-badge--skipped {
-      color: var(--ink-muted);
-      font-style: italic;
-    }
-
-    .asys-badge--queued {
-      background: transparent;
-      border-color: var(--line-strong);
-      color: var(--ink-muted);
-    }
-  `,
+  styleUrl: './status-badge.css',
 })
 export class StatusBadge {
   protected readonly Statuses = StatusBadgeStatus;
@@ -105,4 +58,6 @@ export class StatusBadge {
   readonly status = input.required<StatusBadgeStatus>();
 
   protected readonly word = computed(() => STATUS_WORDS[this.status()]);
+
+  protected readonly icon = computed(() => STATUS_ICONS[this.status()]);
 }

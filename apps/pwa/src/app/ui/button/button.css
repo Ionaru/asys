@@ -1,0 +1,148 @@
+/* SPDX-License-Identifier: EUPL-1.2 */
+.asys-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--tap-target);
+  min-width: var(--tap-target);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: center;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-body-strong);
+  line-height: var(--line-height-body-strong);
+  font-weight: 600;
+  transition: opacity var(--duration-quick) var(--ease-out);
+}
+
+a.asys-button {
+  text-decoration: none;
+}
+
+.asys-button--primary {
+  background: var(--signal);
+  color: var(--on-signal);
+}
+
+.asys-button--secondary {
+  background: var(--surface);
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.asys-button--quiet {
+  background: transparent;
+  color: var(--signal);
+}
+
+.asys-button--danger {
+  background: var(--danger);
+  color: var(--on-danger);
+}
+
+/* Large is the one decision on a card. */
+.asys-button--large {
+  min-height: var(--tap-target-large);
+  padding: var(--space-2) var(--space-4);
+  font-weight: 700;
+}
+
+.asys-button--large .asys-icon {
+  font-size: 1.125em;
+}
+
+.asys-button--small {
+  position: relative;
+  min-height: 36px;
+  min-width: 36px;
+  gap: var(--space-1);
+  font-size: var(--font-size-label);
+  line-height: var(--line-height-label);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.asys-button--small::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+}
+
+/* Icon only is a square tap target holding one icon; the consumer gives it an aria-label. */
+.asys-button--icon {
+  padding: 0;
+  width: var(--tap-target);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--ink);
+}
+
+.asys-button--icon .asys-icon {
+  font-size: 1.25em;
+}
+
+.asys-button-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Fill shares the row in equal widths, never narrower than the words, and stacks when they no longer fit. */
+.asys-button-group--fill > .asys-button {
+  flex: 1 1 0;
+  min-width: min-content;
+  padding-inline: var(--space-2);
+  white-space: nowrap;
+}
+
+.asys-button--block {
+  display: flex;
+  width: 100%;
+}
+
+.asys-button--primary:active:not(:disabled):not(.is-disabled),
+.asys-button--danger:active:not(:disabled):not(.is-disabled) {
+  opacity: 0.85;
+}
+
+.asys-button--secondary:active:not(:disabled):not(.is-disabled),
+.asys-button--quiet:active:not(:disabled):not(.is-disabled),
+.asys-button--icon:active:not(:disabled):not(.is-disabled) {
+  background: var(--signal-soft);
+  color: var(--on-signal-soft);
+}
+
+.asys-button:disabled,
+.asys-button.is-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+[data-theme='drive'] .asys-button {
+  min-height: var(--tap-target-drive);
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
+  font-weight: 700;
+  letter-spacing: normal;
+  transition: none;
+}
+
+[data-theme='drive'] .asys-button--small,
+[data-theme='drive'] .asys-button--icon {
+  min-height: var(--tap-target-drive);
+  min-width: var(--tap-target-drive);
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
+  font-weight: 700;
+  letter-spacing: normal;
+}
+
+[data-theme='drive'] .asys-button--icon {
+  width: var(--tap-target-drive);
+}
