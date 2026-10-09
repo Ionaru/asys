@@ -20,6 +20,14 @@ asys-now-header {
   list-style: none;
 }
 
+.now__list--waiting {
+  margin: 0;
+}
+
+asys-section-header {
+  margin: var(--space-5) 0 0;
+}
+
 .now__text {
   margin: 0 0 var(--space-3);
   font-size: var(--font-size-body);

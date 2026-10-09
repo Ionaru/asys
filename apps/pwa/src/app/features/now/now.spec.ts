@@ -10,6 +10,7 @@ import {
   RejectedReason,
   TaskKind,
   TaskStatus,
+  waitingSummary,
   type ActiveHours,
   type Area,
   type Command,
@@ -99,6 +100,15 @@ const FLIGHTS = task({
   availableFrom: { date: '2026-10-10' },
   estimateMinutes: 10,
   createdAt: 4,
+});
+
+// Available from tomorrow 09:00 in the test zone, so Waiting reads "Next Available tomorrow 09:00".
+const VISA = task({
+  id: 'visa',
+  title: 'Collect the visa',
+  availableFrom: { date: '2026-10-05', time: '09:00' },
+  estimateMinutes: 15,
+  createdAt: 6,
 });
 
 // Overdue and blocked by the dentist call.
@@ -346,10 +356,28 @@ const setup = async (options: SetupOptions = {}) => {
     must(formInput()).dispatchEvent(new Event('input', { bubbles: true }));
     await settle();
   };
+  // The ranked list only: the Waiting list is also a `ul.now__list`, inside the section card.
+  const rankedList = (): HTMLElement | null =>
+    root().querySelector('ul.now__list:not(.now__list--waiting)');
   const rows = (): HTMLAnchorElement[] =>
-    Array.from(root().querySelectorAll<HTMLAnchorElement>('ul.now__list a.asys-picker-row'));
+    Array.from(
+      root().querySelectorAll<HTMLAnchorElement>(
+        'ul.now__list:not(.now__list--waiting) a.asys-picker-row',
+      ),
+    );
+  const waitingSection = (): HTMLElement | null =>
+    root().querySelector('asys-section-header section.asys-section');
   const waitingHeader = (): HTMLButtonElement | null =>
     root().querySelector('asys-section-header button');
+  const waitingBody = (): HTMLElement | null =>
+    root().querySelector('asys-section-header .asys-section__body');
+  const waitingList = (): HTMLElement | null => root().querySelector('ul.now__list--waiting');
+  const waitingRows = (): HTMLAnchorElement[] =>
+    Array.from(
+      root().querySelectorAll<HTMLAnchorElement>('ul.now__list--waiting a.asys-picker-row'),
+    );
+  const waitingSummaryText = (): string | undefined =>
+    root().querySelector('asys-section-header .asys-section-header__summary')?.textContent?.trim();
 
   return {
     fixture,
@@ -385,8 +413,14 @@ const setup = async (options: SetupOptions = {}) => {
     formInput,
     formButton,
     typeIntoForm,
+    rankedList,
     rows,
+    waitingSection,
     waitingHeader,
+    waitingBody,
+    waitingList,
+    waitingRows,
+    waitingSummaryText,
   };
 };
 
@@ -820,13 +854,13 @@ describe('Now', () => {
 
   describe('with nothing ranked', () => {
     it('says Nothing to do right now. and has no top pick, no list and no Triage line', async () => {
-      const { root, topPick } = await setup({ state: domainState([]) });
+      const { root, topPick, rankedList } = await setup({ state: domainState([]) });
 
       expect(root().querySelector('p.now__text')?.textContent?.trim()).toBe(
         'Nothing to do right now.',
       );
       expect(topPick()).toBeNull();
-      expect(root().querySelector('ul.now__list')).toBeNull();
+      expect(rankedList()).toBeNull();
       expect(root().querySelector('a[href="/inbox"]')).toBeNull();
     });
 
@@ -894,9 +928,11 @@ describe('Now', () => {
       ).toEqual(['Call the dentist', 'Water the plants']);
     });
 
-    it('show the reason from the domain, the estimate and the quadrant chip', async () => {
+    it('show the reason from the domain, the estimate and a compact quadrant chip in the reason', async () => {
       const { rows, now } = await setup();
       const [dentist, plants] = now().ranked.slice(1);
+      const chipOf = (row: HTMLAnchorElement | undefined): Element | null | undefined =>
+        row?.querySelector('.asys-picker-row__reason asys-quadrant-chip');
 
       expect(
         must(rows()[0]).querySelector('.asys-picker-row__reason-text')?.textContent?.trim(),
@@ -910,21 +946,19 @@ describe('Now', () => {
       expect(must(rows()[1]).querySelector('.asys-picker-row__estimate')?.textContent?.trim()).toBe(
         '1 min',
       );
-      expect(
-        must(rows()[0])
-          .querySelector('asys-quadrant-chip')
-          ?.textContent?.replace(/\s+/g, ' ')
-          .trim()
-          .toLowerCase(),
-      ).toBe(`quadrant: ${must(dentist).reason.quadrant}`);
-      expect(
-        must(rows()[1])
-          .querySelector('asys-quadrant-chip')
-          ?.textContent?.replace(/\s+/g, ' ')
-          .trim()
-          .toLowerCase(),
-      ).toBe(`quadrant: ${must(plants).reason.quadrant}`);
+      expect(chipOf(rows()[0])?.textContent?.replace(/\s+/g, ' ').trim().toLowerCase()).toBe(
+        `quadrant: ${must(dentist).reason.quadrant}.`,
+      );
+      expect(chipOf(rows()[1])?.textContent?.replace(/\s+/g, ' ').trim().toLowerCase()).toBe(
+        `quadrant: ${must(plants).reason.quadrant}.`,
+      );
       expect(must(dentist).reason.quadrant).not.toBe(must(plants).reason.quadrant);
+      expect(rows().every((a) => chipOf(a)?.classList.contains('asys-quadrant--compact'))).toBe(
+        true,
+      );
+      expect(
+        rows().some((a) => a.querySelector('.asys-picker-row__side asys-quadrant-chip') !== null),
+      ).toBe(false);
     });
 
     it('show an Overdue badge only for overdue Tasks', async () => {
@@ -943,9 +977,20 @@ describe('Now', () => {
     });
 
     it('are absent when only the top pick is ranked', async () => {
-      const { root } = await setup({ state: domainState([INVOICE]) });
+      const { rankedList } = await setup({ state: domainState([INVOICE]) });
 
-      expect(root().querySelector('ul.now__list')).toBeNull();
+      expect(rankedList()).toBeNull();
+    });
+
+    it('stay absent when only the top pick is ranked, although Tasks wait', async () => {
+      const { rankedList, waitingList, waitingHeader, click } = await setup({
+        state: domainState([INVOICE, FLIGHTS]),
+      });
+
+      await click(must(waitingHeader()));
+
+      expect(rankedList()).toBeNull();
+      expect(waitingList()).not.toBeNull();
     });
 
     it('follow the clock: a Task becoming overdue moves up', async () => {
@@ -972,77 +1017,135 @@ describe('Now', () => {
 
   describe('Waiting', () => {
     it('has no section when nothing waits', async () => {
-      const { root, waitingHeader } = await setup({ state: domainState([INVOICE]) });
+      const { root, waitingHeader, waitingSection } = await setup({
+        state: domainState([INVOICE]),
+      });
 
       expect(waitingHeader()).toBeNull();
+      expect(waitingSection()).toBeNull();
       expect(root().querySelector('asys-section-header')).toBeNull();
     });
 
-    it('shows a collapsed header with the count', async () => {
-      const { waitingHeader, rows, text } = await setup();
+    it('shows a collapsed section card with the hourglass, the title and the count', async () => {
+      const { waitingSection, waitingHeader, waitingBody, waitingList, waitingRows, text } =
+        await setup();
+      const header = must(waitingHeader());
+      const title = must(header.querySelector('.asys-section-header__title'));
 
+      expect(must(waitingSection()).getAttribute('aria-label')).toBe('Waiting');
       expect(
-        must(waitingHeader()).querySelector('.asys-section-header__title')?.textContent?.trim(),
-      ).toBe('Waiting');
-      expect(
-        must(waitingHeader()).querySelector('.asys-section-header__count')?.textContent?.trim(),
-      ).toBe('2');
-      expect(must(waitingHeader()).getAttribute('aria-expanded')).toBe('false');
+        header
+          .querySelector('.asys-section-header__icon svg[data-icon]')
+          ?.getAttribute('data-icon'),
+      ).toBe('hourglass-half');
+      expect(text(title)).toMatch(/^Waiting\s*2$/);
+      expect(title.querySelector('.asys-section-header__count')?.textContent?.trim()).toBe('2');
+      expect(header.getAttribute('aria-expanded')).toBe('false');
+      expect(header.getAttribute('aria-controls')).toBe(must(waitingBody()).id);
+      expect(must(waitingBody()).hidden).toBe(true);
+      expect(waitingList()).toBeNull();
+      expect(waitingRows()).toEqual([]);
       expect(text()).not.toContain('Book flights');
       expect(text()).not.toContain('Send the report');
-      expect(rows().map((a) => a.getAttribute('href'))).not.toContain('/tasks/flights');
     });
 
-    it('lists the Tasks that wait with their reason and estimate when expanded', async () => {
-      const { waitingHeader, click, rows, now } = await setup();
+    it('puts the Waiting list inside the section body once expanded', async () => {
+      const { waitingSection, waitingHeader, waitingBody, waitingList, waitingRows, rows, click } =
+        await setup();
 
       await click(must(waitingHeader()));
 
+      const body = must(waitingBody());
+      const list = must(waitingList());
+
       expect(must(waitingHeader()).getAttribute('aria-expanded')).toBe('true');
+      expect(body.hidden).toBe(false);
+      expect(body.closest('section.asys-section')).toBe(waitingSection());
+      expect(list.classList.contains('now__list')).toBe(true);
+      expect(list.classList.contains('now__list--waiting')).toBe(true);
+      expect(list.closest('.asys-section__body')).toBe(body);
+      expect(waitingRows()).toHaveLength(2);
+      expect(waitingRows().every((a) => body.contains(a))).toBe(true);
+      expect(rows().some((a) => body.contains(a))).toBe(false);
+    });
 
-      const waitingRows = rows().filter((a) => a.classList.contains('asys-picker-row--waiting'));
-      const [flights, report] = now().waiting;
+    it('keeps the Waiting rows out of the ranked rows, and the ranked rows out of the card', async () => {
+      const { root, waitingHeader, waitingSection, waitingRows, rows, click } = await setup();
 
-      expect(waitingRows.map((a) => a.getAttribute('href'))).toEqual([
+      await click(must(waitingHeader()));
+
+      expect(rows().map((a) => a.getAttribute('href'))).toEqual([
+        '/tasks/dentist',
+        '/tasks/plants',
+      ]);
+      expect(waitingRows().map((a) => a.getAttribute('href'))).toEqual([
         '/tasks/flights',
         '/tasks/report',
       ]);
       expect(
-        waitingRows.map((a) => a.querySelector('.asys-picker-row__title')?.textContent?.trim()),
+        must(root().querySelector('ul.now__list:not(.now__list--waiting)')).closest(
+          'asys-section-header',
+        ),
+      ).toBeNull();
+      expect(rows().some((a) => must(waitingSection()).contains(a))).toBe(false);
+    });
+
+    it('lists the Tasks that wait with their reason and estimate when expanded', async () => {
+      const { waitingHeader, click, waitingRows, now } = await setup();
+
+      await click(must(waitingHeader()));
+
+      const rows = waitingRows();
+      const [flights, report] = now().waiting;
+
+      expect(rows.every((a) => a.classList.contains('asys-picker-row--waiting'))).toBe(true);
+      expect(rows.map((a) => a.getAttribute('href'))).toEqual(['/tasks/flights', '/tasks/report']);
+      expect(
+        rows.map((a) => a.querySelector('.asys-picker-row__title')?.textContent?.trim()),
       ).toEqual(['Book flights', 'Send the report']);
       expect(
-        must(waitingRows[0]).querySelector('.asys-picker-row__reason-text')?.textContent?.trim(),
+        must(rows[0]).querySelector('.asys-picker-row__reason-text')?.textContent?.trim(),
       ).toBe(must(flights).reasonText);
       expect(must(flights).reasonText).toContain('Available from');
       expect(
-        must(waitingRows[1]).querySelector('.asys-picker-row__reason-text')?.textContent?.trim(),
+        must(rows[1]).querySelector('.asys-picker-row__reason-text')?.textContent?.trim(),
       ).toBe(must(report).reasonText);
       expect(must(report).reasonText).toContain('Blocked by Call the dentist');
       expect(
-        waitingRows.map((a) => a.querySelector('.asys-picker-row__estimate')?.textContent?.trim()),
+        rows.map((a) => a.querySelector('.asys-picker-row__estimate')?.textContent?.trim()),
       ).toEqual(['10 min', '45 min']);
     });
 
     it('shows no quadrant chip and an Overdue badge only for overdue Tasks', async () => {
-      const { waitingHeader, click, rows } = await setup();
+      const { waitingHeader, click, waitingRows } = await setup();
 
       await click(must(waitingHeader()));
 
-      const waitingRows = rows().filter((a) => a.classList.contains('asys-picker-row--waiting'));
+      const rows = waitingRows();
+      const reasonKinds = (row: HTMLAnchorElement | undefined): string[] =>
+        Array.from(must(row).querySelector('.asys-picker-row__reason')?.children ?? [], (c) =>
+          c.tagName === 'ASYS-STATUS-BADGE' ? 'badge' : 'text',
+        );
 
-      expect(waitingRows).toHaveLength(2);
-      expect(waitingRows.every((a) => a.querySelector('asys-quadrant-chip') === null)).toBe(true);
+      expect(rows).toHaveLength(2);
+      expect(rows.every((a) => a.querySelector('asys-quadrant-chip') === null)).toBe(true);
       expect(
-        waitingRows.map((a) => a.querySelector('asys-status-badge')?.textContent?.trim() ?? null),
+        rows.map((a) => a.querySelector('asys-status-badge')?.textContent?.trim() ?? null),
       ).toEqual([null, 'Overdue']);
+      expect(reasonKinds(rows[0])).toEqual(['text']);
+      expect(reasonKinds(rows[1])).toEqual(['badge', 'text']);
     });
 
     it('collapses again', async () => {
-      const { waitingHeader, click, text } = await setup();
+      const { waitingHeader, waitingBody, waitingList, waitingRows, click, text } = await setup();
 
       await click(must(waitingHeader()));
       await click(must(waitingHeader()));
 
+      expect(must(waitingHeader()).getAttribute('aria-expanded')).toBe('false');
+      expect(must(waitingBody()).hidden).toBe(true);
+      expect(waitingList()).toBeNull();
+      expect(waitingRows()).toEqual([]);
       expect(text()).not.toContain('Book flights');
     });
 
@@ -1051,6 +1154,82 @@ describe('Now', () => {
 
       expect(waitingHeader()).not.toBeNull();
       expect(text()).toContain('Nothing to do right now.');
+    });
+
+    describe('the summary', () => {
+      it('reads the next Available from beside the title, collapsed and expanded', async () => {
+        const { waitingHeader, waitingSummaryText, click, now } = await setup();
+        const summary = (): Element | null | undefined =>
+          waitingHeader()?.querySelector('.asys-section-header__summary');
+
+        expect(waitingSummaryText()).toBe('Next Available Sat 10 Oct');
+        expect(waitingSummaryText()).toBe(waitingSummary(now().waiting, T0, ZONE));
+        expect(summary()?.parentElement?.classList.contains('asys-section-header__text')).toBe(
+          true,
+        );
+
+        await click(must(waitingHeader()));
+
+        expect(must(waitingHeader()).getAttribute('aria-expanded')).toBe('true');
+        expect(waitingSummaryText()).toBe('Next Available Sat 10 Oct');
+      });
+
+      it('reads Next Available tomorrow 09:00 for a Task Available from tomorrow 09:00', async () => {
+        const { waitingHeader, waitingSummaryText, waitingRows, click, now } = await setup({
+          state: domainState([DENTIST, VISA]),
+        });
+
+        expect(now().waiting.map((w) => w.task.id)).toEqual(['visa']);
+        expect(waitingSummaryText()).toBe('Next Available tomorrow 09:00');
+
+        await click(must(waitingHeader()));
+
+        expect(
+          must(waitingRows()[0])
+            .querySelector('.asys-picker-row__reason-text')
+            ?.textContent?.trim(),
+        ).toBe('Available from tomorrow 09:00');
+      });
+
+      it('follows the clock and the time zone of the Settings, and goes with the section', async () => {
+        const { clockNow, waitingSection, waitingSummaryText, settle } = await setup({
+          state: domainState([DENTIST, VISA]),
+        });
+
+        expect(waitingSummaryText()).toBe('Next Available tomorrow 09:00');
+
+        // Monday 5 October, 01:30 in Amsterdam, but still Sunday in UTC.
+        clockNow.set(Date.parse('2026-10-04T23:30:00.000Z') as Instant);
+        await settle();
+
+        expect(waitingSummaryText()).toBe('Next Available today 09:00');
+
+        // 09:30 in Amsterdam: the Task is Available and no longer waits.
+        clockNow.set(Date.parse('2026-10-05T07:30:00.000Z') as Instant);
+        await settle();
+
+        expect(waitingSection()).toBeNull();
+        expect(waitingSummaryText()).toBeUndefined();
+      });
+
+      it('shows no summary for a Waiting list that is only Blocked', async () => {
+        const { waitingHeader, waitingSummaryText, now } = await setup({
+          state: domainState([DENTIST, REPORT], {
+            links: [{ id: 'l1', taskId: 'report', blockerId: 'dentist' }],
+          }),
+        });
+        const text = must(waitingHeader()).querySelector('.asys-section-header__text');
+
+        expect(now().waiting.map((w) => w.task.id)).toEqual(['report']);
+        expect(waitingSummaryText()).toBeUndefined();
+        expect(must(waitingHeader()).querySelector('.asys-section-header__summary')).toBeNull();
+        expect(Array.from(must(text).children, (c) => c.className)).toEqual([
+          'asys-section-header__title',
+        ]);
+        expect(
+          must(waitingHeader()).querySelector('.asys-section-header__count')?.textContent?.trim(),
+        ).toBe('1');
+      });
     });
   });
 
@@ -1900,8 +2079,6 @@ describe('Now', () => {
   describe('the task title hooks', () => {
     const titleIdOf = (row: Element): string | null | undefined =>
       row.querySelector('.asys-picker-row__title')?.getAttribute('data-task-id');
-    const waitingRows = (rows: () => HTMLAnchorElement[]): HTMLAnchorElement[] =>
-      rows().filter((a) => a.classList.contains('asys-picker-row--waiting'));
     const marked = (root: () => HTMLElement): Element[] =>
       Array.from(root().querySelectorAll('[data-morph]'));
 
@@ -1919,14 +2096,15 @@ describe('Now', () => {
     });
 
     it('gives each Waiting row title its own Task id once Waiting is expanded', async () => {
-      const { root, waitingHeader, click, rows } = await setup();
+      const { root, waitingHeader, click, rows, waitingRows } = await setup();
 
       expect(root().querySelector('[data-task-id="flights"]')).toBeNull();
       expect(root().querySelector('[data-task-id="report"]')).toBeNull();
 
       await click(must(waitingHeader()));
 
-      expect(waitingRows(rows).map(titleIdOf)).toEqual(['flights', 'report']);
+      expect(waitingRows().map(titleIdOf)).toEqual(['flights', 'report']);
+      expect(rows().map(titleIdOf)).toEqual(['dentist', 'plants']);
     });
 
     it('marks only the second ranked row title while TaskMorph holds its id', async () => {
@@ -1992,7 +2170,7 @@ describe('Now', () => {
     });
 
     it('marks only a Waiting row title while TaskMorph holds its id', async () => {
-      const { root, waitingHeader, click, rows, settle } = await setup();
+      const { root, waitingHeader, click, waitingRows, settle } = await setup();
 
       await click(must(waitingHeader()));
       TestBed.inject(TaskMorph).set('report');
@@ -2001,7 +2179,7 @@ describe('Now', () => {
       const elements = marked(root);
 
       expect(elements).toHaveLength(1);
-      expect(elements[0]).toBe(must(waitingRows(rows)[1]).querySelector('.asys-picker-row__title'));
+      expect(elements[0]).toBe(must(waitingRows()[1]).querySelector('.asys-picker-row__title'));
       expect(elements[0]?.getAttribute('data-task-id')).toBe('report');
     });
   });
