@@ -9,6 +9,7 @@ import { safeReturnUrl } from '../../core/auth/safe-return-url';
 import { Session } from '../../core/auth/session';
 import { GENERIC_MESSAGE } from '../../core/data/outcome-message';
 import { Button, ButtonVariant } from '../../ui/button/button';
+import { IconName } from '../../ui/icon/icon';
 import { ceremonyOptions } from '../auth/ceremony-options';
 import { MISCONFIGURED_MESSAGE, TRY_AGAIN_MESSAGE } from '../auth/passkey-messages';
 
@@ -52,6 +53,8 @@ export class SignIn {
   private readonly router = inject(Router);
 
   protected readonly Variant = ButtonVariant;
+
+  protected readonly Icons = IconName;
 
   readonly returnUrl = input<string | undefined>();
 

@@ -13,6 +13,10 @@
   margin-bottom: var(--space-3);
 }
 
+.asys-quickadd__failure-text .asys-icon svg {
+  margin-inline-end: var(--space-1);
+}
+
 .asys-quickadd__failure-text {
   margin: 0;
   color: var(--ink);

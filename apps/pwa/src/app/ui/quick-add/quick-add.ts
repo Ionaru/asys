@@ -13,6 +13,7 @@ import {
 } from '@angular/core';
 
 import { Button, ButtonSize, ButtonVariant } from '../button/button';
+import { Icon, IconName } from '../icon/icon';
 
 /** A capture that was not sent, shown above the input. */
 export interface QuickAddFailure {
@@ -25,7 +26,7 @@ export interface QuickAddFailure {
 /** The quick-add bar that captures a Task into the Inbox. */
 @Component({
   selector: 'asys-quick-add',
-  imports: [Button],
+  imports: [Button, Icon],
   encapsulation: ViewEncapsulation.None,
   templateUrl: './quick-add.component.html',
   styleUrl: './quick-add.css',
@@ -40,6 +41,8 @@ export class QuickAdd {
   protected readonly Variants = ButtonVariant;
 
   protected readonly Sizes = ButtonSize;
+
+  protected readonly Icons = IconName;
 
   protected readonly inputId = `asys-quickadd-${QuickAdd.nextId++}-input`;
 
