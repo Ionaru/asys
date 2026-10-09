@@ -109,13 +109,15 @@ test('Done on the TopPick shows the next Task with no gap', async ({ page }) => 
 
   await topPick.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(topPick.locator('.asys-top-pick__title')).toHaveText('Plan the year');
-  await expect(page.locator('.shell__status')).toHaveText('“Renew the permit” is Done.');
+  await expect(page.locator('.shell__status')).toHaveText(
+    '“Renew the permit” is Done. Undo is available for 5 seconds.',
+  );
 
   const watch = await page.evaluate(() => window.__nowWatch);
   expect(watch).toEqual({ articleGone: false, emptyOrLoading: false });
 });
 
-const undoBar = (page: Page): Locator => page.locator('.asys-undobar');
+const undoBar = (page: Page): Locator => page.locator('.asys-undo');
 
 const doneOnTopPick = (page: Page): Locator =>
   page.locator('article.asys-top-pick').getByRole('button', { name: 'Done', exact: true });
@@ -241,8 +243,13 @@ test('Enter on Done moves focus to Undo, and Escape to the next title', async ({
   await expect(topPick.locator('.asys-top-pick__title')).toHaveText('Plan the year');
 
   // Now moves focus after the card exit, so Undo must still hold it once every animation has ended. Otherwise
-  // Escape would be pressed outside the bar and the focused title would not come from Escape at all.
-  await expect.poll(() => page.evaluate(() => document.getAnimations().length)).toBe(0);
+  // Escape would be pressed outside the bar and the focused title would not come from Escape at all. The Undo
+  // ring's fill stays paused while Undo holds focus, so only running animations count.
+  await expect
+    .poll(() =>
+      page.evaluate(() => document.getAnimations().filter((a) => a.playState === 'running').length),
+    )
+    .toBe(0);
   await expect(undo).toBeFocused();
 
   await page.keyboard.press('Escape');

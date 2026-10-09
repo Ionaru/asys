@@ -25,6 +25,7 @@ import { GENERIC_MESSAGE } from '../../core/data/outcome-message';
 import { AppUpdate } from '../../core/platform/app-update';
 import { DeviceZone } from '../../core/platform/device-zone';
 import { Button, ButtonVariant } from '../../ui/button/button';
+import { IconName } from '../../ui/icon/icon';
 import { TextField } from '../../ui/text-field/text-field';
 import { ceremonyOptions } from '../auth/ceremony-options';
 import { nameError } from '../auth/name-rule';
@@ -81,6 +82,8 @@ export class SignUp {
   readonly #destroyRef = inject(DestroyRef);
 
   protected readonly Variant = ButtonVariant;
+
+  protected readonly Icons = IconName;
 
   protected readonly Step = SignUpStep;
 

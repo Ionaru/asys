@@ -57,6 +57,14 @@ describe('LoadState', () => {
     expect(buttons()[0].classList.contains('asys-button--quiet')).toBe(true);
   });
 
+  it('draws the rotate-right icon before the Try again label', async () => {
+    const { buttons } = await setup(true);
+    const icon = buttons()[0].querySelector('svg[data-icon="rotate-right"]');
+
+    expect(icon).not.toBeNull();
+    expect(buttons()[0].firstElementChild).toBe(icon?.closest('asys-icon'));
+  });
+
   it('emits nothing on retry before a click', async () => {
     const { host } = await setup(true);
 

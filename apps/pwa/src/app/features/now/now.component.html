@@ -81,30 +81,33 @@
   }
   @if (now.waiting.length > 0) {
     <asys-section-header
+      [icon]="Icons.HourglassHalf"
       [title]="'Waiting'"
       [count]="now.waiting.length"
+      [summary]="waitingLine()"
       [(expanded)]="waitingExpanded"
-    />
-    @if (waitingExpanded()) {
-      <ul class="now__list">
-        @for (item of now.waiting; track item.task.id) {
-          <li>
-            <a
-              asys-picker-row
-              [routerLink]="['/tasks', item.task.id]"
-              [reason]="item.reasonText"
-              [estimate]="estimateText(item.task)"
-              [taskId]="item.task.id"
-              [morph]="morphId() === item.task.id"
-              [overdue]="overdue(item.task)"
-              [variant]="Rows.Waiting"
-            >
-              {{ item.task.title }}
-            </a>
-          </li>
-        }
-      </ul>
-    }
+    >
+      @if (waitingExpanded()) {
+        <ul class="now__list now__list--waiting">
+          @for (item of now.waiting; track item.task.id) {
+            <li>
+              <a
+                asys-picker-row
+                [routerLink]="['/tasks', item.task.id]"
+                [reason]="item.reasonText"
+                [estimate]="estimateText(item.task)"
+                [taskId]="item.task.id"
+                [morph]="morphId() === item.task.id"
+                [overdue]="overdue(item.task)"
+                [variant]="Rows.Waiting"
+              >
+                {{ item.task.title }}
+              </a>
+            </li>
+          }
+        </ul>
+      }
+    </asys-section-header>
   }
 } @else {
   <asys-load-state [failed]="dataStore.status() === Status.Failed" (retry)="dataStore.refresh()" />

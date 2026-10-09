@@ -2,6 +2,7 @@
 import { Component, input, output, ViewEncapsulation } from '@angular/core';
 
 import { Button, ButtonVariant } from '../button/button';
+import { IconName } from '../icon/icon';
 
 /** The "Loading…" line of a screen, or its could-not-load alert with a retry button. */
 @Component({
@@ -10,7 +11,13 @@ import { Button, ButtonVariant } from '../button/button';
   template: `
     @if (failed()) {
       <p role="alert">ASYS could not load your Tasks.</p>
-      <button asys-button type="button" [variant]="Variant.Quiet" (click)="retry.emit()">
+      <button
+        asys-button
+        type="button"
+        [variant]="Variant.Quiet"
+        [icon]="Icons.RotateRight"
+        (click)="retry.emit()"
+      >
         Try again
       </button>
     } @else {
@@ -31,4 +38,6 @@ export class LoadState {
   readonly retry = output<void>();
 
   protected readonly Variant = ButtonVariant;
+
+  protected readonly Icons = IconName;
 }

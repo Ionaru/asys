@@ -56,8 +56,15 @@ const scrollToBottom = async (page: Page): Promise<void> => {
 };
 
 const expectClearOf = async (target: Locator, covers: readonly Locator[]): Promise<void> => {
-  // Boxes mid-animation say nothing about where the elements settle.
-  await expect.poll(() => target.page().evaluate(() => document.getAnimations().length)).toBe(0);
+  // Boxes mid-animation say nothing about where the elements settle. The Undo ring's fill, paused while the
+  // bar holds focus or the pointer, is a clock rather than motion, so only running animations count.
+  await expect
+    .poll(() =>
+      target
+        .page()
+        .evaluate(() => document.getAnimations().filter((a) => a.playState === 'running').length),
+    )
+    .toBe(0);
   const box = await target.boundingBox();
   if (box === null) throw new Error('target has no box');
   for (const cover of covers) {
@@ -147,7 +154,7 @@ test('Nothing covers the last Now row, with the pill or the open quick add', asy
     .getByRole('button', { name: 'Done', exact: true });
   await done.focus();
   await done.press('Enter');
-  const undoBar = page.locator('.asys-undobar');
+  const undoBar = page.locator('.asys-undo');
   await expect(undoBar.getByRole('button', { name: 'Undo' })).toBeFocused();
   await scrollToBottom(page);
   await expectClearOf(lastRow, [undoBar, pill, nav]);
