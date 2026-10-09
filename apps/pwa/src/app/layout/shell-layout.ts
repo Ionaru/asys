@@ -14,7 +14,7 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { Router, RouterLink, RouterOutlet } from '@angular/router';
+import { Router, RouterOutlet } from '@angular/router';
 
 import { CaptureQueue } from '../core/data/capture-queue';
 import { CommandAttempts } from '../core/data/command-attempts';
@@ -24,17 +24,16 @@ import { Motion } from '../core/platform/motion';
 import { TAB_PATHS } from '../core/platform/tabs';
 import { pathOf } from '../core/platform/url-path';
 import { BottomNav } from '../ui/bottom-nav/bottom-nav';
-import { Button, ButtonSize, ButtonVariant } from '../ui/button/button';
 import { CaptureButton } from '../ui/capture-button/capture-button';
 import { QuickAdd } from '../ui/quick-add/quick-add';
 import { UndoBar, UndoBarVariant } from '../ui/undo-bar/undo-bar';
 import { flyCapture, tabInView } from './capture-flight';
 import { leaveMarked } from './shell-motion';
 
-/** The signed-in frame: a Settings link, the routed screen, quick add and the bottom navigation. */
+/** The signed-in frame: the routed screen, quick add, the Undo bar and the bottom navigation. */
 @Component({
   selector: 'app-shell-layout',
-  imports: [RouterOutlet, RouterLink, Button, BottomNav, CaptureButton, QuickAdd, UndoBar],
+  imports: [RouterOutlet, BottomNav, CaptureButton, QuickAdd, UndoBar],
   providers: [CommandAttempts, CaptureQueue, DoneUndo],
   templateUrl: './shell-layout.component.html',
   styleUrl: './shell-layout.css',
@@ -67,10 +66,6 @@ export class ShellLayout {
   protected readonly doneUndo = inject(DoneUndo);
 
   protected readonly PauseReason = PauseReason;
-
-  protected readonly Variant = ButtonVariant;
-
-  protected readonly Size = ButtonSize;
 
   protected readonly onCapturePath = computed(() => {
     const navigation = this.#router.lastSuccessfulNavigation();

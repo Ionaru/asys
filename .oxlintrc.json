@@ -40,7 +40,8 @@
               "effect/*",
               "drizzle-orm",
               "drizzle-orm/*",
-              "@angular/*"
+              "@angular/*",
+              "@fortawesome/*"
             ]
           },
           {
@@ -51,7 +52,8 @@
               "drizzle-orm/*",
               "@effect/sql-pg",
               "@effect/platform-node*",
-              "@angular/*"
+              "@angular/*",
+              "@fortawesome/*"
             ]
           },
           {
@@ -62,7 +64,8 @@
               "drizzle-orm/*",
               "@effect/sql-pg",
               "@effect/platform-node*",
-              "@angular/*"
+              "@angular/*",
+              "@fortawesome/*"
             ]
           },
           {

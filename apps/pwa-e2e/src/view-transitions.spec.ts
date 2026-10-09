@@ -170,13 +170,13 @@ test('opens the top pick with Push and moves its title, then goes back with Pop'
   await expect(topPick.locator('.asys-top-pick__title')).toHaveText('Send the report');
 
   let before = await recordCount(page);
-  await topPick.getByRole('button', { name: 'Open' }).click();
+  await topPick.locator('a.asys-top-pick__link').click();
   await expect(page.locator('h1.task-editor__title')).toBeVisible();
   const push = await lastSettled(page, before);
 
   expect(push.kind).toBe('push');
   expect(withName(push.oldNames, 'task-title')).toEqual([
-    { name: 'task-title', tag: 'h2', classes: 'asys-top-pick__title' },
+    { name: 'task-title', tag: 'span', classes: 'asys-top-pick__title-text' },
   ]);
   expect(withName(push.newNames, 'task-title')).toEqual([
     { name: 'task-title', tag: 'h1', classes: 'task-editor__title' },
@@ -192,7 +192,7 @@ test('opens the top pick with Push and moves its title, then goes back with Pop'
     { name: 'task-title', tag: 'h1', classes: 'task-editor__title' },
   ]);
   expect(withName(pop.newNames, 'task-title')).toEqual([
-    { name: 'task-title', tag: 'h2', classes: 'asys-top-pick__title' },
+    { name: 'task-title', tag: 'span', classes: 'asys-top-pick__title-text' },
   ]);
 });
 
@@ -224,7 +224,7 @@ test("goes back from the editor's Done without a morph", async ({ page }) => {
 
   const topPick = page.locator('article.asys-top-pick');
   let before = await recordCount(page);
-  await topPick.getByRole('button', { name: 'Open' }).click();
+  await topPick.locator('a.asys-top-pick__link').click();
   await expect(page.locator('h1.task-editor__title')).toBeVisible();
   await lastSettled(page, before);
 
@@ -243,7 +243,7 @@ test("captures the Undo bar on the editor's Done Pop", async ({ page }) => {
   await page.reload();
 
   let before = await recordCount(page);
-  await page.locator('article.asys-top-pick').getByRole('button', { name: 'Open' }).click();
+  await page.locator('article.asys-top-pick a.asys-top-pick__link').click();
   await expect(page.locator('h1.task-editor__title')).toBeVisible();
   await lastSettled(page, before);
 
@@ -256,18 +256,17 @@ test("captures the Undo bar on the editor's Done Pop", async ({ page }) => {
   expect(withName(pop.newNames, 'shell-undo')).toHaveLength(1);
 });
 
-test("swaps from the editor to Settings with the browser's own cross-fade", async ({ page }) => {
-  await seedTask(page, { title: 'Send the report', important: false, estimateMinutes: 25 });
-  await page.reload();
+// Capture is a screen of its own at the tabs' level but not a tab, so leaving it for Now is a Swap.
+test("swaps from Capture to Now with the browser's own cross-fade", async ({ page }) => {
+  await page.goto('/capture');
+  await expect(page.getByRole('heading', { level: 1, name: 'Capture' })).toBeVisible();
 
-  let before = await recordCount(page);
-  await page.locator('article.asys-top-pick').getByRole('button', { name: 'Open' }).click();
-  await expect(page.locator('h1.task-editor__title')).toBeVisible();
-  await lastSettled(page, before);
-
-  before = await recordCount(page);
-  await page.getByRole('banner').getByRole('link', { name: 'Settings' }).click();
-  await expect(page).toHaveURL(/\/settings$/);
+  const before = await recordCount(page);
+  await page
+    .getByRole('navigation', { name: 'Primary' })
+    .getByRole('link', { name: 'Now', exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/now$/);
   const swap = await lastSettled(page, before);
 
   expect(swap.kind).toBe('swap');

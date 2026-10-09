@@ -16,7 +16,7 @@ description: Use when adding or changing an Angular component, screen, route, fo
 | `core/auth`, `core/data`, `core/platform` | session, `DataStore`, `CommandAttempts`, the shell-provided `DoneUndo` and `CaptureQueue`, seams (`Clock`, `Ids`, `DeviceStorage`, `Motion`, `Haptics`, `TaskMorph`, ...) | `core/*`, `@asys/domain`                 |
 | `features/<screen>`                       | routed screens plus their pure helpers                                                                                                                                    | `core`, `ui`, `@asys/domain`             |
 | `layout/`                                 | the shell: header, outlet, quick add, bottom nav                                                                                                                          | `core`, `ui`                             |
-| `ui/<name>/`                              | presentational components                                                                                                                                                 | `@angular/*`, `@asys/domain`, other `ui` |
+| `ui/<name>/`                              | presentational components; `ui/icon` alone imports Font Awesome                                                                                                           | `@angular/*`, `@asys/domain`, other `ui` |
 
 Lint bans runtime imports of `@asys/contract`, `effect` and `@ionaru/effect-passkeys/api` (type-only is fine). `@ionaru/effect-passkeys/server` and `/testing` are banned outright. `@ionaru/effect-passkeys/client` is the one passkeys entry the PWA may use at runtime.
 
@@ -39,6 +39,7 @@ Lint bans runtime imports of `@asys/contract`, `effect` and `@ionaru/effect-pass
   - View-transition CSS (names, the z-index ladder, keyframes) lives only in `src/styles.css`. The ladder is `page` auto, `task-title` 1, `shell-capture`, `shell-undo` and `shell-nav` 2, `nav-mark` 3. New fixed shell chrome gets a name and a rung, or the sliding page paints over it.
   - Put a style in `src/styles.css` only when several controls share it.
   - The shared enter classes there are `asys-rise` (a small rise and fade, for bars), `asys-appear` (a fade) and `asys-pop` (a badge pop), used with `animate.enter`. A node that leaves with motion uses the function form `(animate.leave)` with `leaveMarked` (`layout/shell-motion.ts`) or `collapseRow` (`features/now/row-motion.ts`), which set `data-leaving` first, so a view transition never sees the leaving node beside its replacement.
+- **Icons:** draw them with `<asys-icon [name]="IconName.X" />` (`ui/icon`), or a Button's `icon` input. `IconName` is the closed set of Font Awesome Pro Classic Regular names the design system's Icon table lists (Solid only for the current tab); add a name there, with its import, when a screen needs a new one. Icons are 1em tall and take the text colour, so size them with `font-size` in `em`, never px. Never import `@fortawesome/*` outside `ui/icon`, and never copy Pro SVG data into the repository.
 - **Accessibility:**
   - Errors read "Error:" with `aria-invalid` and `aria-describedby`, never colour alone.
   - Quadrants differ in lightness or form, never hue alone.

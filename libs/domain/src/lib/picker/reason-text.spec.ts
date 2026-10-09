@@ -2,9 +2,10 @@
 
 import { describe, expect, it } from 'vitest';
 import { aTask } from '../../test/builders';
+import type { Task } from '../task';
 import { Quadrant } from '../task/priority';
 import type { Reason } from './picker';
-import { reasonText } from './reason-text';
+import { reasonFact, reasonText } from './reason-text';
 
 const AMS = 'Europe/Amsterdam';
 
@@ -97,4 +98,100 @@ describe('reasonText ignores quadrant and urgent', () => {
       expect(reasonText(task, reason, NOW, AMS)).toBe('Latest start 14:30 · important');
     },
   );
+});
+
+describe('reasonFact', () => {
+  it('says Due with the day and time, without important', () => {
+    const task = aTask({ id: 't', important: true, due: { date: '2026-10-03', time: '17:00' } });
+    expect(reasonFact(task, reasonOf({ overdue: true }), NOW, AMS)).toBe('Due yesterday 17:00');
+  });
+
+  it('says Due with the day only for a date-only due', () => {
+    const task = aTask({ id: 't', important: false, due: { date: '2026-10-03' } });
+    expect(reasonFact(task, reasonOf({ overdue: true }), NOW, AMS)).toBe('Due yesterday');
+  });
+
+  it('says Due with the weekday and date for an older due', () => {
+    const task = aTask({ id: 't', important: false, due: { date: '2026-10-01', time: '08:00' } });
+    expect(reasonFact(task, reasonOf({ overdue: true }), NOW, AMS)).toBe('Due Thu 1 Oct 08:00');
+  });
+
+  it('prefers Due over the latest start', () => {
+    const task = aTask({ id: 't', important: true, due: { date: '2026-10-03', time: '17:00' } });
+    const reason = reasonOf({ overdue: true, latestStart: at('2026-10-04T12:30:00.000Z') });
+    expect(reasonFact(task, reason, NOW, AMS)).toBe('Due yesterday 17:00');
+  });
+
+  it('falls back to the latest start when an overdue Task has no due', () => {
+    const task = aTask({ id: 't', important: true, due: null });
+    const reason = reasonOf({ overdue: true, latestStart: at('2026-10-04T12:30:00.000Z') });
+    expect(reasonFact(task, reason, NOW, AMS)).toBe('Latest start 14:30');
+  });
+
+  it('says Latest start with the clock time for a Task that is not overdue', () => {
+    const task = aTask({ id: 't', important: true });
+    const reason = reasonOf({ latestStart: at('2026-10-04T12:30:00.000Z') });
+    expect(reasonFact(task, reason, NOW, AMS)).toBe('Latest start 14:30');
+  });
+
+  it('says Latest start with the weekday and date for a later day', () => {
+    const task = aTask({ id: 't', important: true });
+    const reason = reasonOf({ latestStart: at('2026-10-10T12:30:00.000Z') });
+    expect(reasonFact(task, reason, NOW, AMS)).toBe('Latest start Sat 10 Oct 14:30');
+  });
+
+  it('says No Due without a latest start', () => {
+    const task = aTask({ id: 't', important: true });
+    expect(reasonFact(task, reasonOf(), NOW, AMS)).toBe('No Due');
+  });
+
+  it('ignores a due when the Task is not overdue', () => {
+    const task = aTask({ id: 't', important: false, due: { date: '2026-10-10' } });
+    expect(reasonFact(task, reasonOf(), NOW, AMS)).toBe('No Due');
+  });
+});
+
+describe('reasonText is reasonFact plus important', () => {
+  const cases: readonly [string, Partial<Reason>, Partial<Task>][] = [
+    [
+      'an overdue Task with a due',
+      { overdue: true },
+      { due: { date: '2026-10-03', time: '17:00' } },
+    ],
+    [
+      'an overdue Task without a due',
+      { overdue: true, latestStart: at('2026-10-04T12:30:00.000Z') },
+      { due: null },
+    ],
+    ['a Task with a latest start', { latestStart: at('2026-10-10T12:30:00.000Z') }, {}],
+    ['a Task without a latest start', {}, {}],
+  ];
+
+  describe.each(cases)('for %s', (_name, reasonOverrides, taskOverrides) => {
+    const reason = reasonOf(reasonOverrides);
+
+    it('appends " · important" exactly when the Task is important', () => {
+      const task = aTask({ id: 't', ...taskOverrides, important: true });
+      expect(reasonText(task, reason, NOW, AMS)).toBe(
+        `${reasonFact(task, reason, NOW, AMS)} · important`,
+      );
+    });
+
+    it('adds nothing when the Task is not important', () => {
+      const task = aTask({ id: 't', ...taskOverrides, important: false });
+      expect(reasonText(task, reason, NOW, AMS)).toBe(reasonFact(task, reason, NOW, AMS));
+    });
+
+    it('adds nothing when importance is not set', () => {
+      const task = aTask({ id: 't', ...taskOverrides, important: null });
+      expect(reasonText(task, reason, NOW, AMS)).toBe(reasonFact(task, reason, NOW, AMS));
+    });
+  });
+
+  it('gives Due yesterday 17:00 and Due yesterday 17:00 · important for the same Task', () => {
+    const task = aTask({ id: 't', important: true, due: { date: '2026-10-03', time: '17:00' } });
+    const reason = reasonOf({ overdue: true });
+    expect(reasonFact(task, reason, NOW, AMS)).toBe('Due yesterday 17:00');
+    expect(reasonText(task, reason, NOW, AMS)).toBe('Due yesterday 17:00 · important');
+  });
 });

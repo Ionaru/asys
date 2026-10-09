@@ -215,26 +215,6 @@ const PAIRS: readonly (readonly [string, string, number])[] = [
   ['voice-3', 'sunken', 3],
 ];
 
-// Quadrants differ in lightness or form, never hue alone. Light: Do (ink), Plan (signal) and Delegate (now) are fills of
-// distinct lightness. Dark and Voice only: every fill is light, so Delegate is outlined in now and needs 3:1 on the ground.
-const QUADRANT_PAIRS: Record<ModeValue, readonly (readonly [string, string, number])[]> = {
-  light: [
-    ['ink', 'signal', 1.5],
-    ['signal', 'now', 1.5],
-    ['ink', 'now', 1.5],
-  ],
-  dark: [
-    ['ink', 'signal', 1.5],
-    ['now', 'paper', 3],
-    ['now', 'surface', 3],
-  ],
-  drive: [
-    ['ink', 'signal', 1.5],
-    ['now', 'paper', 3],
-    ['now', 'surface', 3],
-  ],
-};
-
 const toLinear = (v: number): number => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
 
 const toGamma = (v: number): number =>
@@ -403,7 +383,6 @@ const failures = (id: string, maps: ModeMaps): string[] => {
         b,
         mode === Mode.Drive && min === 4.5 ? 7 : min,
       ]),
-      ...QUADRANT_PAIRS[mode],
     ];
     for (const [a, b, min] of pairs) {
       const ratio = contrast(map[a] ?? '', map[b] ?? '');

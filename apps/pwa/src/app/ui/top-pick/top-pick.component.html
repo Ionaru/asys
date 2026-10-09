@@ -1,21 +1,38 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
 <article class="asys-top-pick">
-  <h2
-    class="asys-top-pick__title"
-    tabindex="-1"
-    [attr.data-task-id]="taskId()"
-    [attr.data-morph]="morph() ? '' : null"
-  >
-    {{ title() }}
-  </h2>
-  <p class="asys-top-pick__reason">{{ reason() }}</p>
-  <div class="asys-top-pick__meta">
-    @if (overdue()) {
+  @if (overdue()) {
+    <div class="asys-top-pick__flags">
       <asys-status-badge [status]="Statuses.Overdue" />
+    </div>
+  }
+  <h2 class="asys-top-pick__title">
+    <a class="asys-top-pick__link" [routerLink]="taskId() === null ? null : ['/tasks', taskId()]">
+      <span
+        class="asys-top-pick__title-text"
+        [attr.data-task-id]="taskId()"
+        [attr.data-morph]="morph() ? '' : null"
+        >{{ title() }}</span
+      >
+      <asys-icon [name]="Icons.ChevronRight" />
+    </a>
+  </h2>
+  <p class="asys-top-pick__reason">
+    @if (reasonParts(); as parts) {
+      <span class="asys-danger-text">{{ parts.fact }}</span
+      ><ng-container>{{ parts.rest }}</ng-container>
+    } @else {
+      <ng-container>{{ reason() }}</ng-container>
     }
-    <asys-quadrant-chip [quadrant]="quadrant()" />
-    <span class="asys-top-pick__estimate">{{ estimate() }}</span>
-  </div>
+  </p>
+  <ul class="asys-facts">
+    <li asys-fact [icon]="Icons.Stopwatch" label="Estimate:" [strong]="true">
+      <span class="asys-num">{{ estimate() }}</span>
+    </li>
+    @if (area() !== null) {
+      <li asys-fact [icon]="Icons.Folder" label="Area:">{{ area() }}</li>
+    }
+    <li asys-quadrant-chip [quadrant]="quadrant()"></li>
+  </ul>
   <div class="asys-top-pick__actions">
     @if (completed()) {
       <p class="asys-top-pick__done">
@@ -33,11 +50,13 @@
         Done
       </p>
     } @else {
-      <div class="asys-button-group">
+      <div class="asys-button-group asys-button-group--fill">
         <button
           asys-button
           type="button"
           [variant]="Variants.Primary"
+          [size]="Sizes.Large"
+          [icon]="Icons.Check"
           class="asys-top-pick__main-action"
           [disabled]="actionsDisabled()"
           (click)="done.emit({ keyboard: $event.detail === 0 })"
@@ -49,6 +68,8 @@
             asys-button
             type="button"
             [variant]="Variants.Secondary"
+            [size]="Sizes.Large"
+            [icon]="Icons.BarProgressHalf"
             class="asys-top-pick__secondary asys-top-pick__log-progress"
             [disabled]="actionsDisabled()"
             (click)="logProgress.emit()"
@@ -56,15 +77,6 @@
             Log progress
           </button>
         }
-        <button
-          asys-button
-          type="button"
-          [variant]="Variants.Quiet"
-          class="asys-top-pick__secondary"
-          (click)="open.emit()"
-        >
-          Open
-        </button>
       </div>
     }
   </div>

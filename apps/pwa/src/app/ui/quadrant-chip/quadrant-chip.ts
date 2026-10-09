@@ -9,10 +9,43 @@ const QUADRANT_WORDS: Record<Quadrant, string> = {
   [Quadrant.Drop]: 'Drop',
 };
 
-/** The Eisenhower quadrant of a Task, shown as a word on a chip. */
+/** The cells of the 2x2 glyph: Do top left, Plan top right, Delegate bottom left, Drop bottom right. */
+const GLYPH_CELLS: readonly {
+  readonly quadrant: Quadrant;
+  readonly x: number;
+  readonly y: number;
+}[] = [
+  { quadrant: Quadrant.Do, x: 0.75, y: 0.75 },
+  { quadrant: Quadrant.Plan, x: 9.25, y: 0.75 },
+  { quadrant: Quadrant.Delegate, x: 0.75, y: 9.25 },
+  { quadrant: Quadrant.Drop, x: 9.25, y: 9.25 },
+];
+
+/**
+ * The Eisenhower quadrant of a Task: a 2x2 glyph with the quadrant's cell filled, then its word. Compact
+ * shows the glyph alone and keeps the word for screen readers.
+ */
 @Component({
-  selector: 'asys-quadrant-chip',
-  template: '{{ word() }}',
+  selector: 'asys-quadrant-chip, li[asys-quadrant-chip]',
+  template: `
+    <svg class="asys-quadrant__glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      @for (cell of cells; track cell.quadrant) {
+        <rect
+          width="6"
+          height="6"
+          rx="1.5"
+          [attr.x]="cell.x"
+          [attr.y]="cell.y"
+          [attr.fill-opacity]="cell.quadrant === quadrant() ? null : 0.35"
+        />
+      }
+    </svg>
+    @if (compact()) {
+      <span class="asys-visually-hidden">Quadrant: {{ word() }}.</span>
+    } @else {
+      <span class="asys-visually-hidden">Quadrant: </span>{{ word() }}
+    }
+  `,
   encapsulation: ViewEncapsulation.None,
   host: {
     class: 'asys-quadrant',
@@ -20,57 +53,23 @@ const QUADRANT_WORDS: Record<Quadrant, string> = {
     '[class.asys-quadrant--plan]': 'quadrant() === Quadrants.Plan',
     '[class.asys-quadrant--delegate]': 'quadrant() === Quadrants.Delegate',
     '[class.asys-quadrant--drop]': 'quadrant() === Quadrants.Drop',
+    '[class.asys-quadrant--compact]': 'compact()',
+    '[class.asys-quadrant--strong]': 'strong()',
   },
-  styles: `
-    .asys-quadrant {
-      display: inline-flex;
-      align-items: center;
-      min-height: calc(var(--line-height-label) + var(--space-2));
-      padding: 0 var(--space-2);
-      border: 1px solid transparent;
-      border-radius: var(--radius-sm);
-      white-space: nowrap;
-      font-family: var(--font-sans);
-      font-size: var(--font-size-label);
-      line-height: var(--line-height-label);
-      font-weight: 700;
-      letter-spacing: 0.02em;
-    }
-
-    .asys-quadrant--do {
-      background: var(--ink);
-      color: var(--paper);
-    }
-
-    .asys-quadrant--plan {
-      background: var(--signal);
-      color: var(--on-signal);
-    }
-
-    .asys-quadrant--delegate {
-      background: var(--now);
-      color: var(--on-now);
-    }
-
-    .asys-quadrant--drop {
-      background: transparent;
-      border-color: var(--line-strong);
-      color: var(--ink-muted);
-    }
-
-    [data-theme='dark'] .asys-quadrant--delegate,
-    [data-theme='drive'] .asys-quadrant--delegate {
-      background: transparent;
-      border: 2px solid var(--now);
-      padding: 0 calc(var(--space-2) - 1px);
-      color: var(--ink);
-    }
-  `,
+  styleUrl: './quadrant-chip.css',
 })
 export class QuadrantChip {
   protected readonly Quadrants = Quadrant;
 
+  protected readonly cells = GLYPH_CELLS;
+
   readonly quadrant = input.required<Quadrant>();
+
+  /** Shows the glyph alone. */
+  readonly compact = input<boolean>(false);
+
+  /** Draws the chip in full ink and a heavier weight. */
+  readonly strong = input<boolean>(false);
 
   protected readonly word = computed(() => QUADRANT_WORDS[this.quadrant()]);
 }

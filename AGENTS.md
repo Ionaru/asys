@@ -28,7 +28,7 @@ ASYS (Assisting System) is a personal task manager that answers "what should I d
 
 ## Commands
 
-Use Node 24 and pnpm 11. `package.json` has no scripts, so everything runs through `pnpm exec nx` or `node scripts/<name>.mts`.
+Use Node 24 and pnpm 11. `package.json` has no scripts, so everything runs through `pnpm exec nx` or `node scripts/<name>.mts`. Installing needs a Font Awesome Pro token in the user-level `~/.npmrc` (see `README.md`); never commit it or any Pro icon file.
 
 - **Database:** `docker compose up -d --wait`, then `pnpm exec drizzle-kit migrate --config apps/server/drizzle.config.ts`. The root `.env` holds the passwords and `DATABASE_URL_OWNER` / `DATABASE_URL_APP` (see `README.md`).
 - **Dev stack:** start `pnpm exec nx serve pwa` before `pnpm exec nx serve server`, because generating the PWA's API client rebuilds the server bundle. Open `http://localhost:4200` exactly. On `127.0.0.1`, the Origin guard answers 403 and passkeys fail.

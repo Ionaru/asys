@@ -6,6 +6,13 @@ import { readFileSync } from 'node:fs';
 
 const ALLOWED = new Set(['MIT', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC', '0BSD']);
 
+// The Font Awesome Pro icon sets ship under the commercial Font Awesome Pro licence (ADR 0011). Each is
+// allowed by name, and only while its licence field still reads exactly as reviewed.
+const ALLOWED_BY_NAME: ReadonlyMap<string, string> = new Map([
+  ['@fortawesome/pro-regular-svg-icons', 'UNLICENSED'],
+  ['@fortawesome/pro-solid-svg-icons', 'UNLICENSED'],
+]);
+
 const tokenize = (input: string): string[] => {
   const tokens = input.match(/\(|\)|[^\s()]+/g);
   return tokens ?? [];
@@ -93,7 +100,7 @@ for (const [license, entries] of Object.entries(report ?? {})) {
   }
   for (const entry of entries as Entry[]) {
     total++;
-    if (!passes(entry.license)) {
+    if (ALLOWED_BY_NAME.get(entry.name) !== entry.license && !passes(entry.license)) {
       offenders.push(`${entry.name}@${(entry.versions ?? []).join(',')}: ${entry.license}`);
     }
   }

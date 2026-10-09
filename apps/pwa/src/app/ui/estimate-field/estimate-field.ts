@@ -16,6 +16,7 @@ import type { FormValueControl } from '@angular/forms/signals';
 import { formatMinutes } from '@asys/domain';
 
 import { FieldControl } from '../field-control/field-control';
+import { FieldError } from '../field-error/field-error';
 
 let nextId = 0;
 
@@ -28,6 +29,7 @@ const OTHER_ERROR = 'Use whole minutes from 1 to 100000.';
 /** Estimate chips plus an Other input, usable as a Signal Forms custom control. */
 @Component({
   selector: 'asys-estimate-field',
+  imports: [FieldError],
   encapsulation: ViewEncapsulation.None,
   templateUrl: './estimate-field.component.html',
   styleUrl: './estimate-field.css',

@@ -12,8 +12,7 @@
     [attr.aria-describedby]="messageId"
   />
   @if (error()) {
-    <p class="asys-field__error" [id]="messageId">
-      <span class="asys-field__error-word">Error:</span>
+    <p asys-field-error [id]="messageId">
       Use whole minutes from 1 to {{ estimateMinutes() - 1 }}.
     </p>
   } @else {

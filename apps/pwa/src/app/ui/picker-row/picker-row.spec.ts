@@ -81,7 +81,9 @@ describe('PickerRow', () => {
   it('shows the quadrant chip only when a quadrant is set', async () => {
     const { fixture, host, q } = await setup();
 
-    expect(q('.asys-picker-row__side asys-quadrant-chip')?.textContent?.trim()).toBe('Do');
+    expect(
+      q('.asys-picker-row__side asys-quadrant-chip')?.textContent?.replace(/\s+/g, ' ').trim(),
+    ).toBe('Quadrant: Do');
 
     host.quadrant.set(undefined);
     await fixture.whenStable();

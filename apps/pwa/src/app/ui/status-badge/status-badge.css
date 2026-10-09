@@ -1,0 +1,50 @@
+/* SPDX-License-Identifier: EUPL-1.2 */
+.asys-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: calc(var(--line-height-label) + var(--space-2));
+  padding: 0 var(--space-2) 0 var(--space-1);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-label);
+  line-height: var(--line-height-label);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.asys-badge--overdue {
+  background: var(--danger-soft);
+  color: var(--on-danger-soft);
+}
+
+.asys-badge--blocked {
+  background: var(--sunken);
+  border-color: var(--line-strong);
+  color: var(--ink-muted);
+}
+
+.asys-badge--delegated {
+  background: var(--signal-soft);
+  color: var(--on-signal-soft);
+}
+
+.asys-badge--dropped {
+  color: var(--ink-muted);
+  text-decoration: line-through;
+}
+
+.asys-badge--skipped {
+  color: var(--ink-muted);
+  font-style: italic;
+}
+
+.asys-badge--queued {
+  background: transparent;
+  border-color: var(--line-strong);
+  color: var(--ink-muted);
+}

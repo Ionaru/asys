@@ -2,6 +2,7 @@
 import { Component, ElementRef, inject, input, output, ViewEncapsulation } from '@angular/core';
 
 import { Button, ButtonVariant } from '../button/button';
+import { Icon, IconName } from '../icon/icon';
 
 /** The weight of a review action button. */
 export enum ReviewItemActionKind {
@@ -18,11 +19,11 @@ export interface ReviewItemAction {
 /** A question about one item, with the decisions that answer it. A projected link sits after the buttons. */
 @Component({
   selector: 'asys-review-item',
-  imports: [Button],
+  imports: [Button, Icon],
   encapsulation: ViewEncapsulation.None,
   template: `
     <div class="asys-review">
-      <p class="asys-review__label">Review item</p>
+      <p class="asys-review__label"><asys-icon [name]="IconName.CircleQuestion" />Review item</p>
       <p class="asys-review__question" tabindex="-1">{{ question() }}</p>
       @if (reason() !== '') {
         <p class="asys-review__reason">{{ reason() }}</p>
@@ -43,45 +44,12 @@ export interface ReviewItemAction {
       </div>
     </div>
   `,
-  styles: `
-    .asys-review {
-      background: var(--surface);
-      padding: var(--space-3) var(--space-4);
-      border-bottom: 1px solid var(--line);
-      color: var(--ink);
-    }
-
-    .asys-review__label {
-      margin: 0 0 var(--space-1);
-      color: var(--ink-muted);
-      font-size: var(--font-size-label);
-      line-height: var(--line-height-label);
-      font-weight: 700;
-      letter-spacing: 0.02em;
-    }
-
-    .asys-review__question {
-      margin: 0;
-      font-size: var(--font-size-body-strong);
-      line-height: var(--line-height-body-strong);
-      font-weight: 600;
-    }
-
-    .asys-review__reason {
-      margin: var(--space-1) 0 0;
-      color: var(--ink-muted);
-      font-size: var(--font-size-reason);
-      line-height: var(--line-height-reason);
-      font-weight: 400;
-    }
-
-    .asys-review__actions {
-      margin-top: var(--space-3);
-    }
-  `,
+  styleUrl: './review-item.css',
 })
 export class ReviewItem {
   readonly #host = inject<ElementRef<HTMLElement>>(ElementRef);
+
+  protected readonly IconName = IconName;
 
   protected readonly Kinds = ReviewItemActionKind;
 

@@ -392,15 +392,23 @@ afterEach(() => {
 });
 
 describe('ShellLayout', () => {
-  describe('header', () => {
-    it('links to Settings and no longer to Account', async () => {
+  describe('the frame', () => {
+    it('has no header element, and no link to Settings or Account', async () => {
       const { root } = await setup();
-      const links = Array.from(root().querySelectorAll<HTMLAnchorElement>('header a'));
+      const links = Array.from(root().querySelectorAll<HTMLAnchorElement>('a'));
 
-      const settings = links.find((a) => a.textContent?.trim() === 'Settings');
-
-      expect(settings?.getAttribute('href')).toBe('/settings');
+      expect(root().querySelector('header')).toBeNull();
+      expect(root().querySelector('a[href="/settings"]')).toBeNull();
+      expect(links.some((a) => a.textContent?.trim() === 'Settings')).toBe(false);
       expect(links.some((a) => a.textContent?.trim() === 'Account')).toBe(false);
+    });
+
+    it('starts with the main element, which holds the routed screen', async () => {
+      const { root } = await setup();
+      const main = must(root().querySelector('main'));
+
+      expect(main.querySelector('h1')?.textContent?.trim()).toBe('Now');
+      expect(root().querySelector('app-shell-layout')?.firstElementChild).toBe(main);
     });
   });
 
@@ -1222,7 +1230,7 @@ describe('ShellLayout', () => {
 
       outside.tabIndex = -1;
       outside.dataset['taskId'] = 'x';
-      root().querySelector('header')?.appendChild(outside);
+      must(root().querySelector('nav[aria-label="Primary"]')).appendChild(outside);
 
       doneUndo.pending.set(PENDING);
       await settle();
@@ -1307,7 +1315,7 @@ describe('ShellLayout', () => {
 
       it('leaves focus where it was when a pointer Dismiss leaves a pending Done behind', async () => {
         const { doneUndo, root, undoButton, settle } = await setup();
-        const link = must(root().querySelector<HTMLAnchorElement>('header a'));
+        const link = must(root().querySelector<HTMLAnchorElement>('nav[aria-label="Primary"] a'));
 
         doneUndo.pending.set(PENDING);
         doneUndo.failure.set(NOT_DONE);
@@ -1336,7 +1344,7 @@ describe('ShellLayout', () => {
 
       it('leaves focus alone when no bar is left', async () => {
         const { doneUndo, root, undoBar, undoButton, settle } = await setup();
-        const link = must(root().querySelector<HTMLAnchorElement>('header a'));
+        const link = must(root().querySelector<HTMLAnchorElement>('nav[aria-label="Primary"] a'));
 
         doneUndo.failure.set(NOT_DONE);
         await settle();
@@ -1510,9 +1518,9 @@ describe('ShellLayout', () => {
         expect(doneUndo.resume).not.toHaveBeenCalled();
       });
 
-      it('does not move focus when it was on the header link and the layout changes', async () => {
+      it('does not move focus when it was on a bottom nav link and the layout changes', async () => {
         const { doneUndo, root, undoBar, settle } = await setup();
-        const link = must(root().querySelector<HTMLAnchorElement>('header a'));
+        const link = must(root().querySelector<HTMLAnchorElement>('nav[aria-label="Primary"] a'));
 
         nowItems.set([{ id: 'b' }]);
         doneUndo.pending.set(PENDING);
