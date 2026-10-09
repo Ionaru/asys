@@ -50,9 +50,9 @@
                 "fontSize": "{type-scale.font-size-display}",
                 "lineHeight": "{type-scale.line-height-display}",
                 "fontWeight": 700,
-                "letterSpacing": "-0.01em",
-                "sample": "Call Marit back",
-                "usage": "The single top pick in Now, and the Task title in Voice only. One per screen."
+                "letterSpacing": "-0.005em",
+                "sample": "Prepare talking points",
+                "usage": "The single top pick in Now (a quarter larger in Voice only) and the Task being triaged: one per screen. Sized so a three to five word Task title fits on one or two lines at 360px."
               },
               {
                 "name": "title",
@@ -98,16 +98,16 @@
                 "lineHeight": "{type-scale.line-height-reason}",
                 "fontWeight": 400,
                 "sample": "Latest start 14:30 · important",
-                "usage": "The one-line reason under a Picker row, and metadata. Always ink-muted."
+                "usage": "The one-line reason under a Task title, and metadata (Facts, dates, counts in words). Always ink-muted. As large as body, so it reads at a glance; weight and colour keep it below the title."
               },
               {
                 "name": "label",
                 "fontSize": "{type-scale.font-size-label}",
                 "lineHeight": "{type-scale.line-height-label}",
                 "fontWeight": 700,
-                "letterSpacing": "0.02em",
+                "letterSpacing": "0.01em",
                 "sample": "Plan",
-                "usage": "Chips, badges, segment labels and button text at small size."
+                "usage": "Badges, segment labels, bottom bar labels, the Voice word and button text at small size."
               }
             ]
           },
@@ -121,7 +121,7 @@
                 "lineHeight": "{type-scale.line-height-time}",
                 "fontWeight": 500,
                 "sample": "09:30–10:15",
-                "usage": "Clock times, Estimates and durations in Today and on rows, so columns line up."
+                "usage": "Clock times, Estimates and durations in Today and on rows, so columns line up. The same size as reason, so a row reads as one line."
               },
               {
                 "name": "time-large",
@@ -225,14 +225,14 @@
     "$description": "One size and one line height per type style, in rem so the Android font size applies. Components read these, never literal sizes, so the Text size and Line spacing settings can rewrite them.",
     "font-size-display": {
       "$value": {
-        "value": 2.5,
+        "value": 1.625,
         "unit": "rem"
       },
-      "$description": "Font size of the display style: The single top pick in Now, and the Task title in Voice only. One per screen."
+      "$description": "Font size of the display style: The single top pick in Now (a quarter larger in Voice only) and the Task being triaged: one per screen. Sized so a three to five word Task title fits on one or two lines at 360px."
     },
     "line-height-display": {
       "$value": {
-        "value": 2.75,
+        "value": 2,
         "unit": "rem"
       },
       "$description": "Line height of the display style."
@@ -295,42 +295,42 @@
     },
     "font-size-reason": {
       "$value": {
-        "value": 0.875,
+        "value": 1,
         "unit": "rem"
       },
-      "$description": "Font size of the reason style: The one-line reason under a Picker row, and metadata. Always ink-muted."
+      "$description": "Font size of the reason style: The one-line reason under a Task title, and metadata (Facts, dates, counts in words). Always ink-muted. As large as body, so it reads at a glance; weight and colour keep it below the title."
     },
     "line-height-reason": {
       "$value": {
-        "value": 1.25,
+        "value": 1.375,
         "unit": "rem"
       },
       "$description": "Line height of the reason style."
     },
     "font-size-label": {
       "$value": {
-        "value": 0.8125,
+        "value": 0.875,
         "unit": "rem"
       },
-      "$description": "Font size of the label style: Chips, badges, segment labels and button text at small size."
+      "$description": "Font size of the label style: Badges, segment labels, bottom bar labels, the Voice word and button text at small size."
     },
     "line-height-label": {
       "$value": {
-        "value": 1,
+        "value": 1.125,
         "unit": "rem"
       },
       "$description": "Line height of the label style."
     },
     "font-size-time": {
       "$value": {
-        "value": 0.9375,
+        "value": 1,
         "unit": "rem"
       },
-      "$description": "Font size of the time style: Clock times, Estimates and durations in Today and on rows, so columns line up."
+      "$description": "Font size of the time style: Clock times, Estimates and durations in Today and on rows, so columns line up. The same size as reason, so a row reads as one line."
     },
     "line-height-time": {
       "$value": {
-        "value": 1.25,
+        "value": 1.375,
         "unit": "rem"
       },
       "$description": "Line height of the time style."
@@ -358,6 +358,13 @@
         "unit": "px"
       },
       "$description": "Minimum height and width of anything tappable. Fixed: no setting lowers it."
+    },
+    "tap-target-large": {
+      "$value": {
+        "value": 56,
+        "unit": "px"
+      },
+      "$description": "Large controls: the Done and Log progress buttons on the top pick, bottom bar items and the Capture button. Fixed: no setting lowers it."
     },
     "tap-target-drive": {
       "$value": {

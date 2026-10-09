@@ -10,8 +10,11 @@ RUN npm install --global "$(node -p "require('./package.json').packageManager")"
 FROM base AS build
 # Nx needs no daemon, cloud or terminal UI inside a build.
 ENV NX_DAEMON=false NX_NO_CLOUD=true NX_TUI=false
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+# The Font Awesome Pro packages need a token. It comes in as a user-level .npmrc build secret
+# (`docker build --secret id=npmrc,src=<file>`), so it never lands in a layer.
 RUN --mount=type=cache,target=/pnpm/store \
+    --mount=type=secret,id=npmrc,target=/root/.npmrc,required=true \
     pnpm install --frozen-lockfile --config.store-dir=/pnpm/store
 COPY . .
 # The server build also writes the pruned package.json, pnpm-lock.yaml and

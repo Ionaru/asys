@@ -3,12 +3,14 @@ import { Component, ElementRef, input, model, viewChild, ViewEncapsulation } fro
 import type { FormValueControl } from '@angular/forms/signals';
 
 import { FieldControl } from '../field-control/field-control';
+import { FieldError } from '../field-error/field-error';
 
 let nextId = 0;
 
 /** A single or multi line text field, usable as a Signal Forms custom control. */
 @Component({
   selector: 'asys-text-field',
+  imports: [FieldError],
   encapsulation: ViewEncapsulation.None,
   template: `
     <div
@@ -52,9 +54,7 @@ let nextId = 0;
         />
       }
       @if (showError()) {
-        <p class="asys-field__error" [id]="messageParagraphId">
-          <span class="asys-field__error-word">Error:</span> {{ message() }}
-        </p>
+        <p asys-field-error [id]="messageParagraphId">{{ message() }}</p>
       } @else if (hint()) {
         <p class="asys-field__hint" [id]="messageParagraphId">{{ hint() }}</p>
       }

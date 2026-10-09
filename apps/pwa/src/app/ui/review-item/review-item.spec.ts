@@ -59,6 +59,18 @@ describe('ReviewItem', () => {
     expect(q('.asys-review__reason')?.textContent?.trim()).toBe('No activity for 30 days');
   });
 
+  it('draws a circle-question icon before the label, which still reads Review item', async () => {
+    const { q } = await setup();
+
+    const label = q('.asys-review__label');
+    const glyphs = label?.querySelectorAll('svg[data-icon]') ?? [];
+
+    expect(label?.firstElementChild?.tagName.toLowerCase()).toBe('asys-icon');
+    expect(glyphs.length).toBe(1);
+    expect(glyphs[0].getAttribute('data-icon')).toBe('circle-question');
+    expect(label?.textContent?.trim()).toBe('Review item');
+  });
+
   it('omits the reason when it is empty', async () => {
     const { fixture, host, q } = await setup();
 

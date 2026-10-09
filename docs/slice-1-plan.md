@@ -761,7 +761,7 @@ Re-planned and built on 2026-10-04. The re-plan was reviewed adversarially by th
 
 **Departures from the design system**
 - PickerRow is a link (`a[asys-picker-row]`), with no `(select)` output.
-- TopPick's third action is Open, not Not now, and it has no Gap row in Slice 1. It shows an Overdue badge in its meta row when the Task is Overdue, and Now projects the Log progress form into it.
+- TopPick has no Not now; its title is the link that opens the Task (the design system of 2026-10-09 dropped the Open button). Now projects the Log progress form into it. The NowHeader above it shows the moment and the More button, which opens Settings (the shell's own Settings link is gone); its Gap lines wait for slice 2.
 - TriageCard adds Later and Edit, and "1 of N" counts over the whole visit. Importance and Estimate are the shared Segmented and EstimateField controls, which took the segment and chip CSS. Its title is an `h2`, and Change is disabled while a send is pending.
 - Drop is confirmed inline everywhere (InlineConfirm, a new component), with focus starting on Cancel.
 - ReviewItem projects an "Open Task" link after its buttons.

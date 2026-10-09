@@ -2,7 +2,7 @@
 
 import { BlockedReasonTag, type Task } from '../task';
 import { formatClock, formatDateSpec, toLocalDateTime, type Instant, type TimeZone } from '../time';
-import { ExclusionReasonTag, type ExclusionReason } from './picker';
+import { ExclusionReasonTag, type ExclusionReason, type WaitingTask } from './picker';
 
 // Code-unit order on purpose: localeCompare would differ per runtime locale.
 const compareStrings = (a: string, b: string): number => {
@@ -50,4 +50,25 @@ export const waitingText = (
     }
   }
   return parts.length === 0 ? 'Waiting' : parts.join(' · ');
+};
+
+/** The one fact that matters while the Waiting section is closed: when the next Waiting Task becomes Available, or null when none is waiting for a moment. */
+export const waitingSummary = (
+  waiting: readonly WaitingTask[],
+  now: Instant,
+  timeZone: TimeZone,
+): string | null => {
+  let next: { readonly task: Task; readonly from: Instant } | null = null;
+  for (const entry of waiting) {
+    for (const reason of entry.reasons) {
+      if (reason._tag !== ExclusionReasonTag.NotYetAvailable) continue;
+      if (next === null || reason.from < next.from) next = { task: entry.task, from: reason.from };
+    }
+  }
+  if (next === null) return null;
+  const when =
+    next.task.availableFrom !== null
+      ? formatDateSpec(next.task.availableFrom, toLocalDateTime(now, timeZone).date)
+      : formatClock(next.from, now, timeZone);
+  return `Next Available ${when}`;
 };

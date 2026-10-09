@@ -5,13 +5,14 @@ import type { DateSpec } from '@asys/domain';
 
 import { Button, ButtonSize, ButtonVariant } from '../button/button';
 import { FieldControl } from '../field-control/field-control';
+import { FieldError } from '../field-error/field-error';
 
 let nextId = 0;
 
 /** A date with an optional time and a Clear button, usable as a Signal Forms custom control. */
 @Component({
   selector: 'asys-date-spec-field',
-  imports: [Button],
+  imports: [Button, FieldError],
   encapsulation: ViewEncapsulation.None,
   templateUrl: './date-spec-field.component.html',
   styles: `

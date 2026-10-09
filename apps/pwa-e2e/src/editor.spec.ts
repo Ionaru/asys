@@ -40,13 +40,10 @@ test('The Task editor saves Due and Estimate, blocks and unblocks a Task, and lo
   await expect(topPick.locator('.asys-top-pick__reason')).toHaveText(
     `Latest start ${dayLabel(dueDate, today)} 11:15`,
   );
-  await expect(topPick.locator('.asys-top-pick__estimate')).toHaveText('45 min');
+  await expect(topPick.locator('.asys-fact--strong .asys-num')).toHaveText('45 min');
 
   // Block Alpha by Bravo.
-  await topPick
-    .getByRole('link', { name: 'Open' })
-    .or(topPick.getByRole('button', { name: 'Open' }))
-    .click();
+  await topPick.locator('a.asys-top-pick__link').click();
   await expect(page.getByRole('heading', { level: 1, name: 'Alpha task' })).toBeVisible();
   await expect(due.getByLabel('Date')).toHaveValue(dueDate);
   await expect(due.getByLabel('Time')).toHaveValue('12:00');
@@ -67,10 +64,7 @@ test('The Task editor saves Due and Estimate, blocks and unblocks a Task, and lo
   );
 
   // Bravo's blocker picker cannot offer Alpha, which already waits for it.
-  await topPick
-    .getByRole('link', { name: 'Open' })
-    .or(topPick.getByRole('button', { name: 'Open' }))
-    .click();
+  await topPick.locator('a.asys-top-pick__link').click();
   await expect(page.getByRole('heading', { level: 1, name: 'Bravo task' })).toBeVisible();
   await page.getByRole('button', { name: 'Add a blocker' }).click();
   await page.getByLabel('Find a Task').fill('Alpha task');
@@ -88,5 +82,5 @@ test('The Task editor saves Due and Estimate, blocks and unblocks a Task, and lo
   await topPick.getByLabel('Time still needed').fill('15');
   await topPick.locator('form').getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.locator('.now__status')).toHaveText('Estimate is now 15 min.');
-  await expect(topPick.locator('.asys-top-pick__estimate')).toHaveText('15 min');
+  await expect(topPick.locator('.asys-fact--strong .asys-num')).toHaveText('15 min');
 });

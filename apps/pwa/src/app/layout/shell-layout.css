@@ -4,12 +4,6 @@
   --shell-undo-height: 0px;
 }
 
-.shell__header {
-  display: flex;
-  justify-content: flex-end;
-  padding: var(--space-2) var(--space-4);
-}
-
 .shell__page {
   padding-bottom: calc(
     var(--shell-nav-height) + var(--shell-undo-height) + var(--space-4) +

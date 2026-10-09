@@ -2,11 +2,30 @@
 name: Set up
 description: Check out the repository, set up pnpm and Node 24, and install the dependencies from the frozen lockfile with a cached pnpm store.
 
+inputs:
+  fa-token:
+    description: The Font Awesome Pro package token (the FA_TOKEN secret). The icon packages install from Font Awesome's registry with it.
+    required: true
+
 runs:
   using: composite
   steps:
     - name: Check out
       uses: $/.github/actions/checkout
+    - name: Give pnpm the Font Awesome token
+      # A project .npmrc cannot hold it (pnpm ignores ${...} there), so it goes in the runner's user-level ~/.npmrc.
+      shell: bash
+      env:
+        FA_TOKEN: ${{ inputs.fa-token }}
+      run: |
+        if [ -z "${FA_TOKEN}" ]; then
+          echo "::error::The FA_TOKEN secret is not set; the Font Awesome Pro packages cannot be installed."
+          exit 1
+        fi
+        (
+          umask 077
+          printf '//npm.fontawesome.com/:_authToken=%s\n' "${FA_TOKEN}" >> ~/.npmrc
+        )
     - name: Set up pnpm and Node 24 and install dependencies
       uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
       with:

@@ -34,10 +34,18 @@ Run any target with `pnpm exec nx <target> <project>`, for example `pnpm exec nx
 
 ## Development setup
 
-You need Node 24, pnpm 11 and Docker with the Compose plugin.
+You need Node 24, pnpm 11, Docker with the Compose plugin and a Font Awesome Pro package token.
 
-1. `pnpm install`.
-2. Create `.env` in the repository root. The development database and the server read it:
+1. Give pnpm the Font Awesome token. The PWA's icons come from the Font Awesome Pro packages (ADR 0011), which install from Font Awesome's registry: the project `.npmrc` names the registry, and the token goes in your user-level `~/.npmrc`, because pnpm ignores `${...}` in a project `.npmrc`. Never commit the token or the Pro icon files.
+
+   ```ini
+   //npm.fontawesome.com/:_authToken=<your Font Awesome package token>
+   ```
+
+   pnpm expands environment variables in the user-level file, so `//npm.fontawesome.com/:_authToken=${FA_TOKEN}` works too.
+
+2. `pnpm install`.
+3. Create `.env` in the repository root. The development database and the server read it:
 
    ```dotenv
    POSTGRES_PASSWORD=<hex>
@@ -52,8 +60,8 @@ You need Node 24, pnpm 11 and Docker with the Compose plugin.
 
    Use hex passwords (`openssl rand -hex 24`): they go into the URLs unescaped.
 
-3. `docker compose up -d --wait` starts PostgreSQL 18 on `127.0.0.1:5432`. On an empty volume, `docker/postgres/init/10-roles.sql` creates the roles `asys_owner` (owns the tables, runs migrations), `asys_app` (what the server uses, under row-level security) and `asys_lookup` (owns the few lookup functions) and the database `asys`.
-4. `pnpm exec drizzle-kit migrate --config apps/server/drizzle.config.ts` applies the migrations.
+4. `docker compose up -d --wait` starts PostgreSQL 18 on `127.0.0.1:5432`. On an empty volume, `docker/postgres/init/10-roles.sql` creates the roles `asys_owner` (owns the tables, runs migrations), `asys_app` (what the server uses, under row-level security) and `asys_lookup` (owns the few lookup functions) and the database `asys`.
+5. `pnpm exec drizzle-kit migrate --config apps/server/drizzle.config.ts` applies the migrations.
 
 ## Running the server
 
@@ -146,7 +154,7 @@ Never run this in the deployed checkout, where `deploy/.env` holds the productio
 3. Build and start the stack. Port 3200 must be free:
 
    ```bash
-   docker build --tag ghcr.io/ionaru/asys:latest .
+   docker build --secret id=npmrc,src="$HOME/.npmrc" --tag ghcr.io/ionaru/asys:latest .
    docker compose -p asys-e2e -f deploy/compose.yaml -f deploy/compose.e2e.yaml up -d --wait --no-build
    ```
 
@@ -155,12 +163,12 @@ Never run this in the deployed checkout, where `deploy/.env` holds the productio
 
 ## CI
 
-CI is `.github/workflows/cd.yaml`: on every push and pull request an `audit` job (`pnpm audit --prod`, against the lockfile without installing dependencies) runs first, then the jobs `lint`, `typecheck`, `build`, `test`, `e2e`, `format`, `licences` and `palettes` run in parallel, without Nx Cloud. Each job's steps live in `cd.yaml`. The `build` job also writes the server's OpenAPI document (`nx run server:openapi`), which proves that the server bundle loads without a `.env`. Each of these jobs except `audit` starts with the composite action `.github/actions/setup`, which runs `.github/actions/checkout` and then sets up pnpm with Node 24 and installs from the frozen lockfile. The `typecheck` job also typechecks `scripts/` with `tsc -p scripts/tsconfig.json`. Each job's commands can be run locally in the same way; the `test` and `e2e` jobs need the database from `compose.yaml` (`docker compose up -d --wait`) and a `.env` with its passwords, and the `e2e` job installs Chromium with its system dependencies and uploads `dist/.playwright` when it fails.
+CI is `.github/workflows/cd.yaml`: on every push and pull request an `audit` job (`pnpm audit --prod`, against the lockfile without installing dependencies) runs first, then the jobs `lint`, `typecheck`, `build`, `test`, `e2e`, `format`, `licences` and `palettes` run in parallel, without Nx Cloud. Each job's steps live in `cd.yaml`. The `build` job also writes the server's OpenAPI document (`nx run server:openapi`), which proves that the server bundle loads without a `.env`. Each of these jobs except `audit` starts with the composite action `.github/actions/setup`, which runs `.github/actions/checkout`, writes the Font Awesome token from the repository secret `FA_TOKEN` into the runner's `~/.npmrc` (and fails at once when the secret is missing), and then sets up pnpm with Node 24 and installs from the frozen lockfile. The `typecheck` job also typechecks `scripts/` with `tsc -p scripts/tsconfig.json`. Each job's commands can be run locally in the same way; the `test` and `e2e` jobs need the database from `compose.yaml` (`docker compose up -d --wait`) and a `.env` with its passwords, and the `e2e` job installs Chromium with its system dependencies and uploads `dist/.playwright` when it fails.
 
 Six more jobs build, check and ship the image:
 
 - **`revision`** works out the commit SHA and its 12-character short form as outputs, once, so every later job reads the same tag.
-- **`build-image`** (after `audit` and `revision`) builds the image with `docker build` from the repository root, saves it as a tar and uploads it as the artefact `asys-image` on every run, pull requests included, kept for 7 days. It uses `.github/actions/checkout` only, with no Node or pnpm. To inspect the image behind a failed run, download `asys-image`, then `docker load -i asys-image.tar` and `docker run --rm -it --entrypoint sh ghcr.io/ionaru/asys:latest`. A pull request's image never reaches GHCR.
+- **`build-image`** (after `audit` and `revision`) builds the image with `docker build` from the repository root, passing the `FA_TOKEN` secret as the build secret `npmrc` so it never lands in a layer, saves it as a tar and uploads it as the artefact `asys-image` on every run, pull requests included, kept for 7 days. It uses `.github/actions/checkout` only, with no Node or pnpm. To inspect the image behind a failed run, download `asys-image`, then `docker load -i asys-image.tar` and `docker run --rm -it --entrypoint sh ghcr.io/ionaru/asys:latest`. A pull request's image never reaches GHCR.
 - **`migrate-image`** (after `build-image`) loads the image, starts the stack on an empty database with throwaway passwords, then runs `up --wait` again to prove that `migrate` passes on a migrated database.
 - **`e2e-image`** (after `build-image`, in parallel with `migrate-image`) sets up like the other checks, loads the image, starts the `asys-e2e` stack, installs Chromium and runs `pnpm exec nx run pwa-e2e:e2e-image`. On failure it prints the stack state and logs and uploads `dist/.playwright` as the artefact `playwright-image`. `migrate-image` and `e2e-image` both write `deploy/.env` and create the `edge` and `telemetry` networks through the composite action `.github/actions/prepare-stack` (input `public-origin`).
 - **`push-image`** (pushes to `main` only, after every check, `revision`, `build-image`, `migrate-image` and `e2e-image`) tags the image with the 12-character commit and `latest` and pushes the tar that `build-image` uploaded to `ghcr.io/ionaru/asys`, so the image that passed is the image that ships.

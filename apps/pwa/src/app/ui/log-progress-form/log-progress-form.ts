@@ -13,6 +13,7 @@ import {
 import { formatMinutes, type Task, TaskStatus } from '@asys/domain';
 
 import { Button, ButtonVariant } from '../button/button';
+import { FieldError } from '../field-error/field-error';
 
 let nextId = 0;
 
@@ -31,7 +32,7 @@ export const canLogProgress = (task: Task | undefined): boolean =>
 /** The inline form that lowers a Task's Estimate to the time still needed. */
 @Component({
   selector: 'asys-log-progress-form',
-  imports: [Button],
+  imports: [Button, FieldError],
   encapsulation: ViewEncapsulation.None,
   templateUrl: './log-progress-form.component.html',
   styles: `

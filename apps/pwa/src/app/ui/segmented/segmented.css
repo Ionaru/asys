@@ -13,7 +13,7 @@
   font-size: var(--font-size-label);
   line-height: var(--line-height-label);
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
 }
 
 .asys-segmented__options {

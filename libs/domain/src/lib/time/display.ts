@@ -62,6 +62,17 @@ export const formatClock = (instant: Instant, now: Instant, timeZone: TimeZone):
   return shown.date === nowDate ? shown.time : `${formatDay(shown.date, nowDate)} ${shown.time}`;
 };
 
+/** The moment as the weekday, day, month and 24-hour time in the zone, such as 'Fri 9 Oct · 14:05'. Never 'today', never a year; seconds are dropped. */
+export const formatMoment = (now: Instant, timeZone: TimeZone): string => {
+  if (!isValidTimeZone(timeZone)) throw new RangeError(`Invalid time zone: ${timeZone}`);
+  if (typeof now !== 'number' || !Number.isFinite(now)) {
+    throw new RangeError(`Invalid instant: ${now}`);
+  }
+  const zoned = Temporal.Instant.fromEpochMilliseconds(now).toZonedDateTimeISO(timeZone);
+  const day = `${WEEKDAYS[zoned.dayOfWeek - 1]} ${zoned.day} ${MONTHS[zoned.month - 1]}`;
+  return `${day} · ${pad2(zoned.hour)}:${pad2(zoned.minute)}`;
+};
+
 /** A number of minutes: '5 min', '1 h', '1 h 05'. */
 export const formatMinutes = (minutes: number): string => {
   if (!Number.isInteger(minutes) || minutes < 0) {

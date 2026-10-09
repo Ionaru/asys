@@ -15,16 +15,19 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import {
   type Command,
   CommandTag,
   formatMinutes,
+  formatMoment,
   inboxTasks,
   isOverdue,
   type RankedTask,
+  reasonFact,
   type Task,
   TaskStatus,
+  toLocalDateTime,
 } from '@asys/domain';
 
 import { CommandOutcomeTag, type CommandOutcome } from '../../core/api/data-api';
@@ -35,8 +38,11 @@ import { outcomeMessage } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
 import { Motion, MotionDuration, MotionEasing } from '../../core/platform/motion';
 import { TaskMorph } from '../../core/platform/task-morph';
+import { Button, ButtonVariant } from '../../ui/button/button';
+import { IconName } from '../../ui/icon/icon';
 import { LoadState } from '../../ui/load-state/load-state';
 import { canLogProgress, LogProgressForm } from '../../ui/log-progress-form/log-progress-form';
+import { NowHeader } from '../../ui/now-header/now-header';
 import { PickerRow, PickerRowVariant } from '../../ui/picker-row/picker-row';
 import { SectionHeader } from '../../ui/section-header/section-header';
 import { SyncNote } from '../../ui/sync-note/sync-note';
@@ -59,7 +65,17 @@ const RISE_KEYFRAMES: Keyframe[] = [
 /** What to do now: the top pick with its actions, the other ranked Tasks, and the ones that wait. */
 @Component({
   selector: 'app-now',
-  imports: [LoadState, LogProgressForm, PickerRow, RouterLink, SectionHeader, SyncNote, TopPick],
+  imports: [
+    Button,
+    LoadState,
+    LogProgressForm,
+    NowHeader,
+    PickerRow,
+    RouterLink,
+    SectionHeader,
+    SyncNote,
+    TopPick,
+  ],
   providers: [CommandAttempts],
   templateUrl: './now.component.html',
   styleUrl: './now.css',
@@ -75,8 +91,6 @@ export class Now {
 
   private readonly motion = inject(Motion);
 
-  private readonly router = inject(Router);
-
   private readonly injector = inject(Injector);
 
   private readonly destroyRef = inject(DestroyRef);
@@ -89,9 +103,13 @@ export class Now {
 
   protected readonly Origins = DoneOrigin;
 
+  protected readonly Variants = ButtonVariant;
+
+  protected readonly Icons = IconName;
+
   protected readonly morphId = inject(TaskMorph).taskId;
 
-  private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
+  private readonly nowHeader = viewChild(NowHeader);
 
   private readonly topPick = viewChild(TopPick);
 
@@ -166,6 +184,20 @@ export class Now {
 
   private readonly timeZone = computed(() => zoneOrUtc(this.dataStore.state()?.settings.timeZone));
 
+  /** The moment in the Settings time zone, such as `Fri 9 Oct · 14:05`; it follows the Clock, so it ticks each minute. */
+  protected readonly moment = computed(() => formatMoment(this.clock.now(), this.timeZone()));
+
+  /** The moment as a machine-readable local date and time, for the `datetime` of the header's `time`. */
+  protected readonly momentDatetime = computed(() => {
+    const local = toLocalDateTime(this.clock.now(), this.timeZone());
+
+    return `${local.date}T${local.time}`;
+  });
+
+  private readonly areaNames = computed(
+    () => new Map((this.dataStore.state()?.areas ?? []).map((area) => [area.id, area.name])),
+  );
+
   constructor() {
     effect(() => {
       const open = this.formOpen();
@@ -228,8 +260,16 @@ export class Now {
     return isOverdue(task, this.clock.now(), this.timeZone());
   }
 
-  protected open(taskId: string): void {
-    void this.router.navigate(['/tasks', taskId]);
+  /** The name of the Task's Area, or null when it has none. */
+  protected areaName(task: Task): string | null {
+    return task.areaId === null ? null : (this.areaNames().get(task.areaId) ?? null);
+  }
+
+  /** The Due fact that opens an Overdue Task's reason, or null when the Task is not Overdue. */
+  protected dueFact(item: RankedTask): string | null {
+    return item.reason.overdue
+      ? reasonFact(item.task, item.reason, this.clock.now(), this.timeZone())
+      : null;
   }
 
   protected openForm(taskId: string): void {
@@ -408,13 +448,13 @@ export class Now {
   private focusTopNow(): void {
     const topPick = this.topPick();
     if (topPick === undefined) {
-      this.heading()?.nativeElement.focus();
+      this.nowHeader()?.focusHeading();
     } else {
       topPick.focusTitle();
     }
   }
 
-  /** After the next render, moves focus to the top pick's title, or to the heading when none. */
+  /** After the next render, moves focus to the top pick's title link, or to the heading when none. */
   private focusTop(): void {
     afterNextRender(() => this.focusTopNow(), { injector: this.injector });
   }

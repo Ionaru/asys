@@ -43,15 +43,11 @@
             </button>
           </div>
           @if (row.error !== null) {
-            <p class="asys-field__error" [id]="errorId(day.index, rowIndex)">
-              <span class="asys-field__error-word">Error:</span> {{ row.error }}
-            </p>
+            <p asys-field-error [id]="errorId(day.index, rowIndex)">{{ row.error }}</p>
           }
         }
         @if (day.overlap) {
-          <p class="asys-field__error" [id]="overlapId(day.index)">
-            <span class="asys-field__error-word">Error:</span> Hours overlap
-          </p>
+          <p asys-field-error [id]="overlapId(day.index)">Hours overlap</p>
         }
         <div class="asys-button-group">
           <button
