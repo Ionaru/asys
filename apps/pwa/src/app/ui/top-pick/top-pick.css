@@ -7,7 +7,13 @@
   padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
+}
+
+.asys-top-pick__flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
 .asys-top-pick__title {
@@ -15,7 +21,28 @@
   font-size: var(--font-size-display);
   line-height: var(--line-height-display);
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.005em;
+}
+
+/* The title opens the Task: a block link whose tap-target hit area does not move the layout. */
+.asys-top-pick__link {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  margin-block: calc((var(--tap-target) - var(--line-height-display)) / -2);
+  padding-block: calc((var(--tap-target) - var(--line-height-display)) / 2);
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.asys-top-pick__link:active {
+  background: var(--signal-soft);
+}
+
+.asys-top-pick__title-text {
+  min-width: 0;
   overflow-wrap: anywhere;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -24,28 +51,17 @@
   overflow: hidden;
 }
 
+.asys-top-pick__link .asys-icon {
+  font-size: 0.75em;
+  color: var(--ink-muted);
+}
+
 .asys-top-pick__reason {
   margin: 0;
   font-size: var(--font-size-reason);
   line-height: var(--line-height-reason);
   font-weight: 400;
   color: var(--ink-muted);
-}
-
-.asys-top-pick__meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2) var(--space-3);
-}
-
-.asys-top-pick__estimate {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: var(--font-size-time);
-  line-height: var(--line-height-time);
-  font-weight: 500;
-  color: var(--ink);
 }
 
 .asys-top-pick__actions {
@@ -83,6 +99,18 @@
   border-color: transparent;
   background: transparent;
   padding: var(--space-4) 0;
+}
+
+[data-theme='drive'] .asys-top-pick__title {
+  font-size: calc(var(--font-size-display) * 1.25);
+  line-height: calc(var(--line-height-display) * 1.25);
+}
+
+[data-theme='drive'] .asys-top-pick__link {
+  margin-block: 0;
+  padding-block: 0;
+  min-height: var(--tap-target-drive);
+  align-items: center;
 }
 
 [data-theme='drive'] .asys-top-pick__secondary {

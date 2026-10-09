@@ -1,5 +1,14 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
-<h1 #heading class="now__title" tabindex="-1">Now</h1>
+<asys-now-header [moment]="moment()" [datetime]="momentDatetime()">
+  <a
+    asys-button
+    routerLink="/settings"
+    [variant]="Variants.Quiet"
+    [iconOnly]="true"
+    [icon]="Icons.Ellipsis"
+    aria-label="More: Settings"
+  ></a>
+</asys-now-header>
 <p class="now__status" role="status">{{ statusLine() }}</p>
 @if (dataStore.now(); as now) {
   @if (displayed(); as top) {
@@ -11,14 +20,15 @@
       [reason]="top.reasonText"
       [quadrant]="top.reason.quadrant"
       [overdue]="top.reason.overdue"
+      [dueFact]="dueFact(top)"
       [estimate]="estimateText(top.task)"
+      [area]="areaName(top.task)"
       [taskId]="top.task.id"
       [morph]="morphId() === top.task.id"
       [canLogProgress]="canLogProgress()"
       [actionsDisabled]="busy(top.task.id)"
       (done)="done(top.task, Origins.Button, $event.keyboard)"
       (logProgress)="openForm(top.task.id)"
-      (open)="open(top.task.id)"
     >
       @if (dataStore.awaitingSync().has(top.task.id)) {
         <p asys-sync-note></p>

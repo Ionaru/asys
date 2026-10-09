@@ -1,9 +1,7 @@
 /* SPDX-License-Identifier: EUPL-1.2 */
-.now__title {
+asys-now-header {
+  display: block;
   margin: 0 0 var(--space-3);
-  font-size: var(--font-size-title);
-  line-height: var(--line-height-title);
-  font-weight: 700;
 }
 
 .now__status {

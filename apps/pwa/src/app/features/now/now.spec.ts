@@ -1,13 +1,17 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { computed, ErrorHandler, signal, type AnimationCallbackEvent } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter, Router, type UrlTree } from '@angular/router';
+import { provideRouter } from '@angular/router';
 import {
   CommandTag,
+  IsoWeekday,
   pick,
+  reasonFact,
   RejectedReason,
   TaskKind,
   TaskStatus,
+  type ActiveHours,
+  type Area,
   type Command,
   type DomainState,
   type Instant,
@@ -110,12 +114,44 @@ const FULL = domainState([INVOICE, DENTIST, PLANTS, FLIGHTS, REPORT], {
   links: [{ id: 'l1', taskId: 'report', blockerId: 'dentist' }],
 });
 
+// Active at every minute of the week, so an Area never moves a Task out of the ranking.
+const ALL_DAY: ActiveHours = {
+  [IsoWeekday.Monday]: [[0, 1440]],
+  [IsoWeekday.Tuesday]: [[0, 1440]],
+  [IsoWeekday.Wednesday]: [[0, 1440]],
+  [IsoWeekday.Thursday]: [[0, 1440]],
+  [IsoWeekday.Friday]: [[0, 1440]],
+  [IsoWeekday.Saturday]: [[0, 1440]],
+  [IsoWeekday.Sunday]: [[0, 1440]],
+};
+
+const area = (id: string, name: string): Area => ({
+  id,
+  name,
+  activeHours: ALL_DAY,
+  defaultPrivacy: null,
+  version: 1,
+});
+
+const HOME = area('home', 'Home');
+
 const must = <T>(value: T | null | undefined, what = 'value'): T => {
   if (value === null || value === undefined) {
     throw new Error(`Missing ${what}`);
   }
 
   return value;
+};
+
+/** What a sighted person reads: the text without the icons and the visually hidden parts. */
+const visibleText = (el: Element): string => {
+  const copy = el.cloneNode(true) as Element;
+
+  for (const part of Array.from(copy.querySelectorAll('svg, .asys-visually-hidden'))) {
+    part.remove();
+  }
+
+  return (copy.textContent ?? '').replace(/\s+/g, ' ').trim();
 };
 
 const deferred = <T>() => {
@@ -221,7 +257,7 @@ const setup = async (options: SetupOptions = {}) => {
       el,
       keyframes,
       options: playOptions,
-      title: el.querySelector('.asys-top-pick__title')?.textContent?.trim() ?? null,
+      title: el.querySelector('.asys-top-pick__title-text')?.textContent?.trim() ?? null,
       opacity: el instanceof HTMLElement ? el.style.opacity : null,
     });
 
@@ -273,10 +309,16 @@ const setup = async (options: SetupOptions = {}) => {
     fixture.detectChanges();
     await fixture.whenStable();
   };
-  const heading = (): HTMLElement => must(root().querySelector('h1.now__title'));
+  const nowHeader = (): HTMLElement => must(root().querySelector('asys-now-header'));
+  const heading = (): HTMLElement => must(root().querySelector('asys-now-header h1'));
+  const moreLink = (): HTMLAnchorElement => must(root().querySelector('asys-now-header a'));
   const statusLine = (): HTMLElement => must(root().querySelector('p.now__status'));
   const topPick = (): HTMLElement | null => root().querySelector('asys-top-pick');
-  const topTitle = (): HTMLElement => must(root().querySelector('.asys-top-pick__title'));
+  // The title text carries the Task id and morph hooks; the link around it takes focus.
+  const topTitle = (): HTMLElement => must(root().querySelector('.asys-top-pick__title-text'));
+  const topLink = (): HTMLAnchorElement => must(root().querySelector('a.asys-top-pick__link'));
+  const topFacts = (): HTMLElement[] =>
+    Array.from(root().querySelectorAll('asys-top-pick ul.asys-facts > li'));
   const topButton = (name: string): HTMLButtonElement | undefined =>
     Array.from(topPick()?.querySelectorAll('button') ?? []).find(
       (b) => b.textContent?.trim() === name,
@@ -329,10 +371,14 @@ const setup = async (options: SetupOptions = {}) => {
     root,
     text,
     settle,
+    nowHeader,
     heading,
+    moreLink,
     statusLine,
     topPick,
     topTitle,
+    topLink,
+    topFacts,
     topButton,
     click,
     form,
@@ -391,9 +437,9 @@ describe('Now', () => {
     });
 
     it('always has the heading and an empty status line', async () => {
-      const { heading, statusLine } = await setup({ state: null });
+      const { heading, statusLine, text } = await setup({ state: null });
 
-      expect(heading().textContent?.trim()).toBe('Now');
+      expect(text(heading())).toMatch(/^Now, \S/);
       expect(heading().tagName).toBe('H1');
       expect(heading().getAttribute('tabindex')).toBe('-1');
       expect(statusLine().getAttribute('role')).toBe('status');
@@ -408,11 +454,107 @@ describe('Now', () => {
     });
   });
 
-  describe('the status line', () => {
-    it('sits directly under the heading when there is state', async () => {
-      const { heading, statusLine } = await setup();
+  describe('the header', () => {
+    const STATES: [string, SetupOptions][] = [
+      ['loaded', {}],
+      ['loading', { state: null, status: SyncStatus.Loading }],
+      ['failed', { state: null, status: SyncStatus.Failed }],
+    ];
 
-      expect(heading().nextElementSibling).toBe(statusLine());
+    it.each(STATES)(
+      'is the NowHeader, first in the template, in the %s state',
+      async (_, options) => {
+        const { root, nowHeader, heading, statusLine } = await setup(options);
+
+        expect(root().firstElementChild).toBe(nowHeader());
+        expect(root().querySelectorAll('asys-now-header')).toHaveLength(1);
+        expect(root().querySelectorAll('h1')).toHaveLength(1);
+        expect(heading().closest('asys-now-header')).toBe(nowHeader());
+        expect(nowHeader().nextElementSibling).toBe(statusLine());
+      },
+    );
+
+    it('reads Now and the moment from the clock in the zone of the Settings', async () => {
+      const { heading, text } = await setup();
+      const time = must(heading().querySelector('time'));
+
+      expect(text(heading())).toBe('Now, Sun 4 Oct · 10:00');
+      expect(time.getAttribute('datetime')).toBe('2026-10-04T10:00');
+      expect(text(time)).toBe('Sun 4 Oct · 10:00');
+    });
+
+    it('shows another day and time when the clock says so', async () => {
+      const { heading, clockNow, text, settle } = await setup();
+
+      // Friday 9 October 2026, 14:05 in Amsterdam.
+      clockNow.set(Date.parse('2026-10-09T12:05:00.000Z') as Instant);
+      await settle();
+
+      expect(text(heading())).toBe('Now, Fri 9 Oct · 14:05');
+      expect(must(heading().querySelector('time')).getAttribute('datetime')).toBe(
+        '2026-10-09T14:05',
+      );
+    });
+
+    it('follows each tick of the clock', async () => {
+      const { heading, clockNow, text, settle } = await setup();
+
+      clockNow.set(T0 + MINUTE);
+      await settle();
+
+      expect(text(heading())).toBe('Now, Sun 4 Oct · 10:01');
+      expect(must(heading().querySelector('time')).getAttribute('datetime')).toBe(
+        '2026-10-04T10:01',
+      );
+
+      clockNow.set(T0 + 60 * MINUTE);
+      await settle();
+
+      expect(text(heading())).toBe('Now, Sun 4 Oct · 11:00');
+    });
+
+    it('uses the time zone of the Settings', async () => {
+      const { heading, text } = await setup({
+        state: domainState([INVOICE], {
+          settings: { timeZone: 'America/New_York', urgencyWindowDays: 2 },
+        }),
+      });
+
+      expect(text(heading())).toBe('Now, Sun 4 Oct · 04:00');
+      expect(must(heading().querySelector('time')).getAttribute('datetime')).toBe(
+        '2026-10-04T04:00',
+      );
+    });
+
+    it('shows UTC while there is no state', async () => {
+      const { heading, text } = await setup({ state: null, status: SyncStatus.Loading });
+
+      expect(text(heading())).toBe('Now, Sun 4 Oct · 08:00');
+    });
+
+    it.each(STATES)(
+      'has a More link to Settings after the heading in the %s state',
+      async (_, options) => {
+        const { heading, moreLink, text } = await setup(options);
+        const link = moreLink();
+
+        expect(link.getAttribute('href')).toBe('/settings');
+        expect(link.getAttribute('aria-label')).toBe('More: Settings');
+        expect(link.classList.contains('asys-button--icon')).toBe(true);
+        expect(link.classList.contains('asys-button--quiet')).toBe(true);
+        expect(link.querySelector('svg[data-icon]')?.getAttribute('data-icon')).toBe('ellipsis');
+        expect(text(link)).toBe('');
+        expect(heading().nextElementSibling).toBe(link);
+        expect(link.parentElement).toBe(heading().parentElement);
+      },
+    );
+  });
+
+  describe('the status line', () => {
+    it('follows the header when there is state', async () => {
+      const { nowHeader, statusLine } = await setup();
+
+      expect(nowHeader().nextElementSibling).toBe(statusLine());
       expect(statusLine().textContent?.trim()).toBe('');
     });
 
@@ -423,57 +565,55 @@ describe('Now', () => {
       expect(getComputedStyle(statusLine()).display).not.toBe('none');
     });
 
-    it('sits directly under the heading without state', async () => {
-      const { heading, statusLine } = await setup({ state: null });
+    it('follows the header without state', async () => {
+      const { nowHeader, statusLine } = await setup({ state: null });
 
-      expect(heading().nextElementSibling).toBe(statusLine());
+      expect(nowHeader().nextElementSibling).toBe(statusLine());
     });
   });
 
   describe('the top pick', () => {
     it('shows the first ranked Task with its reason from the domain, chip, estimate and badge', async () => {
-      const { topPick, topTitle, now } = await setup();
+      const { topPick, topTitle, topFacts, now, text } = await setup();
       const first = must(now().ranked[0]);
 
       expect(first.task.id).toBe('invoice');
       expect(topTitle().textContent?.trim()).toBe('Pay the invoice');
-      expect(must(topPick()).querySelector('.asys-top-pick__reason')?.textContent?.trim()).toBe(
+      expect(text(must(must(topPick()).querySelector('.asys-top-pick__reason')))).toBe(
         first.reasonText,
       );
       expect(first.reasonText).toContain('Due');
       expect(first.reasonText).toContain('important');
+      expect(text(must(must(topPick()).querySelector('li.asys-quadrant'))).toLowerCase()).toBe(
+        `quadrant: ${first.reason.quadrant}`,
+      );
+      expect(must(topFacts()[0]).querySelector('.asys-num')?.textContent?.trim()).toBe('30 min');
       expect(
         must(topPick())
-          .querySelector('asys-quadrant-chip')
-          ?.textContent?.replace(/\s+/g, ' ')
-          .trim()
-          .toLowerCase(),
-      ).toBe(`quadrant: ${first.reason.quadrant}`);
-      expect(must(topPick()).querySelector('.asys-top-pick__estimate')?.textContent?.trim()).toBe(
-        '30 min',
-      );
-      expect(must(topPick()).querySelector('asys-status-badge')?.textContent?.trim()).toBe(
-        'Overdue',
-      );
+          .querySelector('.asys-top-pick__flags asys-status-badge')
+          ?.textContent?.trim(),
+      ).toBe('Overdue');
     });
 
-    it('shows no Overdue badge for a Task that is not overdue', async () => {
-      const { topPick, topTitle, now } = await setup({ state: without(FULL, 'invoice') });
+    it('shows no flags and no Overdue badge for a Task that is not overdue', async () => {
+      const { topPick, topTitle, topFacts, now } = await setup({ state: without(FULL, 'invoice') });
 
       expect(must(now().ranked[0]).task.id).toBe('dentist');
       expect(topTitle().textContent?.trim()).toBe('Call the dentist');
+      expect(must(topPick()).querySelector('.asys-top-pick__flags')).toBeNull();
       expect(must(topPick()).querySelector('asys-status-badge')).toBeNull();
-      expect(must(topPick()).querySelector('.asys-top-pick__estimate')?.textContent?.trim()).toBe(
-        '20 min',
-      );
+      expect(must(topFacts()[0]).querySelector('.asys-num')?.textContent?.trim()).toBe('20 min');
     });
 
-    it('offers Done, Log progress and Open, enabled', async () => {
-      const { topButton } = await setup();
+    it('offers Done and Log progress, enabled, and no Open', async () => {
+      const { topPick, topButton } = await setup();
 
+      expect(
+        Array.from(must(topPick()).querySelectorAll('button'), (b) => b.textContent?.trim()),
+      ).toEqual(['Done', 'Log progress']);
       expect(topButton('Done')?.disabled).toBe(false);
       expect(topButton('Log progress')?.disabled).toBe(false);
-      expect(topButton('Open')?.disabled).toBe(false);
+      expect(topButton('Open')).toBeUndefined();
     });
 
     it('hides Log progress when the Estimate is 1', async () => {
@@ -494,20 +634,135 @@ describe('Now', () => {
       expect(topButton('Log progress')).toBeDefined();
     });
 
-    it('Open navigates to the Task', async () => {
-      const { fixture, topButton, click } = await setup();
-      const router = fixture.debugElement.injector.get(Router);
-      const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+    it('links the title to the Task, with href /tasks/<id>', async () => {
+      const { topLink, topPick } = await setup();
 
-      await click(topButton('Open'));
+      expect(topLink().getAttribute('href')).toBe('/tasks/invoice');
+      expect(topLink().textContent?.trim()).toBe('Pay the invoice');
+      expect(topLink().closest('h2')).not.toBeNull();
+      expect(must(topPick()).querySelectorAll('a')).toHaveLength(1);
+    });
 
-      expect(navigate).toHaveBeenCalledTimes(1);
+    it('points the title link at the next Task once the top pick changes', async () => {
+      const { state, topLink, settle } = await setup();
 
-      const target = must(navigate.mock.calls[0])[0];
+      state.set(without(FULL, 'invoice'));
+      await settle();
 
-      expect(typeof target === 'string' ? target : router.serializeUrl(target as UrlTree)).toBe(
-        '/tasks/invoice',
-      );
+      expect(topLink().getAttribute('href')).toBe('/tasks/dentist');
+      expect(topLink().textContent?.trim()).toBe('Call the dentist');
+    });
+
+    describe('the Area', () => {
+      const withArea = (areaId: string | null, ...areas: Area[]): DomainState =>
+        domainState([task({ id: 'tap', title: 'Fix the tap', areaId })], { areas });
+
+      const kinds = (facts: HTMLElement[]): string[] =>
+        facts.map((li) =>
+          li.matches('.asys-quadrant')
+            ? 'quadrant'
+            : (li.querySelector('svg[data-icon]')?.getAttribute('data-icon') ?? ''),
+        );
+
+      it('is the name of the Area of the Task, between the Estimate and the quadrant', async () => {
+        const { topFacts, text } = await setup({ state: withArea('home', HOME) });
+        const fact = must(topFacts()[1]);
+
+        expect(kinds(topFacts())).toEqual(['stopwatch', 'folder', 'quadrant']);
+        expect(text(must(fact.querySelector('.asys-visually-hidden')))).toBe('Area:');
+        expect(visibleText(fact)).toBe('Home');
+      });
+
+      it('is picked by id among the Areas', async () => {
+        const { topFacts } = await setup({
+          state: withArea('home', area('work', 'Work'), HOME, area('other', 'Other')),
+        });
+
+        expect(topFacts()[1]?.textContent).toContain('Home');
+        expect(topFacts()[1]?.textContent).not.toContain('Work');
+        expect(topFacts()[1]?.textContent).not.toContain('Other');
+      });
+
+      it('is absent for a Task without an Area', async () => {
+        const { topFacts } = await setup({ state: withArea(null, HOME) });
+
+        expect(kinds(topFacts())).toEqual(['stopwatch', 'quadrant']);
+      });
+
+      it('is absent when no listed Area has the id of the Task', async () => {
+        const { topTitle, topFacts } = await setup({ state: withArea('gone', HOME) });
+
+        expect(topTitle().textContent?.trim()).toBe('Fix the tap');
+        expect(kinds(topFacts())).toEqual(['stopwatch', 'quadrant']);
+      });
+
+      it('follows the store when the Area is renamed', async () => {
+        const { state, topFacts, settle } = await setup({ state: withArea('home', HOME) });
+
+        state.update((s) => ({ ...must(s), areas: [{ ...HOME, name: 'House' }] }));
+        await settle();
+
+        expect(topFacts()[1]?.textContent).toContain('House');
+        expect(topFacts()[1]?.textContent).not.toContain('Home');
+      });
+    });
+
+    describe('the Due fact', () => {
+      const dangerOf = (topPick: () => HTMLElement | null): HTMLElement[] =>
+        Array.from(must(topPick()).querySelectorAll('.asys-top-pick__reason .asys-danger-text'));
+
+      it('is drawn in danger for an Overdue Task, the reason text staying whole', async () => {
+        const { topPick, now, text } = await setup();
+        const first = must(now().ranked[0]);
+        const fact = reasonFact(first.task, first.reason, T0, ZONE);
+        const reason = must(must(topPick()).querySelector('.asys-top-pick__reason'));
+
+        expect(first.reason.overdue).toBe(true);
+        expect(fact).toContain('Due');
+        expect(first.reasonText.startsWith(fact)).toBe(true);
+        expect(dangerOf(topPick)).toHaveLength(1);
+        expect(dangerOf(topPick)[0]?.textContent).toBe(fact);
+        expect(text(reason)).toBe(first.reasonText);
+      });
+
+      it('is not drawn for a Task that is not overdue', async () => {
+        const { topPick, now, text } = await setup({ state: without(FULL, 'invoice') });
+        const first = must(now().ranked[0]);
+
+        expect(first.reason.overdue).toBe(false);
+        expect(dangerOf(topPick)).toEqual([]);
+        expect(text(must(must(topPick()).querySelector('.asys-top-pick__reason')))).toBe(
+          first.reasonText,
+        );
+      });
+
+      it('follows the clock: a Task becoming overdue takes the danger fact', async () => {
+        const steady = task({ id: 'steady', title: 'Steady one', createdAt: 1 });
+        const early = task({
+          id: 'early',
+          title: 'Early bird',
+          important: false,
+          due: { date: '2026-10-04', time: '10:15' },
+          estimateMinutes: 20,
+          createdAt: 2,
+        });
+        const { topPick, clockNow, now, settle } = await setup({
+          state: domainState([steady, early]),
+        });
+
+        expect(dangerOf(topPick)).toEqual([]);
+
+        clockNow.set(T0 + 16 * MINUTE);
+        await settle();
+
+        const first = must(now().ranked[0]);
+
+        expect(first.task.id).toBe('early');
+        expect(dangerOf(topPick)).toHaveLength(1);
+        expect(dangerOf(topPick)[0]?.textContent).toBe(
+          reasonFact(first.task, first.reason, T0 + 16 * MINUTE, ZONE),
+        );
+      });
     });
   });
 
@@ -901,27 +1156,27 @@ describe('Now', () => {
     });
 
     it('moves focus to the new top pick title once the exit is over, and clears the status line', async () => {
-      const { statusLine, topTitle, topButton, press } = await setup({ allowed: true });
+      const { statusLine, topTitle, topLink, topButton, press } = await setup({ allowed: true });
 
       await press(topButton('Done'));
 
       expect(statusLine().textContent?.trim()).toBe('');
       expect(topTitle().textContent?.trim()).toBe('Call the dentist');
-      expect(document.activeElement).toBe(topTitle());
+      expect(document.activeElement).toBe(topLink());
     });
 
     it('still hands over to the next top pick when motion is not allowed', async () => {
-      const { doneUndo, topTitle, topButton, press } = await setup({ allowed: false });
+      const { doneUndo, topTitle, topLink, topButton, press } = await setup({ allowed: false });
 
       await press(topButton('Done'));
 
       expect(doneUndo.complete).toHaveBeenCalledTimes(1);
       expect(topTitle().textContent?.trim()).toBe('Call the dentist');
-      expect(document.activeElement).toBe(topTitle());
+      expect(document.activeElement).toBe(topLink());
     });
 
     it('leaves focus on the Undo bar for a keyboard Done and asks for it once', async () => {
-      const { doneUndo, topTitle, topButton, settle } = await setup({ allowed: true });
+      const { doneUndo, topTitle, topLink, topButton, settle } = await setup({ allowed: true });
 
       must(topButton('Done')).click();
       await settle();
@@ -929,7 +1184,7 @@ describe('Now', () => {
       expect(doneUndo.complete).toHaveBeenCalledExactlyOnceWith(INVOICE, DoneOrigin.Button);
       expect(doneUndo.requestFocus).toHaveBeenCalledTimes(1);
       expect(topTitle().textContent?.trim()).toBe('Call the dentist');
-      expect(document.activeElement).not.toBe(topTitle());
+      expect(document.activeElement).not.toBe(topLink());
     });
 
     it('does nothing for a second Done of the Task that is leaving', async () => {
@@ -967,10 +1222,11 @@ describe('Now', () => {
     });
 
     it('takes over from a running exit for a Swipe, rising the next content and moving focus', async () => {
-      const { motion, internals, topPick, topTitle, topButton, press, settle } = await setup({
-        allowed: true,
-        hold: true,
-      });
+      const { motion, internals, topPick, topTitle, topLink, topButton, press, settle } =
+        await setup({
+          allowed: true,
+          hold: true,
+        });
 
       await press(topButton('Done'));
       await internals().done(DENTIST, DoneOrigin.Swipe, false);
@@ -983,7 +1239,7 @@ describe('Now', () => {
       expect(
         motion.plays.some((p) => JSON.stringify(p.keyframes) === JSON.stringify(RISE_KEYFRAMES)),
       ).toBe(true);
-      expect(document.activeElement).toBe(topTitle());
+      expect(document.activeElement).toBe(topLink());
     });
 
     it('shows the Task again, not leaving, when it is undone during its exit, and the exit then does nothing more', async () => {
@@ -1124,10 +1380,11 @@ describe('Now', () => {
 
     describe('as a Swipe', () => {
       it('skips the exit and rises the next content at once', async () => {
-        const { doneUndo, motion, internals, article, root, topTitle, now, settle } = await setup({
-          allowed: true,
-          hold: true,
-        });
+        const { doneUndo, motion, internals, article, root, topTitle, topLink, now, settle } =
+          await setup({
+            allowed: true,
+            hold: true,
+          });
         const card = article();
         const invoice = must(now().ranked[0]).task;
 
@@ -1141,7 +1398,7 @@ describe('Now', () => {
         expect(must(motion.plays[0]).el).toBe(card);
         expect(must(motion.plays[0]).keyframes).toEqual(RISE_KEYFRAMES);
         expect(card.style.opacity).toBe('');
-        expect(document.activeElement).toBe(topTitle());
+        expect(document.activeElement).toBe(topLink());
 
         motion.release();
       });
@@ -1185,7 +1442,9 @@ describe('Now', () => {
           must(must(link).closest('li'));
 
         it('moves focus to the top pick title when the collapsing row holds focus', async () => {
-          const { motion, internals, rows, topTitle, settle } = await setup({ allowed: true });
+          const { motion, internals, rows, topTitle, topLink, settle } = await setup({
+            allowed: true,
+          });
           const row = rowOf(rows()[0]);
 
           must(rows()[0]).focus();
@@ -1197,7 +1456,7 @@ describe('Now', () => {
           await internals().collapse(event);
           await settle();
 
-          expect(document.activeElement).toBe(topTitle());
+          expect(document.activeElement).toBe(topLink());
           expect(topTitle().textContent?.trim()).toBe('Pay the invoice');
           // The collapse itself still runs and still completes.
           expect(motion.plays).toHaveLength(1);
@@ -1206,7 +1465,7 @@ describe('Now', () => {
         });
 
         it('moves focus to the top pick title when the focus is deeper inside the collapsing row', async () => {
-          const { internals, topTitle, settle } = await setup({ allowed: true });
+          const { internals, topLink, settle } = await setup({ allowed: true });
           const row = document.createElement('li');
           const button = document.createElement('button');
 
@@ -1217,7 +1476,7 @@ describe('Now', () => {
           await internals().collapse(eventFor(row).event);
           await settle();
 
-          expect(document.activeElement).toBe(topTitle());
+          expect(document.activeElement).toBe(topLink());
         });
 
         it('moves focus to the h1 when the collapsing row holds focus and no card is displayed', async () => {
@@ -1431,7 +1690,8 @@ describe('Now', () => {
         state,
         sends,
         statusLine,
-        topTitle,
+        topLink,
+        topFacts,
         topButton,
         click,
         typeIntoForm,
@@ -1452,10 +1712,8 @@ describe('Now', () => {
 
       expect(form()).toBeNull();
       expect(statusLine().textContent?.trim()).toBe('Estimate is now 15 min.');
-      expect(document.activeElement).toBe(topTitle());
-      expect(document.querySelector('.asys-top-pick__estimate')?.textContent?.trim()).toBe(
-        '15 min',
-      );
+      expect(document.activeElement).toBe(topLink());
+      expect(must(topFacts()[0]).querySelector('.asys-num')?.textContent?.trim()).toBe('15 min');
     });
 
     it('does nothing when the screen is destroyed while the send is pending', async () => {
@@ -1597,7 +1855,7 @@ describe('Now', () => {
     const options = { state: domainState([STEADY, EARLY]) };
 
     it('closes the form and moves focus from inside it to the new top pick', async () => {
-      const { clockNow, topButton, click, form, formInput, topTitle, settle } =
+      const { clockNow, topButton, click, form, formInput, topTitle, topLink, settle } =
         await setup(options);
 
       await click(topButton('Log progress'));
@@ -1609,7 +1867,7 @@ describe('Now', () => {
 
       expect(topTitle().textContent?.trim()).toBe('Early bird');
       expect(form()).toBeNull();
-      expect(document.activeElement).toBe(topTitle());
+      expect(document.activeElement).toBe(topLink());
     });
 
     it('leaves focus alone when it was not inside the form', async () => {

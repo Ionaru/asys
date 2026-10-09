@@ -246,5 +246,5 @@ test('Enter on Done moves focus to Undo, and Escape to the next title', async ({
   await expect(undo).toBeFocused();
 
   await page.keyboard.press('Escape');
-  await expect(topPick.locator('.asys-top-pick__title')).toBeFocused();
+  await expect(topPick.locator('a.asys-top-pick__link')).toBeFocused();
 });
