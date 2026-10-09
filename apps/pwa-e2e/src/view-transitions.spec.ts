@@ -3,7 +3,7 @@
 import type { Page } from '@playwright/test';
 
 import { expect, test } from './support/fixtures.ts';
-import { seedTask } from './support/seed.ts';
+import { captureTask, seedTask } from './support/seed.ts';
 
 interface Named {
   name: string;
@@ -11,16 +11,27 @@ interface Named {
   classes: string;
 }
 
+interface Box {
+  left: number;
+  top: number;
+}
+
 interface TransitionRecord {
   kind: string | null;
   oldNames: Named[];
   newNames: Named[];
+  oldNavBoxes: Record<string, Box>;
+  newNavBoxes: Record<string, Box>;
   skipped: boolean;
   settled: boolean;
   navMarkZ: string | null;
   shellNavZ: string | null;
+  navZ: Record<string, string>;
   pageNewAnimation: string | null;
 }
+
+// The bottom nav's names that must not move between tabs: its glyphs and the Inbox count.
+const NAV_STILL = ['nav-glyph-1', 'nav-glyph-2', 'nav-glyph-3', 'nav-badge'];
 
 declare global {
   interface Window {
@@ -28,18 +39,24 @@ declare global {
   }
 }
 
-// Runs in the page before its own scripts. Records each view transition: the kind and the names on the old side
-// (read just after the router's handler), and the names and the group ladder on the new side (read on `ready`).
+// Runs in the page before its own scripts. Records each view transition: the kind, the names and the bottom nav's
+// boxes on the old side (read just after the router's handler), and the same plus the group ladder on the new side
+// (read on `ready`).
 const recordViewTransitions = (): void => {
   if (typeof Document.prototype.startViewTransition !== 'function') return;
 
   const records: TransitionRecord[] = [];
   window.__viewTransitions = records;
 
+  const nameOf = (element: Element): string | null => {
+    const name = getComputedStyle(element).getPropertyValue('view-transition-name');
+    return name === 'none' || name === '' ? null : name;
+  };
+
   const named = (): Named[] =>
     [...document.body.querySelectorAll('*')].flatMap((element) => {
-      const name = getComputedStyle(element).getPropertyValue('view-transition-name');
-      return name === 'none' || name === ''
+      const name = nameOf(element);
+      return name === null
         ? []
         : [
             {
@@ -49,6 +66,16 @@ const recordViewTransitions = (): void => {
             },
           ];
     });
+
+  const navBoxes = (): Record<string, Box> =>
+    Object.fromEntries(
+      [...document.body.querySelectorAll('*')].flatMap((element) => {
+        const name = nameOf(element);
+        if (name === null || !name.startsWith('nav-')) return [];
+        const rect = element.getBoundingClientRect();
+        return [[name, { left: Math.round(rect.left), top: Math.round(rect.top) }]];
+      }),
+    );
 
   const groupZ = (name: string): string =>
     getComputedStyle(document.documentElement, `::view-transition-group(${name})`).zIndex;
@@ -66,10 +93,13 @@ const recordViewTransitions = (): void => {
       kind: null,
       oldNames: [],
       newNames: [],
+      oldNavBoxes: {},
+      newNavBoxes: {},
       skipped: false,
       settled: false,
       navMarkZ: null,
       shellNavZ: null,
+      navZ: {},
       pageNewAnimation: null,
     };
     records.push(record);
@@ -78,13 +108,18 @@ const recordViewTransitions = (): void => {
     queueMicrotask(() => {
       record.kind = document.documentElement.getAttribute('data-transition');
       record.oldNames = named();
+      record.oldNavBoxes = navBoxes();
     });
 
     transition.ready.then(
       () => {
         record.newNames = named();
+        record.newNavBoxes = navBoxes();
         record.navMarkZ = groupZ('nav-mark');
         record.shellNavZ = groupZ('shell-nav');
+        record.navZ = Object.fromEntries(
+          Object.keys(record.newNavBoxes).map((name) => [name, groupZ(name)]),
+        );
         record.pageNewAnimation = pageNewAnimation();
         record.settled = true;
       },
@@ -158,6 +193,37 @@ test('switches tabs with a fade-through and keeps the mark above the nav', async
 
   expect(records[0]?.navMarkZ).toBe('3');
   expect(records[0]?.shellNavZ).toBe('2');
+});
+
+test('moves only the mark between tabs, leaving the glyphs and the Inbox count in place', async ({
+  page,
+}) => {
+  await captureTask(page, { title: 'Call the bank' });
+  await page.reload();
+
+  const inbox = page
+    .getByRole('navigation', { name: 'Primary' })
+    .getByRole('link', { name: 'Inbox, 1 waiting' });
+  await expect(inbox).toBeVisible();
+
+  const before = await recordCount(page);
+  await inbox.click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Inbox' })).toBeVisible();
+  const record = await lastSettled(page, before);
+
+  expect(record.kind).toBe('tab-forward');
+  expect(record.skipped).toBe(false);
+
+  for (const name of NAV_STILL) {
+    expect(record.oldNavBoxes[name], name).toBeDefined();
+    expect(record.newNavBoxes[name], name).toEqual(record.oldNavBoxes[name]);
+    expect(record.navZ[name], name).toBe('4');
+  }
+
+  expect(record.navZ['nav-mark']).toBe('3');
+  expect(record.newNavBoxes['nav-mark']?.left).toBeGreaterThan(
+    record.oldNavBoxes['nav-mark']?.left ?? Infinity,
+  );
 });
 
 test('opens the top pick with Push and moves its title, then goes back with Pop', async ({
