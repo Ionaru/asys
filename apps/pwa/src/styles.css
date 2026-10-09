@@ -276,7 +276,7 @@ textarea.asys-field__input,
   view-transition-name: shell-capture;
 }
 
-.asys-undobar {
+.asys-undo {
   view-transition-name: shell-undo;
 }
 

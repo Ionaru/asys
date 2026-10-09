@@ -24,11 +24,12 @@ export enum PauseReason {
 /** How long a Done can be undone, in milliseconds. */
 export const UNDO_WINDOW_MS = 5_000;
 
-/** The Done whose Undo window is open. */
+/** The Done whose Undo window is open, with how much of the window is left when its bar appears. */
 export interface PendingDone {
   readonly taskId: string;
   readonly title: string;
   readonly origin: DoneOrigin;
+  readonly remainingMs: number;
 }
 
 /** A Done that was not applied, with the sentence to show and what the person can do about it. */
@@ -159,8 +160,15 @@ export class DoneUndo {
     this.dataStore.hold(command, key);
     this.held = { task, command, key, origin };
     this.remaining = UNDO_WINDOW_MS;
-    this.pendingSignal.set({ taskId: task.id, title: task.title, origin });
-    this.announce(`“${task.title}” is Done.`);
+    this.pendingSignal.set({
+      taskId: task.id,
+      title: task.title,
+      origin,
+      remainingMs: UNDO_WINDOW_MS,
+    });
+    this.announce(
+      `“${task.title}” is Done. Undo is available for ${UNDO_WINDOW_MS / 1000} seconds.`,
+    );
     this.syncTimer();
 
     if (origin === DoneOrigin.Button) {
@@ -206,9 +214,19 @@ export class DoneUndo {
 
   /** Closes the failure or notice; a displaced Done's window runs again for the time it had left. */
   dismiss(): void {
+    const displaced = this.failureSignal() !== null;
+
     this.failureSignal.set(null);
     this.failedTask = null;
     this.syncTimer();
+
+    // The bar shows the displaced Done again, so its ring starts where the timer is.
+    if (displaced) {
+      this.pendingSignal.update((pending) =>
+        pending === null ? null : { ...pending, remainingMs: this.remaining },
+      );
+    }
+
     this.clearPausesWhenIdle();
   }
 

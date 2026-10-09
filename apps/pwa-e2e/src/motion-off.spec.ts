@@ -131,8 +131,10 @@ const done = async (page: Page): Promise<void> => {
     .locator('article.asys-top-pick')
     .getByRole('button', { name: 'Done', exact: true })
     .click();
-  await expect(page.locator('.shell__status')).toHaveText('“Renew the permit” is Done.');
-  await expect(page.locator('.asys-undobar')).toBeVisible();
+  await expect(page.locator('.shell__status')).toHaveText(
+    '“Renew the permit” is Done. Undo is available for 5 seconds.',
+  );
+  await expect(page.locator('.asys-undo')).toBeVisible();
 };
 
 test.describe('under reduced motion', () => {

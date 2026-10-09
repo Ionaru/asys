@@ -13,6 +13,7 @@ import {
   DoneOrigin,
   DoneUndo,
   PauseReason,
+  UNDO_WINDOW_MS,
   type DoneFailure,
   type DoneNotice,
   type DoneUndone,
@@ -57,7 +58,23 @@ class NowStub {
   protected readonly items = nowItems;
 }
 
-const PENDING: PendingDone = { taskId: 'a', title: 'Pay the invoice', origin: DoneOrigin.Button };
+const PENDING: PendingDone = {
+  taskId: 'a',
+  title: 'Pay the invoice',
+  origin: DoneOrigin.Button,
+  remainingMs: UNDO_WINDOW_MS,
+};
+
+/** The Undo bar's ring duration and delay, set on its host as custom properties. */
+const RING_DURATION = '--asys-undo-duration';
+
+const RING_DELAY = '--asys-undo-delay';
+
+/** No delay, however the bar spells a zero: `0ms` or `-0ms`. */
+const NO_DELAY = /^-?0ms$/;
+
+const ringStyle = (bar: HTMLElement | null, name: string): string | undefined =>
+  bar?.style.getPropertyValue(name).trim();
 
 const NOT_DONE: DoneFailure = {
   taskId: 'a',
@@ -1227,14 +1244,79 @@ describe('ShellLayout', () => {
       doneUndo.pending.set(PENDING);
       await settle();
 
-      expect(undoBar()?.classList.contains('asys-undobar')).toBe(true);
+      expect(undoBar()?.classList.contains('asys-undo')).toBe(true);
+      expect(undoBar()?.classList.contains('asys-undobar')).toBe(false);
       expect(undoBar()?.textContent).toContain('Pay the invoice');
       expect(undoButton('Undo')).toBeDefined();
+      expect(undoButton('Undo')?.getAttribute('aria-label')).toBe('Undo Done: Pay the invoice');
 
       undoButton('Undo')?.click();
       await settle();
 
       expect(doneUndo.undo).toHaveBeenCalledTimes(1);
+    });
+
+    it('gives the bar the whole Undo window to run for a Done that has just opened', async () => {
+      const { doneUndo, undoBar, settle } = await setup();
+
+      doneUndo.pending.set(PENDING);
+      await settle();
+
+      expect(ringStyle(undoBar(), RING_DURATION)).toBe(`${UNDO_WINDOW_MS}ms`);
+      expect(ringStyle(undoBar(), RING_DELAY)).toMatch(NO_DELAY);
+    });
+
+    it('hands the bar the time the Done has left, so the ring starts part-way round', async () => {
+      const { doneUndo, undoBar, settle } = await setup();
+
+      doneUndo.pending.set({ ...PENDING, remainingMs: 3_000 });
+      await settle();
+
+      expect(ringStyle(undoBar(), RING_DURATION)).toBe(`${UNDO_WINDOW_MS}ms`);
+      expect(ringStyle(undoBar(), RING_DELAY)).toBe('-2000ms');
+    });
+
+    it('restarts the ring where the timer is when a dismissed failure lets the Done run again', async () => {
+      const { doneUndo, undoBar, settle } = await setup();
+
+      doneUndo.pending.set(PENDING);
+      doneUndo.failure.set(NOT_DONE);
+      await settle();
+      doneUndo.pending.set({ ...PENDING, remainingMs: 3_000 });
+      doneUndo.failure.set(null);
+      await settle();
+
+      expect(undoBar()?.textContent).toContain('Pay the invoice');
+      expect(ringStyle(undoBar(), RING_DELAY)).toBe('-2000ms');
+    });
+
+    it('starts the ring again when a second Done replaces the first in the open bar', async () => {
+      const { doneUndo, undoBar, settle } = await setup();
+
+      doneUndo.pending.set(PENDING);
+      await settle();
+
+      const fill = must(undoBar()?.querySelector('.asys-undo__fill'));
+      const animation = { currentTime: 2_400 } as unknown as Animation;
+
+      fill.getAnimations = () => [animation];
+      doneUndo.pending.set({ ...PENDING, taskId: 'b', title: 'Water the plants' });
+      await settle();
+
+      expect(undoBar()?.querySelector('.asys-undo__fill')).toBe(fill);
+      expect(animation.currentTime).toBe(0);
+    });
+
+    it('carries the time left only into the Done layout, never into a failure', async () => {
+      const { doneUndo, undoBar, settle } = await setup();
+
+      doneUndo.pending.set({ ...PENDING, remainingMs: 3_000 });
+      doneUndo.failure.set(NOT_DONE);
+      await settle();
+
+      expect(undoBar()?.textContent).toContain('is not Done');
+      expect(ringStyle(undoBar(), RING_DURATION)).toBe(`${UNDO_WINDOW_MS}ms`);
+      expect(ringStyle(undoBar(), RING_DELAY)).toMatch(NO_DELAY);
     });
 
     it('sits after <main> in the shell, not inside it', async () => {
@@ -1361,6 +1443,25 @@ describe('ShellLayout', () => {
       expect(doneUndo.resume).toHaveBeenLastCalledWith(PauseReason.Focus);
       expect(doneUndo.pause).toHaveBeenCalledTimes(2);
       expect(doneUndo.resume).toHaveBeenCalledTimes(2);
+    });
+
+    it('pauses the ring while the pointer rests on the bar, and lets it run when it leaves', async () => {
+      const { doneUndo, undoBar, settle } = await setup();
+
+      doneUndo.pending.set(PENDING);
+      await settle();
+
+      expect(undoBar()?.classList.contains('is-paused')).toBe(false);
+
+      undoBar()?.dispatchEvent(new Event('pointerenter'));
+      await settle();
+
+      expect(undoBar()?.classList.contains('is-paused')).toBe(true);
+
+      undoBar()?.dispatchEvent(new Event('pointerleave'));
+      await settle();
+
+      expect(undoBar()?.classList.contains('is-paused')).toBe(false);
     });
   });
 
@@ -1738,7 +1839,12 @@ describe('ShellLayout', () => {
         await settle();
         undoButton('Undo')?.focus();
         await settle();
-        doneUndo.pending.set({ taskId: 'b', title: 'Call Marit', origin: DoneOrigin.Button });
+        doneUndo.pending.set({
+          taskId: 'b',
+          title: 'Call Marit',
+          origin: DoneOrigin.Button,
+          remainingMs: UNDO_WINDOW_MS,
+        });
         await settle();
 
         expect(document.activeElement).toBe(undoButton('Undo'));

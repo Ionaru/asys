@@ -1,40 +1,48 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
 @switch (variant()) {
   @case (Variant.Done) {
-    <p class="asys-undobar__text asys-undobar__text--done">
-      <svg class="asys-undobar__check" aria-hidden="true" viewBox="0 0 24 24">
-        <path
-          d="M5 12.5l4.5 4.5L19 7.5"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
-      </svg>
-      <span class="asys-undobar__done">Done</span>
-      <span class="asys-undobar__title">{{ title() }}</span>
-    </p>
+    <asys-icon class="asys-undo__check" [name]="Icons.Check" />
+    <span class="asys-undo__text">
+      <span class="asys-undo__status">Done</span>
+      <span class="asys-undo__title">{{ title() }}</span>
+    </span>
     <button
       asys-button
       type="button"
-      class="asys-undobar__action"
-      [variant]="Variants.Quiet"
+      class="asys-undo__button"
+      [variant]="Variants.Secondary"
+      [attr.aria-label]="'Undo Done: ' + title()"
       (click)="undo.emit()"
     >
+      <span class="asys-undo__timer" aria-hidden="true">
+        <svg viewBox="0 0 20 20">
+          <circle class="asys-undo__ring" cx="10" cy="10" r="9" />
+          <circle
+            #fill
+            class="asys-undo__fill"
+            cx="10"
+            cy="10"
+            r="3.25"
+            pathLength="100"
+            transform="rotate(-90 10 10)"
+          />
+        </svg>
+      </span>
       Undo
     </button>
   }
   @case (Variant.Failed) {
-    <p class="asys-undobar__text">“{{ title() }}” is not Done.</p>
+    <p class="asys-undo__text asys-undo__text--failed">“{{ title() }}” is not Done.</p>
     @if (detail() !== null) {
-      <p class="asys-undobar__detail">{{ detail() }}</p>
+      <p class="asys-undo__detail">{{ detail() }}</p>
     }
     @if (canRetry()) {
       <button
         asys-button
         type="button"
-        class="asys-undobar__action"
+        class="asys-undo__action"
+        [variant]="Variants.Secondary"
+        [icon]="Icons.RotateRight"
         (click)="retry.emit({ keyboard: $event.detail === 0 })"
       >
         Try again
@@ -43,7 +51,7 @@
     <button
       asys-button
       type="button"
-      class="asys-undobar__action"
+      class="asys-undo__action"
       [variant]="Variants.Quiet"
       (click)="dismiss.emit({ keyboard: $event.detail === 0 })"
     >
@@ -52,12 +60,12 @@
   }
   @case (Variant.Notice) {
     @if (detail() !== null) {
-      <p class="asys-undobar__detail">{{ detail() }}</p>
+      <p class="asys-undo__detail">{{ detail() }}</p>
     }
     <button
       asys-button
       type="button"
-      class="asys-undobar__action"
+      class="asys-undo__action"
       [variant]="Variants.Quiet"
       (click)="dismiss.emit({ keyboard: $event.detail === 0 })"
     >

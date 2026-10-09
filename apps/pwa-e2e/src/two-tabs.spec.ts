@@ -28,7 +28,9 @@ test('A Done Task closed in another tab leaves a Review item in the Inbox', asyn
   }
 
   await page.getByRole('button', { name: 'Done', exact: true }).click();
-  await expect(page.locator('.shell__status')).toHaveText('“Pay the invoice” is Done.');
+  await expect(page.locator('.shell__status')).toHaveText(
+    '“Pay the invoice” is Done. Undo is available for 5 seconds.',
+  );
   // The Done is held for 5 s. Sending it is the window ending.
   const firstSent = page.waitForResponse('**/v1/commands');
   await page.clock.fastForward(5_000);
@@ -50,7 +52,7 @@ test('A Done Task closed in another tab leaves a Review item in the Inbox', asyn
   expect(await commandAnswer).toContain('NotApplicable');
   // The bar shows the notice once the send has settled, and settling waits for the gated sync.
   release();
-  await expect(page2.locator('.asys-undobar')).toContainText(
+  await expect(page2.locator('.asys-undo')).toContainText(
     'That no longer applied, so it waits in the Inbox as a Review item.',
   );
 

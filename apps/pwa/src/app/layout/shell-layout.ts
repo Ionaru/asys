@@ -19,7 +19,7 @@ import { Router, RouterOutlet } from '@angular/router';
 import { CaptureQueue } from '../core/data/capture-queue';
 import { CommandAttempts } from '../core/data/command-attempts';
 import { DataStore } from '../core/data/data-store';
-import { DoneUndo, PauseReason } from '../core/data/done-undo';
+import { DoneUndo, PauseReason, UNDO_WINDOW_MS } from '../core/data/done-undo';
 import { Motion } from '../core/platform/motion';
 import { TAB_PATHS } from '../core/platform/tabs';
 import { pathOf } from '../core/platform/url-path';
@@ -69,6 +69,8 @@ export class ShellLayout {
 
   protected readonly PauseReason = PauseReason;
 
+  protected readonly windowMs = UNDO_WINDOW_MS;
+
   protected readonly onCapturePath = computed(() => {
     const navigation = this.router.lastSuccessfulNavigation();
 
@@ -110,6 +112,8 @@ export class ShellLayout {
         title: failure.title,
         detail: failure.message,
         canRetry: failure.canRetry,
+        remainingMs: null,
+        windowKey: null,
       };
     }
 
@@ -121,6 +125,8 @@ export class ShellLayout {
         title: pending.title,
         detail: null,
         canRetry: false,
+        remainingMs: pending.remainingMs,
+        windowKey: pending.taskId,
       };
     }
 

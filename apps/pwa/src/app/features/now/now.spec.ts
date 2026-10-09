@@ -1454,6 +1454,7 @@ describe('Now', () => {
         taskId: 'invoice',
         title: 'Pay the invoice',
         origin: DoneOrigin.Button,
+        remainingMs: 5_000,
       });
       await internals().done(INVOICE, DoneOrigin.Button, false);
       await settle();
