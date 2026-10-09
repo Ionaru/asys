@@ -12,6 +12,9 @@ import { UndoBar, UndoBarVariant } from './undo-bar';
       [title]="title()"
       [detail]="detail()"
       [canRetry]="canRetry()"
+      [windowMs]="windowMs()"
+      [remainingMs]="remainingMs()"
+      [windowKey]="windowKey()"
       (undo)="onUndo($event)"
       (retry)="onRetry($event)"
       (dismiss)="onDismiss($event)"
@@ -31,6 +34,12 @@ class Host {
   readonly detail = signal<string | null>(null);
 
   readonly canRetry = signal(false);
+
+  readonly windowMs = signal(5000);
+
+  readonly remainingMs = signal<number | null>(null);
+
+  readonly windowKey = signal<string | null>('task-1');
 
   undos = 0;
 
@@ -67,7 +76,23 @@ class Host {
   }
 }
 
+/** A bar with neither `windowMs` nor `remainingMs` bound, to see their defaults. */
+@Component({
+  imports: [UndoBar],
+  template: `<asys-undo-bar [variant]="variant" title="Pay the invoice" />`,
+})
+class BareHost {
+  protected readonly variant = UndoBarVariant.Done;
+}
+
 const NOT_SENT = 'ASYS cannot reach the server. Try again.';
+
+const DURATION = '--asys-undo-duration';
+
+const DELAY = '--asys-undo-delay';
+
+/** No delay, however the bar spells a zero: `0ms` or `-0ms`. */
+const NO_DELAY = /^-?0ms$/;
 
 const REVIEW_SENTENCE = 'That no longer applied, so it waits in the Inbox as a Review item.';
 
@@ -100,6 +125,13 @@ const setup = async (variant = UndoBarVariant.Done) => {
   const labels = (): (string | undefined)[] => buttons().map((b) => b.textContent?.trim());
   const text = (selector: string): string | undefined =>
     q(selector)?.textContent?.replace(/\s+/g, ' ').trim();
+  /** A custom property of the host's inline style, such as the ring's duration. */
+  const style = (name: string): string => bar().style.getPropertyValue(name).trim();
+  /** Which of `classNames` each direct child of the bar carries, in document order. */
+  const order = (...classNames: string[]): (string | undefined)[] =>
+    Array.from(bar().children).map((child) =>
+      classNames.find((className) => child.classList.contains(className)),
+    );
   const update = async (change: () => void): Promise<void> => {
     change();
     await fixture.whenStable();
@@ -112,7 +144,7 @@ const setup = async (variant = UndoBarVariant.Done) => {
     return event;
   };
 
-  return { fixture, host, bar, q, buttons, button, labels, text, update, keydown };
+  return { fixture, host, bar, q, buttons, button, labels, text, style, order, update, keydown };
 };
 
 describe('UndoBar', () => {
@@ -120,48 +152,100 @@ describe('UndoBar', () => {
     document.body.innerHTML = '';
   });
 
-  it('puts the class asys-undobar on its host', async () => {
+  it('puts the class asys-undo on its host, and not the old asys-undobar', async () => {
     const { bar } = await setup();
 
-    expect(bar().classList.contains('asys-undobar')).toBe(true);
+    expect(bar().classList.contains('asys-undo')).toBe(true);
+    expect(bar().classList.contains('asys-undobar')).toBe(false);
   });
 
   describe('the Done variant', () => {
-    it('shows an aria-hidden check, Done and the title on one line of text', async () => {
-      const { q, text } = await setup();
+    it('lays out the check, the text and the Undo button in that order', async () => {
+      const { order } = await setup();
 
-      const check = q('svg.asys-undobar__check');
+      expect(order('asys-undo__check', 'asys-undo__text', 'asys-undo__button')).toEqual([
+        'asys-undo__check',
+        'asys-undo__text',
+        'asys-undo__button',
+      ]);
+    });
+
+    it('draws the check as an aria-hidden Icon with the check glyph', async () => {
+      const { q } = await setup();
+
+      const check = q('asys-icon.asys-undo__check');
 
       expect(check).not.toBeNull();
       expect(check?.getAttribute('aria-hidden')).toBe('true');
-      expect(check?.closest('.asys-undobar__text')).not.toBeNull();
-      expect(text('.asys-undobar__done')).toBe('Done');
-      expect(text('.asys-undobar__title')).toBe('Pay the invoice');
-      expect(q('.asys-undobar__done')?.closest('.asys-undobar__text')).not.toBeNull();
-      expect(q('.asys-undobar__title')?.closest('.asys-undobar__text')).not.toBeNull();
+      expect(check?.querySelector('svg[data-icon="check"]')).not.toBeNull();
     });
 
-    it('shows Undo as its only button, a quiet one', async () => {
+    it('shows Done, then the title, in one block of text', async () => {
+      const { q, text } = await setup();
+
+      const status = must(q('.asys-undo__status'));
+      const title = must(q('.asys-undo__title'));
+
+      expect(text('.asys-undo__status')).toBe('Done');
+      expect(text('.asys-undo__title')).toBe('Pay the invoice');
+      expect(status.closest('.asys-undo__text')).not.toBeNull();
+      expect(title.closest('.asys-undo__text')).toBe(status.closest('.asys-undo__text'));
+      expect(status.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('shows Undo as its only button, a Secondary one', async () => {
       const { labels, button } = await setup();
 
       expect(labels()).toEqual(['Undo']);
       expect(button('Undo')?.type).toBe('button');
-      expect(button('Undo')?.classList.contains('asys-button--quiet')).toBe(true);
-      expect(button('Undo')?.classList.contains('asys-undobar__action')).toBe(true);
+      expect(button('Undo')?.classList.contains('asys-button--secondary')).toBe(true);
+      expect(button('Undo')?.classList.contains('asys-button--quiet')).toBe(false);
+      expect(button('Undo')?.classList.contains('asys-undo__button')).toBe(true);
     });
 
-    it('shows no failure text', async () => {
-      const { bar } = await setup();
+    it('names the button Undo Done and the title, while its text stays Undo', async () => {
+      const { button } = await setup();
+
+      expect(button('Undo')?.getAttribute('aria-label')).toBe('Undo Done: Pay the invoice');
+      expect(button('Undo')?.textContent?.trim()).toBe('Undo');
+    });
+
+    it('draws the timer inside the button, hidden from screen readers, as a ring and a fill', async () => {
+      const { q, button } = await setup();
+
+      const timer = q('span.asys-undo__timer');
+      const svg = timer?.querySelector('svg');
+      const ring = timer?.querySelector('circle.asys-undo__ring');
+      const fill = timer?.querySelector('circle.asys-undo__fill');
+
+      expect(timer).not.toBeNull();
+      expect(timer?.getAttribute('aria-hidden')).toBe('true');
+      expect(button('Undo')?.contains(timer ?? null)).toBe(true);
+      expect(svg?.getAttribute('viewBox')).toBe('0 0 20 20');
+      expect(ring).not.toBeNull();
+      expect(fill).not.toBeNull();
+      expect(ring?.getAttribute('r')).toBe('9');
+      expect(fill?.getAttribute('r')).toBe('3.25');
+      expect(fill?.getAttribute('pathLength')).toBe('100');
+      expect(timer?.querySelectorAll('circle')).toHaveLength(2);
+    });
+
+    it('shows no failure text, detail or Try again icon', async () => {
+      const { bar, q } = await setup();
 
       expect(bar().textContent).not.toContain('is not Done');
+      expect(q('.asys-undo__text--failed')).toBeNull();
+      expect(q('.asys-undo__detail')).toBeNull();
+      expect(q('svg[data-icon="rotate-right"]')).toBeNull();
     });
 
-    it('follows the title input', async () => {
-      const { host, update, text } = await setup();
+    it('follows the title input, in the text and in the button name', async () => {
+      const { host, update, text, button } = await setup();
 
       await update(() => host.title.set('Call Marit'));
 
-      expect(text('.asys-undobar__title')).toBe('Call Marit');
+      expect(text('.asys-undo__title')).toBe('Call Marit');
+      expect(button('Undo')?.getAttribute('aria-label')).toBe('Undo Done: Call Marit');
     });
 
     it('emits undo when Undo is clicked, and nothing else', async () => {
@@ -184,6 +268,158 @@ describe('UndoBar', () => {
 
       expect(host.voidPayloads).toEqual([undefined, undefined]);
     });
+
+    it('emits undo when the press lands on the timer inside the button', async () => {
+      const { host, q, fixture } = await setup();
+
+      pointerClick(must(q('.asys-undo__timer')));
+      await fixture.whenStable();
+
+      expect(host.undos).toBe(1);
+    });
+  });
+
+  describe('the ring timer', () => {
+    it('runs for 5000 ms from the start when neither window nor remaining is bound', async () => {
+      const fixture = TestBed.createComponent(BareHost);
+
+      await fixture.whenStable();
+
+      const bar: HTMLElement = fixture.nativeElement.querySelector('asys-undo-bar');
+
+      expect(bar.style.getPropertyValue(DURATION).trim()).toBe('5000ms');
+      expect(bar.style.getPropertyValue(DELAY).trim()).toMatch(NO_DELAY);
+    });
+
+    it('runs for the whole window with no delay for the default remaining of null', async () => {
+      const { style } = await setup();
+
+      expect(style(DURATION)).toBe('5000ms');
+      expect(style(DELAY)).toMatch(NO_DELAY);
+    });
+
+    it('starts part-way round when part of the window is gone: 3000 ms left of 5000 delays by -2000 ms', async () => {
+      const { host, update, style } = await setup();
+
+      await update(() => host.remainingMs.set(3000));
+
+      expect(style(DURATION)).toBe('5000ms');
+      expect(style(DELAY)).toBe('-2000ms');
+    });
+
+    it.each([
+      { windowMs: 5000, remainingMs: 1000, delay: '-4000ms' },
+      { windowMs: 5000, remainingMs: 0, delay: '-5000ms' },
+      { windowMs: 8000, remainingMs: 2500, delay: '-5500ms' },
+    ])(
+      'delays by $delay for $remainingMs ms left of a $windowMs ms window',
+      async ({ windowMs, remainingMs, delay }) => {
+        const { host, update, style } = await setup();
+
+        await update(() => {
+          host.windowMs.set(windowMs);
+          host.remainingMs.set(remainingMs);
+        });
+
+        expect(style(DURATION)).toBe(`${windowMs}ms`);
+        expect(style(DELAY)).toBe(delay);
+      },
+    );
+
+    it.each([
+      { windowMs: 5000, remainingMs: 5000 },
+      { windowMs: 3000, remainingMs: null },
+    ])(
+      'has no delay when the whole $windowMs ms window is left ($remainingMs)',
+      async ({ windowMs, remainingMs }) => {
+        const { host, update, style } = await setup();
+
+        await update(() => {
+          host.windowMs.set(windowMs);
+          host.remainingMs.set(remainingMs);
+        });
+
+        expect(style(DURATION)).toBe(`${windowMs}ms`);
+        expect(style(DELAY)).toMatch(NO_DELAY);
+      },
+    );
+
+    it('follows the inputs when they change', async () => {
+      const { host, update, style } = await setup();
+
+      await update(() => host.remainingMs.set(1000));
+
+      expect(style(DELAY)).toBe('-4000ms');
+
+      await update(() => host.remainingMs.set(null));
+
+      expect(style(DELAY)).toMatch(NO_DELAY);
+    });
+
+    it('starts the running fill again when the window key changes, as when a second Done follows', async () => {
+      const { host, q, update } = await setup();
+      const fill = must(q<HTMLElement>('.asys-undo__fill'), 'fill') as unknown as SVGCircleElement;
+      const animation = { currentTime: 2400 } as unknown as Animation;
+
+      fill.getAnimations = () => [animation];
+
+      await update(() => host.windowKey.set('task-2'));
+
+      expect(animation.currentTime).toBe(0);
+    });
+
+    it('starts the running fill again when the time left changes', async () => {
+      const { host, q, update } = await setup();
+      const fill = must(q<HTMLElement>('.asys-undo__fill'), 'fill') as unknown as SVGCircleElement;
+      const animation = { currentTime: 1200 } as unknown as Animation;
+
+      fill.getAnimations = () => [animation];
+
+      await update(() => host.remainingMs.set(3000));
+
+      expect(animation.currentTime).toBe(0);
+    });
+
+    it('leaves the running fill alone when only the title changes', async () => {
+      const { host, q, update } = await setup();
+      const fill = must(q<HTMLElement>('.asys-undo__fill'), 'fill') as unknown as SVGCircleElement;
+      const animation = { currentTime: 2400 } as unknown as Animation;
+
+      fill.getAnimations = () => [animation];
+
+      await update(() => host.title.set('Water the plants'));
+
+      expect(animation.currentTime).toBe(2400);
+    });
+
+    it('is not paused to begin with', async () => {
+      const { bar } = await setup();
+
+      expect(bar().classList.contains('is-paused')).toBe(false);
+    });
+
+    it('pauses while the pointer is inside the bar and runs again when it leaves', async () => {
+      const { bar, fixture } = await setup();
+
+      bar().dispatchEvent(new Event('pointerenter'));
+      await fixture.whenStable();
+
+      expect(bar().classList.contains('is-paused')).toBe(true);
+
+      bar().dispatchEvent(new Event('pointerleave'));
+      await fixture.whenStable();
+
+      expect(bar().classList.contains('is-paused')).toBe(false);
+    });
+
+    it('is not marked paused by focus alone, because :focus-within pauses the fill in CSS', async () => {
+      const { bar, button, fixture } = await setup();
+
+      must(button('Undo')).dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+      await fixture.whenStable();
+
+      expect(bar().classList.contains('is-paused')).toBe(false);
+    });
   });
 
   describe('the Failed variant', () => {
@@ -199,27 +435,69 @@ describe('UndoBar', () => {
     };
 
     it('says the Task is not Done, in curly quotes, and gives the reason on its own line', async () => {
-      const { text, bar } = await failed(true);
+      const { text } = await failed(true);
 
-      expect(text('.asys-undobar__text')).toBe('“Pay the invoice” is not Done.');
-      expect(text('.asys-undobar__detail')).toBe(NOT_SENT);
-      expect(bar().querySelector('.asys-undobar__check')).toBeNull();
-      expect(bar().querySelector('.asys-undobar__title')).toBeNull();
+      expect(text('p.asys-undo__text.asys-undo__text--failed')).toBe(
+        '“Pay the invoice” is not Done.',
+      );
+      expect(text('p.asys-undo__detail')).toBe(NOT_SENT);
     });
 
-    it('shows Try again then Dismiss when it can retry, Try again not quiet and Dismiss quiet', async () => {
+    it('shows none of the Done layout: no check, status, title or timer', async () => {
+      const { q } = await failed(true);
+
+      expect(q('.asys-undo__check')).toBeNull();
+      expect(q('.asys-undo__status')).toBeNull();
+      expect(q('.asys-undo__title')).toBeNull();
+      expect(q('.asys-undo__timer')).toBeNull();
+      expect(q('.asys-undo__button')).toBeNull();
+    });
+
+    it('lays out the text, the reason, Try again and Dismiss in that order', async () => {
+      const { order } = await failed(true);
+
+      expect(order('asys-undo__text', 'asys-undo__detail', 'asys-undo__action')).toEqual([
+        'asys-undo__text',
+        'asys-undo__detail',
+        'asys-undo__action',
+        'asys-undo__action',
+      ]);
+    });
+
+    it('leaves out the reason line when there is no detail', async () => {
+      const { q, text } = await failed(true, null);
+
+      expect(q('.asys-undo__detail')).toBeNull();
+      expect(text('.asys-undo__text--failed')).toBe('“Pay the invoice” is not Done.');
+    });
+
+    it('shows Try again then Dismiss when it can retry, Try again Secondary and Dismiss quiet', async () => {
       const { labels, button } = await failed(true);
 
       expect(labels()).toEqual(['Try again', 'Dismiss']);
       expect(button('Try again')?.classList.contains('asys-button--quiet')).toBe(false);
       expect(button('Try again')?.classList.contains('asys-button--secondary')).toBe(true);
+      expect(button('Try again')?.classList.contains('asys-undo__action')).toBe(true);
       expect(button('Dismiss')?.classList.contains('asys-button--quiet')).toBe(true);
+      expect(button('Dismiss')?.classList.contains('asys-undo__action')).toBe(true);
+    });
+
+    it('draws the rotate-right icon before the Try again label, and none on Dismiss', async () => {
+      const { button } = await failed(true);
+
+      const retryIcon = button('Try again')?.querySelector('svg[data-icon="rotate-right"]');
+
+      expect(retryIcon).not.toBeNull();
+      expect(retryIcon?.closest('asys-icon')?.getAttribute('aria-hidden')).toBe('true');
+      expect(button('Try again')?.firstElementChild).toBe(retryIcon?.closest('asys-icon'));
+      expect(button('Dismiss')?.querySelector('svg')).toBeNull();
     });
 
     it('shows only Dismiss when it cannot retry', async () => {
-      const { labels } = await failed(false, 'That Task or Area no longer exists.');
+      const { labels, q } = await failed(false, 'That Task or Area no longer exists.');
 
       expect(labels()).toEqual(['Dismiss']);
+      expect(q('svg[data-icon="rotate-right"]')).toBeNull();
     });
 
     it('emits retry and dismiss with keyboard true for a click with detail 0, as Enter and Space give', async () => {
@@ -266,11 +544,40 @@ describe('UndoBar', () => {
     it('shows only the detail and Dismiss, with no title line', async () => {
       const { text, labels, bar, button } = await notice();
 
-      expect(text('.asys-undobar__detail')).toBe(REVIEW_SENTENCE);
+      expect(text('p.asys-undo__detail')).toBe(REVIEW_SENTENCE);
       expect(labels()).toEqual(['Dismiss']);
       expect(button('Dismiss')?.classList.contains('asys-button--quiet')).toBe(true);
+      expect(button('Dismiss')?.classList.contains('asys-undo__action')).toBe(true);
       expect(bar().textContent).not.toContain('is not Done');
       expect(bar().textContent).not.toContain('Pay the invoice');
+    });
+
+    it('shows none of the Done or Failed layout: no check, timer or failure text', async () => {
+      const { q } = await notice();
+
+      expect(q('.asys-undo__check')).toBeNull();
+      expect(q('.asys-undo__status')).toBeNull();
+      expect(q('.asys-undo__title')).toBeNull();
+      expect(q('.asys-undo__timer')).toBeNull();
+      expect(q('.asys-undo__text--failed')).toBeNull();
+    });
+
+    it('lays out the detail and then Dismiss', async () => {
+      const { order } = await notice();
+
+      expect(order('asys-undo__detail', 'asys-undo__action')).toEqual([
+        'asys-undo__detail',
+        'asys-undo__action',
+      ]);
+    });
+
+    it('leaves out the detail line when there is none', async () => {
+      const { host, update, q, labels } = await notice();
+
+      await update(() => host.detail.set(null));
+
+      expect(q('.asys-undo__detail')).toBeNull();
+      expect(labels()).toEqual(['Dismiss']);
     });
 
     it('shows no Try again even when canRetry is set', async () => {
@@ -308,6 +615,22 @@ describe('UndoBar', () => {
       bar().dispatchEvent(new Event('pointerleave'));
 
       expect(host.pointer).toEqual([true, false]);
+    });
+
+    it('keeps emitting pointerInside while it marks the bar paused', async () => {
+      const { host, bar, fixture } = await setup();
+
+      bar().dispatchEvent(new Event('pointerenter'));
+      await fixture.whenStable();
+
+      expect(host.pointer).toEqual([true]);
+      expect(bar().classList.contains('is-paused')).toBe(true);
+
+      bar().dispatchEvent(new Event('pointerleave'));
+      await fixture.whenStable();
+
+      expect(host.pointer).toEqual([true, false]);
+      expect(bar().classList.contains('is-paused')).toBe(false);
     });
 
     it('emits focusInside true on focusin', async () => {

@@ -28,6 +28,7 @@ import {
   type Task,
   TaskStatus,
   toLocalDateTime,
+  waitingSummary,
 } from '@asys/domain';
 
 import { CommandOutcomeTag, type CommandOutcome } from '../../core/api/data-api';
@@ -192,6 +193,13 @@ export class Now {
     const local = toLocalDateTime(this.clock.now(), this.timeZone());
 
     return `${local.date}T${local.time}`;
+  });
+
+  /** The one fact the closed Waiting section shows, such as `Next Available tomorrow 09:00`, or null. */
+  protected readonly waitingLine = computed(() => {
+    const now = this.dataStore.now();
+
+    return now === null ? null : waitingSummary(now.waiting, this.clock.now(), this.timeZone());
   });
 
   private readonly areaNames = computed(

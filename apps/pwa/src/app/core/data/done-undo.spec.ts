@@ -38,6 +38,10 @@ const SIGNED_OUT: CommandOutcome = { _tag: CommandOutcomeTag.SignedOut };
 
 const REVIEW_SENTENCE = 'That no longer applied, so it waits in the Inbox as a Review item.';
 
+/** What `complete` announces: the Task is Done, and for how long Undo stays available. */
+const doneAnnouncement = (title: string): string =>
+  `“${title}” is Done. Undo is available for 5 seconds.`;
+
 const task = (overrides: Partial<Task> & Pick<Task, 'id' | 'title'>): Task => ({
   kind: TaskKind.Task,
   status: TaskStatus.Open,
@@ -201,9 +205,13 @@ describe('DoneUndo', () => {
         taskId: 'a',
         title: 'Pay the invoice',
         origin: 'button',
+        remainingMs: 5_000,
       });
       expect(tick).toHaveBeenCalledTimes(1);
-      expect(doneUndo.notice()).toEqual({ text: '“Pay the invoice” is Done.', seq: 1 });
+      expect(doneUndo.notice()).toEqual({
+        text: '“Pay the invoice” is Done. Undo is available for 5 seconds.',
+        seq: 1,
+      });
       expect(send).not.toHaveBeenCalled();
     });
 
@@ -214,9 +222,29 @@ describe('DoneUndo', () => {
         taskId: 'a',
         title: 'Pay the invoice',
         origin: 'swipe',
+        remainingMs: 5_000,
       });
       expect(hold).toHaveBeenCalledTimes(1);
       expect(tick).not.toHaveBeenCalled();
+    });
+
+    it('opens the window with the whole of it remaining, whatever the origin', () => {
+      doneUndo.complete(A, DoneOrigin.Button);
+
+      expect(UNDO_WINDOW_MS).toBe(5_000);
+      expect(doneUndo.pending()?.remainingMs).toBe(UNDO_WINDOW_MS);
+
+      doneUndo.undo();
+      doneUndo.complete(B, DoneOrigin.Swipe);
+
+      expect(doneUndo.pending()?.remainingMs).toBe(UNDO_WINDOW_MS);
+    });
+
+    it('announces the Task as Done and how long Undo is available, in whole seconds', () => {
+      doneUndo.complete(A, DoneOrigin.Button);
+
+      expect(doneUndo.notice()?.text).toBe(doneAnnouncement('Pay the invoice'));
+      expect(doneUndo.notice()?.text).toContain(`${UNDO_WINDOW_MS / 1000} seconds`);
     });
 
     it('does nothing for a Task that is already pending, and keeps its window', async () => {
@@ -285,8 +313,13 @@ describe('DoneUndo', () => {
       expect(hold).toHaveBeenCalledTimes(2);
       expect(hold.mock.calls[1]?.[0]).toStrictEqual(completeCommand('b'));
       expect(hold.mock.calls[1]?.[1]).toBe('key-2');
-      expect(doneUndo.pending()).toEqual({ taskId: 'b', title: 'Call Marit', origin: 'button' });
-      expect(doneUndo.notice()).toEqual({ text: '“Call Marit” is Done.', seq: 2 });
+      expect(doneUndo.pending()).toEqual({
+        taskId: 'b',
+        title: 'Call Marit',
+        origin: 'button',
+        remainingMs: 5_000,
+      });
+      expect(doneUndo.notice()).toEqual({ text: doneAnnouncement('Call Marit'), seq: 2 });
 
       await advance(4_999);
 
@@ -371,6 +404,26 @@ describe('DoneUndo', () => {
       await advance(1);
 
       expect(send).toHaveBeenCalledTimes(1);
+    });
+
+    it('never touches pending, so the ring is left to pause itself and remainingMs stays whole', async () => {
+      doneUndo.complete(A, DoneOrigin.Button);
+
+      const before = doneUndo.pending();
+
+      await advance(1_000);
+      doneUndo.pause(PauseReason.Pointer);
+      doneUndo.pause(PauseReason.Focus);
+      await advance(2_000);
+
+      expect(doneUndo.pending()).toBe(before);
+
+      doneUndo.resume(PauseReason.Pointer);
+      doneUndo.resume(PauseReason.Focus);
+      await advance(500);
+
+      expect(doneUndo.pending()).toBe(before);
+      expect(doneUndo.pending()?.remainingMs).toBe(5_000);
     });
 
     it('treats a reason as a set, so pausing twice and resuming once runs the timer', async () => {
@@ -461,7 +514,7 @@ describe('DoneUndo', () => {
 
       expect(release).not.toHaveBeenCalled();
       expect(doneUndo.failure()).toBeNull();
-      expect(doneUndo.notice()).toEqual({ text: '“Pay the invoice” is Done.', seq: 1 });
+      expect(doneUndo.notice()).toEqual({ text: doneAnnouncement('Pay the invoice'), seq: 1 });
     });
 
     it('forgets the key after Applied, so a later Done of the Task gets a new one', async () => {
@@ -504,6 +557,7 @@ describe('DoneUndo', () => {
         taskId: 'a',
         title: 'Pay the invoice',
         origin: 'button',
+        remainingMs: 5_000,
       });
       expect(doneUndo.failure()).toBeNull();
 
@@ -570,7 +624,7 @@ describe('DoneUndo', () => {
       expect(release).toHaveBeenCalledTimes(1);
       expect(release).toHaveBeenCalledWith('key-1');
       expect(doneUndo.failure()).toBeNull();
-      expect(doneUndo.notice()).toEqual({ text: '“Pay the invoice” is Done.', seq: 1 });
+      expect(doneUndo.notice()).toEqual({ text: doneAnnouncement('Pay the invoice'), seq: 1 });
     });
 
     it('ignores retry when the failure cannot be retried', async () => {
@@ -602,6 +656,7 @@ describe('DoneUndo', () => {
       doneUndo.dismiss();
 
       expect(doneUndo.failure()).toBeNull();
+      expect(doneUndo.pending()).toBeNull();
     });
 
     it('clears the failure when another Task is completed', async () => {
@@ -645,6 +700,46 @@ describe('DoneUndo', () => {
       expect(send.mock.calls[1]?.[1]).toBe('key-2');
     });
 
+    it('sets pending again with the time left when dismiss lets the displaced Done run again', async () => {
+      await failAWhileBIsPending();
+
+      expect(doneUndo.pending()?.remainingMs).toBe(5_000);
+
+      doneUndo.dismiss();
+
+      expect(doneUndo.pending()).toEqual({
+        taskId: 'b',
+        title: 'Call Marit',
+        origin: 'button',
+        remainingMs: 3_000,
+      });
+    });
+
+    it.each([
+      { elapsed: 500, left: 4_500 },
+      { elapsed: 4_000, left: 1_000 },
+    ])(
+      'restarts the ring with $left ms after $elapsed ms of the window were used up',
+      async ({ elapsed, left }) => {
+        doneUndo.complete(A, DoneOrigin.Button);
+        doneUndo.complete(B, DoneOrigin.Button);
+        await advance(elapsed);
+        await resolveSend(0, FAILED);
+        doneUndo.dismiss();
+
+        expect(doneUndo.pending()?.remainingMs).toBe(left);
+
+        await advance(left - 1);
+
+        expect(send).toHaveBeenCalledTimes(1);
+
+        await advance(1);
+
+        expect(send).toHaveBeenCalledTimes(2);
+        expect(send.mock.calls[1]?.[0]).toStrictEqual(completeCommand('b'));
+      },
+    );
+
     it('does not restart the timer when a pause reason is resumed during the displacement', async () => {
       await failAWhileBIsPending();
       doneUndo.pause(PauseReason.Focus);
@@ -678,6 +773,7 @@ describe('DoneUndo', () => {
       expect(hold.mock.calls[2]?.[0]).toStrictEqual(completeCommand('a'));
       expect(hold.mock.calls[2]?.[1]).toBe('key-1');
       expect(doneUndo.pending()?.taskId).toBe('a');
+      expect(doneUndo.pending()?.remainingMs).toBe(5_000);
       expect(doneUndo.failure()).toBeNull();
     });
   });

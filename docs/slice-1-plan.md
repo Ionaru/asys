@@ -765,7 +765,9 @@ Re-planned and built on 2026-10-04. The re-plan was reviewed adversarially by th
 - TriageCard adds Later and Edit, and "1 of N" counts over the whole visit. Importance and Estimate are the shared Segmented and EstimateField controls, which took the segment and chip CSS. Its title is an `h2`, and Change is disabled while a send is pending.
 - Drop is confirmed inline everywhere (InlineConfirm, a new component), with focus starting on Cancel.
 - ReviewItem projects an "Open Task" link after its buttons.
-- QuickAdd has no `open` model: the shell renders the bar while it is open, and the bar replaces the Capture button.
+- QuickAdd has no `open` model: the shell renders the bar while it is open. Capture sits at the end of the bottom bar (the design system of 2026-10-09) and stays while quick add is open, with `aria-expanded`; pressing it again closes the bar.
+- UndoBar (in the design system since 2026-10-09) also shows a Done that was not applied, with Try again and Dismiss, and one closed in another tab, with Dismiss, because both belong to the Done the bar was holding. DoneUndo owns the window and closes the bar, so the bar has no `(close)` output and takes `windowMs`, `remainingMs` and `windowKey` instead of `duration`: a Done back from a dismissed failure starts its ring where its timer is, and a second Done starts it again. The bar marks itself paused from the pointer, and focus and a press pause the ring in CSS.
+- Icons are Font Awesome Pro SVGs drawn by `<asys-icon>` (`@fortawesome/angular-fontawesome`), not the design system's CSS masks with inline SVG data, so no Pro path data sits in the repository (ADR 0011). They keep the design system's size, baseline and colour rules. The quadrant glyph is ASYS's own inline SVG in QuadrantChip.
 - `/capture` skips the shared Loading and Failed rule, because capturing needs no working set.
 - LogProgressForm is a shared component.
 - The `.asys-field` CSS moved from TextField into the global `styles.css`, so every control is styled.
@@ -793,7 +795,7 @@ Re-planned and built on 2026-10-04. The re-plan was reviewed adversarially by th
 - DateSpecField writes `''` back into a date input whose date became partial. Typing a date into an empty Date input works, because Chromium fires no `input` event until the date is complete. Editing one part of a filled date empties the field: the date, its Time and the Clear button all go. The Area editor's time inputs share the cause: clearing one part of a From or To empties the whole time and shows "Enter a time". `apps/pwa-e2e/src/known-limits.spec.ts` pins all three, so a fix flips those tests and this bullet together.
 - The Area editor keeps its inputs enabled while sending; only Save or Create is disabled. A missing Area offers "Go to Areas".
 - Areas cannot be deleted, because no command exists, and Privacy gets no UI until Stage 2.
-- The initial bundle is 480.83 kB (127.18 kB transferred), 19 kB under the 500 kB warning; the next screens may need Inbox or the shared controls loaded lazily.
+- The initial bundle is 617.00 kB (162.69 kB transferred) since the design system of 2026-10-09 brought icons, so its warning budget moved from 500 kB to 625 kB on 2026-10-09; the error stays at 1 MB. About 105 kB of the growth is the Font Awesome Angular component and its SVG core: an Icon component that drew the same icon definitions as inline SVG measured 104.57 kB less. The next screens may need Inbox or the shared controls loaded lazily.
 
 ## Piece 7: deployment and phone check
 

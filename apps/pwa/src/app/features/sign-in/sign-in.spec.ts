@@ -403,6 +403,7 @@ describe('SignIn', () => {
 
       expect(root().textContent).toContain(SOMETHING_WENT_WRONG);
       expect(button('Try again')).toBeDefined();
+      expect(button('Try again')?.querySelector('svg[data-icon="rotate-right"]')).not.toBeNull();
       expect(signInButton().disabled).toBe(true);
     });
 

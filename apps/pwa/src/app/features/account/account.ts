@@ -23,6 +23,7 @@ import { AppUpdate } from '../../core/platform/app-update';
 import { Clock } from '../../core/platform/clock';
 import { DeviceZone } from '../../core/platform/device-zone';
 import { Button, ButtonSize, ButtonVariant } from '../../ui/button/button';
+import { IconName } from '../../ui/icon/icon';
 import { TextField } from '../../ui/text-field/text-field';
 import { ceremonyOptions } from '../auth/ceremony-options';
 import { nameError } from '../auth/name-rule';
@@ -88,6 +89,8 @@ export class Account {
   protected readonly Variant = ButtonVariant;
 
   protected readonly Size = ButtonSize;
+
+  protected readonly Icons = IconName;
 
   protected readonly AuthError = AuthError;
 

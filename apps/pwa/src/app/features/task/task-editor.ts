@@ -48,6 +48,7 @@ import { TaskMorph } from '../../core/platform/task-morph';
 import { Button, ButtonSize, ButtonVariant } from '../../ui/button/button';
 import { DateSpecField } from '../../ui/date-spec-field/date-spec-field';
 import { EstimateField } from '../../ui/estimate-field/estimate-field';
+import { IconName } from '../../ui/icon/icon';
 import { InlineConfirm } from '../../ui/inline-confirm/inline-confirm';
 import { LoadState } from '../../ui/load-state/load-state';
 import { canLogProgress, LogProgressForm } from '../../ui/log-progress-form/log-progress-form';
@@ -128,6 +129,8 @@ export class TaskEditor {
   protected readonly Variant = ButtonVariant;
 
   protected readonly Size = ButtonSize;
+
+  protected readonly Icons = IconName;
 
   protected readonly Badge = StatusBadgeStatus;
 

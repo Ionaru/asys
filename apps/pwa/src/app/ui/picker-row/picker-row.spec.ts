@@ -41,8 +41,21 @@ const setup = async () => {
 
   const row = (): HTMLAnchorElement => fixture.nativeElement.querySelector('a');
   const q = (selector: string): HTMLElement | null => row().querySelector(selector);
+  // The children of the reason line, named by what they are, in document order.
+  const reasonKinds = (): string[] =>
+    Array.from(q('.asys-picker-row__reason')?.children ?? [], (child) => {
+      if (child.tagName === 'ASYS-QUADRANT-CHIP') {
+        return 'chip';
+      }
 
-  return { fixture, host: fixture.componentInstance, row, q };
+      if (child.tagName === 'ASYS-STATUS-BADGE') {
+        return 'badge';
+      }
+
+      return child.classList.contains('asys-picker-row__reason-text') ? 'text' : child.tagName;
+    });
+
+  return { fixture, host: fixture.componentInstance, row, q, reasonKinds };
 };
 
 describe('PickerRow', () => {
@@ -78,17 +91,113 @@ describe('PickerRow', () => {
     expect(q('asys-status-badge')).toBeNull();
   });
 
+  it('puts a compact quadrant chip in the reason, and none in the side', async () => {
+    const { q } = await setup();
+    const chip = q('.asys-picker-row__reason asys-quadrant-chip');
+
+    expect(chip).not.toBeNull();
+    expect(chip?.classList.contains('asys-quadrant--compact')).toBe(true);
+    expect(chip?.classList.contains('asys-quadrant--do')).toBe(true);
+    expect(chip?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Quadrant: Do.');
+    expect(q('.asys-picker-row__side asys-quadrant-chip')).toBeNull();
+    expect(q('.asys-picker-row__side .asys-quadrant')).toBeNull();
+    expect(q('asys-quadrant-chip')).toBe(chip);
+  });
+
+  it('follows the quadrant input', async () => {
+    const { fixture, host, q } = await setup();
+
+    host.quadrant.set(Quadrant.Plan);
+    await fixture.whenStable();
+
+    const chip = q('.asys-picker-row__reason asys-quadrant-chip');
+
+    expect(chip?.classList.contains('asys-quadrant--plan')).toBe(true);
+    expect(chip?.classList.contains('asys-quadrant--do')).toBe(false);
+    expect(chip?.classList.contains('asys-quadrant--compact')).toBe(true);
+    expect(chip?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Quadrant: Plan.');
+  });
+
   it('shows the quadrant chip only when a quadrant is set', async () => {
     const { fixture, host, q } = await setup();
 
-    expect(
-      q('.asys-picker-row__side asys-quadrant-chip')?.textContent?.replace(/\s+/g, ' ').trim(),
-    ).toBe('Quadrant: Do');
+    expect(q('asys-quadrant-chip')).not.toBeNull();
 
     host.quadrant.set(undefined);
     await fixture.whenStable();
 
     expect(q('asys-quadrant-chip')).toBeNull();
+    expect(q('.asys-quadrant')).toBeNull();
+
+    host.quadrant.set(Quadrant.Delegate);
+    await fixture.whenStable();
+
+    expect(
+      q('.asys-picker-row__reason asys-quadrant-chip')?.textContent?.replace(/\s+/g, ' ').trim(),
+    ).toBe('Quadrant: Delegate.');
+  });
+
+  it.each([
+    { quadrant: Quadrant.Do, overdue: true, kinds: ['chip', 'badge', 'text'] },
+    { quadrant: Quadrant.Do, overdue: false, kinds: ['chip', 'text'] },
+    { quadrant: undefined, overdue: true, kinds: ['badge', 'text'] },
+    { quadrant: undefined, overdue: false, kinds: ['text'] },
+  ])(
+    'orders the reason as $kinds for quadrant $quadrant and overdue $overdue',
+    async ({ quadrant, overdue, kinds }) => {
+      const { fixture, host, reasonKinds } = await setup();
+
+      host.quadrant.set(quadrant);
+      host.overdue.set(overdue);
+      await fixture.whenStable();
+
+      expect(reasonKinds()).toEqual(kinds);
+    },
+  );
+
+  it('puts the title and then the reason in the main part', async () => {
+    const { q } = await setup();
+
+    expect(Array.from(q('.asys-picker-row__main')?.children ?? [], (c) => c.className)).toEqual([
+      'asys-picker-row__title',
+      'asys-picker-row__reason',
+    ]);
+  });
+
+  it('holds only the Estimate in the side, whatever the quadrant and the badge', async () => {
+    const { fixture, host, q } = await setup();
+    const sideClasses = (): string[] =>
+      Array.from(q('.asys-picker-row__side')?.children ?? [], (c) => c.className);
+
+    expect(sideClasses()).toEqual(['asys-picker-row__estimate']);
+
+    host.overdue.set(true);
+    await fixture.whenStable();
+
+    expect(sideClasses()).toEqual(['asys-picker-row__estimate']);
+
+    host.quadrant.set(undefined);
+    await fixture.whenStable();
+
+    expect(sideClasses()).toEqual(['asys-picker-row__estimate']);
+    expect(q('.asys-picker-row__side')?.textContent?.trim()).toBe('25 min');
+  });
+
+  it('shows no quadrant chip for a Waiting row without a quadrant', async () => {
+    const { fixture, host, q, reasonKinds } = await setup();
+
+    host.variant.set(PickerRowVariant.Waiting);
+    host.quadrant.set(undefined);
+    await fixture.whenStable();
+
+    expect(q('asys-quadrant-chip')).toBeNull();
+    expect(reasonKinds()).toEqual(['text']);
+
+    host.overdue.set(true);
+    await fixture.whenStable();
+
+    expect(q('asys-quadrant-chip')).toBeNull();
+    expect(reasonKinds()).toEqual(['badge', 'text']);
   });
 
   it('has only the base class for the ranked variant', async () => {

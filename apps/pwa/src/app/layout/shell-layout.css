@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: EUPL-1.2 */
 :host {
-  --shell-nav-height: 56px;
+  --shell-nav-height: calc(var(--tap-target-large) + 2 * var(--space-2) + 1px);
   --shell-undo-height: 0px;
 }
 
@@ -11,27 +11,11 @@
   );
 }
 
-.shell__page--pill {
-  padding-bottom: calc(
-    var(--shell-nav-height) + var(--shell-undo-height) + var(--space-4) +
-      env(safe-area-inset-bottom) + 56px + var(--space-3)
-  );
-}
-
 .shell__page--bar {
   padding-bottom: calc(
     var(--shell-nav-height) + var(--shell-undo-height) + var(--space-4) +
       env(safe-area-inset-bottom) + var(--tap-target) + 3 * var(--space-3) + var(--space-2) +
       var(--space-1) + 2 * var(--line-height-reason)
-  );
-}
-
-.shell__capture {
-  position: fixed;
-  right: var(--space-4);
-  bottom: calc(
-    var(--shell-nav-height) + var(--shell-undo-height) + var(--space-3) +
-      env(safe-area-inset-bottom)
   );
 }
 
@@ -48,15 +32,12 @@
   bottom: calc(var(--shell-nav-height) + env(safe-area-inset-bottom));
 }
 
-:host-context([data-theme='drive']) .shell__undo {
-  bottom: env(safe-area-inset-bottom);
-}
-
 .shell__nav {
   position: fixed;
   inset-inline: 0;
-  bottom: 0;
+  bottom: env(safe-area-inset-bottom);
   display: block;
-  padding-bottom: env(safe-area-inset-bottom);
   background: var(--surface);
+  /* The safe area under the bar is painted, not padded, so the measured height is the bar's alone. */
+  box-shadow: 0 env(safe-area-inset-bottom) 0 0 var(--surface);
 }

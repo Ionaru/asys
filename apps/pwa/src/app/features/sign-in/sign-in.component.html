@@ -16,7 +16,13 @@
     <p class="sign-in__message" role="alert">{{ text }}</p>
   }
   @if (loadError() !== null) {
-    <button asys-button type="button" [variant]="Variant.Quiet" (click)="discard()">
+    <button
+      asys-button
+      type="button"
+      [variant]="Variant.Quiet"
+      [icon]="Icons.RotateRight"
+      (click)="discard()"
+    >
       Try again
     </button>
   }

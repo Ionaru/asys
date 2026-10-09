@@ -12,6 +12,10 @@ class Host {
   readonly count = signal(0);
 }
 
+/** The text a screen reader reads: whitespace collapsed and trimmed. */
+const textOf = (button: HTMLElement): string =>
+  (button.textContent ?? '').replace(/\s+/g, ' ').trim();
+
 const setup = async () => {
   const fixture = TestBed.createComponent(Host);
   await fixture.whenStable();
@@ -27,7 +31,7 @@ const setupWith = async (count: number) => {
 
   const button = fixture.nativeElement.querySelector('button') as HTMLButtonElement;
 
-  return { fixture, button, badge: button.querySelector('.asys-capture__badge') };
+  return { fixture, button, countBadge: button.querySelector('.asys-capture__count') };
 };
 
 describe('CaptureButton', () => {
@@ -46,45 +50,77 @@ describe('CaptureButton', () => {
   it('reads Capture', async () => {
     const button = await setup();
 
-    expect(button.textContent?.trim()).toBe('Capture');
+    expect(textOf(button)).toBe('Capture');
   });
 
-  it('has no badge and reads exactly Capture at a count of 0', async () => {
-    const { button, badge } = await setupWith(0);
+  it('draws the plus icon first, in Regular, before the label', async () => {
+    const button = await setup();
+    const icon = button.firstElementChild;
 
-    expect(badge).toBeNull();
-    expect(button.textContent).toBe('Capture');
+    expect(icon?.matches('asys-icon')).toBe(true);
+    expect(icon?.querySelector('svg')?.getAttribute('data-icon')).toBe('plus');
+    expect(icon?.querySelector('svg')?.getAttribute('data-prefix')).toBe('far');
+    expect(icon?.nextElementSibling?.classList.contains('asys-capture__label')).toBe(true);
   });
 
-  it('shows the count in a badge with a visually hidden "not captured"', async () => {
-    const { button, badge } = await setupWith(3);
+  it('puts the word in the label', async () => {
+    const button = await setup();
 
-    expect(badge?.firstChild?.textContent).toBe('3');
-    expect(badge?.querySelector('.asys-visually-hidden')?.textContent).toBe(' not captured');
-    expect(button.textContent?.trim().startsWith('Capture')).toBe(true);
-    expect(button.textContent).toContain('3 not captured');
+    expect(button.querySelector('.asys-capture__label')?.textContent?.trim()).toBe('Capture');
+  });
+
+  it('has no count and reads exactly Capture at a count of 0', async () => {
+    const { button, countBadge } = await setupWith(0);
+
+    expect(countBadge).toBeNull();
+    expect(textOf(button)).toBe('Capture');
+  });
+
+  it('shows the count in __count with a visually hidden "not captured"', async () => {
+    const { button, countBadge } = await setupWith(3);
+
+    expect(countBadge?.firstChild?.textContent).toBe('3');
+    expect(countBadge?.querySelector('.asys-visually-hidden')?.textContent).toBe(' not captured');
+    expect(textOf(button)).toBe('Capture 3 not captured');
+  });
+
+  it('puts the icon, the label and the count in that order', async () => {
+    const { button } = await setupWith(2);
+    const children = Array.from(button.children);
+
+    expect(children).toHaveLength(3);
+    expect(children[0].matches('asys-icon')).toBe(true);
+    expect(children[1].classList.contains('asys-capture__label')).toBe(true);
+    expect(children[2].classList.contains('asys-capture__count')).toBe(true);
   });
 
   it('reads "Capture 1 not captured" as one phrase at a count of 1', async () => {
     const { button } = await setupWith(1);
 
-    expect(button.textContent).toBe('Capture 1 not captured');
+    expect(textOf(button)).toBe('Capture 1 not captured');
   });
 
-  it('updates the badge when the count changes and removes it again at 0', async () => {
+  it.each([0, 1, 3])('has no __badge at a count of %d', async (count) => {
+    const { button } = await setupWith(count);
+
+    expect(button.querySelector('.asys-capture__badge')).toBeNull();
+  });
+
+  it('updates the count when it changes and removes it again at 0', async () => {
     const { fixture, button } = await setupWith(1);
 
-    expect(button.querySelector('.asys-capture__badge')?.firstChild?.textContent).toBe('1');
+    expect(button.querySelector('.asys-capture__count')?.firstChild?.textContent).toBe('1');
 
     fixture.componentInstance.count.set(2);
     await fixture.whenStable();
 
-    expect(button.querySelector('.asys-capture__badge')?.firstChild?.textContent).toBe('2');
+    expect(button.querySelector('.asys-capture__count')?.firstChild?.textContent).toBe('2');
+    expect(textOf(button)).toBe('Capture 2 not captured');
 
     fixture.componentInstance.count.set(0);
     await fixture.whenStable();
 
-    expect(button.querySelector('.asys-capture__badge')).toBeNull();
-    expect(button.textContent).toBe('Capture');
+    expect(button.querySelector('.asys-capture__count')).toBeNull();
+    expect(textOf(button)).toBe('Capture');
   });
 });

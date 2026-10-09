@@ -2,18 +2,28 @@
 <form class="asys-quickadd" (submit)="submit($event)" (keydown.escape)="close.emit()">
   @for (failure of failures(); track failure.id) {
     <div class="asys-quickadd__failure">
-      <p class="asys-quickadd__failure-text">Not captured: “{{ failure.text }}”</p>
+      <p class="asys-quickadd__failure-text">
+        <asys-icon [name]="Icons.TriangleExclamation" />Not captured: “{{ failure.text }}”
+      </p>
       @if (failure.message !== null) {
         <p class="asys-quickadd__failure-reason">{{ failure.message }}</p>
       }
       <div class="asys-quickadd__failure-actions">
         @if (failure.canRetry) {
-          <button asys-button type="button" (click)="retryFailure(failure.id)">Try again</button>
+          <button
+            asys-button
+            type="button"
+            [icon]="Icons.RotateRight"
+            (click)="retryFailure(failure.id)"
+          >
+            Try again
+          </button>
         }
         <button
           asys-button
           type="button"
           [variant]="Variants.Quiet"
+          [icon]="Icons.Xmark"
           (click)="discardFailure(failure.id)"
         >
           Discard

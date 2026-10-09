@@ -42,6 +42,7 @@
         asys-button
         type="button"
         [variant]="Variant.Secondary"
+        [icon]="Icons.Check"
         [disabled]="actionsBusy()"
         (click)="done($event)"
       >
@@ -53,6 +54,7 @@
           asys-button
           type="button"
           [variant]="Variant.Secondary"
+          [icon]="Icons.BarProgressHalf"
           [disabled]="actionsBusy()"
           (click)="logOpen.set(true)"
         >

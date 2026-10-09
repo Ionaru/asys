@@ -19,7 +19,7 @@ import { Router, RouterOutlet } from '@angular/router';
 import { CaptureQueue } from '../core/data/capture-queue';
 import { CommandAttempts } from '../core/data/command-attempts';
 import { DataStore } from '../core/data/data-store';
-import { DoneUndo, PauseReason } from '../core/data/done-undo';
+import { DoneUndo, PauseReason, UNDO_WINDOW_MS } from '../core/data/done-undo';
 import { Motion } from '../core/platform/motion';
 import { TAB_PATHS } from '../core/platform/tabs';
 import { pathOf } from '../core/platform/url-path';
@@ -51,6 +51,8 @@ export class ShellLayout {
 
   private readonly bottomNav = viewChild(BottomNav);
 
+  private readonly bottomNavHost = viewChild(BottomNav, { read: ElementRef<HTMLElement> });
+
   private readonly pill = viewChild('pill', { read: ElementRef<HTMLElement> });
 
   private readonly main = viewChild<ElementRef<HTMLElement>>('main');
@@ -66,6 +68,8 @@ export class ShellLayout {
   protected readonly doneUndo = inject(DoneUndo);
 
   protected readonly PauseReason = PauseReason;
+
+  protected readonly windowMs = UNDO_WINDOW_MS;
 
   protected readonly onCapturePath = computed(() => {
     const navigation = this.router.lastSuccessfulNavigation();
@@ -108,6 +112,8 @@ export class ShellLayout {
         title: failure.title,
         detail: failure.message,
         canRetry: failure.canRetry,
+        remainingMs: null,
+        windowKey: null,
       };
     }
 
@@ -119,6 +125,8 @@ export class ShellLayout {
         title: pending.title,
         detail: null,
         canRetry: false,
+        remainingMs: pending.remainingMs,
+        windowKey: pending.taskId,
       };
     }
 
@@ -157,7 +165,7 @@ export class ShellLayout {
       });
     });
 
-    // The bar's height lifts the page padding, the pill and quick add above it.
+    // The bar's height lifts the page padding and quick add above it.
     effect((onCleanup) => {
       const element = this.undoBarHost()?.nativeElement;
 
@@ -165,26 +173,40 @@ export class ShellLayout {
         return;
       }
 
-      const observer = new ResizeObserver((entries) => {
-        const size = entries[0]?.borderBoxSize[0]?.blockSize;
-
-        if (size !== undefined) {
-          this.host.nativeElement.style.setProperty('--shell-undo-height', `${size}px`);
-        }
-      });
-
-      observer.observe(element);
+      const stop = this.observeBlockSize(element, '--shell-undo-height');
 
       onCleanup(() => {
-        observer.disconnect();
+        stop();
         this.host.nativeElement.style.setProperty('--shell-undo-height', '0px');
+      });
+    });
+
+    // The nav's height lifts the page padding, the Undo bar and quick add above it. Until it is known
+    // (and without ResizeObserver) the stylesheet's own estimate stands.
+    effect((onCleanup) => {
+      const element = this.bottomNavHost()?.nativeElement;
+
+      if (!element || typeof ResizeObserver !== 'function') {
+        return;
+      }
+
+      const stop = this.observeBlockSize(element, '--shell-nav-height');
+
+      onCleanup(() => {
+        stop();
+        this.host.nativeElement.style.removeProperty('--shell-nav-height');
       });
     });
   }
 
-  protected openQuickAdd(): void {
-    this.captureQueue.clearMessage();
-    this.open.set(true);
+  /** The Capture button in the bar: opens quick add, or closes it again. */
+  protected toggleQuickAdd(): void {
+    if (this.open()) {
+      this.close();
+    } else {
+      this.captureQueue.clearMessage();
+      this.open.set(true);
+    }
   }
 
   protected close(): void {
@@ -223,6 +245,24 @@ export class ShellLayout {
   /** Moves focus to the next title, or to the page heading when there is none (Escape in the bar). */
   protected focusMain(): void {
     this.focusTitle(null);
+  }
+
+  /**
+   * Writes the border-box block size of `element` to the custom property `name` on the shell host, as
+   * it changes. Returns the function that stops observing.
+   */
+  private observeBlockSize(element: HTMLElement, name: string): () => void {
+    const observer = new ResizeObserver((entries) => {
+      const size = entries[0]?.borderBoxSize[0]?.blockSize;
+
+      if (size !== undefined) {
+        this.host.nativeElement.style.setProperty(name, `${size}px`);
+      }
+    });
+
+    observer.observe(element);
+
+    return () => observer.disconnect();
   }
 
   /**

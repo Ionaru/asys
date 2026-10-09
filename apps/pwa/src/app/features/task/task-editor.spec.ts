@@ -1032,6 +1032,16 @@ describe('TaskEditor', () => {
       expect(button('Log progress')).toBeUndefined();
     });
 
+    it('draws the check icon on Done and the progress bar on Log progress, and none on Drop', async () => {
+      const { button } = await setup({ state: domainState([{ ...CALL, estimateMinutes: 30 }]) });
+
+      expect(must(button('Done')).querySelector('svg[data-icon="check"]')).not.toBeNull();
+      expect(
+        must(button('Log progress')).querySelector('svg[data-icon="bar-progress-half"]'),
+      ).not.toBeNull();
+      expect(must(button('Drop')).querySelector('svg')).toBeNull();
+    });
+
     it('shows Log progress only for an Estimate of at least 2 minutes', async () => {
       const two = await setup({ state: domainState([{ ...CALL, estimateMinutes: 2 }]) });
 

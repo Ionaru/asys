@@ -337,6 +337,29 @@ describe('QuickAdd', () => {
       expect(rowButton(third, 'Try again')).toBeDefined();
     });
 
+    it('leads each failure with the warning icon, and draws rotate-right on Try again and xmark on Discard', async () => {
+      const { host, fixture, q } = await setup();
+
+      host.failures.set(FAILURES);
+      await fixture.whenStable();
+
+      const [first] = rows(q) as [HTMLElement];
+      /** The icon that comes first in `element`, by its glyph name, or null when it starts with none. */
+      const leadingIcon = (element: Element | null | undefined): string | null => {
+        const lead = element?.firstElementChild;
+
+        return lead?.tagName === 'ASYS-ICON'
+          ? (lead.querySelector('svg')?.getAttribute('data-icon') ?? null)
+          : null;
+      };
+      const text = first.querySelector('.asys-quickadd__failure-text');
+
+      expect(leadingIcon(text)).toBe('triangle-exclamation');
+      expect(text?.firstElementChild?.getAttribute('aria-hidden')).toBe('true');
+      expect(leadingIcon(rowButton(first, 'Try again'))).toBe('rotate-right');
+      expect(leadingIcon(rowButton(first, 'Discard'))).toBe('xmark');
+    });
+
     it('uses the secondary variant for Try again and the quiet one for Discard', async () => {
       const { host, fixture, q } = await setup();
 
