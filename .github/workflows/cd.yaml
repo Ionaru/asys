@@ -39,6 +39,8 @@ jobs:
     steps:
       - name: Set up
         uses: $/.github/actions/setup
+        with:
+          fa-token: ${{ secrets.FA_TOKEN }}
       - name: Lint
         run: pnpm exec nx run-many -t lint
 
@@ -49,6 +51,8 @@ jobs:
     steps:
       - name: Set up
         uses: $/.github/actions/setup
+        with:
+          fa-token: ${{ secrets.FA_TOKEN }}
       - name: Typecheck the projects
         run: pnpm exec nx run-many -t typecheck
       - name: Typecheck the scripts
@@ -61,6 +65,8 @@ jobs:
     steps:
       - name: Set up
         uses: $/.github/actions/setup
+        with:
+          fa-token: ${{ secrets.FA_TOKEN }}
       - name: Build
         run: pnpm exec nx run-many -t build
       - name: OpenAPI document
@@ -73,6 +79,8 @@ jobs:
     steps:
       - name: Set up
         uses: $/.github/actions/setup
+        with:
+          fa-token: ${{ secrets.FA_TOKEN }}
       - name: Write .env
         run: |
           owner_pw="$(openssl rand -hex 24)"
@@ -103,6 +111,8 @@ jobs:
     steps:
       - name: Set up
         uses: $/.github/actions/setup
+        with:
+          fa-token: ${{ secrets.FA_TOKEN }}
       - name: Write .env
         run: |
           owner_pw="$(openssl rand -hex 24)"
@@ -140,6 +150,8 @@ jobs:
     steps:
       - name: Set up
         uses: $/.github/actions/setup
+        with:
+          fa-token: ${{ secrets.FA_TOKEN }}
       - name: Check formatting
         run: pnpm exec nx format:check --all
 
@@ -150,6 +162,8 @@ jobs:
     steps:
       - name: Set up
         uses: $/.github/actions/setup
+        with:
+          fa-token: ${{ secrets.FA_TOKEN }}
       - name: Check SPDX headers
         run: node scripts/check-spdx.mts
       - name: Lint REUSE compliance
@@ -164,6 +178,8 @@ jobs:
     steps:
       - name: Set up
         uses: $/.github/actions/setup
+        with:
+          fa-token: ${{ secrets.FA_TOKEN }}
       - name: Check the curated palettes
         run: node scripts/palettes.mts --check
 
@@ -188,7 +204,14 @@ jobs:
       - name: Check out
         uses: $/.github/actions/checkout
       - name: Build the image
-        run: docker build --build-arg ASYS_GIT_REVISION="${{ needs.revision.outputs.short }}" --tag ghcr.io/ionaru/asys:latest .
+        env:
+          FA_TOKEN: ${{ secrets.FA_TOKEN }}
+        # The Font Awesome token reaches the build as a secret file, never as a build argument or a layer.
+        run: |
+          npmrc="${RUNNER_TEMP}/fa.npmrc"
+          (umask 077; printf '//npm.fontawesome.com/:_authToken=%s\n' "${FA_TOKEN}" > "${npmrc}")
+          docker build --secret id=npmrc,src="${npmrc}" --build-arg ASYS_GIT_REVISION="${{ needs.revision.outputs.short }}" --tag ghcr.io/ionaru/asys:latest .
+          rm -f "${npmrc}"
       - name: Save the image
         run: docker save -o asys-image.tar ghcr.io/ionaru/asys:latest
       - name: Upload the image
@@ -240,6 +263,8 @@ jobs:
     steps:
       - name: Set up
         uses: $/.github/actions/setup
+        with:
+          fa-token: ${{ secrets.FA_TOKEN }}
       - name: Prepare the stack
         uses: $/.github/actions/prepare-stack
         with:
