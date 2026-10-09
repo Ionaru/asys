@@ -14,9 +14,9 @@ import { Icon, IconName } from '../icon/icon';
 
 /**
  * The primary navigation bar with Now, Today and Inbox, each an icon over its word, and room at its end for
- * the Capture button (projected). Routing owns the current item (`routerLinkActive` sets
- * `aria-current="page"` and the Solid icon), which departs on purpose from the design system README's
- * `current` input and `(navigate)` output.
+ * the Capture button (projected). Without Capture, the destinations sit in the middle. Routing owns the
+ * current item (`routerLinkActive` sets `aria-current="page"` and the Solid icon), which departs on purpose
+ * from the design system README's `current` input and `(navigate)` output.
  */
 @Component({
   selector: 'asys-bottom-nav',

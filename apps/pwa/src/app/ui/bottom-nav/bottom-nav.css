@@ -4,6 +4,9 @@
   container: asys-bottomnav / inline-size;
   display: flex;
   align-items: center;
+  /* Centres the destinations on screens without Capture. With Capture, its auto margin takes the free
+     space first, so the destinations start the bar and Capture ends it. */
+  justify-content: center;
   gap: var(--space-1);
   padding: var(--space-2) var(--space-3);
   background: var(--surface);

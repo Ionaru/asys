@@ -111,6 +111,43 @@ test('No sideways scroll on Settings, Areas and the account at phone width', asy
   }
 });
 
+test('The bottom nav centres its destinations when Capture is not shown', async ({ page }) => {
+  const taskId = await seedTask(page, {
+    title: 'Centred nav Task',
+    important: false,
+    estimateMinutes: 25,
+  });
+  await page.reload();
+  const nav = page.getByRole('navigation', { name: 'Primary' });
+  const capture = page.getByRole('button', { name: 'Capture' });
+  // The free space between the bar's padding edges and its first and last child.
+  const gaps = (): Promise<{ start: number; end: number }> =>
+    nav.evaluate((element) => {
+      const bar = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      const first = element.firstElementChild?.getBoundingClientRect();
+      const last = element.lastElementChild?.getBoundingClientRect();
+      if (!first || !last) throw new Error('the bar is empty');
+      return {
+        start: first.left - bar.left - parseFloat(style.paddingLeft),
+        end: bar.right - parseFloat(style.paddingRight) - last.right,
+      };
+    });
+
+  // On a tab the destinations start the bar and Capture ends it.
+  await expect(capture).toBeVisible();
+  const tab = await gaps();
+  expect(tab.start, JSON.stringify(tab)).toBeCloseTo(0, 0);
+  expect(tab.end, JSON.stringify(tab)).toBeCloseTo(0, 0);
+
+  await page.goto(`/tasks/${taskId}`);
+  await expect(page.getByRole('heading', { level: 1, name: 'Centred nav Task' })).toBeVisible();
+  await expect(capture).toHaveCount(0);
+  const editor = await gaps();
+  expect(editor.start, JSON.stringify(editor)).toBeGreaterThan(1);
+  expect(Math.abs(editor.start - editor.end), JSON.stringify(editor)).toBeLessThan(1);
+});
+
 test('Nothing covers the last Now row, with the pill or the open quick add', async ({ page }) => {
   await seedPhoneTasks(page);
   await page.goto('/now');
