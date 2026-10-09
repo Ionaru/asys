@@ -35,11 +35,11 @@ const toMilliseconds = (time: string): number => {
 /** The one way script code animates: honours reduced motion and the Voice only theme, resolves motion tokens. */
 @Service()
 export class Motion {
-  private readonly document = inject(DOCUMENT);
+  readonly #document = inject(DOCUMENT);
 
-  private readonly reducedSignal = signal(false);
+  readonly #reducedSignal = signal(false);
 
-  readonly reduced: Signal<boolean> = this.reducedSignal.asReadonly();
+  readonly reduced: Signal<boolean> = this.#reducedSignal.asReadonly();
 
   constructor() {
     const mql =
@@ -49,10 +49,10 @@ export class Motion {
       return;
     }
 
-    this.reducedSignal.set(mql.matches);
+    this.#reducedSignal.set(mql.matches);
 
     const handler = (event: Event): void => {
-      this.reducedSignal.set((event as MediaQueryListEvent).matches);
+      this.#reducedSignal.set((event as MediaQueryListEvent).matches);
     };
 
     mql.addEventListener('change', handler);
@@ -66,7 +66,7 @@ export class Motion {
     return (
       typeof Element.prototype.animate === 'function' &&
       !this.reduced() &&
-      this.document.documentElement.getAttribute('data-theme') !== ThemeName.Drive
+      this.#document.documentElement.getAttribute('data-theme') !== ThemeName.Drive
     );
   }
 
@@ -80,7 +80,7 @@ export class Motion {
       return;
     }
 
-    const resolved = this.resolveOptions(options);
+    const resolved = this.#resolveOptions(options);
 
     if (resolved === undefined) {
       return;
@@ -99,14 +99,14 @@ export class Motion {
   }
 
   /** The options with `duration` and `easing` tokens resolved; undefined when a token has no value. */
-  private resolveOptions(options: KeyframeAnimationOptions): KeyframeAnimationOptions | undefined {
+  #resolveOptions(options: KeyframeAnimationOptions): KeyframeAnimationOptions | undefined {
     const resolved = { ...options };
 
     if (typeof options.duration === 'string') {
       const name = tokenName(options.duration);
 
       if (name !== undefined) {
-        const duration = toMilliseconds(this.readToken(name));
+        const duration = toMilliseconds(this.#readToken(name));
 
         if (!Number.isFinite(duration)) {
           return undefined;
@@ -120,7 +120,7 @@ export class Motion {
       const name = tokenName(options.easing);
 
       if (name !== undefined) {
-        const easing = this.readToken(name);
+        const easing = this.#readToken(name);
 
         if (easing === '') {
           return undefined;
@@ -134,9 +134,9 @@ export class Motion {
   }
 
   /** The computed value of a custom property on the root element, trimmed; empty when unset. */
-  private readToken(name: string): string {
-    const root = this.document.documentElement;
-    const view = this.document.defaultView ?? window;
+  #readToken(name: string): string {
+    const root = this.#document.documentElement;
+    const view = this.#document.defaultView ?? window;
 
     return view.getComputedStyle(root).getPropertyValue(name).trim();
   }

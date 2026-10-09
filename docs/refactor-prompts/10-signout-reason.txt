@@ -1,10 +1,10 @@
 SPDX-License-Identifier: EUPL-1.2
 
-Let `Session.signedOut()` carry why the session ended, so `App.leave()` stops special-casing the Account route.
+Let `Session.signedOut()` carry why the session ended, so `App.#leave()` stops special-casing the Account route.
 
-Why: `App.leave()` in `apps/pwa/src/app/app.ts` drops `returnUrl` when `pathOf(url) === '/account'`, because Account's own Sign out should land on a plain `/signin`. That couples the root to one screen's route, and it also applies to a revoked session: if another device makes new recovery codes while Account is open, the User signs in again and lands on Now, not Account. The only callers of `signedOut()` are `Account.signOut()` and `unauthorizedInterceptor` (`core/auth/unauthorized.interceptor.ts`); `Session.apply()` also sets SignedOut on a 401 from `me()`.
+Why: `App.#leave()` in `apps/pwa/src/app/app.ts` drops `returnUrl` when `pathOf(url) === '/account'`, because Account's own Sign out should land on a plain `/signin`. That couples the root to one screen's route, and it also applies to a revoked session: if another device makes new recovery codes while Account is open, the User signs in again and lands on Now, not Account. The only callers of `signedOut()` are `Account.signOut()` and `unauthorizedInterceptor` (`core/auth/unauthorized.interceptor.ts`); `Session.#apply()` also sets SignedOut on a 401 from `me()`.
 
-Change: add an enum (for example `SignOutReason { Chosen = 'chosen', Revoked = 'revoked' }`) in `core/auth/session.ts`. `signedOut(reason)` and the Unauthorized branch of `apply()` record it before the state changes, readable by `App` (a field or signal on `Session`). `Account.signOut()` passes Chosen, the interceptor and `apply()` pass Revoked. `leave()` omits `returnUrl` for Chosen and keeps it otherwise, with no path test beyond `SIGNED_OUT_PATHS`.
+Change: add an enum (for example `SignOutReason { Chosen = 'chosen', Revoked = 'revoked' }`) in `core/auth/session.ts`. `signedOut(reason)` and the Unauthorized branch of `#apply()` record it before the state changes, readable by `App` (a field or signal on `Session`). `Account.signOut()` passes Chosen, the interceptor and `#apply()` pass Revoked. `#leave()` omits `returnUrl` for Chosen and keeps it otherwise, with no path test beyond `SIGNED_OUT_PATHS`.
 
 Watch the double call: when the server answers Account's sign-out with a tagged 401, the interceptor records Revoked and then `Account.signOut()` records Chosen, and both can land before `App`'s effect runs. Today that lands on `/signin` without `returnUrl`; keep it so and pin it with a spec.
 

@@ -31,31 +31,31 @@ const CAPTURED = 'Captured. It waits in the Inbox.';
  */
 @Service({ autoProvided: false })
 export class CaptureQueue {
-  private readonly attempts = inject(CommandAttempts);
+  readonly #attempts = inject(CommandAttempts);
 
-  private readonly ids = inject(Ids);
+  readonly #ids = inject(Ids);
 
-  private readonly waiting: CaptureCommand[] = [];
+  readonly #waiting: CaptureCommand[] = [];
 
-  private readonly entries = signal<readonly FailedEntry[]>([]);
+  readonly #entries = signal<readonly FailedEntry[]>([]);
 
-  private readonly idleWaiters: (() => void)[] = [];
+  readonly #idleWaiters: (() => void)[] = [];
 
-  private running = false;
+  #running = false;
 
-  private readonly statusMessage = signal<string | null>(null);
+  readonly #statusMessage = signal<string | null>(null);
 
   readonly failed: Signal<readonly FailedCapture[]> = computed(() =>
-    this.entries().map((entry) => entry.capture),
+    this.#entries().map((entry) => entry.capture),
   );
 
-  readonly message: Signal<string | null> = this.statusMessage.asReadonly();
+  readonly message: Signal<string | null> = this.#statusMessage.asReadonly();
 
   /** Queues a capture of this (already trimmed) text. */
   submit(text: string): void {
-    this.enqueue({
+    this.#enqueue({
       _tag: CommandTag.CaptureTask,
-      taskId: this.ids.next(),
+      taskId: this.#ids.next(),
       title: text,
       captureText: text,
     });
@@ -63,54 +63,54 @@ export class CaptureQueue {
 
   /** Queues the failed capture again: the same command after Failed, a fresh one after KeyReused. */
   retry(id: string): void {
-    const entry = this.entries().find((candidate) => candidate.capture.id === id);
+    const entry = this.#entries().find((candidate) => candidate.capture.id === id);
 
     if (entry === undefined || !entry.capture.canRetry) {
       return;
     }
 
-    this.remove(id);
+    this.#remove(id);
 
     if (entry.outcomeTag === CommandOutcomeTag.KeyReused) {
-      this.enqueue({ ...entry.command, taskId: this.ids.next() });
+      this.#enqueue({ ...entry.command, taskId: this.#ids.next() });
     } else {
-      this.enqueue(entry.command);
+      this.#enqueue(entry.command);
     }
   }
 
   /** Drops the failed capture without sending anything. */
   discard(id: string): void {
-    this.remove(id);
+    this.#remove(id);
   }
 
   /** Resolves once nothing is queued or in flight. */
   drain(): Promise<void> {
-    if (!this.running && this.waiting.length === 0) {
+    if (!this.#running && this.#waiting.length === 0) {
       return Promise.resolve();
     }
 
     return new Promise((resolve) => {
-      this.idleWaiters.push(resolve);
+      this.#idleWaiters.push(resolve);
     });
   }
 
   clearMessage(): void {
-    this.statusMessage.set(null);
+    this.#statusMessage.set(null);
   }
 
-  private enqueue(command: CaptureCommand): void {
-    this.waiting.push(command);
+  #enqueue(command: CaptureCommand): void {
+    this.#waiting.push(command);
 
-    if (!this.running) {
-      void this.run();
+    if (!this.#running) {
+      void this.#run();
     }
   }
 
-  private remove(id: string): void {
-    this.entries.update((entries) => entries.filter((entry) => entry.capture.id !== id));
+  #remove(id: string): void {
+    this.#entries.update((entries) => entries.filter((entry) => entry.capture.id !== id));
   }
 
-  private addFailure(
+  #addFailure(
     command: CaptureCommand,
     outcomeTag: CommandOutcomeTag,
     message: string | null,
@@ -122,37 +122,37 @@ export class CaptureQueue {
       canRetry: isRetryable(outcomeTag),
     };
 
-    this.entries.update((entries) => [...entries, { command, outcomeTag, capture }]);
+    this.#entries.update((entries) => [...entries, { command, outcomeTag, capture }]);
   }
 
-  private async run(): Promise<void> {
-    this.running = true;
+  async #run(): Promise<void> {
+    this.#running = true;
 
     try {
       for (
-        let command = this.waiting.shift();
+        let command = this.#waiting.shift();
         command !== undefined;
-        command = this.waiting.shift()
+        command = this.#waiting.shift()
       ) {
-        const outcome = await this.attempts.send(command);
+        const outcome = await this.#attempts.send(command);
 
         if (outcome._tag === CommandOutcomeTag.Applied) {
-          this.statusMessage.set(CAPTURED);
+          this.#statusMessage.set(CAPTURED);
         } else if (outcome._tag === CommandOutcomeTag.SignedOut) {
-          this.waiting.length = 0;
-          this.entries.set([]);
-          this.statusMessage.set(null);
+          this.#waiting.length = 0;
+          this.#entries.set([]);
+          this.#statusMessage.set(null);
         } else {
           const message = outcomeMessage(outcome);
 
-          this.statusMessage.set(message);
-          this.addFailure(command, outcome._tag, message);
+          this.#statusMessage.set(message);
+          this.#addFailure(command, outcome._tag, message);
         }
       }
     } finally {
-      this.running = false;
+      this.#running = false;
 
-      for (const resolve of this.idleWaiters.splice(0)) {
+      for (const resolve of this.#idleWaiters.splice(0)) {
         resolve();
       }
     }

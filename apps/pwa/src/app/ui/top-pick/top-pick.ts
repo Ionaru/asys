@@ -29,7 +29,7 @@ import { StatusBadge, StatusBadgeStatus } from '../status-badge/status-badge';
   styleUrl: './top-pick.css',
 })
 export class TopPick {
-  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  readonly #host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   protected readonly Variants = ButtonVariant;
 
@@ -82,11 +82,11 @@ export class TopPick {
 
   /** Moves focus to the title link (used after Done, so focus lands on the new top pick). */
   focusTitle(): void {
-    this.host.nativeElement.querySelector<HTMLElement>('.asys-top-pick__link')?.focus();
+    this.#host.nativeElement.querySelector<HTMLElement>('.asys-top-pick__link')?.focus();
   }
 
   /** Moves focus to the Log progress button, when it is shown (used when Now's form closes). */
   focusLogProgress(): void {
-    this.host.nativeElement.querySelector<HTMLElement>('.asys-top-pick__log-progress')?.focus();
+    this.#host.nativeElement.querySelector<HTMLElement>('.asys-top-pick__log-progress')?.focus();
   }
 }

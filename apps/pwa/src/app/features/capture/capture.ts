@@ -31,19 +31,19 @@ import { TextField } from '../../ui/text-field/text-field';
   styleUrl: './capture.css',
 })
 export class Capture {
-  private readonly router = inject(Router);
+  readonly #router = inject(Router);
 
-  private readonly ids = inject(Ids);
+  readonly #ids = inject(Ids);
 
-  private readonly attempts = inject(CommandAttempts);
+  readonly #attempts = inject(CommandAttempts);
 
-  private readonly injector = inject(Injector);
+  readonly #injector = inject(Injector);
 
-  private readonly destroyRef = inject(DestroyRef);
+  readonly #destroyRef = inject(DestroyRef);
 
   private readonly titleField = viewChild(TextField);
 
-  private pending: Command | null = null;
+  #pending: Command | null = null;
 
   readonly title = input<string | undefined>();
 
@@ -77,41 +77,41 @@ export class Capture {
       return;
     }
 
-    const command = this.commandFor(title);
+    const command = this.#commandFor(title);
 
     this.message.set(null);
     this.confirmation.set(null);
     this.busy.set(true);
 
-    const outcome = await this.attempts.send(command);
+    const outcome = await this.#attempts.send(command);
 
     this.busy.set(false);
 
-    if (this.destroyRef.destroyed) {
+    if (this.#destroyRef.destroyed) {
       return;
     }
 
     switch (outcome._tag) {
       case CommandOutcomeTag.Applied:
-        this.pending = null;
+        this.#pending = null;
         this.confirmation.set(title);
         this.field.set('');
-        await this.router.navigate(['/capture'], { replaceUrl: true });
-        this.focusTitle();
+        await this.#router.navigate(['/capture'], { replaceUrl: true });
+        this.#focusTitle();
         break;
       case CommandOutcomeTag.Failed:
         this.message.set(outcomeMessage(outcome));
         break;
       default:
-        this.pending = null;
+        this.#pending = null;
         this.message.set(outcomeMessage(outcome));
         break;
     }
   }
 
-  private commandFor(title: string): Command {
+  #commandFor(title: string): Command {
     const captureText = this.shared()?.captureText ?? title;
-    const pending = this.pending;
+    const pending = this.#pending;
 
     if (
       pending !== null &&
@@ -124,17 +124,17 @@ export class Capture {
 
     const command: Command = {
       _tag: CommandTag.CaptureTask,
-      taskId: this.ids.next(),
+      taskId: this.#ids.next(),
       title,
       captureText,
     };
 
-    this.pending = command;
+    this.#pending = command;
 
     return command;
   }
 
-  private focusTitle(): void {
-    afterNextRender(() => this.titleField()?.focus(), { injector: this.injector });
+  #focusTitle(): void {
+    afterNextRender(() => this.titleField()?.focus(), { injector: this.#injector });
   }
 }

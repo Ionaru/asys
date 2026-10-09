@@ -45,17 +45,17 @@ export const canLogProgress = (task: Task | undefined): boolean =>
   `,
 })
 export class LogProgressForm {
-  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  readonly #host = inject<ElementRef<HTMLElement>>(ElementRef);
 
-  private readonly injector = inject(Injector);
+  readonly #injector = inject(Injector);
 
-  private readonly uid = nextId++;
+  readonly #uid = nextId++;
 
   protected readonly Variants = ButtonVariant;
 
-  protected readonly inputId = `asys-progress-input-${this.uid}`;
+  protected readonly inputId = `asys-progress-input-${this.#uid}`;
 
-  protected readonly messageId = `asys-progress-message-${this.uid}`;
+  protected readonly messageId = `asys-progress-message-${this.#uid}`;
 
   protected readonly error = signal(false);
 
@@ -70,8 +70,8 @@ export class LogProgressForm {
 
   constructor() {
     afterNextRender(
-      () => this.host.nativeElement.querySelector<HTMLInputElement>('input')?.focus(),
-      { injector: this.injector },
+      () => this.#host.nativeElement.querySelector<HTMLInputElement>('input')?.focus(),
+      { injector: this.#injector },
     );
   }
 
@@ -85,7 +85,7 @@ export class LogProgressForm {
       return;
     }
     const text = (
-      this.host.nativeElement.querySelector<HTMLInputElement>('input')?.value ?? ''
+      this.#host.nativeElement.querySelector<HTMLInputElement>('input')?.value ?? ''
     ).trim();
     const minutes = WHOLE_MINUTES.test(text) ? Number(text) : Number.NaN;
     if (!Number.isInteger(minutes) || minutes < 1 || minutes > this.estimateMinutes() - 1) {

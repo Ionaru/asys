@@ -84,6 +84,7 @@ These fail lint, a test or a CI check when broken.
 - **TypeScript:**
   - Use `enum`s with string values for closed sets, `_tag` discriminators included, not string-literal unions. `scripts/` and `apps/pwa-e2e` allow only erasable syntax, so they use `as const` objects.
   - Leave a blank line between top-level declarations, because oxfmt keeps blank lines but never adds them.
+  - A class member that only its own class uses is an ES private `#name`, not a TypeScript `private` one. Angular signal queries (`viewChild()`, `viewChildren()`, `contentChild()`, `contentChildren()`) are the exception: Angular's compiler refuses them on a `#` name, so they stay `private`. A template cannot read a `#` member either, so members a template reads stay `protected`. A decorated class cannot have a `static #` member (TS18036, because of `experimentalDecorators`), so state shared by its instances, such as an id counter, is a module-level `let`.
   - File names are kebab-case. Specs sit next to the source as `*.spec.ts`, and type tests are `*.test-d.ts`.
 - **Domain:**
   - `now`, the time zone and Settings are passed in. No clock, randomness or `Intl` inside `libs/domain`.

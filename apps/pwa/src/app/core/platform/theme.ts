@@ -11,11 +11,11 @@ export enum ThemeName {
 /** Applies the colour scheme to the document and follows the device preference. */
 @Service()
 export class Theme {
-  private readonly document = inject(DOCUMENT);
+  readonly #document = inject(DOCUMENT);
 
-  private readonly currentSignal = signal(ThemeName.Light);
+  readonly #currentSignal = signal(ThemeName.Light);
 
-  readonly current = this.currentSignal.asReadonly();
+  readonly current = this.#currentSignal.asReadonly();
 
   constructor() {
     const mql =
@@ -23,14 +23,14 @@ export class Theme {
         ? window.matchMedia('(prefers-color-scheme: dark)')
         : undefined;
 
-    this.apply(mql?.matches === true);
+    this.#apply(mql?.matches === true);
 
     if (mql === undefined) {
       return;
     }
 
     const handler = (event: Event): void => {
-      this.apply((event as MediaQueryListEvent).matches);
+      this.#apply((event as MediaQueryListEvent).matches);
     };
 
     mql.addEventListener('change', handler);
@@ -39,10 +39,10 @@ export class Theme {
     });
   }
 
-  private apply(dark: boolean): void {
+  #apply(dark: boolean): void {
     const name = dark ? ThemeName.Dark : ThemeName.Light;
 
-    this.currentSignal.set(name);
-    this.document.documentElement.setAttribute('data-theme', name);
+    this.#currentSignal.set(name);
+    this.#document.documentElement.setAttribute('data-theme', name);
   }
 }

@@ -63,9 +63,9 @@ import { Button, ButtonVariant } from '../button/button';
   `,
 })
 export class InlineConfirm {
-  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  readonly #host = inject<ElementRef<HTMLElement>>(ElementRef);
 
-  private readonly injector = inject(Injector);
+  readonly #injector = inject(Injector);
 
   protected readonly Variants = ButtonVariant;
 
@@ -81,8 +81,8 @@ export class InlineConfirm {
 
   constructor() {
     afterNextRender(
-      () => this.host.nativeElement.querySelector<HTMLElement>('.asys-confirm__cancel')?.focus(),
-      { injector: this.injector },
+      () => this.#host.nativeElement.querySelector<HTMLElement>('.asys-confirm__cancel')?.focus(),
+      { injector: this.#injector },
     );
   }
 }

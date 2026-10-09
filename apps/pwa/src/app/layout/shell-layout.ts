@@ -39,15 +39,15 @@ import { leaveMarked } from './shell-motion';
   styleUrl: './shell-layout.css',
 })
 export class ShellLayout {
-  private readonly router = inject(Router);
+  readonly #router = inject(Router);
 
-  private readonly injector = inject(Injector);
+  readonly #injector = inject(Injector);
 
-  private readonly document = inject(DOCUMENT);
+  readonly #document = inject(DOCUMENT);
 
-  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  readonly #host = inject<ElementRef<HTMLElement>>(ElementRef);
 
-  private readonly motion = inject(Motion);
+  readonly #motion = inject(Motion);
 
   private readonly bottomNav = viewChild(BottomNav);
 
@@ -72,14 +72,14 @@ export class ShellLayout {
   protected readonly windowMs = UNDO_WINDOW_MS;
 
   protected readonly onCapturePath = computed(() => {
-    const navigation = this.router.lastSuccessfulNavigation();
+    const navigation = this.#router.lastSuccessfulNavigation();
 
     if (navigation === null) {
       return false;
     }
 
     return TAB_PATHS.includes(
-      pathOf(this.router.serializeUrl(navigation.finalUrl ?? navigation.extractedUrl)),
+      pathOf(this.#router.serializeUrl(navigation.finalUrl ?? navigation.extractedUrl)),
     );
   });
 
@@ -91,10 +91,10 @@ export class ShellLayout {
   protected readonly text = signal('');
 
   /** Whether focus is in the Undo bar, from its `focusInside` output. */
-  private focusInBar = false;
+  #focusInBar = false;
 
   /** Whether the next change of the bar's layout follows a pointer activation of Dismiss or Try again. */
-  private pointerActivated = false;
+  #pointerActivated = false;
 
   /** The latest notice, keyed by its seq: each notice is a new node, so the live region reads it, even when the text repeats. */
   protected readonly notices = computed(() => {
@@ -136,7 +136,7 @@ export class ShellLayout {
   constructor() {
     effect(() => {
       if (this.doneUndo.focusRequest() > 0) {
-        afterNextRender(() => this.undoBar()?.focusAction(), { injector: this.injector });
+        afterNextRender(() => this.undoBar()?.focusAction(), { injector: this.#injector });
       }
     });
 
@@ -144,7 +144,7 @@ export class ShellLayout {
       const undone = this.doneUndo.undone();
 
       if (undone !== null) {
-        afterNextRender(() => this.focusTitle(undone.taskId), { injector: this.injector });
+        afterNextRender(() => this.#focusTitle(undone.taskId), { injector: this.#injector });
       }
     });
 
@@ -154,13 +154,13 @@ export class ShellLayout {
       this.undoView();
 
       untracked(() => {
-        const wasInBar = this.focusInBar;
-        const pointer = this.pointerActivated;
+        const wasInBar = this.#focusInBar;
+        const pointer = this.#pointerActivated;
 
-        this.pointerActivated = false;
+        this.#pointerActivated = false;
 
         if (wasInBar) {
-          afterNextRender(() => this.guardFocus(pointer), { injector: this.injector });
+          afterNextRender(() => this.#guardFocus(pointer), { injector: this.#injector });
         }
       });
     });
@@ -173,11 +173,11 @@ export class ShellLayout {
         return;
       }
 
-      const stop = this.observeBlockSize(element, '--shell-undo-height');
+      const stop = this.#observeBlockSize(element, '--shell-undo-height');
 
       onCleanup(() => {
         stop();
-        this.host.nativeElement.style.setProperty('--shell-undo-height', '0px');
+        this.#host.nativeElement.style.setProperty('--shell-undo-height', '0px');
       });
     });
 
@@ -190,11 +190,11 @@ export class ShellLayout {
         return;
       }
 
-      const stop = this.observeBlockSize(element, '--shell-nav-height');
+      const stop = this.#observeBlockSize(element, '--shell-nav-height');
 
       onCleanup(() => {
         stop();
-        this.host.nativeElement.style.removeProperty('--shell-nav-height');
+        this.#host.nativeElement.style.removeProperty('--shell-nav-height');
       });
     });
   }
@@ -212,11 +212,11 @@ export class ShellLayout {
   protected close(): void {
     this.open.set(false);
 
-    afterNextRender(() => this.pill()?.nativeElement.focus(), { injector: this.injector });
+    afterNextRender(() => this.pill()?.nativeElement.focus(), { injector: this.#injector });
   }
 
   protected leave(event: AnimationCallbackEvent): void {
-    void leaveMarked(this.motion, event);
+    void leaveMarked(this.#motion, event);
   }
 
   protected inside(reason: PauseReason, inside: boolean): void {
@@ -228,35 +228,35 @@ export class ShellLayout {
   }
 
   protected barFocus(inside: boolean): void {
-    this.focusInBar = inside;
+    this.#focusInBar = inside;
     this.inside(PauseReason.Focus, inside);
   }
 
   protected retryDone(activation: { readonly keyboard: boolean }): void {
-    this.pointerActivated = !activation.keyboard;
+    this.#pointerActivated = !activation.keyboard;
     this.doneUndo.retry();
   }
 
   protected dismissDone(activation: { readonly keyboard: boolean }): void {
-    this.pointerActivated = !activation.keyboard;
+    this.#pointerActivated = !activation.keyboard;
     this.doneUndo.dismiss();
   }
 
   /** Moves focus to the next title, or to the page heading when there is none (Escape in the bar). */
   protected focusMain(): void {
-    this.focusTitle(null);
+    this.#focusTitle(null);
   }
 
   /**
    * Writes the border-box block size of `element` to the custom property `name` on the shell host, as
    * it changes. Returns the function that stops observing.
    */
-  private observeBlockSize(element: HTMLElement, name: string): () => void {
+  #observeBlockSize(element: HTMLElement, name: string): () => void {
     const observer = new ResizeObserver((entries) => {
       const size = entries[0]?.borderBoxSize[0]?.blockSize;
 
       if (size !== undefined) {
-        this.host.nativeElement.style.setProperty(name, `${size}px`);
+        this.#host.nativeElement.style.setProperty(name, `${size}px`);
       }
     });
 
@@ -270,18 +270,20 @@ export class ShellLayout {
    * Otherwise the Focus pause ends, and when focus was lost (not moved elsewhere) and the change was
    * not a pointer action, it goes to the bar's first button, or to the page as Escape does.
    */
-  private guardFocus(pointer: boolean): void {
-    const active = this.document.activeElement;
+  #guardFocus(pointer: boolean): void {
+    const active = this.#document.activeElement;
 
     if (this.undoBarHost()?.nativeElement.contains(active)) {
       return;
     }
 
     this.doneUndo.resume(PauseReason.Focus);
-    this.focusInBar = false;
+    this.#focusInBar = false;
 
     const lost =
-      active === null || active === this.document.body || active.closest('[data-leaving]') !== null;
+      active === null ||
+      active === this.#document.body ||
+      active.closest('[data-leaving]') !== null;
 
     if (pointer || !lost) {
       return;
@@ -297,7 +299,7 @@ export class ShellLayout {
   }
 
   /** Focuses the first title in the page that is not leaving (that of `taskId`, when given), else the heading. */
-  private focusTitle(taskId: string | null): void {
+  #focusTitle(taskId: string | null): void {
     const main = this.main()?.nativeElement;
 
     if (!main) {
@@ -314,28 +316,28 @@ export class ShellLayout {
   }
 
   protected add(text: string): void {
-    const from = this.host.nativeElement
+    const from = this.#host.nativeElement
       .querySelector('.asys-quickadd__input')
       ?.getBoundingClientRect();
 
     this.text.set('');
     this.captureQueue.submit(text);
-    this.flight(from, text);
+    this.#flight(from, text);
   }
 
   /** Flies the captured text to the Inbox tab, when motion is allowed and the tab is visible. */
-  private flight(from: DOMRectReadOnly | undefined, text: string): void {
-    const viewport = this.document.defaultView?.visualViewport;
+  #flight(from: DOMRectReadOnly | undefined, text: string): void {
+    const viewport = this.#document.defaultView?.visualViewport;
     const tab = this.bottomNav()?.inboxTab();
 
-    if (from === undefined || !this.motion.allowed() || !viewport || !tab) {
+    if (from === undefined || !this.#motion.allowed() || !viewport || !tab) {
       return;
     }
 
     const to = tab.getBoundingClientRect();
 
     if (tabInView(to, viewport)) {
-      void flyCapture(this.document, this.motion, from, to, text);
+      void flyCapture(this.#document, this.#motion, from, to, text);
     }
   }
 }

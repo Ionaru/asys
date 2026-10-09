@@ -380,10 +380,10 @@ const stubResizeObserver = (present: boolean, immediate = true): ObserverInstanc
 
     readonly disconnect = vi.fn();
 
-    private readonly callback: (entries: unknown[], observer: unknown) => void;
+    readonly #callback: (entries: unknown[], observer: unknown) => void;
 
     constructor(callback: (entries: unknown[], observer: unknown) => void) {
-      this.callback = callback;
+      this.#callback = callback;
       instances.push(this);
     }
 
@@ -396,7 +396,7 @@ const stubResizeObserver = (present: boolean, immediate = true): ObserverInstanc
     }
 
     fire(target: Element, blockSize: number): void {
-      this.callback(
+      this.#callback(
         [
           {
             target,

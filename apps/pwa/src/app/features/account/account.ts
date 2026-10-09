@@ -66,23 +66,23 @@ const messageForAddError = (error: AuthError): string | null => {
   styleUrl: './account.css',
 })
 export class Account {
-  private readonly authApi = inject(AuthApi);
+  readonly #authApi = inject(AuthApi);
 
-  private readonly ceremony = inject(PasskeyCeremony);
+  readonly #ceremony = inject(PasskeyCeremony);
 
-  private readonly appUpdate = inject(AppUpdate);
+  readonly #appUpdate = inject(AppUpdate);
 
-  private readonly dataStore = inject(DataStore);
+  readonly #dataStore = inject(DataStore);
 
-  private readonly clock = inject(Clock);
+  readonly #clock = inject(Clock);
 
-  private readonly deviceZone = inject(DeviceZone);
+  readonly #deviceZone = inject(DeviceZone);
 
-  private readonly doneUndo = inject(DoneUndo);
+  readonly #doneUndo = inject(DoneUndo);
 
-  private readonly captureQueue = inject(CaptureQueue);
+  readonly #captureQueue = inject(CaptureQueue);
 
-  private readonly destroyRef = inject(DestroyRef);
+  readonly #destroyRef = inject(DestroyRef);
 
   protected readonly session = inject(Session);
 
@@ -98,7 +98,7 @@ export class Account {
 
   protected readonly passkeys = resource({
     loader: async () => {
-      const result = await this.authApi.passkeys();
+      const result = await this.#authApi.passkeys();
 
       if (result._tag === AuthResultTag.Failed) {
         throw new Error('passkeys');
@@ -108,8 +108,8 @@ export class Account {
     },
   });
 
-  private readonly timeZone = computed(
-    () => this.dataStore.state()?.settings.timeZone ?? this.deviceZone.current() ?? 'UTC',
+  readonly #timeZone = computed(
+    () => this.#dataStore.state()?.settings.timeZone ?? this.#deviceZone.current() ?? 'UTC',
   );
 
   protected readonly rows = computed(() => {
@@ -117,12 +117,12 @@ export class Account {
       return [];
     }
 
-    const zone = this.timeZone();
+    const zone = this.#timeZone();
 
     return this.passkeys.value().map((passkey: Passkey) => ({
       passkey,
-      created: this.formatDate(passkey.createdAt, zone),
-      lastUsed: passkey.lastUsedAt === null ? null : this.formatDate(passkey.lastUsedAt, zone),
+      created: this.#formatDate(passkey.createdAt, zone),
+      lastUsed: passkey.lastUsedAt === null ? null : this.#formatDate(passkey.lastUsedAt, zone),
     }));
   });
 
@@ -136,24 +136,24 @@ export class Account {
 
   protected readonly added = signal(false);
 
-  private readonly addMessage = signal<string | null>(null);
+  readonly #addMessage = signal<string | null>(null);
 
-  protected readonly addRef = ceremonyOptions(() => this.authApi.addOptions());
+  protected readonly addRef = ceremonyOptions(() => this.#authApi.addOptions());
 
   protected readonly addOptions = this.addRef.options;
 
   protected readonly shownAddMessage = computed(
     () =>
-      this.addMessage() ??
+      this.#addMessage() ??
       (this.addRef.error() === null || this.addRef.error() === AuthError.Unauthorized
         ? null
         : GENERIC_MESSAGE),
   );
 
-  private readonly addModel = signal({ name: '' });
+  readonly #addModel = signal({ name: '' });
 
   protected readonly addForm = form(
-    this.addModel,
+    this.#addModel,
     (path) => {
       validate(path.name, ({ value }) => {
         const name = value();
@@ -164,7 +164,7 @@ export class Account {
     {
       submission: {
         action: async () => {
-          await this.addPasskey();
+          await this.#addPasskey();
 
           return undefined;
         },
@@ -185,16 +185,16 @@ export class Account {
 
   protected readonly codesMessage = signal<string | null>(null);
 
-  private held = false;
+  #held = false;
 
   protected readonly signingOut = signal(false);
 
   protected readonly signOutMessage = signal<string | null>(null);
 
   constructor() {
-    this.destroyRef.onDestroy(() => {
+    this.#destroyRef.onDestroy(() => {
       this.codes.set([]);
-      this.releaseHold();
+      this.#releaseHold();
     });
   }
 
@@ -211,7 +211,7 @@ export class Account {
     this.removing.set(true);
 
     try {
-      const result = await this.authApi.removePasskey(credentialId);
+      const result = await this.#authApi.removePasskey(credentialId);
 
       if (result._tag === AuthResultTag.Ok) {
         this.confirmingRemoval.set(null);
@@ -231,22 +231,22 @@ export class Account {
     }
   }
 
-  private async addPasskey(): Promise<void> {
+  async #addPasskey(): Promise<void> {
     const current = this.addOptions();
 
     if (current === null || this.adding()) {
       return;
     }
 
-    this.addMessage.set(null);
+    this.#addMessage.set(null);
     this.added.set(false);
     this.adding.set(true);
 
     try {
-      const created = await this.ceremony.create(current.options);
+      const created = await this.#ceremony.create(current.options);
 
       if (created._tag === CeremonyResultTag.Failed) {
-        this.addMessage.set(messageForFailure(created.failure));
+        this.#addMessage.set(messageForFailure(created.failure));
 
         if (created.failure !== PasskeyFailure.Cancelled) {
           this.addRef.discard();
@@ -255,9 +255,9 @@ export class Account {
         return;
       }
 
-      const name = this.addModel().name.trim();
+      const name = this.#addModel().name.trim();
 
-      const result = await this.authApi.addPasskey(
+      const result = await this.#authApi.addPasskey(
         current.challengeId,
         created.response,
         name === '' ? undefined : name,
@@ -273,7 +273,7 @@ export class Account {
         return;
       }
 
-      this.addMessage.set(messageForAddError(result.error));
+      this.#addMessage.set(messageForAddError(result.error));
     } finally {
       this.adding.set(false);
     }
@@ -288,9 +288,9 @@ export class Account {
     this.regenerating.set(true);
 
     try {
-      const result = await this.authApi.regenerateRecoveryCodes();
+      const result = await this.#authApi.regenerateRecoveryCodes();
 
-      if (this.destroyRef.destroyed) {
+      if (this.#destroyRef.destroyed) {
         return;
       }
 
@@ -306,14 +306,14 @@ export class Account {
       this.copyStatus.set(null);
       this.codes.set(result.value.recoveryCodes);
 
-      if (!this.held) {
-        this.held = true;
-        this.appUpdate.hold();
+      if (!this.#held) {
+        this.#held = true;
+        this.#appUpdate.hold();
       }
 
       await this.session.check();
     } finally {
-      if (!this.destroyRef.destroyed) {
+      if (!this.#destroyRef.destroyed) {
         this.regenerating.set(false);
       }
     }
@@ -331,7 +331,7 @@ export class Account {
   protected hideCodes(): void {
     this.codes.set([]);
     this.copyStatus.set(null);
-    this.releaseHold();
+    this.#releaseHold();
   }
 
   protected async signOut(): Promise<void> {
@@ -343,10 +343,10 @@ export class Account {
     this.signingOut.set(true);
 
     try {
-      await this.doneUndo.flush();
-      await this.captureQueue.drain();
+      await this.#doneUndo.flush();
+      await this.#captureQueue.drain();
 
-      const result = await this.authApi.signOut();
+      const result = await this.#authApi.signOut();
 
       if (result._tag === AuthResultTag.Ok || result.error === AuthError.Unauthorized) {
         this.session.signedOut();
@@ -360,14 +360,14 @@ export class Account {
     }
   }
 
-  private releaseHold(): void {
-    if (this.held) {
-      this.held = false;
-      this.appUpdate.release();
+  #releaseHold(): void {
+    if (this.#held) {
+      this.#held = false;
+      this.#appUpdate.release();
     }
   }
 
-  private formatDate(at: number, zone: string): string {
+  #formatDate(at: number, zone: string): string {
     try {
       const year = (instant: number): string =>
         new Intl.DateTimeFormat('en-GB', { year: 'numeric', timeZone: zone }).format(instant);
@@ -376,15 +376,15 @@ export class Account {
         weekday: 'short',
         day: 'numeric',
         month: 'short',
-        ...(year(at) === year(this.clock.now()) ? {} : { year: 'numeric' }),
+        ...(year(at) === year(this.#clock.now()) ? {} : { year: 'numeric' }),
         timeZone: zone,
       }).format(at);
     } catch {
-      return this.formatDateIn(at, 'UTC');
+      return this.#formatDateIn(at, 'UTC');
     }
   }
 
-  private formatDateIn(at: number, zone: string): string {
+  #formatDateIn(at: number, zone: string): string {
     return new Intl.DateTimeFormat('en-GB', {
       weekday: 'short',
       day: 'numeric',
