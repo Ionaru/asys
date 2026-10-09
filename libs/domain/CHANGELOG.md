@@ -4,6 +4,30 @@
 
 `RULES_VERSION` in `src/lib/rules-version.ts` names the rules a front-end derives its values with. Any change to a rule is at least a minor version (ADR 0003).
 
+## 0.4.0 (2026-10-09)
+
+The moment line of the Now screen, the summary of the Waiting section, and the fact of the reason line on its own.
+
+### The moment line
+
+- The moment reads as the weekday, the day, the month and the 24-hour time in the Current time zone, joined by a middle dot between spaces: `Fri 9 Oct · 14:05`.
+- It never reads `today` and never carries a year, even across New Year: `Fri 1 Jan · 00:59`.
+- Weekday and month names come from the same fixed English tables as the day formats. The day has no leading zero and the time does.
+- Seconds are dropped, not rounded: 14:05:59 reads `14:05`.
+- The local day and date change at local midnight: 22:30 UTC on Sunday 4 Oct reads `Mon 5 Oct · 00:30` in Amsterdam. When daylight saving ends, both 00:30 UTC and 01:30 UTC on 25 Oct read `Sun 25 Oct · 02:30`.
+
+### The Waiting summary
+
+- While the Waiting section is closed, one line says when the next Waiting Task becomes Available: `Next Available` and the Task's own Available from (`Next Available Tue 6 Oct`, `Next Available tomorrow 09:00`).
+- The Task whose moment of becoming Available is earliest decides, whatever the list order. On a tie, the first in the list decides.
+- A Task without an Available from reads the time its moment falls at (`Next Available 15:30`, or the day and the time on another day).
+- A Task that is both Blocked and not yet Available counts by its not-yet-Available moment.
+- There is no line (`null`) when no Waiting Task is waiting for a moment: the list is empty, or every Waiting Task is only Blocked. Unknown reasons are ignored.
+
+### The reason line
+
+- The fact of the reason line is now available on its own, so a front-end can colour an Overdue Due. The line itself is unchanged: `Due yesterday 17:00 · important` still reads the same.
+
 ## 0.3.0 (2026-10-04)
 
 The display formats, the reason and Waiting lines in the design system's style, the Inbox order, the blocker lists and the Active hours text.

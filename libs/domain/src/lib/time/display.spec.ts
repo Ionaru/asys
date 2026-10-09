@@ -2,7 +2,8 @@
 
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import { formatClock, formatDateSpec, formatDay, formatMinutes } from './display';
+import { formatClock, formatDateSpec, formatDay, formatMinutes, formatMoment } from './display';
+import { toLocalDateTime } from './zoned';
 
 const AMS = 'Europe/Amsterdam';
 
@@ -204,5 +205,123 @@ describe('formatMinutes', () => {
 
   it.each([-1, 1.5, NaN, Infinity])('rejects %j', (bad) => {
     expect(() => formatMinutes(bad)).toThrow(RangeError);
+  });
+});
+
+describe('formatMoment', () => {
+  it.each([
+    ['2026-10-09T12:05:00.000Z', 'Fri 9 Oct · 14:05'],
+    ['2026-10-04T22:30:00.000Z', 'Mon 5 Oct · 00:30'],
+    ['2026-12-31T23:59:00.000Z', 'Fri 1 Jan · 00:59'],
+    ['2026-10-09T12:05:59.999Z', 'Fri 9 Oct · 14:05'],
+  ])('formats %s as %j in Amsterdam', (iso, expected) => {
+    expect(formatMoment(at(iso), AMS)).toBe(expected);
+  });
+
+  it('joins the parts with a space, a middle dot and a space', () => {
+    expect(formatMoment(at('2026-10-09T12:05:00.000Z'), AMS)).toContain(' \u00B7 ');
+  });
+
+  it('writes the day without a leading zero and the time with one', () => {
+    expect(formatMoment(at('2026-10-05T07:05:00.000Z'), AMS)).toBe('Mon 5 Oct · 09:05');
+  });
+
+  it('keeps the two-digit day of the tenth and later', () => {
+    expect(formatMoment(at('2026-10-10T12:30:00.000Z'), AMS)).toBe('Sat 10 Oct · 14:30');
+  });
+
+  it('crosses local midnight to the next weekday and date', () => {
+    expect(formatMoment(at('2026-10-04T21:59:00.000Z'), AMS)).toBe('Sun 4 Oct · 23:59');
+    expect(formatMoment(at('2026-10-04T22:00:00.000Z'), AMS)).toBe('Mon 5 Oct · 00:00');
+  });
+
+  it('never says today and never adds a year, also across a year change', () => {
+    const moment = formatMoment(at('2026-12-31T23:59:00.000Z'), AMS);
+
+    expect(moment).not.toContain('today');
+    expect(moment).not.toContain('2026');
+    expect(moment).not.toContain('2027');
+  });
+
+  it('drops the seconds instead of rounding them up', () => {
+    expect(formatMoment(at('2026-10-09T12:05:59.999Z'), AMS)).toBe(
+      formatMoment(at('2026-10-09T12:05:00.000Z'), AMS),
+    );
+  });
+
+  describe('daylight saving', () => {
+    it('shows 02:30 for both occurrences of the repeated hour on the fall-back day', () => {
+      expect(formatMoment(at('2026-10-25T00:30:00.000Z'), AMS)).toBe('Sun 25 Oct · 02:30');
+      expect(formatMoment(at('2026-10-25T01:30:00.000Z'), AMS)).toBe('Sun 25 Oct · 02:30');
+    });
+
+    it('shows 03:30 for 01:30Z on the spring-forward day', () => {
+      expect(formatMoment(at('2026-03-29T01:30:00.000Z'), AMS)).toBe('Sun 29 Mar · 03:30');
+    });
+  });
+
+  it('uses the time zone it is given', () => {
+    expect(formatMoment(at('2026-10-09T12:05:00.000Z'), 'UTC')).toBe('Fri 9 Oct · 12:05');
+    expect(formatMoment(at('2026-10-09T23:30:00.000Z'), 'UTC')).toBe('Fri 9 Oct · 23:30');
+    expect(formatMoment(at('2026-10-09T23:30:00.000Z'), AMS)).toBe('Sat 10 Oct · 01:30');
+  });
+
+  it('names every weekday and month from the fixed English tables', () => {
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    // 2026-01-05 is a Monday, so the next seven days run Monday to Sunday.
+    for (const [index, weekday] of weekdays.entries()) {
+      const moment = formatMoment(at(`2026-01-${pad(5 + index, 2)}T12:00:00.000Z`), 'UTC');
+
+      expect(moment.startsWith(`${weekday} ${5 + index} Jan`)).toBe(true);
+    }
+
+    for (const [index, month] of months.entries()) {
+      const moment = formatMoment(at(`2026-${pad(index + 1, 2)}-15T12:00:00.000Z`), 'UTC');
+
+      expect(moment).toContain(` 15 ${month} · 12:00`);
+    }
+  });
+
+  describe('invalid input', () => {
+    const instant = at('2026-10-09T12:05:00.000Z');
+
+    it('rejects an invalid time zone', () => {
+      expect(() => formatMoment(instant, 'Mars/Base')).toThrow(RangeError);
+    });
+
+    it.each([Number.NaN, Infinity, -Infinity])('rejects an instant of %j', (bad) => {
+      expect(() => formatMoment(bad, AMS)).toThrow(RangeError);
+    });
+  });
+
+  it('matches the moment pattern and shows the local time for every instant in 2026', () => {
+    const start = at('2026-01-01T00:00:00.000Z');
+    const end = at('2026-12-31T23:59:59.999Z');
+    const pattern =
+      /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \u00B7 \d{2}:\d{2}$/;
+
+    fc.assert(
+      fc.property(fc.integer({ min: start, max: end }), (instant) => {
+        const moment = formatMoment(instant, AMS);
+
+        expect(moment).toMatch(pattern);
+        expect(moment.slice(-5)).toBe(toLocalDateTime(instant, AMS).time);
+      }),
+      { numRuns: 500 },
+    );
   });
 });
