@@ -90,24 +90,25 @@ test('The Urgency window moves an important Task between Plan and Do', async ({ 
     due: { date: addDays(localToday().date, 3), time: '12:00' },
   });
   await page.reload();
-  const chip = page.locator('article.asys-top-pick asys-quadrant-chip');
+  // The quadrant word follows a visually hidden "Quadrant: " for screen readers.
+  const chip = page.locator('article.asys-top-pick .asys-quadrant');
   const status = (text: string) => page.getByText(text, { exact: true });
   await expect(page.locator('article.asys-top-pick .asys-top-pick__title')).toHaveText(
     'Window task',
   );
-  await expect(chip).toHaveText('Plan');
+  await expect(chip).toHaveText('Quadrant: Plan');
 
   await page.getByRole('link', { name: 'Settings' }).click();
   await page.getByLabel('Urgency window').selectOption('7');
   await expect(status('Urgency window saved.')).toBeVisible();
   await nav(page).getByRole('link', { name: 'Now' }).click();
-  await expect(chip).toHaveText('Do');
+  await expect(chip).toHaveText('Quadrant: Do');
 
   await page.getByRole('link', { name: 'Settings' }).click();
   await page.getByLabel('Urgency window').selectOption('1');
   await expect(status('Urgency window saved.')).toBeVisible();
   await nav(page).getByRole('link', { name: 'Now' }).click();
-  await expect(chip).toHaveText('Plan');
+  await expect(chip).toHaveText('Quadrant: Plan');
 });
 
 test('A chosen time zone is not switched back to the device zone on focus', async ({ page }) => {
