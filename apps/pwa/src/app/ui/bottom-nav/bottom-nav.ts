@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 import {
   Component,
+  computed,
   ElementRef,
   input,
   linkedSignal,
@@ -9,68 +10,35 @@ import {
 } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 
+import { Icon, IconName } from '../icon/icon';
+
 /**
- * The primary navigation bar with Now, Today and Inbox. Routing owns the current
- * item (`routerLinkActive` sets `aria-current="page"`), which departs on purpose
- * from the design system README's `current` input and `(navigate)` output.
+ * The primary navigation bar with Now, Today and Inbox, each an icon over its word, and room at its end for
+ * the Capture button (projected). Routing owns the current item (`routerLinkActive` sets
+ * `aria-current="page"` and the Solid icon), which departs on purpose from the design system README's
+ * `current` input and `(navigate)` output.
  */
 @Component({
   selector: 'asys-bottom-nav',
-  imports: [RouterLink, RouterLinkActive],
+  imports: [RouterLink, RouterLinkActive, Icon],
   encapsulation: ViewEncapsulation.None,
-  template: `
-    @let popKey = pop();
-    <nav class="asys-bottomnav" aria-label="Primary">
-      <a
-        class="asys-bottomnav__item"
-        routerLink="/now"
-        routerLinkActive="is-current"
-        ariaCurrentWhenActive="page"
-      >
-        <span class="asys-bottomnav__pill" aria-hidden="true"></span>
-        <span class="asys-bottomnav__label">Now</span>
-      </a>
-      <a
-        class="asys-bottomnav__item"
-        routerLink="/today"
-        routerLinkActive="is-current"
-        ariaCurrentWhenActive="page"
-      >
-        <span class="asys-bottomnav__pill" aria-hidden="true"></span>
-        <span class="asys-bottomnav__label">Today</span>
-      </a>
-      <a
-        #inbox
-        class="asys-bottomnav__item"
-        routerLink="/inbox"
-        routerLinkActive="is-current"
-        ariaCurrentWhenActive="page"
-      >
-        <span class="asys-bottomnav__pill" aria-hidden="true"></span>
-        <span class="asys-bottomnav__label"
-          >Inbox
-          @if ((inboxCount() ?? 0) > 0) {
-            @for (key of [popKey]; track key) {
-              @if (popKey > 0) {
-                <span class="asys-bottomnav__badge" animate.enter="asys-pop">{{
-                  inboxCount()
-                }}</span>
-              } @else {
-                <span class="asys-bottomnav__badge">{{ inboxCount() }}</span>
-              }
-            }
-          }
-        </span>
-      </a>
-    </nav>
-  `,
+  templateUrl: './bottom-nav.component.html',
   styleUrl: './bottom-nav.css',
 })
 export class BottomNav {
   /** The Inbox count; null while it is not known yet, which shows no badge. */
   readonly inboxCount = input<number | null>(0);
 
+  protected readonly IconName = IconName;
+
   private readonly inbox = viewChild<ElementRef<HTMLElement>>('inbox');
+
+  /** What the Inbox link says aloud: its count, which the badge hides from screen readers. */
+  protected readonly inboxLabel = computed(() => {
+    const count = this.inboxCount() ?? 0;
+
+    return count > 0 ? `Inbox, ${count} waiting` : null;
+  });
 
   /**
    * Bumps when the count rises from one known number to a larger one, so the badge is re-created and

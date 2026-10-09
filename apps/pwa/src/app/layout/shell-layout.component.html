@@ -1,10 +1,5 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
-<main
-  #main
-  class="asys-page shell__page"
-  [class.shell__page--pill]="onCapturePath() && !open()"
-  [class.shell__page--bar]="onCapturePath() && open()"
->
+<main #main class="asys-page shell__page" [class.shell__page--bar]="onCapturePath() && open()">
   <router-outlet />
 </main>
 <p class="asys-visually-hidden shell__status" role="status">
@@ -29,33 +24,31 @@
     (focusInside)="barFocus($event)"
   />
 }
-@if (onCapturePath()) {
-  @if (open()) {
-    <asys-quick-add
-      class="shell__quickadd"
-      animate.enter="asys-rise"
-      (animate.leave)="leave($event)"
-      [(value)]="text"
-      [message]="captureQueue.message()"
-      [failures]="captureQueue.failed()"
-      (add)="add($event)"
-      (retry)="captureQueue.retry($event)"
-      (discard)="captureQueue.discard($event)"
-      (close)="close()"
-    />
-  } @else {
-    <button
-      asys-capture-button
-      #pill
-      class="shell__capture"
-      animate.enter="asys-appear"
-      (animate.leave)="leave($event)"
-      [count]="captureQueue.failed().length"
-      (click)="openQuickAdd()"
-    ></button>
-  }
+@if (onCapturePath() && open()) {
+  <asys-quick-add
+    class="shell__quickadd"
+    animate.enter="asys-rise"
+    (animate.leave)="leave($event)"
+    [(value)]="text"
+    [message]="captureQueue.message()"
+    [failures]="captureQueue.failed()"
+    (add)="add($event)"
+    (retry)="captureQueue.retry($event)"
+    (discard)="captureQueue.discard($event)"
+    (close)="close()"
+  />
 }
 <asys-bottom-nav
   class="shell__nav"
   [inboxCount]="dataStore.state() === null ? null : dataStore.inboxCount()"
-/>
+>
+  @if (onCapturePath()) {
+    <button
+      asys-capture-button
+      #pill
+      [count]="captureQueue.failed().length"
+      [attr.aria-expanded]="open() ? 'true' : 'false'"
+      (click)="toggleQuickAdd()"
+    ></button>
+  }
+</asys-bottom-nav>

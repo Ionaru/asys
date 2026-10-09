@@ -7,7 +7,7 @@ import { seedTask } from './support/seed.ts';
 interface Peak {
   animations: number;
   transition: boolean;
-  // The pill and the quick add bar both in the DOM at one rendered frame: a leave that has not finished.
+  // The quick add bar still in the DOM at a rendered frame after Capture says it is closed: a leave that has not finished.
   overlap: boolean;
 }
 
@@ -58,7 +58,7 @@ const watchMotion = (page: Page): Promise<void> =>
       // Only a rendered frame counts: a removal that follows in the same task is not a lingering leave.
       if (
         frame &&
-        document.querySelector('button.asys-capture') !== null &&
+        document.querySelector('button.asys-capture[aria-expanded="false"]') !== null &&
         document.querySelector('asys-quick-add') !== null
       )
         watch.peak.overlap = true;
@@ -153,7 +153,7 @@ test.describe('under reduced motion', () => {
     });
     console.log(`fact 12: typeof document.activeViewTransition is ${kind}`);
 
-    const pill = page.getByRole('button', { name: 'Capture', exact: true });
+    const capture = page.getByRole('button', { name: 'Capture', exact: true });
     const quickAdd = page.locator('asys-quick-add');
     await watchMotion(page);
 
@@ -164,20 +164,20 @@ test.describe('under reduced motion', () => {
 
     // Each step waits only for what enters, then reads, so a leave that still runs (and its removal) is not waited out.
     await resetPeak(page);
-    await pill.click();
+    await capture.click();
     await expect(quickAdd).toBeVisible();
-    expect(await page.evaluate(() => document.querySelector('button.asys-capture'))).toBeNull();
+    // Capture stays in the bottom bar while quick add is open, and says so.
+    await expect(capture).toHaveAttribute('aria-expanded', 'true');
     await expectNoMotion(page);
-    await expect(pill).toHaveCount(0);
 
     await resetPeak(page);
     await page.getByRole('button', { name: 'Close', exact: true }).click();
-    await expect(pill).toBeVisible();
+    await expect(capture).toHaveAttribute('aria-expanded', 'false');
     expect(await page.evaluate(() => document.querySelector('asys-quick-add'))).toBeNull();
     await expectNoMotion(page);
     await expect(quickAdd).toHaveCount(0);
 
-    await pill.click();
+    await capture.click();
     await expect(quickAdd).toBeVisible();
     await resetPeak(page);
     await page.getByLabel('Capture a Task').fill('Water the plants');
@@ -212,19 +212,19 @@ test.describe('with motion allowed', () => {
   });
 
   test('opening and closing quick add start animations', async ({ page }) => {
-    const pill = page.getByRole('button', { name: 'Capture', exact: true });
+    const capture = page.getByRole('button', { name: 'Capture', exact: true });
     const quickAdd = page.locator('asys-quick-add');
     await watchMotion(page);
 
     await resetPeak(page);
-    await pill.click();
+    await capture.click();
     await expect(quickAdd).toBeVisible();
     await expect.poll(async () => (await readWatch(page)).peak.animations).toBeGreaterThan(0);
-    await expect(pill).toHaveCount(0);
+    await expect(capture).toHaveAttribute('aria-expanded', 'true');
 
     await resetPeak(page);
     await page.getByRole('button', { name: 'Close', exact: true }).click();
-    await expect(pill).toBeVisible();
+    await expect(capture).toBeVisible();
     await expect.poll(async () => (await readWatch(page)).peak.animations).toBeGreaterThan(0);
   });
 });

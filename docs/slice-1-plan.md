@@ -765,7 +765,7 @@ Re-planned and built on 2026-10-04. The re-plan was reviewed adversarially by th
 - TriageCard adds Later and Edit, and "1 of N" counts over the whole visit. Importance and Estimate are the shared Segmented and EstimateField controls, which took the segment and chip CSS. Its title is an `h2`, and Change is disabled while a send is pending.
 - Drop is confirmed inline everywhere (InlineConfirm, a new component), with focus starting on Cancel.
 - ReviewItem projects an "Open Task" link after its buttons.
-- QuickAdd has no `open` model: the shell renders the bar while it is open, and the bar replaces the Capture button.
+- QuickAdd has no `open` model: the shell renders the bar while it is open. Capture sits at the end of the bottom bar (the design system of 2026-10-09) and stays while quick add is open, with `aria-expanded`; pressing it again closes the bar.
 - `/capture` skips the shared Loading and Failed rule, because capturing needs no working set.
 - LogProgressForm is a shared component.
 - The `.asys-field` CSS moved from TextField into the global `styles.css`, so every control is styled.

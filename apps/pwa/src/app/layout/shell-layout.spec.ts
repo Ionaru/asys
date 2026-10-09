@@ -108,6 +108,12 @@ const pointerClick = (element: HTMLElement | undefined): void => {
   element?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
 };
 
+/** The two ways a click reaches Capture: a pointer press (`detail` 1) and a keyboard activation (`detail` 0). */
+const ACTIVATIONS: [string, (element: HTMLElement | undefined) => void][] = [
+  ['a pointer press', pointerClick],
+  ['a keyboard activation', (element) => element?.click()],
+];
+
 const APPLIED: CommandOutcome = { _tag: CommandOutcomeTag.Applied, seq: 1 };
 
 const deferred = <V>() => {
@@ -195,7 +201,14 @@ const setup = async (url = '/now', { motion }: SetupOptions = {}) => {
     await settle();
   };
 
-  const pill = (): HTMLButtonElement | null => root().querySelector('button.asys-capture');
+  const nav = (): HTMLElement | null => root().querySelector('nav[aria-label="Primary"]');
+  /** Capture, found where the contract puts it: inside the Primary nav. */
+  const capture = (): HTMLButtonElement | null =>
+    root().querySelector('nav[aria-label="Primary"] button.asys-capture');
+  /** Every Capture button anywhere in the shell, however it got there. */
+  const captures = (): HTMLButtonElement[] =>
+    Array.from(root().querySelectorAll<HTMLButtonElement>('button.asys-capture'));
+  const page = (): HTMLElement | null => root().querySelector('main');
   const bar = (): HTMLElement | null => root().querySelector('asys-quick-add');
   const input = (): HTMLInputElement | null => root().querySelector('.asys-quickadd__input');
   const status = (): string | null =>
@@ -213,14 +226,17 @@ const setup = async (url = '/now', { motion }: SetupOptions = {}) => {
       (b) => b.textContent?.trim() === label,
     );
   const badge = (): string | null =>
-    pill()?.querySelector('.asys-capture__badge')?.firstChild?.textContent?.trim() ?? null;
+    capture()?.querySelector('.asys-capture__count')?.firstChild?.textContent?.trim() ?? null;
+  /** The accessible name of Capture: its text, whitespace collapsed. */
+  const captureName = (): string | null =>
+    capture()?.textContent?.replace(/\s+/g, ' ').trim() ?? null;
   const closeButton = (): HTMLButtonElement | undefined =>
     Array.from(root().querySelectorAll<HTMLButtonElement>('.asys-quickadd button')).find(
       (b) => b.textContent?.trim() === 'Close',
     );
 
   const open = async (): Promise<void> => {
-    pill()?.click();
+    capture()?.click();
     await settle();
   };
 
@@ -268,6 +284,7 @@ const setup = async (url = '/now', { motion }: SetupOptions = {}) => {
     root().querySelector('.asys-bottomnav__badge')?.textContent?.trim() ?? null;
 
   return {
+    fixture,
     dataStore,
     inboxBadge,
     doneUndo,
@@ -280,7 +297,11 @@ const setup = async (url = '/now', { motion }: SetupOptions = {}) => {
     root,
     settle,
     go,
-    pill,
+    capture,
+    captures,
+    nav,
+    page,
+    captureName,
     bar,
     input,
     status,
@@ -325,13 +346,16 @@ const OBSERVER_KEY = 'ResizeObserver';
 interface ObserverInstance {
   readonly observed: Element[];
   readonly disconnect: ReturnType<typeof vi.fn>;
+  /** Reports a border box of `blockSize` for `target`, as the browser does after a resize. */
+  readonly fire: (target: Element, blockSize: number) => void;
 }
 
 /**
  * Stubs `ResizeObserver` on the global and on the document's own window, whichever the shell
- * reads. Every observed target reports a 64px border box at once.
+ * reads. With `immediate` (the default) every observed target reports a 64px border box at once;
+ * without it, nothing is reported until a case calls `fire`.
  */
-const stubResizeObserver = (present: boolean): ObserverInstance[] => {
+const stubResizeObserver = (present: boolean, immediate = true): ObserverInstance[] => {
   const instances: ObserverInstance[] = [];
 
   class FakeResizeObserver {
@@ -348,12 +372,19 @@ const stubResizeObserver = (present: boolean): ObserverInstance[] => {
 
     observe(target: Element): void {
       this.observed.push(target);
+
+      if (immediate) {
+        this.fire(target, 64);
+      }
+    }
+
+    fire(target: Element, blockSize: number): void {
       this.callback(
         [
           {
             target,
-            borderBoxSize: [{ blockSize: 64, inlineSize: 412 }],
-            contentRect: { height: 64 },
+            borderBoxSize: [{ blockSize, inlineSize: 412 }],
+            contentRect: { height: blockSize },
           },
         ],
         this,
@@ -443,24 +474,77 @@ describe('ShellLayout', () => {
   });
 
   describe('where Capture shows', () => {
-    it.each(['/now', '/today', '/inbox'])('shows the pill and no bar on %s', async (url) => {
-      const { pill, bar } = await setup(url);
+    it.each(['/now', '/today', '/inbox'])(
+      'shows Capture in the bottom nav and no bar on %s',
+      async (url) => {
+        const { capture, bar } = await setup(url);
 
-      expect(pill()).not.toBeNull();
-      expect(bar()).toBeNull();
-    });
+        expect(capture()).not.toBeNull();
+        expect(bar()).toBeNull();
+      },
+    );
 
-    it.each(['/tasks/x', '/settings'])('shows neither the pill nor the bar on %s', async (url) => {
-      const { pill, bar } = await setup(url);
+    it.each(['/tasks/x', '/settings'])(
+      'shows neither Capture nor the bar on %s, and leaves the nav with its links',
+      async (url) => {
+        const { captures, nav, bar } = await setup(url);
 
-      expect(pill()).toBeNull();
-      expect(bar()).toBeNull();
-    });
+        expect(captures()).toHaveLength(0);
+        expect(bar()).toBeNull();
+        expect(nav()?.querySelectorAll('a')).toHaveLength(3);
+        expect(nav()?.querySelector('button')).toBeNull();
+      },
+    );
 
     it('ignores the query when deciding the path', async () => {
-      const { pill } = await setup('/now?x=1');
+      const { capture } = await setup('/now?x=1');
 
-      expect(pill()).not.toBeNull();
+      expect(capture()).not.toBeNull();
+    });
+
+    it('renders Capture inside the Primary nav, after the three links, and nowhere else', async () => {
+      const { capture, captures, nav } = await setup();
+
+      expect(captures()).toHaveLength(1);
+      expect(capture()).toBe(captures()[0]);
+      expect(capture()?.parentElement).toBe(nav());
+      expect(nav()?.lastElementChild).toBe(capture());
+      expect(
+        Array.from(nav()?.children ?? [])
+          .slice(0, 3)
+          .map((child) => child.getAttribute('href')),
+      ).toEqual(TAB_PATHS);
+    });
+
+    it('has no floating Capture pill of its own', async () => {
+      const { root, capture, open } = await setup();
+
+      expect(root().querySelector('.shell__capture')).toBeNull();
+      expect(capture()?.classList.contains('shell__capture')).toBe(false);
+
+      await open();
+
+      expect(root().querySelector('.shell__capture')).toBeNull();
+    });
+
+    it('labels Capture with its name and a collapsed state', async () => {
+      const { capture, captureName } = await setup();
+
+      expect(captureName()).toBe('Capture');
+      expect(capture()?.getAttribute('type')).toBe('button');
+      expect(capture()?.getAttribute('aria-expanded')).toBe('false');
+    });
+
+    it('drops Capture when moving to a screen that is not a tab, and brings it back on a tab', async () => {
+      const { captures, go } = await setup('/now');
+
+      await go('/settings');
+
+      expect(captures()).toHaveLength(0);
+
+      await go('/inbox');
+
+      expect(captures()).toHaveLength(1);
     });
 
     it('takes the tabs from TAB_PATHS, which lists the bottom nav links in their order', async () => {
@@ -474,36 +558,132 @@ describe('ShellLayout', () => {
   });
 
   describe('opening and closing', () => {
-    it('replaces the pill with the bar and focuses its input when the pill is clicked', async () => {
-      const { pill, bar, input, open } = await setup();
+    it('opens the bar and focuses its input when Capture is clicked, and Capture stays', async () => {
+      const { capture, nav, bar, input, open } = await setup();
+      const before = capture();
 
       await open();
 
-      expect(pill()).toBeNull();
       expect(bar()).not.toBeNull();
       expect(document.activeElement).toBe(input());
+      expect(capture()).not.toBeNull();
+      expect(capture()).toBe(before);
+      expect(nav()?.lastElementChild).toBe(capture());
     });
 
-    it('closes with the Close button, shows the pill again and focuses it', async () => {
-      const { pill, bar, open, closeButton, settle } = await setup();
+    it('reports the state in aria-expanded: false while closed, true while open, false once closed', async () => {
+      const { capture, open, closeButton, settle } = await setup();
+
+      expect(capture()?.getAttribute('aria-expanded')).toBe('false');
+
+      await open();
+
+      expect(capture()?.getAttribute('aria-expanded')).toBe('true');
+
+      closeButton()?.click();
+      await settle();
+
+      expect(capture()?.getAttribute('aria-expanded')).toBe('false');
+    });
+
+    it('marks the page for the open bar, and never for a pill', async () => {
+      const { page, open, escape } = await setup();
+
+      expect(page()?.classList.contains('shell__page--bar')).toBe(false);
+      expect(page()?.classList.contains('shell__page--pill')).toBe(false);
+
+      await open();
+
+      expect(page()?.classList.contains('shell__page--bar')).toBe(true);
+      expect(page()?.classList.contains('shell__page--pill')).toBe(false);
+
+      await escape();
+
+      expect(page()?.classList.contains('shell__page--bar')).toBe(false);
+      expect(page()?.classList.contains('shell__page--pill')).toBe(false);
+    });
+
+    it('never marks the page for a pill on a screen that is not a tab', async () => {
+      const { page } = await setup('/settings');
+
+      expect(page()?.classList.contains('shell__page--pill')).toBe(false);
+      expect(page()?.classList.contains('shell__page--bar')).toBe(false);
+    });
+
+    it('closes with the Close button, keeps Capture and focuses it', async () => {
+      const { capture, bar, open, closeButton, settle } = await setup();
+      const before = capture();
 
       await open();
       closeButton()?.click();
       await settle();
 
       expect(bar()).toBeNull();
-      expect(pill()).not.toBeNull();
-      expect(document.activeElement).toBe(pill());
+      expect(capture()).not.toBeNull();
+      expect(capture()).toBe(before);
+      expect(document.activeElement).toBe(capture());
     });
 
-    it('closes on Escape, shows the pill again and focuses it', async () => {
-      const { pill, bar, open, escape } = await setup();
+    it('closes on Escape, keeps Capture and focuses it', async () => {
+      const { capture, bar, open, escape } = await setup();
+      const before = capture();
 
       await open();
       await escape();
 
       expect(bar()).toBeNull();
-      expect(document.activeElement).toBe(pill());
+      expect(capture()).toBe(before);
+      expect(document.activeElement).toBe(capture());
+    });
+
+    it.each(ACTIVATIONS)(
+      'closes the bar when Capture is activated by %s while it is open, and keeps focus on Capture',
+      async (_how, activate) => {
+        const { capture, bar, input, open, settle } = await setup();
+        const before = capture();
+
+        await open();
+
+        expect(document.activeElement).toBe(input());
+
+        activate(capture() ?? undefined);
+        await settle();
+
+        expect(bar()).toBeNull();
+        expect(capture()).toBe(before);
+        expect(capture()?.getAttribute('aria-expanded')).toBe('false');
+        expect(document.activeElement).toBe(capture());
+      },
+    );
+
+    it('opens the bar again on a second click after closing it with Capture', async () => {
+      const { capture, bar, input, open, settle } = await setup();
+
+      await open();
+      capture()?.click();
+      await settle();
+
+      expect(bar()).toBeNull();
+
+      capture()?.click();
+      await settle();
+
+      expect(bar()).not.toBeNull();
+      expect(capture()?.getAttribute('aria-expanded')).toBe('true');
+      expect(document.activeElement).toBe(input());
+    });
+
+    it('keeps the typed text when Capture closes the bar', async () => {
+      const { capture, input, open, type, settle } = await setup();
+
+      await open();
+      await type('Buy milk');
+      capture()?.click();
+      await settle();
+      capture()?.click();
+      await settle();
+
+      expect(input()?.value).toBe('Buy milk');
     });
 
     it('keeps the typed text for the next opening', async () => {
@@ -530,18 +710,33 @@ describe('ShellLayout', () => {
       expect(bar()).not.toBeNull();
     });
 
+    it('keeps Capture expanded while moving between the tabs with the bar open', async () => {
+      const { capture, open, go } = await setup('/now');
+
+      await open();
+      await go('/today');
+
+      expect(capture()?.getAttribute('aria-expanded')).toBe('true');
+
+      await go('/inbox');
+
+      expect(capture()?.getAttribute('aria-expanded')).toBe('true');
+    });
+
     it('closes on any other path and starts closed when coming back', async () => {
-      const { pill, bar, open, go } = await setup('/now');
+      const { capture, captures, bar, open, go } = await setup('/now');
 
       await open();
       await go('/settings');
 
       expect(bar()).toBeNull();
+      expect(captures()).toHaveLength(0);
 
       await go('/now');
 
       expect(bar()).toBeNull();
-      expect(pill()).not.toBeNull();
+      expect(capture()).not.toBeNull();
+      expect(capture()?.getAttribute('aria-expanded')).toBe('false');
     });
   });
 
@@ -753,9 +948,20 @@ describe('ShellLayout', () => {
       expect(failures()).toHaveLength(1);
     });
 
-    it('shows the number of rows as a badge on the pill and drops it when the rows are gone', async () => {
-      const { send, pill, badge, failures, rowButton, open, type, submit, escape, settle } =
-        await setup();
+    it('shows the number of rows as a count on Capture and drops it when the rows are gone', async () => {
+      const {
+        send,
+        capture,
+        captureName,
+        badge,
+        failures,
+        rowButton,
+        open,
+        type,
+        submit,
+        escape,
+        settle,
+      } = await setup();
 
       send.mockResolvedValueOnce({ _tag: CommandOutcomeTag.Failed, status: 0 });
       send.mockResolvedValueOnce({ _tag: CommandOutcomeTag.Failed, status: 0 });
@@ -766,6 +972,7 @@ describe('ShellLayout', () => {
       await escape();
 
       expect(badge()).toBe('1');
+      expect(captureName()).toBe('Capture 1 not captured');
 
       await open();
       await type('Buy bread');
@@ -773,6 +980,7 @@ describe('ShellLayout', () => {
       await escape();
 
       expect(badge()).toBe('2');
+      expect(captureName()).toBe('Capture 2 not captured');
 
       await open();
       rowButton(failures()[0], 'Discard')?.click();
@@ -786,12 +994,31 @@ describe('ShellLayout', () => {
       await settle();
       await escape();
 
-      expect(pill()?.querySelector('.asys-capture__badge')).toBeNull();
+      expect(capture()?.querySelector('.asys-capture__count')).toBeNull();
+      expect(capture()?.querySelector('.asys-capture__badge')).toBeNull();
       expect(badge()).toBeNull();
+      expect(captureName()).toBe('Capture');
     });
 
-    it('clears the field and leaves focus on the pill when an add resolves Applied after the bar closed', async () => {
-      const { send, pill, input, open, type, submit, escape, settle } = await setup();
+    it('keeps the count on Capture visible while the bar is open', async () => {
+      const { send, capture, badge, open, type, submit, escape } = await setup();
+
+      send.mockResolvedValueOnce({ _tag: CommandOutcomeTag.Failed, status: 0 });
+
+      await open();
+      await type('Buy milk');
+      await submit();
+
+      expect(capture()?.getAttribute('aria-expanded')).toBe('true');
+      expect(badge()).toBe('1');
+
+      await escape();
+
+      expect(badge()).toBe('1');
+    });
+
+    it('clears the field and leaves focus on Capture when an add resolves Applied after the bar closed', async () => {
+      const { send, capture, input, open, type, submit, escape, settle } = await setup();
       const pending = deferred<CommandOutcome>();
 
       send.mockReturnValueOnce(pending.promise);
@@ -801,12 +1028,12 @@ describe('ShellLayout', () => {
       await submit();
       await escape();
 
-      expect(document.activeElement).toBe(pill());
+      expect(document.activeElement).toBe(capture());
 
       pending.resolve(APPLIED);
       await settle();
 
-      expect(document.activeElement).toBe(pill());
+      expect(document.activeElement).toBe(capture());
 
       await open();
 
@@ -1621,18 +1848,25 @@ describe('ShellLayout', () => {
       expect(instances.flatMap((instance) => instance.observed)).toContain(undoBar());
     });
 
-    it('sets 0px and disconnects the observer once the bar is gone', async () => {
+    it('sets 0px and disconnects the bar observer once the bar is gone', async () => {
       const instances = stubResizeObserver(true);
-      const { doneUndo, shellHost, settle } = await setup();
+      const { doneUndo, shellHost, undoBar, settle } = await setup();
 
       doneUndo.pending.set(PENDING);
       await settle();
+
+      const bar = must(undoBar());
+
       doneUndo.pending.set(null);
       await settle();
 
+      const barObservers = instances.filter((instance) => instance.observed.includes(bar));
+
       expect(heightOf(shellHost())).toBe('0px');
-      expect(instances.length).toBeGreaterThan(0);
-      expect(instances.every((instance) => instance.disconnect.mock.calls.length > 0)).toBe(true);
+      expect(barObservers.length).toBeGreaterThan(0);
+      expect(barObservers.every((instance) => instance.disconnect.mock.calls.length > 0)).toBe(
+        true,
+      );
     });
 
     it('observes nothing and still shows the bar without ResizeObserver', async () => {
@@ -1645,6 +1879,91 @@ describe('ShellLayout', () => {
 
       expect(undoBar()).not.toBeNull();
       expect(heightOf(shellHost())).not.toBe('64px');
+    });
+  });
+
+  describe('the nav height', () => {
+    const NAV_HEIGHT = '--shell-nav-height';
+
+    const navHeightOf = (host: HTMLElement | null): string =>
+      host?.style.getPropertyValue(NAV_HEIGHT) ?? '';
+
+    /** The observer that watches the nav host, and the host it watches. */
+    const navObserver = (instances: ObserverInstance[], root: HTMLElement) => {
+      const target = must(root.querySelector<HTMLElement>('.shell__nav'), 'the nav host');
+
+      return { target, observer: instances.find((instance) => instance.observed.includes(target)) };
+    };
+
+    it('observes the nav host, which is the bottom nav component', async () => {
+      const instances = stubResizeObserver(true, false);
+      const { root } = await setup();
+      const { target, observer } = navObserver(instances, root());
+
+      expect(target.tagName).toBe('ASYS-BOTTOM-NAV');
+      expect(target.querySelector('nav[aria-label="Primary"]')).not.toBeNull();
+      expect(observer).toBeDefined();
+    });
+
+    it('writes the observed border-box block size on the shell host, and follows later sizes', async () => {
+      const instances = stubResizeObserver(true, false);
+      const { root, shellHost } = await setup();
+      const { target, observer } = navObserver(instances, root());
+
+      expect(navHeightOf(shellHost())).not.toBe('81px');
+
+      observer?.fire(target, 81);
+
+      expect(navHeightOf(shellHost())).toBe('81px');
+
+      observer?.fire(target, 112);
+
+      expect(navHeightOf(shellHost())).toBe('112px');
+    });
+
+    it('keeps the nav height apart from the Undo bar height', async () => {
+      const instances = stubResizeObserver(true, false);
+      const { root, shellHost } = await setup();
+      const { target, observer } = navObserver(instances, root());
+
+      observer?.fire(target, 81);
+
+      expect(shellHost()?.style.getPropertyValue('--shell-undo-height')).not.toBe('81px');
+    });
+
+    it('measures the nav on a screen that is not a tab too', async () => {
+      const instances = stubResizeObserver(true, false);
+      const { root, shellHost } = await setup('/settings');
+      const { target, observer } = navObserver(instances, root());
+
+      observer?.fire(target, 81);
+
+      expect(navHeightOf(shellHost())).toBe('81px');
+    });
+
+    it('resets the property and disconnects the observer when the shell is destroyed', async () => {
+      const instances = stubResizeObserver(true, false);
+      const { root, shellHost, fixture } = await setup();
+      const { target, observer } = navObserver(instances, root());
+      const host = must(shellHost());
+
+      observer?.fire(target, 81);
+
+      expect(navHeightOf(host)).toBe('81px');
+
+      fixture.destroy();
+
+      expect(navHeightOf(host)).not.toBe('81px');
+      expect(observer?.disconnect).toHaveBeenCalled();
+    });
+
+    it('observes nothing and writes no nav height without ResizeObserver', async () => {
+      stubResizeObserver(false);
+
+      const { shellHost, nav } = await setup();
+
+      expect(nav()).not.toBeNull();
+      expect(navHeightOf(shellHost())).toBe('');
     });
   });
 });

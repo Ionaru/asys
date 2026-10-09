@@ -42,7 +42,7 @@ Lint bans runtime imports of `@asys/contract`, `effect` and `@ionaru/effect-pass
 - **Accessibility:**
   - Errors read "Error:" with `aria-invalid` and `aria-describedby`, never colour alone.
   - Quadrants differ in lightness or form, never hue alone.
-  - The bottom nav's 56px height is repeated in the styles of `ui/bottom-nav` and `ui/capture-button`, and as `--shell-nav-height` in `layout/shell-layout`, so change all three. New code reads `--shell-nav-height`. The Undo bar is a fourth place that sits on the nav: the shell publishes its height as `--shell-undo-height`, which the page padding, the pill and quick add add.
+  - The bottom bar holds the three destinations and, on the tabs, the Capture button at its end. Its height grows with Text size, so the shell measures it with a `ResizeObserver` and publishes it as `--shell-nav-height` (the CSS default, `tap-target-large` plus its padding and line, only covers the first frame). The Undo bar sits on the nav, and the shell publishes its height as `--shell-undo-height` the same way. The page padding and quick add read both; never repeat a bar height as a literal.
 
 ## Recipes
 

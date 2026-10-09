@@ -272,7 +272,6 @@ textarea.asys-field__input,
   view-transition-name: page;
 }
 
-.shell__capture,
 .shell__quickadd {
   view-transition-name: shell-capture;
 }
@@ -285,7 +284,7 @@ textarea.asys-field__input,
   view-transition-name: shell-nav;
 }
 
-.asys-bottomnav__item[aria-current='page'] .asys-bottomnav__pill {
+.asys-bottomnav__item[aria-current='page'] .asys-bottomnav__icon {
   view-transition-name: nav-mark;
 }
 
