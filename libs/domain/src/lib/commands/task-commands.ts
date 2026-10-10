@@ -226,6 +226,19 @@ export const logProgress = (
   return put(task, { ...task, estimateMinutes: command.remainingMinutes });
 };
 
+/** The time still needed is at least 1 minute and less than the Estimate, so the Estimate must be 2 or more. */
+const MIN_LOGGABLE_ESTIMATE = 2;
+
+/** Whether `logProgress` can apply to the Task: it is Open and its Estimate leaves room below it. */
+export const canLogProgress = (task: Task | undefined): boolean => {
+  return (
+    task !== undefined &&
+    task.status === TaskStatus.Open &&
+    task.estimateMinutes !== null &&
+    task.estimateMinutes >= MIN_LOGGABLE_ESTIMATE
+  );
+};
+
 const close = (
   state: DomainState,
   command: CompleteTask | DropTask,
