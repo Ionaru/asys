@@ -612,9 +612,9 @@ All five units were built in order on top of plans 1 and 3. Each unit's source a
   - Unit 3: sourcing the form from the top pick again failed the case where a row form survives a change of the top pick. Dropping the focus move failed three focus cases, a Button origin failed two, and Cancel focusing the top pick's button failed the Cancel and Escape cases.
   - Unit 4, through styles injected in a scratch run: `touch-action: none` failed cases 4 and 6, `overflow: visible` case 7 (`scrollWidth` 696 against 412), plain `pan-y` case 6, and no `[hidden]` rule cases 1, 3 and 9. Without `flow-root`, case 8 failed (the form at 427 against the row's end at 415).
 - **Gate, on the branch merged with main at `7091f93`.** `nx run-many -t lint`, `typecheck`, `build` and `test --skip-nx-cache` passed for all seven projects, with 2472 PWA tests in 78 files. `tsc -p scripts/tsconfig.json`, `nx run server:openapi`, `nx format:check --all`, `check-spdx` and `palettes --check` passed. `check-licenses` could not run against the stubbed icon packages (below), and `reuse lint` was not available. This change adds no dependency, and CI runs both.
-- **Bundle.** Measured with stub icons (below), the initial total went from 604.24 kB on main to 613.95 kB (161.24 kB transferred), +9.71 kB, with no budget warning. The real build of main (`d4528c1`, from CI's `build-image` log) is 612.40 kB, so with the real icons the total should be about 622 kB, under the 625 kB warning. Minified with esbuild, `swipe-actions.css` is 1.16 kB and `now.css` 0.62 kB, both under the 4 kB `anyComponentStyle` warning.
-- **End-to-end.** `swipe.spec.ts` passed its nine cases four times in a row on the dev stack, and the full dev-stack suite passed with 50 tests. The image suite was not run (below).
-- **The environment.** The container had no Font Awesome token, so the two Pro icon packages were installed as local stubs with placeholder glyphs (never committed). That is why `check-licenses` and the image build could not run, and why the bundle figures above are estimates. Chromium 141 ran through a local browser-path shim, because Playwright 1.63 pins Chromium 153.
+- **Bundle.** Measured with stub icons (below), the initial total went from 604.24 kB on main to 613.95 kB (161.24 kB transferred), +9.71 kB, with no budget warning. With the real icons, CI's `build-image` log gives 612.40 kB for main (`d4528c1`) and 622.07 kB (164.35 kB transferred) for this branch, under the 625 kB warning. Minified with esbuild, `swipe-actions.css` is 1.16 kB and `now.css` 0.62 kB, both under the 4 kB `anyComponentStyle` warning.
+- **End-to-end.** `swipe.spec.ts` passed its nine cases four times in a row on the dev stack, and the full dev-stack suite passed with 50 tests. The image suite was not run locally (below); it passed in CI's `e2e-image` job, as did the `licences` job.
+- **The environment.** The container had no Font Awesome token, so the two Pro icon packages were installed as local stubs with placeholder glyphs (never committed). That is why `check-licenses` and the image build could not run locally, and why the local bundle figures sit below CI's. Chromium 141 ran through a local browser-path shim, because Playwright 1.63 pins Chromium 153.
 
 ### Facts checked while building
 
@@ -635,7 +635,6 @@ All five units were built in order on top of plans 1 and 3. Each unit's source a
 ### Known limits
 
 - Facts 5 to 8, 10, 11 (Chrome Android) and 13 need the installed PWA on a phone.
-- The image-stack suite and `check-licenses` were not run locally; CI's `e2e-image` and `licences` jobs run them. The real bundle size is CI's to confirm.
 
 ## Out of scope
 
