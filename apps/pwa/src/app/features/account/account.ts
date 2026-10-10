@@ -19,7 +19,6 @@ import { CaptureQueue } from '../../core/data/capture-queue';
 import { DataStore } from '../../core/data/data-store';
 import { DoneUndo } from '../../core/data/done-undo';
 import { GENERIC_MESSAGE } from '../../core/data/outcome-message';
-import { AppUpdate } from '../../core/platform/app-update';
 import { Clock } from '../../core/platform/clock';
 import { DeviceZone } from '../../core/platform/device-zone';
 import { Button, ButtonSize, ButtonVariant } from '../../ui/button/button';
@@ -28,6 +27,7 @@ import { TextField } from '../../ui/text-field/text-field';
 import { ceremonyOptions } from '../auth/ceremony-options';
 import { nameError } from '../auth/name-rule';
 import { MISCONFIGURED_MESSAGE, TRY_AGAIN_MESSAGE } from '../auth/passkey-messages';
+import { recoveryCodes } from '../auth/recovery-codes';
 
 const messageForFailure = (failure: PasskeyFailure): string | null => {
   switch (failure) {
@@ -69,8 +69,6 @@ export class Account {
   readonly #authApi = inject(AuthApi);
 
   readonly #ceremony = inject(PasskeyCeremony);
-
-  readonly #appUpdate = inject(AppUpdate);
 
   readonly #dataStore = inject(DataStore);
 
@@ -179,24 +177,17 @@ export class Account {
 
   protected readonly regenerating = signal(false);
 
-  protected readonly codes = signal<readonly string[]>([]);
+  readonly #recovery = recoveryCodes();
 
-  protected readonly copyStatus = signal<string | null>(null);
+  protected readonly codes = this.#recovery.codes;
+
+  protected readonly copyStatus = this.#recovery.copyStatus;
 
   protected readonly codesMessage = signal<string | null>(null);
-
-  #held = false;
 
   protected readonly signingOut = signal(false);
 
   protected readonly signOutMessage = signal<string | null>(null);
-
-  constructor() {
-    this.#destroyRef.onDestroy(() => {
-      this.codes.set([]);
-      this.#releaseHold();
-    });
-  }
 
   protected reload(): void {
     this.passkeys.reload();
@@ -303,13 +294,7 @@ export class Account {
       }
 
       this.confirmingCodes.set(false);
-      this.copyStatus.set(null);
-      this.codes.set(result.value.recoveryCodes);
-
-      if (!this.#held) {
-        this.#held = true;
-        this.#appUpdate.hold();
-      }
+      this.#recovery.show(result.value.recoveryCodes);
 
       await this.session.check();
     } finally {
@@ -319,19 +304,12 @@ export class Account {
     }
   }
 
-  protected async copy(): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(this.codes().join('\n'));
-      this.copyStatus.set('Copied.');
-    } catch {
-      this.copyStatus.set('Could not copy. Select the codes instead.');
-    }
+  protected copy(): Promise<void> {
+    return this.#recovery.copy();
   }
 
   protected hideCodes(): void {
-    this.codes.set([]);
-    this.copyStatus.set(null);
-    this.#releaseHold();
+    this.#recovery.hide();
   }
 
   protected async signOut(): Promise<void> {
@@ -357,13 +335,6 @@ export class Account {
       this.signOutMessage.set('Could not sign out. Try again.');
     } finally {
       this.signingOut.set(false);
-    }
-  }
-
-  #releaseHold(): void {
-    if (this.#held) {
-      this.#held = false;
-      this.#appUpdate.release();
     }
   }
 
