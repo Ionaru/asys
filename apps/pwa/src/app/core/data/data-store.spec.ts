@@ -231,6 +231,24 @@ describe('DataStore', () => {
       expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 13 });
       noRequests();
     });
+
+    it('resolves syncPast at once and requests nothing before start and after stop', async () => {
+      const before = track(store.syncPast('t1'));
+      await advance(0);
+
+      expect(before.done).toBe(true);
+      noRequests();
+      expect(store.status()).toBe(SyncStatus.Idle);
+
+      await begin();
+      store.stop();
+      const after = track(store.syncPast('t1'));
+      await advance(0);
+
+      expect(after.done).toBe(true);
+      noRequests();
+      expect(store.status()).toBe(SyncStatus.Idle);
+    });
   });
 
   describe('start', () => {
