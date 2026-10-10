@@ -21,13 +21,13 @@ import {
   type AddBlocker,
   blockerCandidates,
   blocks,
+  canLogProgress,
   type Command,
   CommandTag,
   type DomainState,
   dueInstant,
   effectiveDue,
   formatClock,
-  formatMinutes,
   isBlocked,
   isInInbox,
   isOverdue,
@@ -51,7 +51,11 @@ import { EstimateField } from '../../ui/estimate-field/estimate-field';
 import { IconName } from '../../ui/icon/icon';
 import { InlineConfirm } from '../../ui/inline-confirm/inline-confirm';
 import { LoadState } from '../../ui/load-state/load-state';
-import { canLogProgress, LogProgressForm } from '../../ui/log-progress-form/log-progress-form';
+import {
+  estimateNowText,
+  LogProgressForm,
+  logProgressCommand,
+} from '../../ui/log-progress-form/log-progress-form';
 import { Segmented } from '../../ui/segmented/segmented';
 import { type SelectOption, SelectField } from '../../ui/select-field/select-field';
 import { StatusBadge, StatusBadgeStatus } from '../../ui/status-badge/status-badge';
@@ -494,12 +498,7 @@ export class TaskEditor {
 
     this.#clearMessages();
 
-    const outcome = await this.#runAction({
-      _tag: CommandTag.LogProgress,
-      taskId: this.taskId(),
-      remainingMinutes: minutes,
-      expect: { status: TaskStatus.Open },
-    });
+    const outcome = await this.#runAction(logProgressCommand(this.taskId(), minutes));
 
     if (this.#destroyRef.destroyed) {
       return;
@@ -510,7 +509,7 @@ export class TaskEditor {
       return;
     }
 
-    this.statusLine.set(`Estimate is now ${formatMinutes(minutes)}.`);
+    this.statusLine.set(estimateNowText(minutes));
     this.logOpen.set(false);
     this.#focusAfterRender(() => this.logButton()?.nativeElement);
   }

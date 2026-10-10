@@ -11,11 +11,13 @@ import {
   ChangeEntity,
   ChangeOp,
   CommandTag,
+  MAX_MINUTES,
   NotApplicableReason,
   RejectedReason,
   TransitionResultTag,
 } from './command';
 import {
+  canLogProgress,
   captureTask,
   completeTask,
   dropTask,
@@ -634,6 +636,49 @@ describe('logProgress', () => {
       now,
     );
     expect(result).toEqual(rejected(RejectedReason.NotFound));
+  });
+});
+
+describe('canLogProgress', () => {
+  /** Whether the smallest valid time still needed, 1 minute, is accepted for the Task. */
+  const logProgressApplies = (task: Task): boolean =>
+    logProgress(
+      aState({ tasks: [task] }),
+      { _tag: CommandTag.LogProgress, taskId: task.id, remainingMinutes: 1 },
+      now,
+    )._tag === TransitionResultTag.Applied;
+
+  it.each([
+    [1, false],
+    [2, true],
+    [3, true],
+    [MAX_MINUTES, true],
+  ])('agrees with logProgress for an Open Task with an Estimate of %s', (estimateMinutes, can) => {
+    const task = aTask({ id: 't1', estimateMinutes });
+
+    expect(canLogProgress(task)).toBe(can);
+    expect(logProgressApplies(task)).toBe(can);
+  });
+
+  it('agrees with logProgress for a Task without an Estimate', () => {
+    const task = aTask({ id: 't1', estimateMinutes: null });
+
+    expect(canLogProgress(task)).toBe(false);
+    expect(logProgressApplies(task)).toBe(false);
+  });
+
+  it.each([TaskStatus.Done, TaskStatus.Dropped, TaskStatus.Delegated])(
+    'agrees with logProgress for a %s Task, whatever its Estimate',
+    (status) => {
+      const task = aTask({ id: 't1', status, estimateMinutes: 30 });
+
+      expect(canLogProgress(task)).toBe(false);
+      expect(logProgressApplies(task)).toBe(false);
+    },
+  );
+
+  it('is false when there is no Task', () => {
+    expect(canLogProgress(undefined)).toBe(false);
   });
 });
 

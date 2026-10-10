@@ -10,7 +10,7 @@ import {
   signal,
   ViewEncapsulation,
 } from '@angular/core';
-import { formatMinutes, type Task, TaskStatus } from '@asys/domain';
+import { CommandTag, formatMinutes, type LogProgress, TaskStatus } from '@asys/domain';
 
 import { Button, ButtonVariant } from '../button/button';
 import { FieldError } from '../field-error/field-error';
@@ -19,15 +19,17 @@ let nextId = 0;
 
 const WHOLE_MINUTES = /^\d+$/;
 
-/** The time still needed is at least 1 minute and less than the Estimate, so the Estimate must be 2 or more. */
-const MIN_LOGGABLE_ESTIMATE = 2;
+/** The Command that lowers an open Task's Estimate to the time still needed. */
+export const logProgressCommand = (taskId: string, minutes: number): LogProgress => ({
+  _tag: CommandTag.LogProgress,
+  taskId,
+  remainingMinutes: minutes,
+  expect: { status: TaskStatus.Open },
+});
 
-/** Whether progress can be logged on the Task: it is open and its Estimate leaves room below it. */
-export const canLogProgress = (task: Task | undefined): boolean =>
-  task !== undefined &&
-  task.status === TaskStatus.Open &&
-  task.estimateMinutes !== null &&
-  task.estimateMinutes >= MIN_LOGGABLE_ESTIMATE;
+/** The confirmation that follows a saved Log progress. */
+export const estimateNowText = (minutes: number): string =>
+  `Estimate is now ${formatMinutes(minutes)}.`;
 
 /** The inline form that lowers a Task's Estimate to the time still needed. */
 @Component({
@@ -35,14 +37,7 @@ export const canLogProgress = (task: Task | undefined): boolean =>
   imports: [Button, FieldError],
   encapsulation: ViewEncapsulation.None,
   templateUrl: './log-progress-form.component.html',
-  styles: `
-    .asys-progress {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2);
-      margin-top: var(--space-3);
-    }
-  `,
+  styleUrl: './log-progress-form.css',
 })
 export class LogProgressForm {
   readonly #host = inject<ElementRef<HTMLElement>>(ElementRef);
