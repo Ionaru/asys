@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Quadrant } from '@asys/domain';
 
+import type { Activation } from '../activation/activation';
 import { TopPick } from './top-pick';
 
 @Component({
@@ -56,7 +57,7 @@ class Host {
 
   readonly completed = signal(false);
 
-  readonly doneEvents: { readonly keyboard: boolean }[] = [];
+  readonly doneEvents: Activation[] = [];
 
   done = 0;
 
