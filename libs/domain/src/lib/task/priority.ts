@@ -23,9 +23,17 @@ export const isUrgent = (
 };
 
 export const isUrgentAt = (start: Instant | null, now: Instant, settings: Settings): boolean => {
-  return (
-    start !== null && start <= addCalendarDays(now, settings.urgencyWindowDays, settings.timeZone)
+  return isUrgentBy(start, () =>
+    addCalendarDays(now, settings.urgencyWindowDays, settings.timeZone),
   );
+};
+
+/**
+ * isUrgentAt for a caller that asks about many Tasks. `cutoff` returns the end of the Urgency
+ * window, so the caller can derive it once; it is called only for a Task with a Latest start.
+ */
+export const isUrgentBy = (start: Instant | null, cutoff: () => Instant): boolean => {
+  return start !== null && start <= cutoff();
 };
 
 export const quadrant = (important: boolean, urgent: boolean): Quadrant => {

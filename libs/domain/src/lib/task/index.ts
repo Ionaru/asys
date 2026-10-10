@@ -5,5 +5,6 @@ export * from './inbox';
 export * from './blocked';
 export * from './available';
 export * from './deadlines';
-export * from './priority';
+// Named, so isUrgentBy (the Picker's form of isUrgentAt) stays inside the library.
+export { Quadrant, isUrgent, isUrgentAt, quadrant } from './priority';
 export * from './blockers';
