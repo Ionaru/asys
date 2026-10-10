@@ -23,6 +23,7 @@ import { DoneUndo, PauseReason, UNDO_WINDOW_MS } from '../core/data/done-undo';
 import { Motion } from '../core/platform/motion';
 import { TAB_PATHS } from '../core/platform/tabs';
 import { pathOf } from '../core/platform/url-path';
+import type { Activation } from '../ui/activation/activation';
 import { BottomNav } from '../ui/bottom-nav/bottom-nav';
 import { CaptureButton } from '../ui/capture-button/capture-button';
 import { QuickAdd } from '../ui/quick-add/quick-add';
@@ -232,12 +233,12 @@ export class ShellLayout {
     this.inside(PauseReason.Focus, inside);
   }
 
-  protected retryDone(activation: { readonly keyboard: boolean }): void {
+  protected retryDone(activation: Activation): void {
     this.#pointerActivated = !activation.keyboard;
     this.doneUndo.retry();
   }
 
-  protected dismissDone(activation: { readonly keyboard: boolean }): void {
+  protected dismissDone(activation: Activation): void {
     this.#pointerActivated = !activation.keyboard;
     this.doneUndo.dismiss();
   }

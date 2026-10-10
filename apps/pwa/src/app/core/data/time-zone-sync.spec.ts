@@ -335,6 +335,23 @@ describe('TimeZoneSync', () => {
       expect(current).not.toHaveBeenCalled();
     });
 
+    it('still runs the zone check on a focus whose poll it does not repeat', async () => {
+      await begin(12);
+      current.mockReturnValue(LONDON);
+      setVisibility('visible');
+      const poll = http.expectOne('/v1/changes?after=12');
+
+      window.dispatchEvent(new Event('focus'));
+
+      const report = http.expectOne('/v1/commands');
+      expect(report.request.body).toMatchObject({
+        _tag: CommandTag.SetTimeZone,
+        timeZone: LONDON,
+      });
+      noRequests();
+      await respond(poll, changesBody(12));
+    });
+
     it('has at most one SetTimeZone in flight', async () => {
       current.mockReturnValue(LONDON);
       await begin(12);

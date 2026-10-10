@@ -126,13 +126,14 @@ export class DataStore {
   #requestCount = 0;
   #followUpPending = false;
   #forcedFollowUp = false;
+  #resumeInFlight = false;
   #needsSnapshot = false;
   #waiters: Waiter[] = [];
   readonly #settingsChecks = new Set<() => void>();
   #timer: ReturnType<typeof setTimeout> | undefined;
 
   readonly #onFocus = (): void => {
-    this.#trigger();
+    this.#trigger(true);
 
     if (this.#started) {
       this.#checkSettings();
@@ -145,7 +146,7 @@ export class DataStore {
 
   readonly #onVisibilityChange = (): void => {
     if (this.#isVisible()) {
-      this.#trigger();
+      this.#trigger(true);
     }
   };
 
@@ -181,6 +182,7 @@ export class DataStore {
     this.#inFlight = false;
     this.#followUpPending = false;
     this.#forcedFollowUp = false;
+    this.#resumeInFlight = false;
     this.#needsSnapshot = false;
     this.#seq = 0;
     this.#stateSignal.set(null);
@@ -326,8 +328,12 @@ export class DataStore {
     this.#timer = undefined;
   }
 
-  /** A trigger: poll (or load the snapshot) now, or remember one follow-up when a request is out. */
-  #trigger(): void {
+  /**
+   * A trigger: poll (or load the snapshot) now, or remember one follow-up when a request is out.
+   * Focus and visibilitychange pass `resume`: returning to the app fires both, so while a request
+   * one of them started is out, the other adds no follow-up. Every other trigger still does.
+   */
+  #trigger(resume = false): void {
     if (!this.#started) {
       return;
     }
@@ -337,11 +343,14 @@ export class DataStore {
     }
 
     if (this.#inFlight) {
-      this.#followUpPending = true;
+      if (!(resume && this.#resumeInFlight)) {
+        this.#followUpPending = true;
+      }
 
       return;
     }
 
+    this.#resumeInFlight = resume;
     this.#startNext();
   }
 
@@ -468,6 +477,7 @@ export class DataStore {
 
     this.#followUpPending = false;
     this.#forcedFollowUp = false;
+    this.#resumeInFlight = false;
 
     if (isExpired(settled)) {
       this.#requestSnapshot(false);
