@@ -44,13 +44,24 @@ export const formatDateSpec = (spec: DateSpec, today: LocalDate): string => {
 
 /** An instant as a 24-hour time in the zone; the time alone on now's local day, else the day and the time. */
 export const formatClock = (instant: Instant, now: Instant, timeZone: TimeZone): string => {
+  return formatClockOn(instant, () => toLocalDateTime(now, timeZone).date, timeZone);
+};
+
+/**
+ * formatClock for a caller that formats many instants against one now. `today` returns now's local
+ * date, so the caller can derive it once; it is called after the zone and the instant are checked,
+ * and it is where an invalid now is rejected.
+ */
+export const formatClockOn = (
+  instant: Instant,
+  today: () => LocalDate,
+  timeZone: TimeZone,
+): string => {
   if (!isValidTimeZone(timeZone)) throw new RangeError(`Invalid time zone: ${timeZone}`);
   if (typeof instant !== 'number' || !Number.isFinite(instant)) {
     throw new RangeError(`Invalid instant: ${instant}`);
   }
-  if (typeof now !== 'number' || !Number.isFinite(now)) {
-    throw new RangeError(`Invalid instant: ${now}`);
-  }
+  const nowDate = today();
   const current = Temporal.Instant.fromEpochMilliseconds(instant).toZonedDateTimeISO(timeZone);
   const next = Temporal.Instant.fromEpochMilliseconds(instant + 1).toZonedDateTimeISO(timeZone);
   const onBoundary = next.second === 0 && next.millisecond === 0;
@@ -58,7 +69,6 @@ export const formatClock = (instant: Instant, now: Instant, timeZone: TimeZone):
   const isDayEnd = !next.toPlainDate().equals(current.toPlainDate());
   const shownInstant = onBoundary && !isDayEnd ? instant + 1 : instant;
   const shown = toLocalDateTime(shownInstant, timeZone);
-  const nowDate = toLocalDateTime(now, timeZone).date;
   return shown.date === nowDate ? shown.time : `${formatDay(shown.date, nowDate)} ${shown.time}`;
 };
 
