@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 import { isWithinActiveHours, type Area } from '../area';
+import { compareCodeUnits } from '../compare';
 import type { Settings } from '../settings';
 import {
   blockedReasons,
@@ -63,13 +64,8 @@ const QUADRANT_ORDER: Readonly<Record<Quadrant, number>> = {
   [Quadrant.Drop]: 3,
 };
 
-// Code-unit order on purpose: localeCompare would differ per runtime locale.
-const compareStrings = (a: string, b: string): number => {
-  return a < b ? -1 : a > b ? 1 : 0;
-};
-
 const compareCreated = (a: Task, b: Task): number => {
-  return a.createdAt - b.createdAt || compareStrings(a.id, b.id);
+  return a.createdAt - b.createdAt || compareCodeUnits(a.id, b.id);
 };
 
 const compareRanked = (a: RankedTask, b: RankedTask): number => {
