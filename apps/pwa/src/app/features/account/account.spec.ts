@@ -17,7 +17,7 @@ import {
   type RecoveryCodes,
 } from '../../core/api/auth-api';
 import { PasskeyCeremony } from '../../core/api/passkey-ceremony';
-import { Session } from '../../core/auth/session';
+import { Session, SignOutReason } from '../../core/auth/session';
 import { CaptureQueue } from '../../core/data/capture-queue';
 import { DataStore } from '../../core/data/data-store';
 import { DoneUndo } from '../../core/data/done-undo';
@@ -99,7 +99,7 @@ const setup = async ({ api = {}, create = vi.fn() }: Seams = {}) => {
   const flush = vi.fn<() => Promise<void>>(() => Promise.resolve());
   const drain = vi.fn<() => Promise<void>>(() => Promise.resolve());
   const signOut = vi.fn<() => Promise<AuthResult<void>>>(() => Promise.resolve(OK));
-  const signedOut = vi.fn<() => void>();
+  const signedOut = vi.fn<(reason: SignOutReason) => void>();
   const hold = vi.fn<() => void>();
   const release = vi.fn<() => void>();
   const check = vi.fn<() => Promise<void>>(() => Promise.resolve());
@@ -225,7 +225,19 @@ describe('Account sign out', () => {
     const order = [flush, drain, signOut].map((spy) => must(spy.mock.invocationCallOrder[0]));
 
     expect(order).toEqual([...order].sort((a, b) => a - b));
-    expect(signedOut).toHaveBeenCalledTimes(1);
+    expect(signedOut).toHaveBeenCalledExactlyOnceWith(SignOutReason.Chosen);
+  });
+
+  it('ends the session as Chosen when the server no longer knows it', async () => {
+    const { fixture, signOut, signedOut, signOutButton } = await setup();
+
+    signOut.mockResolvedValueOnce({ _tag: AuthResultTag.Failed, error: AuthError.Unauthorized });
+
+    signOutButton().click();
+    await fixture.whenStable();
+    await settle();
+
+    expect(signedOut).toHaveBeenCalledExactlyOnceWith(SignOutReason.Chosen);
   });
 
   it('does not sign out while the flush is pending, nor drain before it resolves', async () => {

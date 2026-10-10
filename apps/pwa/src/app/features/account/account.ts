@@ -14,7 +14,7 @@ import { CeremonyResultTag, PasskeyFailure } from '@ionaru/effect-passkeys/clien
 
 import { AuthApi, AuthError, AuthResultTag, type Passkey } from '../../core/api/auth-api';
 import { PasskeyCeremony } from '../../core/api/passkey-ceremony';
-import { Session } from '../../core/auth/session';
+import { Session, SignOutReason } from '../../core/auth/session';
 import { CaptureQueue } from '../../core/data/capture-queue';
 import { DataStore } from '../../core/data/data-store';
 import { DoneUndo } from '../../core/data/done-undo';
@@ -318,7 +318,7 @@ export class Account {
       const result = await this.#authApi.signOut();
 
       if (result._tag === AuthResultTag.Ok || result.error === AuthError.Unauthorized) {
-        this.session.signedOut();
+        this.session.signedOut(SignOutReason.Chosen);
 
         return;
       }

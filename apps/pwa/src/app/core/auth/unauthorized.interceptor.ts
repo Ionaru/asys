@@ -10,7 +10,7 @@ import { catchError, throwError } from 'rxjs';
 
 import { errorTagOf } from '../api/http-outcome';
 import { IGNORE_UNAUTHORIZED } from '../api/ignore-unauthorized';
-import { Session } from './session';
+import { Session, SignOutReason } from './session';
 
 const PASSKEYS_PATH = '/v1/auth/passkeys';
 
@@ -47,7 +47,7 @@ export const unauthorizedInterceptor: HttpInterceptorFn = (request, next) => {
         const tag = errorTagOf(error.error);
 
         if (tag === 'Unauthorized' || (tag === null && isPasskeyWrite(request))) {
-          session.signedOut();
+          session.signedOut(SignOutReason.Revoked);
         }
       }
 

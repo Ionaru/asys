@@ -5,7 +5,7 @@ import { Router, RouterOutlet } from '@angular/router';
 import { isValidTimeZone } from '@asys/domain';
 
 import { SIGNED_OUT_PATHS } from './core/auth/safe-return-url';
-import { Session, SessionState } from './core/auth/session';
+import { Session, SessionState, SignOutReason } from './core/auth/session';
 import { DataStore, SyncStatus } from './core/data/data-store';
 import { TimeZoneSync } from './core/data/time-zone-sync';
 import { AppUpdate } from './core/platform/app-update';
@@ -129,7 +129,7 @@ export class App {
     }
 
     const tree =
-      path === '/account'
+      this.session.signOutReason() === SignOutReason.Chosen
         ? this.#router.createUrlTree(['/signin'])
         : this.#router.createUrlTree(['/signin'], { queryParams: { returnUrl: url } });
 

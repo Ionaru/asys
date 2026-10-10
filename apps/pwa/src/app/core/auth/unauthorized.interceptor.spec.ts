@@ -10,16 +10,16 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 
 import { IGNORE_UNAUTHORIZED } from '../api/ignore-unauthorized';
-import { Session } from './session';
+import { Session, SignOutReason } from './session';
 import { unauthorizedInterceptor } from './unauthorized.interceptor';
 
 describe('unauthorizedInterceptor', () => {
   let http: HttpClient;
   let controller: HttpTestingController;
-  let signedOut: ReturnType<typeof vi.fn<() => void>>;
+  let signedOut: ReturnType<typeof vi.fn<(reason: SignOutReason) => void>>;
 
   beforeEach(() => {
-    signedOut = vi.fn<() => void>();
+    signedOut = vi.fn<(reason: SignOutReason) => void>();
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(withInterceptors([unauthorizedInterceptor])),
@@ -56,25 +56,25 @@ describe('unauthorizedInterceptor', () => {
   it('signs out on a 401 with the Unauthorized tag', async () => {
     await fail('GET', '/v1/auth/me', 401, { _tag: 'Unauthorized' } as object | null);
 
-    expect(signedOut).toHaveBeenCalledTimes(1);
+    expect(signedOut).toHaveBeenCalledExactlyOnceWith(SignOutReason.Revoked);
   });
 
   it('signs out on a 401 whose text body is a JSON string with the Unauthorized tag', async () => {
     await fail('POST', '/v1/auth/signout', 401, JSON.stringify({ _tag: 'Unauthorized' }));
 
-    expect(signedOut).toHaveBeenCalledTimes(1);
+    expect(signedOut).toHaveBeenCalledExactlyOnceWith(SignOutReason.Revoked);
   });
 
   it('signs out on a body-less 401 of POST /v1/auth/passkeys', async () => {
     await fail('POST', '/v1/auth/passkeys', 401, null);
 
-    expect(signedOut).toHaveBeenCalledTimes(1);
+    expect(signedOut).toHaveBeenCalledExactlyOnceWith(SignOutReason.Revoked);
   });
 
   it('signs out on a body-less 401 of DELETE /v1/auth/passkeys/<id>', async () => {
     await fail('DELETE', '/v1/auth/passkeys/cred-1', 401, null);
 
-    expect(signedOut).toHaveBeenCalledTimes(1);
+    expect(signedOut).toHaveBeenCalledExactlyOnceWith(SignOutReason.Revoked);
   });
 
   it.each([
