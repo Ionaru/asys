@@ -18,7 +18,7 @@ description: Use when changing how ASYS derives a value (Available, Blocked, Ove
    - `now`, the zone and Settings come in as arguments.
    - `Temporal` is used only in `time/zoned.ts` and `time/display.ts`.
    - Display words come from fixed English tables, never `Intl`.
-   - Strings compare by code unit. `compareStrings` is copied in `picker.ts`, `waiting-text.ts`, `task/blockers.ts` and `working-set/inbox.ts`, and `task/blocked.ts` inlines the same comparator in its `.sort(...)`. Change all five together.
+   - Strings compare by code unit, with `compareCodeUnits` from `lib/compare.ts`, which the PWA also imports from `@asys/domain`. Never add a local copy or use `localeCompare`.
    - Reason unions (`ExclusionReason`, `BlockedReason`) are open: consumers keep a `default` branch.
 4. Export new functions through the folder's `index.ts` and `src/index.ts`.
 5. In the same commit, bump `RULES_VERSION` in `src/lib/rules-version.ts` and add a section at the top of `CHANGELOG.md`:
