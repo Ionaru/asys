@@ -7,7 +7,6 @@ import {
   type Change,
   ChangeEntity,
   type Command,
-  CommandTag,
   type CompleteTask,
   type DomainState,
   type Instant,
@@ -24,14 +23,10 @@ import {
   type SnapshotData,
 } from '../api/data-api';
 import { HttpOutcomeTag, type HttpOutcome } from '../api/http-outcome';
-import { LAST_REPORTED_ZONE_KEY } from '../auth/session';
 import { Clock } from '../platform/clock';
-import { DeviceStorage } from '../platform/device-storage';
-import { DeviceZone } from '../platform/device-zone';
 import { Ids } from '../platform/ids';
-import { commandSubject, SETTINGS_SUBJECT } from './command-subject';
+import { commandSubject } from './command-subject';
 import { applyHolds, type Hold, isStillHeld } from './held-state';
-import { zoneToReport } from './zone-to-report';
 
 /** Where the store stands with the server. */
 export enum SyncStatus {
@@ -65,7 +60,8 @@ const isUnauthorized = (settled: Settled): boolean =>
   settled.failure?.status === HttpStatusCode.Unauthorized &&
   settled.failure.errorTag === 'Unauthorized';
 
-const isApplied = (outcome: CommandOutcome): boolean =>
+/** Whether a command outcome changed the server's state, so the store syncs past it. */
+export const isApplied = (outcome: CommandOutcome): boolean =>
   outcome._tag === CommandOutcomeTag.Applied || outcome._tag === CommandOutcomeTag.NotApplicable;
 
 /** A snapshot request issued before `start()`, with the generation it belongs to. */
@@ -86,8 +82,6 @@ interface Waiter {
 export class DataStore {
   readonly #api = inject(DataApi);
   readonly #clock = inject(Clock);
-  readonly #deviceZone = inject(DeviceZone);
-  readonly #storage = inject(DeviceStorage);
   readonly #document = inject(DOCUMENT);
   readonly #ids = inject(Ids);
 
@@ -146,8 +140,7 @@ export class DataStore {
   #resumeInFlight = false;
   #needsSnapshot = false;
   #waiters: Waiter[] = [];
-  #zoneReport: Promise<void> | null = null;
-  #zoneChoices = 0;
+  readonly #settingsChecks = new Set<() => void>();
   #timer: ReturnType<typeof setTimeout> | undefined;
   #preload: Preload | null = null;
 
@@ -155,7 +148,7 @@ export class DataStore {
     this.#trigger(true);
 
     if (this.#started) {
-      this.#checkZone();
+      this.#checkSettings();
     }
   };
 
@@ -224,7 +217,6 @@ export class DataStore {
     this.#forcedFollowUp = false;
     this.#resumeInFlight = false;
     this.#needsSnapshot = false;
-    this.#zoneReport = null;
     this.#seq = 0;
     this.#stateSignal.set(null);
     this.#holds.set([]);
@@ -269,66 +261,34 @@ export class DataStore {
     const outcome = await this.#api.runCommand(command, idempotencyKey);
 
     if (wasStarted && this.#isLive(outcome, generation)) {
-      await this.#syncPast(commandSubject(command));
+      await this.syncPast(commandSubject(command));
     }
 
     return outcome;
   }
 
-  /** Sets the account's time zone by the person's choice; resolves like send. */
-  async chooseTimeZone(zone: string): Promise<CommandOutcome> {
-    const generation = this.#generation;
-    const wasStarted = this.#started;
+  /**
+   * Calls the listener at each settings check: after every successful snapshot, after a poll that
+   * applied a Settings change, and on focus while started. Returns a function that removes it.
+   */
+  onSettingsCheck(listener: () => void): () => void {
+    this.#settingsChecks.add(listener);
 
-    this.#zoneChoices += 1;
-
-    try {
-      if (this.#zoneReport !== null) {
-        await this.#zoneReport;
-      }
-
-      const outcome = await this.#api.runCommand(
-        { _tag: CommandTag.SetTimeZone, timeZone: zone },
-        this.#ids.next(),
-      );
-
-      if (!wasStarted || !this.#isLive(outcome, generation)) {
-        return outcome;
-      }
-
-      const device = this.#deviceZone.current();
-
-      if (outcome._tag === CommandOutcomeTag.Applied && device !== undefined) {
-        this.#storage.set(LAST_REPORTED_ZONE_KEY, device);
-      }
-
-      await this.#syncPast(SETTINGS_SUBJECT);
-
-      return outcome;
-    } finally {
-      this.#zoneChoices -= 1;
-    }
+    return () => {
+      this.#settingsChecks.delete(listener);
+    };
   }
 
-  /** Whether an outcome applied while the store is started in the given generation. */
-  #isLive(outcome: CommandOutcome, generation: number): boolean {
-    return generation === this.#generation && this.#started && isApplied(outcome);
-  }
-
-  /** Posts a command and resolves its outcome without waiting; an applied command fires the ordinary trigger. */
-  async #runOnly(command: Command, idempotencyKey: string): Promise<CommandOutcome> {
-    const generation = this.#generation;
-    const outcome = await this.#api.runCommand(command, idempotencyKey);
-
-    if (this.#isLive(outcome, generation)) {
-      this.#trigger();
+  /**
+   * Waits for the first request started after now to settle, starting it at once (even while
+   * hidden) when none is in flight. A failed settle holds the subject in `awaitingSync`. Resolves at
+   * once when the store is not started.
+   */
+  syncPast(subject: string): Promise<void> {
+    if (!this.#started) {
+      return Promise.resolve();
     }
 
-    return outcome;
-  }
-
-  /** Waits for the first request started after now to settle, starting it at once (even while hidden) when none is in flight. */
-  #syncPast(subject: string): Promise<void> {
     return new Promise<void>((resolve) => {
       this.#waiters.push({ after: this.#requestCount, subject, resolve });
 
@@ -339,6 +299,11 @@ export class DataStore {
         this.#startNext();
       }
     });
+  }
+
+  /** Whether an outcome applied while the store is started in the given generation. */
+  #isLive(outcome: CommandOutcome, generation: number): boolean {
+    return generation === this.#generation && this.#started && isApplied(outcome);
   }
 
   /** Resolves the waiters a settle answers: all on an unauthorized settle, else those waiting for this request or an earlier one. */
@@ -463,7 +428,7 @@ export class DataStore {
         this.#needsSnapshot = false;
         this.#statusSignal.set(SyncStatus.Ready);
         this.#syncedAtSignal.set(Date.now() as Instant);
-        this.#checkZone();
+        this.#checkSettings();
         this.#settle({ request, isSnapshot: true, failure: null });
 
         return;
@@ -550,7 +515,7 @@ export class DataStore {
     this.#syncedAtSignal.set(Date.now() as Instant);
 
     if (fresh.some((entry) => entry.entity === ChangeEntity.Settings)) {
-      this.#checkZone();
+      this.#checkSettings();
     }
   }
 
@@ -611,47 +576,10 @@ export class DataStore {
     }
   }
 
-  /** Records or reports the device time zone when it differs from the account's; reports nothing while the person chooses one. */
-  #checkZone(): void {
-    const state = this.#stateSignal();
-
-    if (state === null) {
-      return;
+  /** Calls every settings check listener. */
+  #checkSettings(): void {
+    for (const listener of this.#settingsChecks) {
+      listener();
     }
-
-    const { report, record } = zoneToReport(
-      this.#deviceZone.current(),
-      state.settings.timeZone,
-      this.#storage.get(LAST_REPORTED_ZONE_KEY),
-    );
-
-    if (record !== null) {
-      this.#storage.set(LAST_REPORTED_ZONE_KEY, record);
-    }
-
-    if (report === null || this.#zoneReport !== null || this.#zoneChoices > 0) {
-      return;
-    }
-
-    const generation = this.#generation;
-
-    this.#zoneReport = this.#runOnly(
-      { _tag: CommandTag.SetTimeZone, timeZone: report },
-      this.#ids.next(),
-    ).then((outcome) => {
-      if (generation !== this.#generation) {
-        return;
-      }
-
-      this.#zoneReport = null;
-
-      if (
-        outcome._tag === CommandOutcomeTag.Applied ||
-        outcome._tag === CommandOutcomeTag.NotApplicable ||
-        outcome._tag === CommandOutcomeTag.Rejected
-      ) {
-        this.#storage.set(LAST_REPORTED_ZONE_KEY, report);
-      }
-    });
   }
 }
