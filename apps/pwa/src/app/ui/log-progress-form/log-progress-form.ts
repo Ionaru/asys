@@ -19,7 +19,7 @@ let nextId = 0;
 
 const WHOLE_MINUTES = /^\d+$/;
 
-/** The Command that lowers an open Task's Estimate to the time still needed. */
+/** The Command that lowers an Open Task's Estimate to the time still needed. */
 export const logProgressCommand = (taskId: string, minutes: number): LogProgress => ({
   _tag: CommandTag.LogProgress,
   taskId,

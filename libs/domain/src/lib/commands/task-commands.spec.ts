@@ -667,7 +667,7 @@ describe('canLogProgress', () => {
     expect(logProgressApplies(task)).toBe(false);
   });
 
-  it.each([TaskStatus.Done, TaskStatus.Dropped, TaskStatus.Delegated])(
+  it.each(Object.values(TaskStatus).filter((status) => status !== TaskStatus.Open))(
     'agrees with logProgress for a %s Task, whatever its Estimate',
     (status) => {
       const task = aTask({ id: 't1', status, estimateMinutes: 30 });

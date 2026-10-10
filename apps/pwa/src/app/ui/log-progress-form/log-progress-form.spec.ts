@@ -251,7 +251,7 @@ describe('LogProgressForm', () => {
 });
 
 describe('logProgressCommand', () => {
-  it('lowers the Estimate of an open Task to the minutes still needed', () => {
+  it('lowers the Estimate of an Open Task to the minutes still needed', () => {
     expect(logProgressCommand('dentist', 15)).toEqual({
       _tag: CommandTag.LogProgress,
       taskId: 'dentist',
