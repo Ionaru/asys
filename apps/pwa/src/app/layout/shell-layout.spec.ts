@@ -1121,7 +1121,13 @@ describe('ShellLayout', () => {
       stubViewport(viewportHeight === null ? undefined : { height: viewportHeight });
 
       const harness = await setup('/now', {
-        motion: { allowed: () => allowed, reduced: signal(false), play } as Partial<Motion>,
+        motion: {
+          allowed: () => allowed,
+          reduced: signal(false),
+          play,
+          // The real `leave` over the fake `play`: it only uses `this.play`.
+          leave: Motion.prototype.leave,
+        } as Partial<Motion>,
       });
       const inboxLink = harness
         .root()

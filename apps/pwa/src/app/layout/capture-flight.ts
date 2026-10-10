@@ -20,7 +20,7 @@ export const tabInView = (tab: DOMRectReadOnly, viewport: ViewportBox): boolean 
 
 /**
  * Flies a ghost carrying the captured text from `from` to the centre of `to`, shrinking and fading out.
- * The flight is decoration: the ghost is removed afterwards and a failed animation is swallowed.
+ * The flight is decoration: the ghost is removed afterwards, also when the animation fails.
  */
 export const flyCapture = async (
   doc: Document,
@@ -55,8 +55,6 @@ export const flyCapture = async (
       ],
       { duration: MotionDuration.Moderate, easing: MotionEasing.Emphasized },
     );
-  } catch {
-    // The flight is decoration, so a failed animation is not an error.
   } finally {
     ghost.remove();
   }
