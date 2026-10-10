@@ -12,38 +12,47 @@
 <p class="asys-page__status now__status" role="status">{{ statusLine() }}</p>
 @if (dataStore.now(); as now) {
   @if (displayed(); as top) {
-    <asys-top-pick
-      [attr.inert]="leaving() !== null ? '' : null"
-      [attr.data-leaving]="leaving() !== null ? '' : null"
-      [completed]="leaving() !== null"
-      [title]="top.task.title"
-      [reason]="top.reasonText"
-      [quadrant]="top.reason.quadrant"
-      [overdue]="top.reason.overdue"
-      [dueFact]="dueFact(top)"
-      [estimate]="estimateText(top.task)"
-      [area]="areaName(top.task)"
+    <asys-swipe-actions
+      class="now__top-swipe"
       [taskId]="top.task.id"
-      [morph]="morphId() === top.task.id"
-      [canLogProgress]="canLogProgress()"
-      [actionsDisabled]="busy(top.task.id)"
-      (done)="done(top.task, Origins.Button, $event.keyboard)"
-      (logProgress)="openForm(top.task.id)"
+      [disabled]="busy(top.task.id) || leaving() !== null"
+      [startEnabled]="canLogProgress(top.task.id)"
+      (commitEnd)="swipeDone($event)"
+      (commitStart)="openForm($event)"
     >
-      @if (dataStore.awaitingSync().has(top.task.id)) {
-        <p asys-sync-note></p>
-      }
-      @if (formOpen() && storedEstimate(); as estimate) {
-        <asys-log-progress-form
-          [estimateMinutes]="estimate"
-          [busy]="busy(top.task.id)"
-          (save)="saveProgress($event)"
-          (cancel)="cancelForm()"
-          (focusin)="focusInside = true"
-          (focusout)="focusInside = false"
-        />
-      }
-    </asys-top-pick>
+      <asys-top-pick
+        [attr.inert]="leaving() !== null ? '' : null"
+        [attr.data-leaving]="leaving() !== null ? '' : null"
+        [completed]="leaving() !== null"
+        [title]="top.task.title"
+        [reason]="top.reasonText"
+        [quadrant]="top.reason.quadrant"
+        [overdue]="top.reason.overdue"
+        [dueFact]="dueFact(top)"
+        [estimate]="estimateText(top.task)"
+        [area]="areaName(top.task)"
+        [taskId]="top.task.id"
+        [morph]="morphId() === top.task.id"
+        [canLogProgress]="canLogProgress(top.task.id)"
+        [actionsDisabled]="busy(top.task.id)"
+        (done)="done(top.task, Origins.Button, $event.keyboard)"
+        (logProgress)="openForm(top.task.id)"
+      >
+        @if (dataStore.awaitingSync().has(top.task.id)) {
+          <p asys-sync-note></p>
+        }
+        @if (formOpenFor(top.task.id) && estimateOf(top.task.id); as estimate) {
+          <asys-log-progress-form
+            [estimateMinutes]="estimate"
+            [busy]="busy(top.task.id)"
+            (save)="saveProgress($event)"
+            (cancel)="cancelForm()"
+            (focusin)="focusInside = true"
+            (focusout)="focusInside = false"
+          />
+        }
+      </asys-top-pick>
+    </asys-swipe-actions>
   } @else {
     <p class="now__text">Nothing to do right now.</p>
     @if (inboxTaskCount() > 0) {
@@ -62,19 +71,39 @@
     <ul class="now__list">
       @for (item of listed(); track item.task.id) {
         <li (animate.leave)="collapse($event)" (animate.enter)="expand($event, item.task.id)">
-          <a
-            asys-picker-row
-            [routerLink]="['/tasks', item.task.id]"
-            [reason]="item.reasonText"
-            [estimate]="estimateText(item.task)"
-            [quadrant]="item.reason.quadrant"
+          <asys-swipe-actions
             [taskId]="item.task.id"
-            [morph]="morphId() === item.task.id"
-            [overdue]="item.reason.overdue"
-            [variant]="Rows.Ranked"
+            [disabled]="busy(item.task.id)"
+            [startEnabled]="canLogProgress(item.task.id)"
+            (commitEnd)="swipeDone($event)"
+            (commitStart)="openForm($event)"
           >
-            {{ item.task.title }}
-          </a>
+            <a
+              asys-picker-row
+              [routerLink]="['/tasks', item.task.id]"
+              [reason]="item.reasonText"
+              [estimate]="estimateText(item.task)"
+              [quadrant]="item.reason.quadrant"
+              [taskId]="item.task.id"
+              [morph]="morphId() === item.task.id"
+              [overdue]="item.reason.overdue"
+              [variant]="Rows.Ranked"
+            >
+              {{ item.task.title }}
+            </a>
+          </asys-swipe-actions>
+          @if (formOpenFor(item.task.id) && estimateOf(item.task.id); as estimate) {
+            <div class="now__row-form">
+              <asys-log-progress-form
+                [estimateMinutes]="estimate"
+                [busy]="busy(item.task.id)"
+                (save)="saveProgress($event)"
+                (cancel)="cancelForm()"
+                (focusin)="focusInside = true"
+                (focusout)="focusInside = false"
+              />
+            </div>
+          }
         </li>
       }
     </ul>

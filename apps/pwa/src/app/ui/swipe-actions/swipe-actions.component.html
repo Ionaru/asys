@@ -1,0 +1,14 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
+<div class="asys-swipe__reveal asys-swipe__reveal--end" aria-hidden="true" hidden #endReveal>
+  <asys-icon [name]="Icons.Check" /><span>Done</span>
+</div>
+<div
+  class="asys-swipe__reveal asys-swipe__reveal--start"
+  aria-hidden="true"
+  hidden
+  #startReveal
+  [attr.data-reason]="startEnabled() ? null : ''"
+>
+  <span>{{ startEnabled() ? 'Log progress' : 'Needs an Estimate' }}</span>
+</div>
+<div class="asys-swipe__surface" #surface><ng-content /></div>

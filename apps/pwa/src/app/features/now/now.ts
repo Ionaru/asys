@@ -48,6 +48,7 @@ import {
 import { NowHeader } from '../../ui/now-header/now-header';
 import { PickerRow, PickerRowVariant } from '../../ui/picker-row/picker-row';
 import { SectionHeader } from '../../ui/section-header/section-header';
+import { SwipeActions } from '../../ui/swipe-actions/swipe-actions';
 import { SyncNote } from '../../ui/sync-note/sync-note';
 import { TopPick } from '../../ui/top-pick/top-pick';
 import { collapseRow, expandRow } from './row-motion';
@@ -76,6 +77,7 @@ const RISE_KEYFRAMES: Keyframe[] = [
     PickerRow,
     RouterLink,
     SectionHeader,
+    SwipeActions,
     SyncNote,
     TopPick,
   ],
@@ -99,6 +101,8 @@ export class Now {
   readonly #destroyRef = inject(DestroyRef);
 
   readonly #document = inject(DOCUMENT);
+
+  readonly #host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   protected readonly Status = SyncStatus;
 
@@ -155,26 +159,37 @@ export class Now {
   /** Numbers each Done, so an exit that a newer Done or an Undo ended does nothing more. */
   #doneSeq = 0;
 
-  readonly #topId = computed(() => this.dataStore.now()?.ranked[0]?.task.id ?? null);
+  /** The ids of the ranked Tasks in rank order; the first is the top pick. */
+  readonly #rankedIds = computed(
+    () => this.dataStore.now()?.ranked.map((item) => item.task.id) ?? [],
+  );
 
-  readonly #topTask = computed(() => {
-    const id = this.#topId();
-    return id === null ? undefined : this.dataStore.state()?.tasks.find((task) => task.id === id);
+  readonly #tasksById = computed(
+    () => new Map((this.dataStore.state()?.tasks ?? []).map((task) => [task.id, task])),
+  );
+
+  /**
+   * The Task the Log progress form is open for. It stays open while its Task stays on the same side, the
+   * top pick or the rows, and closes when the Task leaves the ranking or moves between the two.
+   */
+  readonly #logProgressFor = linkedSignal<readonly string[], string | null>({
+    source: () => this.#rankedIds(),
+    computation: (ids, previous) => {
+      const value = previous?.value ?? null;
+
+      if (previous === undefined || value === null || !ids.includes(value)) {
+        return null;
+      }
+
+      return (ids[0] === value) === (previous.source[0] === value) ? value : null;
+    },
   });
 
-  protected readonly storedEstimate = computed(() => this.#topTask()?.estimateMinutes ?? null);
-
-  protected readonly canLogProgress = computed(() => canLogProgress(this.#topTask()));
-
-  /** The Task the Log progress form is open for; any change of the top pick closes it. */
-  readonly #logProgressFor = linkedSignal<string | null, string | null>({
-    source: () => this.#topId(),
-    computation: () => null,
-  });
-
-  protected readonly formOpen = computed(() => {
+  /** The id of the Task whose Log progress form shows, or null when none does. */
+  readonly #openFormId = computed(() => {
     const id = this.#logProgressFor();
-    return id !== null && id === this.#topId() && this.canLogProgress();
+
+    return id !== null && this.canLogProgress(id) ? id : null;
   });
 
   protected readonly inboxTaskCount = computed(() => {
@@ -207,7 +222,7 @@ export class Now {
 
   constructor() {
     effect(() => {
-      const open = this.formOpen();
+      const open = this.#openFormId() !== null;
       untracked(() => {
         if (this.#formWasOpen && !open && this.focusInside) {
           this.#focusTop();
@@ -259,6 +274,21 @@ export class Now {
     return this.#attempts.busy(taskId);
   }
 
+  /** The stored Estimate of the Task in minutes, or null when it has none or is not in the state. */
+  protected estimateOf(taskId: string): number | null {
+    return this.#tasksById().get(taskId)?.estimateMinutes ?? null;
+  }
+
+  /** Whether progress can be logged on the Task, by the domain's `canLogProgress`. */
+  protected canLogProgress(taskId: string): boolean {
+    return canLogProgress(this.#tasksById().get(taskId));
+  }
+
+  /** Whether the Log progress form shows for the Task, in the card or under its row. */
+  protected formOpenFor(taskId: string): boolean {
+    return this.#logProgressFor() === taskId && this.canLogProgress(taskId);
+  }
+
   protected estimateText(task: Task): string {
     return task.estimateMinutes === null ? '' : formatMinutes(task.estimateMinutes);
   }
@@ -283,10 +313,43 @@ export class Now {
     this.#logProgressFor.set(taskId);
   }
 
+  /** Closes the form; focus returns to the card's Log progress button, or to the row's link. */
   protected cancelForm(): void {
+    const taskId = this.#logProgressFor();
+
     this.focusInside = false;
     this.#logProgressFor.set(null);
-    afterNextRender(() => this.topPick()?.focusLogProgress(), { injector: this.#injector });
+    if (taskId !== null && taskId !== this.#rankedIds()[0]) {
+      this.#focusLinkAfterRender(taskId);
+    } else {
+      afterNextRender(() => this.topPick()?.focusLogProgress(), { injector: this.#injector });
+    }
+  }
+
+  /** Marks the Task Done from a swipe; a row keeps focus off itself when it had it, so it never falls to the body. */
+  protected swipeDone(taskId: string): void {
+    const task = this.dataStore.now()?.ranked.find((item) => item.task.id === taskId)?.task;
+
+    if (task === undefined) {
+      return;
+    }
+    if (this.displayed()?.task.id === taskId) {
+      void this.done(task, DoneOrigin.Swipe);
+      return;
+    }
+    if (this.#refusesDone(taskId)) {
+      return;
+    }
+
+    const row = this.#linkOf(taskId)?.closest('li') ?? null;
+    const focused = this.#document.activeElement;
+    const hadFocus = row !== null && focused !== null && row.contains(focused);
+    const neighbourId = hadFocus ? this.#neighbourIdOf(taskId) : null;
+
+    void this.done(task, DoneOrigin.Swipe);
+    if (hadFocus) {
+      this.#focusRowOrTop(neighbourId);
+    }
   }
 
   /** Holds the Task through DoneUndo, then plays the exit and rise for the card; a row just collapses. */
@@ -295,11 +358,7 @@ export class Now {
     origin: DoneOrigin = DoneOrigin.Button,
     keyboard = false,
   ): Promise<void> {
-    if (
-      this.busy(task.id) ||
-      this.#doneUndo.pending()?.taskId === task.id ||
-      this.leaving()?.task.id === task.id
-    ) {
+    if (this.#refusesDone(task.id)) {
       return;
     }
     this.#endExit();
@@ -359,8 +418,21 @@ export class Now {
     if (this.#logProgressFor() === taskId) {
       this.focusInside = false;
       this.#logProgressFor.set(null);
-      this.#focusTop();
+      if (taskId === this.#rankedIds()[0]) {
+        this.#focusTop();
+      } else {
+        this.#focusLinkAfterRender(taskId);
+      }
     }
+  }
+
+  /** Whether a Done for this Task is refused: it is busy, already held in DoneUndo, or its card is leaving. */
+  #refusesDone(taskId: string): boolean {
+    return (
+      this.busy(taskId) ||
+      this.#doneUndo.pending()?.taskId === taskId ||
+      this.leaving()?.task.id === taskId
+    );
   }
 
   /** Records which row to expand if this Done is undone; nothing when there is none. */
@@ -438,6 +510,43 @@ export class Now {
       this.nowHeader()?.focusHeading();
     } else {
       topPick.focusTitle();
+    }
+  }
+
+  /** The link of the Task's row or card, skipping one that is leaving, or null when none shows. */
+  #linkOf(taskId: string): HTMLElement | null {
+    const title = Array.from(
+      this.#host.nativeElement.querySelectorAll<HTMLElement>('[data-task-id]'),
+    ).find(
+      (element) =>
+        element.getAttribute('data-task-id') === taskId &&
+        element.closest('[data-leaving]') === null,
+    );
+
+    return title?.closest('a') ?? null;
+  }
+
+  /** After the next render, moves focus to the link of the Task's row. */
+  #focusLinkAfterRender(taskId: string): void {
+    afterNextRender(() => this.#linkOf(taskId)?.focus(), { injector: this.#injector });
+  }
+
+  /** The id of the row after this one in the list, else the one before it, else null. Read it before the Done. */
+  #neighbourIdOf(taskId: string): string | null {
+    const rows = this.listed();
+    const index = rows.findIndex((item) => item.task.id === taskId);
+
+    return (rows[index + 1] ?? rows[index - 1])?.task.id ?? null;
+  }
+
+  /** Moves focus now to the link of the row, or to the top pick when there is none. */
+  #focusRowOrTop(taskId: string | null): void {
+    const link = taskId === null ? null : this.#linkOf(taskId);
+
+    if (link === null) {
+      this.#focusTopNow();
+    } else {
+      link.focus();
     }
   }
 

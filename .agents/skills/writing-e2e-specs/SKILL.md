@@ -24,6 +24,7 @@ Each test signs up a fresh Owner with a WebAuthn virtual authenticator, so tests
 3. Seed data through the API helpers in `support/seed.ts` (`seedTask`, `captureTask`, `triageTask`, `editTask`, `addBlocker`, `areaId`, `snapshot`, or `command` for anything else). These post to `/v1/commands` with the right Origin. Add a helper there for a new Command. Then call `page.reload()`, or the PWA waits up to 15 s for its next poll.
 4. For dates, use `support/time.ts`: `localToday()`, `addDays`, `dayLabel`, and the zone `E2E_ZONE` (Europe/Amsterdam). The clock is real, so call `skipNearMidnight(test)` when "today" matters.
 5. Select by role and label first, then by component BEM classes. For phone width, use `test.use({ viewport: { width: 375, height: 812 } })`. To simulate a stale tab, block `**/v1/changes**` with `page.route`.
+   - **Touch** (a swipe, a drag-scroll, a pinch): per file, `test.use({ viewport: { width: 412, height: 839 }, hasTouch: true, isMobile: true })`, then `const touch = await touchscreen(page)` from `support/touch.ts` (`down`, `move`, `up`, `cancel`, `drag`, `pinch`). It sends CDP `Input.dispatchTouchEvent`, so the page gets trusted touch input as Pointer Events with `pointerType: 'touch'`, and `touch-action` applies. Open the session after the seeding reload. A swipe starts at least 24px from the viewport edge, or the swipe ignores it (`swipe.spec.ts` starts 40px inside the target).
 6. A Done is held for 5 seconds before CompleteTask is sent, and the shell announces it in `.shell__status`. To see a Done reach the server, install the clock before the page loads its timers, `await page.clock.install(); await page.reload();`, then after the Done run `const sent = page.waitForResponse('**/v1/commands'); await page.clock.fastForward(5_000); await sent;`. The clock covers the whole browser context, so a second page in it shares it, and one jump never reaches the 15 s poll.
 7. To pin a known UX limit, add it to `known-limits.spec.ts` and note it in the slice plan's Known limits. A fix then flips both.
 
@@ -50,13 +51,17 @@ pnpm exec nx run pwa-e2e:e2e-image -- src/<topic>.spec.ts
 
 ## Common mistakes
 
-| Mistake                                | Symptom                                                                                                          |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Seeding without `page.reload()`        | The test waits for a poll and times out                                                                          |
-| Fixed calendar dates                   | Fails on another day; use `localToday()`                                                                         |
-| Renamed sign-up UI strings             | Every spec fails in the fixture (`fixtures.ts`)                                                                  |
-| Running Playwright directly            | Stale `asys_e2e`, or the server bundle changes mid-run; use `nx e2e pwa-e2e` or `nx run pwa-e2e:e2e-image`       |
-| Expecting the service worker           | Neither stack runs one: the dev stack serves none, and the image config blocks it                                |
-| Expecting a Done on the server at once | It is held for 5 s; use the clock recipe                                                                         |
-| Measuring a box mid-animation          | The box is still moving; first wait for `document.getAnimations().length` to be 0 with `expect.poll`             |
-| Counting the keepalive POST            | Playwright's request events miss a keepalive fetch sent while the page unloads; check the server with `snapshot` |
+| Mistake                                                | Symptom                                                                                                          |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| Seeding without `page.reload()`                        | The test waits for a poll and times out                                                                          |
+| Fixed calendar dates                                   | Fails on another day; use `localToday()`                                                                         |
+| Renamed sign-up UI strings                             | Every spec fails in the fixture (`fixtures.ts`)                                                                  |
+| Running Playwright directly                            | Stale `asys_e2e`, or the server bundle changes mid-run; use `nx e2e pwa-e2e` or `nx run pwa-e2e:e2e-image`       |
+| Expecting the service worker                           | Neither stack runs one: the dev stack serves none, and the image config blocks it                                |
+| Expecting a Done on the server at once                 | It is held for 5 s; use the clock recipe                                                                         |
+| Measuring a box mid-animation                          | The box is still moving; first wait for `document.getAnimations().length` to be 0 with `expect.poll`             |
+| Counting the keepalive POST                            | Playwright's request events miss a keepalive fetch sent while the page unloads; check the server with `snapshot` |
+| Swiping with `page.mouse`                              | Nothing moves: the swipe ignores mouse pointers                                                                  |
+| Using `page.touchscreen` for a drag                    | It only taps; use `support/touch.ts`                                                                             |
+| Dispatching `TouchEvent`s with `locator.dispatchEvent` | They are untrusted and produce no Pointer Events                                                                 |
+| Waiting for every animation while the Undo bar shows   | The Undo ring's fill runs for the whole 5 s window; leave it out of the count, as `swipe.spec.ts` does           |
