@@ -2,7 +2,7 @@
 import { inject, Service, signal } from '@angular/core';
 
 import { AuthApi, AuthError, AuthResultTag, type AuthResult, type Me } from '../api/auth-api';
-import { DeviceStorage } from '../platform/device-storage';
+import { ReportedZone } from '../platform/reported-zone';
 
 /** What the PWA knows about the sign-in. */
 export enum SessionState {
@@ -12,9 +12,6 @@ export enum SessionState {
   Unreachable = 'unreachable',
 }
 
-/** The DeviceStorage key holding the time zone last reported to the server. */
-export const LAST_REPORTED_ZONE_KEY = 'asys.timeZone.lastReported';
-
 /** How long `check()` waits for the server before reporting it unreachable. */
 export const SESSION_CHECK_TIMEOUT_MS = 10_000;
 
@@ -23,7 +20,7 @@ export const SESSION_CHECK_TIMEOUT_MS = 10_000;
 export class Session {
   readonly #api = inject(AuthApi);
 
-  readonly #storage = inject(DeviceStorage);
+  readonly #reportedZone = inject(ReportedZone);
 
   readonly #stateSignal = signal(SessionState.Unknown);
 
@@ -58,7 +55,7 @@ export class Session {
   /** Records a successful sign-up, sign-in or recovery. */
   async signedIn(me?: Me): Promise<void> {
     this.#generation += 1;
-    this.#storage.remove(LAST_REPORTED_ZONE_KEY);
+    this.#reportedZone.clear();
 
     if (me === undefined) {
       await this.#ask();
@@ -75,7 +72,7 @@ export class Session {
     this.#generation += 1;
     this.#stateSignal.set(SessionState.SignedOut);
     this.#meSignal.set(null);
-    this.#storage.remove(LAST_REPORTED_ZONE_KEY);
+    this.#reportedZone.clear();
   }
 
   #ask(): Promise<void> {

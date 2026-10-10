@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { signal } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
 
 import { Motion, MotionDuration, MotionEasing } from '../core/platform/motion';
 import { flyCapture, tabInView } from './capture-flight';
@@ -125,13 +126,38 @@ describe('flyCapture', () => {
     expect(ghost()).toBeNull();
   });
 
-  it('removes the ghost and still resolves when play rejects', async () => {
-    const play = vi.fn(() => Promise.reject(new Error('boom')));
+  describe('when the real Motion cannot start the animation', () => {
+    afterEach(() => {
+      TestBed.resetTestingModule();
+      vi.restoreAllMocks();
+      Reflect.deleteProperty(Element.prototype, 'animate');
+      document.documentElement.style.removeProperty('--duration-moderate');
+      document.documentElement.style.removeProperty('--ease-emphasized');
+    });
 
-    await expect(flyCapture(document, fakeMotion(play), FROM, TO, 'Buy milk')).resolves.toBe(
-      undefined,
-    );
+    it('removes the ghost and still resolves', async () => {
+      const failure = new TypeError('Keyframes are not loosely sorted by offset');
+      const report = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const animate = vi.fn(() => {
+        throw failure;
+      });
 
-    expect(ghost()).toBeNull();
+      Object.defineProperty(Element.prototype, 'animate', {
+        value: animate,
+        configurable: true,
+        writable: true,
+      });
+      // Without these tokens the real Motion resolves at once and never reaches `animate`.
+      document.documentElement.style.setProperty('--duration-moderate', '250ms');
+      document.documentElement.style.setProperty('--ease-emphasized', 'cubic-bezier(0.2, 0, 0, 1)');
+
+      await expect(
+        flyCapture(document, TestBed.inject(Motion), FROM, TO, 'Buy milk'),
+      ).resolves.toBeUndefined();
+
+      expect(animate).toHaveBeenCalledTimes(1);
+      expect(report).toHaveBeenCalledExactlyOnceWith(failure);
+      expect(ghost()).toBeNull();
+    });
   });
 });
