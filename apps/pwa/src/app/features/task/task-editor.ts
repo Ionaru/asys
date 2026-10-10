@@ -53,7 +53,8 @@ import { InlineConfirm } from '../../ui/inline-confirm/inline-confirm';
 import { LoadState } from '../../ui/load-state/load-state';
 import { canLogProgress, LogProgressForm } from '../../ui/log-progress-form/log-progress-form';
 import { Segmented } from '../../ui/segmented/segmented';
-import { type SelectOption, SelectField } from '../../ui/select-field/select-field';
+import { areaSelectOptions } from '../../ui/select-field/area-options';
+import { SelectField } from '../../ui/select-field/select-field';
 import { StatusBadge, StatusBadgeStatus } from '../../ui/status-badge/status-badge';
 import { SyncNote } from '../../ui/sync-note/sync-note';
 import { TextField } from '../../ui/text-field/text-field';
@@ -268,14 +269,9 @@ export class TaskEditor {
       !this.actionsBusy(),
   );
 
-  protected readonly areaOptions = computed<readonly SelectOption[]>(() => {
-    const areas = [...(this.dataStore.state()?.areas ?? [])].sort(byAreaName);
-
-    return [
-      { value: '', label: 'No Area' },
-      ...areas.map((area) => ({ value: area.id, label: area.name })),
-    ];
-  });
+  protected readonly areaOptions = computed(() =>
+    areaSelectOptions([...(this.dataStore.state()?.areas ?? [])].sort(byAreaName)),
+  );
 
   readonly #timeZone = computed(() => zoneOrUtc(this.view()?.state.settings.timeZone));
 
