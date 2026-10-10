@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
+import { compareCodeUnits } from '../compare';
 import { BlockedReasonTag, type Task } from '../task';
 import {
   formatClock,
@@ -12,16 +13,11 @@ import {
 } from '../time';
 import { ExclusionReasonTag, type ExclusionReason, type WaitingTask } from './picker';
 
-// Code-unit order on purpose: localeCompare would differ per runtime locale.
-const compareStrings = (a: string, b: string): number => {
-  return a < b ? -1 : a > b ? 1 : 0;
-};
-
 const blockedText = (taskIds: readonly string[], tasks: readonly Task[]): string | null => {
   const ids = new Set(taskIds);
   const titles = tasks
     .filter((candidate) => ids.has(candidate.id))
-    .sort((a, b) => compareStrings(a.title, b.title) || compareStrings(a.id, b.id))
+    .sort((a, b) => compareCodeUnits(a.title, b.title) || compareCodeUnits(a.id, b.id))
     .map((blocker) => blocker.title);
   const [first, second] = titles;
   if (first === undefined) return null;
