@@ -6,6 +6,7 @@ import { CommandTag, RejectedReason, type Command, type DomainState } from '@asy
 
 import { CommandOutcomeTag, type CommandOutcome } from '../../core/api/data-api';
 import { DataStore, SyncStatus } from '../../core/data/data-store';
+import { TimeZoneSync } from '../../core/data/time-zone-sync';
 import { DeviceZone } from '../../core/platform/device-zone';
 import { Ids } from '../../core/platform/ids';
 import { Settings } from './settings';
@@ -65,7 +66,7 @@ const setup = async (options: SetupOptions = {}) => {
     return d.promise;
   };
   const send = vi.fn<(command: Command, key?: string) => Promise<CommandOutcome>>(pending);
-  const chooseTimeZone = vi.fn<(zone: string) => Promise<CommandOutcome>>(pending);
+  const chooseZone = vi.fn<(zone: string) => Promise<CommandOutcome>>(pending);
   const refresh = vi.fn<() => void>();
   let counter = 0;
   const next = vi.fn<() => string>(() => `key-${++counter}`);
@@ -76,8 +77,9 @@ const setup = async (options: SetupOptions = {}) => {
       provideRouter([]),
       {
         provide: DataStore,
-        useValue: { state, status, awaitingSync, send, chooseTimeZone, refresh },
+        useValue: { state, status, awaitingSync, send, refresh },
       },
+      { provide: TimeZoneSync, useValue: { choose: chooseZone } },
       { provide: DeviceZone, useValue: { current: vi.fn(() => deviceZone) } },
       { provide: Ids, useValue: { next } },
     ],
@@ -132,7 +134,7 @@ const setup = async (options: SetupOptions = {}) => {
     awaitingSync,
     sends,
     send,
-    chooseTimeZone,
+    chooseZone,
     refresh,
     next,
     fixture,
@@ -292,12 +294,12 @@ describe('Settings', () => {
       expect(select('Time zone').value).toBe('UTC');
     });
 
-    it('calls chooseTimeZone with the chosen zone', async () => {
-      const { choose, chooseTimeZone, send } = await setup();
+    it('calls TimeZoneSync.choose with the chosen zone', async () => {
+      const { choose, chooseZone, send } = await setup();
 
       await choose('Time zone', 'Europe/London');
 
-      expect(chooseTimeZone).toHaveBeenCalledExactlyOnceWith('Europe/London');
+      expect(chooseZone).toHaveBeenCalledExactlyOnceWith('Europe/London');
       expect(send).not.toHaveBeenCalled();
     });
 
@@ -342,7 +344,7 @@ describe('Settings', () => {
     });
 
     it('offers the device zone when it differs and chooses it on click', async () => {
-      const { deviceButton, chooseTimeZone, settle } = await setup({
+      const { deviceButton, chooseZone, settle } = await setup({
         state: domainState('Europe/London', 2),
         deviceZone: 'Europe/Amsterdam',
       });
@@ -354,7 +356,7 @@ describe('Settings', () => {
       must(deviceButton()).click();
       await settle();
 
-      expect(chooseTimeZone).toHaveBeenCalledExactlyOnceWith('Europe/Amsterdam');
+      expect(chooseZone).toHaveBeenCalledExactlyOnceWith('Europe/Amsterdam');
     });
   });
 

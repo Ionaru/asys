@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { DOCUMENT } from '@angular/common';
-import { DestroyRef, inject, type Signal, Service, signal } from '@angular/core';
+import { computed, DestroyRef, inject, type Signal, Service, signal } from '@angular/core';
 import { CommandTag, type CompleteTask, TaskStatus, type Task } from '@asys/domain';
 
 import { CommandOutcomeTag, DataApi, isRetryable, type CommandOutcome } from '../api/data-api';
@@ -82,7 +82,8 @@ export class DoneUndo {
 
   readonly #pendingSignal = signal<PendingDone | null>(null);
 
-  readonly #failureSignal = signal<DoneFailure | null>(null);
+  /** The failure the shell shows, beside the Task it is about, which only `retry` needs. */
+  readonly #failed = signal<{ readonly failure: DoneFailure; readonly task: Task } | null>(null);
 
   readonly #noticeSignal = signal<DoneNotice | null>(null);
 
@@ -96,8 +97,6 @@ export class DoneUndo {
 
   #held: Held | null = null;
 
-  #failedTask: Task | null = null;
-
   #timer: ReturnType<typeof setTimeout> | null = null;
 
   #startedAt = 0;
@@ -110,7 +109,7 @@ export class DoneUndo {
 
   readonly pending: Signal<PendingDone | null> = this.#pendingSignal.asReadonly();
 
-  readonly failure: Signal<DoneFailure | null> = this.#failureSignal.asReadonly();
+  readonly failure: Signal<DoneFailure | null> = computed(() => this.#failed()?.failure ?? null);
 
   readonly notice: Signal<DoneNotice | null> = this.#noticeSignal.asReadonly();
 
@@ -141,8 +140,7 @@ export class DoneUndo {
       return;
     }
 
-    this.#failureSignal.set(null);
-    this.#failedTask = null;
+    this.#failed.set(null);
 
     const earlier = this.#take();
 
@@ -203,21 +201,20 @@ export class DoneUndo {
 
   /** Holds the failed Task again with the key it has now: the same after Failed, a fresh one after KeyReused. */
   retry(): void {
-    const task = this.#failedTask;
+    const failed = this.#failed();
 
-    if (task === null || !this.#failureSignal()?.canRetry) {
+    if (failed === null || !failed.failure.canRetry) {
       return;
     }
 
-    this.complete(task, DoneOrigin.Button);
+    this.complete(failed.task, DoneOrigin.Button);
   }
 
   /** Closes the failure or notice; a displaced Done's window runs again for the time it had left. */
   dismiss(): void {
-    const displaced = this.#failureSignal() !== null;
+    const displaced = this.#failed() !== null;
 
-    this.#failureSignal.set(null);
-    this.#failedTask = null;
+    this.#failed.set(null);
     this.#syncTimer();
 
     // The bar shows the displaced Done again, so its ring starts where the timer is.
@@ -231,7 +228,7 @@ export class DoneUndo {
   }
 
   pause(reason: PauseReason): void {
-    if (this.#held === null && this.#failureSignal() === null) {
+    if (this.#held === null && this.#failed() === null) {
       return;
     }
 
@@ -297,7 +294,7 @@ export class DoneUndo {
       !this.#destroyRef.destroyed &&
       this.#held !== null &&
       this.#paused.size === 0 &&
-      this.#failureSignal() === null;
+      this.#failed() === null;
 
     if (shouldRun && this.#timer === null) {
       this.#startedAt = Date.now();
@@ -311,7 +308,7 @@ export class DoneUndo {
 
   /** A bar that is removed never reports pointerleave or focusout, so a stale reason would freeze the next window. */
   #clearPausesWhenIdle(): void {
-    if (this.#held === null && this.#failureSignal() === null) {
+    if (this.#held === null && this.#failed() === null) {
       this.#paused.clear();
     }
   }
@@ -354,17 +351,18 @@ export class DoneUndo {
     const title = held.task.title;
     const closedElsewhere = outcome._tag === CommandOutcomeTag.NotApplicable;
 
-    this.#failureSignal.set({
-      taskId: held.task.id,
-      title,
-      message,
-      canRetry: isRetryable(outcome._tag),
-      closedElsewhere,
+    this.#failed.set({
+      failure: {
+        taskId: held.task.id,
+        title,
+        message,
+        canRetry: isRetryable(outcome._tag),
+        closedElsewhere,
+      },
+      task: held.task,
     });
     // Closed elsewhere, the Task may well be Done, so the title line is left out.
     this.#announce(closedElsewhere ? message : `“${title}” is not Done. ${message}`);
-
-    this.#failedTask = held.task;
     this.#syncTimer();
   }
 }

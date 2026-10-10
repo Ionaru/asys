@@ -99,7 +99,7 @@
     @if (shownAddMessage(); as text) {
       <p class="account__message" role="alert">{{ text }}</p>
     }
-    @if (addRef.error() !== null && addRef.error() !== AuthError.Unauthorized) {
+    @if (addLoadFailed()) {
       <div>
         <button
           asys-button

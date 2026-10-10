@@ -10,13 +10,13 @@ description: Use when adding or changing an Angular component, screen, route, fo
 
 `apps/pwa` is Angular 22, zoneless, with OnPush and standalone as defaults. Never set either explicitly. Its layers:
 
-| Layer                                     | Holds                                                                                                                                                                     | May import                               |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| `core/api`                                | `DataApi`, `AuthApi`, `wire.ts`; the only importer of `src/generated`                                                                                                     | generated client, `@asys/domain`         |
-| `core/auth`, `core/data`, `core/platform` | session, `DataStore`, `CommandAttempts`, the shell-provided `DoneUndo` and `CaptureQueue`, seams (`Clock`, `Ids`, `DeviceStorage`, `Motion`, `Haptics`, `TaskMorph`, ...) | `core/*`, `@asys/domain`                 |
-| `features/<screen>`                       | routed screens plus their pure helpers                                                                                                                                    | `core`, `ui`, `@asys/domain`             |
-| `layout/`                                 | the shell: header, outlet, quick add, bottom nav                                                                                                                          | `core`, `ui`                             |
-| `ui/<name>/`                              | presentational components; `ui/icon` alone imports Font Awesome                                                                                                           | `@angular/*`, `@asys/domain`, other `ui` |
+| Layer                                     | Holds                                                                                                                                                                                                     | May import                               |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `core/api`                                | `DataApi`, `AuthApi`, `wire.ts`; the only importer of `src/generated`                                                                                                                                     | generated client, `@asys/domain`         |
+| `core/auth`, `core/data`, `core/platform` | session, `DataStore`, `TimeZoneSync`, `CommandAttempts`, the shell-provided `DoneUndo` and `CaptureQueue`, `ReportedZone`, seams (`Clock`, `Ids`, `DeviceStorage`, `Motion`, `Haptics`, `TaskMorph`, ...) | `core/*`, `@asys/domain`                 |
+| `features/<screen>`                       | routed screens plus their pure helpers                                                                                                                                                                    | `core`, `ui`, `@asys/domain`             |
+| `layout/`                                 | the shell: header, outlet, quick add, bottom nav                                                                                                                                                          | `core`, `ui`                             |
+| `ui/<name>/`                              | presentational components; `ui/icon` alone imports Font Awesome                                                                                                                                           | `@angular/*`, `@asys/domain`, other `ui` |
 
 Lint bans runtime imports of `@asys/contract`, `effect` and `@ionaru/effect-passkeys/api` (type-only is fine). `@ionaru/effect-passkeys/server` and `/testing` are banned outright. `@ionaru/effect-passkeys/client` is the one passkeys entry the PWA may use at runtime.
 
@@ -91,7 +91,8 @@ Lint bans runtime imports of `@asys/contract`, `effect` and `@ionaru/effect-pass
 - `vi.mock` of relative imports is refused, so override a seam service with `{ provide: X, useValue }`. `features/now/now.spec.ts` is the model.
 - Use the real domain functions over a fixed state and clock.
 - Specs that render scripted motion provide a fake `Motion` whose `play` promise they control. The real one resolves at once in jsdom.
-- `HTMLElement.click()` dispatches a click with `detail: 0`, which a Done reads as a keyboard activation (focus goes to Undo). A pointer press in a spec dispatches `new MouseEvent('click', { bubbles: true, detail: 1 })`.
+- A click handler that must tell Enter or Space from a pointer calls `activationOf(event)` (`ui/activation`), which returns an `Activation` (`{ keyboard: boolean }`). Never read `event.detail` yourself, and type an output that carries it as `Activation`. A template cannot call an import, so the component exposes it as `protected readonly activationOf = activationOf`.
+- `HTMLElement.click()` dispatches a click with `detail: 0`, which `activationOf` reads as keyboard (a Done then moves focus to Undo). A pointer press in a spec dispatches `new MouseEvent('click', { bubbles: true, detail: 1 })`.
 
 ```bash
 pnpm exec nx run-many -t lint typecheck test build -p pwa

@@ -21,13 +21,13 @@ import {
   type AddBlocker,
   blockerCandidates,
   blocks,
+  canLogProgress,
   type Command,
   CommandTag,
   type DomainState,
   dueInstant,
   effectiveDue,
   formatClock,
-  formatMinutes,
   isBlocked,
   isInInbox,
   isOverdue,
@@ -45,15 +45,21 @@ import { outcomeMessage } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
 import { Ids } from '../../core/platform/ids';
 import { TaskMorph } from '../../core/platform/task-morph';
+import { activationOf } from '../../ui/activation/activation';
 import { Button, ButtonSize, ButtonVariant } from '../../ui/button/button';
 import { DateSpecField } from '../../ui/date-spec-field/date-spec-field';
 import { EstimateField } from '../../ui/estimate-field/estimate-field';
 import { IconName } from '../../ui/icon/icon';
 import { InlineConfirm } from '../../ui/inline-confirm/inline-confirm';
 import { LoadState } from '../../ui/load-state/load-state';
-import { canLogProgress, LogProgressForm } from '../../ui/log-progress-form/log-progress-form';
+import {
+  estimateNowText,
+  LogProgressForm,
+  logProgressCommand,
+} from '../../ui/log-progress-form/log-progress-form';
 import { Segmented } from '../../ui/segmented/segmented';
-import { type SelectOption, SelectField } from '../../ui/select-field/select-field';
+import { areaSelectOptions } from '../../ui/select-field/area-options';
+import { SelectField } from '../../ui/select-field/select-field';
 import { StatusBadge, StatusBadgeStatus } from '../../ui/status-badge/status-badge';
 import { SyncNote } from '../../ui/sync-note/sync-note';
 import { TextField } from '../../ui/text-field/text-field';
@@ -268,14 +274,9 @@ export class TaskEditor {
       !this.actionsBusy(),
   );
 
-  protected readonly areaOptions = computed<readonly SelectOption[]>(() => {
-    const areas = [...(this.dataStore.state()?.areas ?? [])].sort(byAreaName);
-
-    return [
-      { value: '', label: 'No Area' },
-      ...areas.map((area) => ({ value: area.id, label: area.name })),
-    ];
-  });
+  protected readonly areaOptions = computed(() =>
+    areaSelectOptions([...(this.dataStore.state()?.areas ?? [])].sort(byAreaName)),
+  );
 
   readonly #timeZone = computed(() => zoneOrUtc(this.view()?.state.settings.timeZone));
 
@@ -447,7 +448,7 @@ export class TaskEditor {
     this.leaving.set(true);
     this.#doneUndo.complete(task, DoneOrigin.Button);
 
-    if (event.detail === 0) {
+    if (activationOf(event).keyboard) {
       this.#doneUndo.requestFocus();
     }
 
@@ -494,12 +495,7 @@ export class TaskEditor {
 
     this.#clearMessages();
 
-    const outcome = await this.#runAction({
-      _tag: CommandTag.LogProgress,
-      taskId: this.taskId(),
-      remainingMinutes: minutes,
-      expect: { status: TaskStatus.Open },
-    });
+    const outcome = await this.#runAction(logProgressCommand(this.taskId(), minutes));
 
     if (this.#destroyRef.destroyed) {
       return;
@@ -510,7 +506,7 @@ export class TaskEditor {
       return;
     }
 
-    this.statusLine.set(`Estimate is now ${formatMinutes(minutes)}.`);
+    this.statusLine.set(estimateNowText(minutes));
     this.logOpen.set(false);
     this.#focusAfterRender(() => this.logButton()?.nativeElement);
   }

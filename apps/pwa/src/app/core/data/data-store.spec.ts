@@ -10,17 +10,12 @@ import { TestBed } from '@angular/core/testing';
 import { CommandTag, type Command, type CompleteTask, type Instant } from '@asys/domain';
 
 import { CommandOutcomeTag, type CommandOutcome } from '../api/data-api';
-import { LAST_REPORTED_ZONE_KEY } from '../auth/session';
 import { Clock } from '../platform/clock';
-import { DeviceStorage } from '../platform/device-storage';
-import { DeviceZone } from '../platform/device-zone';
 import { DataStore, POLL_INTERVAL_MS, SyncStatus } from './data-store';
 
 const T0 = Date.UTC(2026, 9, 3, 10, 0, 0);
 
 const AMSTERDAM = 'Europe/Amsterdam';
-
-const LONDON = 'Europe/London';
 
 const aTask = (id: string, overrides: object = {}): object => ({
   id,
@@ -144,11 +139,6 @@ const holdB: CompleteTask = { _tag: CommandTag.CompleteTask, taskId: 'B' };
 describe('DataStore', () => {
   let store: DataStore;
   let http: HttpTestingController;
-  let current: ReturnType<typeof vi.fn<() => string | undefined>>;
-  let get: ReturnType<typeof vi.fn<(key: string) => string | null>>;
-  let set: ReturnType<typeof vi.fn<(key: string, value: string) => void>>;
-  let remove: ReturnType<typeof vi.fn<(key: string) => void>>;
-  let stored: Map<string, string>;
 
   const noRequests = (): void => {
     http.expectNone(() => true);
@@ -162,20 +152,11 @@ describe('DataStore', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(T0);
-    stored = new Map<string, string>();
-    current = vi.fn<() => string | undefined>().mockReturnValue(undefined);
-    get = vi.fn<(key: string) => string | null>((key) => stored.get(key) ?? null);
-    set = vi.fn<(key: string, value: string) => void>((key, value) => {
-      stored.set(key, value);
-    });
-    remove = vi.fn<(key: string) => void>();
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: Clock, useValue: { now: signal(T0 as Instant) } },
-        { provide: DeviceZone, useValue: { current } },
-        { provide: DeviceStorage, useValue: { get, set, remove } },
       ],
     });
     store = TestBed.inject(DataStore);
@@ -249,6 +230,24 @@ describe('DataStore', () => {
 
       expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 13 });
       noRequests();
+    });
+
+    it('resolves syncPast at once and requests nothing before start and after stop', async () => {
+      const before = track(store.syncPast('t1'));
+      await advance(0);
+
+      expect(before.done).toBe(true);
+      noRequests();
+      expect(store.status()).toBe(SyncStatus.Idle);
+
+      await begin();
+      store.stop();
+      const after = track(store.syncPast('t1'));
+      await advance(0);
+
+      expect(after.done).toBe(true);
+      noRequests();
+      expect(store.status()).toBe(SyncStatus.Idle);
     });
   });
 
@@ -451,22 +450,6 @@ describe('DataStore', () => {
       expect(http.match('/v1/snapshot')).toHaveLength(1);
     });
 
-    it('lets an older poll with a settings entry run no zone check and write no storage', async () => {
-      current.mockReturnValue(LONDON);
-      await begin(12, { settings: settingsOf(LONDON) });
-      window.dispatchEvent(new Event('focus'));
-      const oldPoll = http.expectOne('/v1/changes?after=12');
-      store.stop();
-      store.start();
-      current.mockClear();
-      set.mockClear();
-
-      await respond(oldPoll, changesBody(13, [putSettings(13, AMSTERDAM)]));
-
-      expect(current).not.toHaveBeenCalled();
-      expect(set).not.toHaveBeenCalled();
-    });
-
     it('cancels the timer on stop', async () => {
       await begin();
 
@@ -502,27 +485,6 @@ describe('DataStore', () => {
       await respond(b, snapshotBody(9));
 
       noRequests();
-    });
-
-    it('does not record the zone when a zone report resolves after stop', async () => {
-      current.mockReturnValue(LONDON);
-      await begin(12);
-      const report = http.expectOne('/v1/commands');
-      store.stop();
-
-      await respond(report, { _tag: 'Applied', seq: 13 });
-
-      expect(set).not.toHaveBeenCalled();
-    });
-
-    it('forgets the SetTimeZone in-flight flag on stop', async () => {
-      current.mockReturnValue(LONDON);
-      await begin(12);
-      store.stop();
-
-      await begin(12);
-
-      expect(http.match('/v1/commands')).toHaveLength(2);
     });
   });
 
@@ -659,45 +621,6 @@ describe('DataStore', () => {
       expect(store.state()).toBe(before);
       expect(store.status()).toBe(SyncStatus.Ready);
       expect(store.syncedAt()).toBe(T0 + POLL_INTERVAL_MS);
-    });
-
-    it('runs the zone check once after all entries when settings entries were applied', async () => {
-      await begin(12);
-      await advance(POLL_INTERVAL_MS);
-      current.mockClear();
-
-      await respond(
-        http.expectOne('/v1/changes?after=12'),
-        changesBody(14, [putSettings(13, 'Europe/Paris'), putSettings(14, AMSTERDAM)]),
-      );
-
-      expect(current).toHaveBeenCalledTimes(1);
-    });
-
-    it('runs the zone check on a settings entry even when it changed nothing', async () => {
-      await begin(12);
-      await advance(POLL_INTERVAL_MS);
-      current.mockClear();
-
-      await respond(
-        http.expectOne('/v1/changes?after=12'),
-        changesBody(13, [putSettings(13, AMSTERDAM)]),
-      );
-
-      expect(current).toHaveBeenCalledTimes(1);
-    });
-
-    it('runs no zone check for a settings entry at or below the store seq or for other entities', async () => {
-      await begin(12);
-      await advance(POLL_INTERVAL_MS);
-      current.mockClear();
-
-      await respond(
-        http.expectOne('/v1/changes?after=12'),
-        changesBody(13, [putSettings(12, 'Europe/Paris'), putTask(13, 't13')]),
-      );
-
-      expect(current).not.toHaveBeenCalled();
     });
   });
 
@@ -953,20 +876,6 @@ describe('DataStore', () => {
       noRequests();
     });
 
-    it('still sends a command, including the zone report, while hidden', async () => {
-      setVisibility('hidden', false);
-      current.mockReturnValue(LONDON);
-      store.start();
-
-      await respond(http.expectOne('/v1/snapshot'), snapshotBody(12));
-
-      const report = http.expectOne('/v1/commands');
-      expect(report.request.body).toMatchObject({
-        _tag: CommandTag.SetTimeZone,
-        timeZone: LONDON,
-      });
-    });
-
     it('runs the forced follow-up of an Applied outcome while hidden, resolves after it and sets no timer', async () => {
       await begin(12);
       setVisibility('hidden');
@@ -1085,6 +994,220 @@ describe('DataStore', () => {
 
       expect(http.match('/v1/changes?after=12')).toHaveLength(1);
       noRequests();
+    });
+
+    describe('resume triggers', () => {
+      const focus = (): void => {
+        window.dispatchEvent(new Event('focus'));
+      };
+
+      const visible = (): void => {
+        setVisibility('visible');
+      };
+
+      it.each([
+        { name: 'visibilitychange then focus', first: visible, second: focus },
+        { name: 'focus then visibilitychange', first: focus, second: visible },
+      ])('sends one request in total for $name from idle', async ({ first, second }) => {
+        await begin(12);
+        await advance(1_000);
+
+        first();
+        const poll = http.expectOne('/v1/changes?after=12');
+        second();
+        noRequests();
+        await respond(poll, changesBody(12));
+
+        noRequests();
+        await advance(POLL_INTERVAL_MS - 1);
+        noRequests();
+        await advance(1);
+        http.expectOne('/v1/changes?after=12');
+        noRequests();
+      });
+
+      it('sends one request in total for a resume that fires both listeners twice', async () => {
+        await begin(12);
+        await advance(1_000);
+        visible();
+        focus();
+        await respond(http.expectOne('/v1/changes?after=12'), changesBody(12));
+        noRequests();
+
+        visible();
+        const second = http.expectOne('/v1/changes?after=12');
+        focus();
+        visible();
+        noRequests();
+        await respond(second, changesBody(12));
+
+        noRequests();
+      });
+
+      it('queues one follow-up for refresh() during a resume poll', async () => {
+        await begin(12);
+        await advance(1_000);
+        visible();
+        const poll = http.expectOne('/v1/changes?after=12');
+        focus();
+        store.refresh();
+        noRequests();
+
+        await respond(poll, changesBody(12));
+
+        const followUp = http.expectOne('/v1/changes?after=12');
+        noRequests();
+        await respond(followUp, changesBody(12));
+        noRequests();
+      });
+
+      it('queues one follow-up for online during a resume poll', async () => {
+        await begin(12);
+        await advance(1_000);
+        visible();
+        const poll = http.expectOne('/v1/changes?after=12');
+        focus();
+        window.dispatchEvent(new Event('online'));
+        noRequests();
+
+        await respond(poll, changesBody(12));
+
+        const followUp = http.expectOne('/v1/changes?after=12');
+        noRequests();
+        await respond(followUp, changesBody(12));
+        noRequests();
+      });
+
+      it('queues one follow-up for a focus and a visibilitychange during a refresh() poll', async () => {
+        await begin(12);
+        await advance(1_000);
+        store.refresh();
+        const poll = http.expectOne('/v1/changes?after=12');
+        focus();
+        visible();
+        noRequests();
+
+        await respond(poll, changesBody(12));
+
+        const followUp = http.expectOne('/v1/changes?after=12');
+        noRequests();
+        await respond(followUp, changesBody(12));
+        noRequests();
+      });
+
+      it('queues one follow-up for a focus during a timer poll, after a resume poll settled', async () => {
+        await begin(12);
+        await advance(1_000);
+        visible();
+        await respond(http.expectOne('/v1/changes?after=12'), changesBody(12));
+        await advance(POLL_INTERVAL_MS);
+        const timerPoll = http.expectOne('/v1/changes?after=12');
+
+        focus();
+        noRequests();
+        await respond(timerPoll, changesBody(12));
+
+        const followUp = http.expectOne('/v1/changes?after=12');
+        noRequests();
+        await respond(followUp, changesBody(12));
+        noRequests();
+      });
+
+      it('queues one follow-up for a focus during the follow-up of a resume poll', async () => {
+        await begin(12);
+        await advance(1_000);
+        visible();
+        const poll = http.expectOne('/v1/changes?after=12');
+        store.refresh();
+        await respond(poll, changesBody(12));
+        const followUp = http.expectOne('/v1/changes?after=12');
+
+        focus();
+        noRequests();
+        await respond(followUp, changesBody(12));
+
+        const last = http.expectOne('/v1/changes?after=12');
+        noRequests();
+        await respond(last, changesBody(12));
+        noRequests();
+      });
+
+      it('runs the forced follow-up of an Applied send made during a resume poll', async () => {
+        await begin(12);
+        await advance(1_000);
+        visible();
+        const poll = http.expectOne('/v1/changes?after=12');
+        focus();
+        const result = store.send(capture, 'key-1');
+        const flag = track(result);
+        await respond(http.expectOne('/v1/commands'), applied(13));
+
+        await respond(poll, changesBody(12));
+
+        expect(flag.done).toBe(false);
+        const followUp = http.expectOne('/v1/changes?after=12');
+        await respond(followUp, changesBody(13));
+        expect(flag.done).toBe(true);
+        noRequests();
+      });
+
+      it('queues one follow-up for a focus during the snapshot of start', async () => {
+        store.start();
+        const snapshot = http.expectOne('/v1/snapshot');
+        focus();
+        visible();
+        noRequests();
+
+        await respond(snapshot, snapshotBody(12));
+
+        http.expectOne('/v1/changes?after=12');
+        noRequests();
+      });
+
+      it('retries a failed first snapshot once for a visibilitychange and a focus', async () => {
+        store.start();
+        await networkError(http.expectOne('/v1/snapshot'));
+
+        visible();
+        const retry = http.expectOne('/v1/snapshot');
+        focus();
+        noRequests();
+        await networkError(retry);
+
+        noRequests();
+        expect(store.status()).toBe(SyncStatus.Failed);
+      });
+
+      it('sets no timer after a 401 Unauthorized on a resume poll', async () => {
+        await begin(12);
+        await advance(1_000);
+        visible();
+        const poll = http.expectOne('/v1/changes?after=12');
+        focus();
+
+        await respond(poll, unauthorized, 401);
+
+        noRequests();
+        await advance(POLL_INTERVAL_MS * 4);
+        noRequests();
+      });
+
+      it('forgets that a resume poll is in flight on stop', async () => {
+        await begin(12);
+        await advance(1_000);
+        visible();
+        http.expectOne('/v1/changes?after=12');
+
+        store.stop();
+        store.start();
+        const snapshot = http.expectOne('/v1/snapshot');
+        focus();
+        noRequests();
+        await respond(snapshot, snapshotBody(20));
+
+        http.expectOne('/v1/changes?after=20');
+        noRequests();
+      });
     });
 
     it('never overlaps a poll with the snapshot: a trigger during the snapshot waits for it', async () => {
@@ -1680,442 +1803,118 @@ describe('DataStore', () => {
     });
   });
 
-  describe('chooseTimeZone', () => {
-    const TOKYO = 'Asia/Tokyo';
+  describe('settings check', () => {
+    let check: ReturnType<typeof vi.fn<() => void>>;
 
-    it('waits for the automatic report, posts the chosen zone, keeps the device zone as reported and sends no second report', async () => {
-      current.mockReturnValue(LONDON);
-      await begin(12);
-      const report = http.expectOne('/v1/commands');
-      expect(report.request.body).toMatchObject({
-        _tag: CommandTag.SetTimeZone,
-        timeZone: LONDON,
-      });
-
-      const result = store.chooseTimeZone(TOKYO);
-      const flag = track(result);
-      await advance(0);
-      http.expectNone('/v1/commands');
-
-      await respond(report, applied(13));
-      expect(stored.get(LAST_REPORTED_ZONE_KEY)).toBe(LONDON);
-      const reportPoll = http.expectOne('/v1/changes?after=12');
-      const chosen = http.expectOne('/v1/commands');
-      expect(chosen.request.body).toMatchObject({ _tag: CommandTag.SetTimeZone, timeZone: TOKYO });
-      expect((chosen.request.body as { idempotencyKey: string }).idempotencyKey).not.toBe(
-        (report.request.body as { idempotencyKey: string }).idempotencyKey,
-      );
-      set.mockClear();
-
-      await respond(chosen, applied(14));
-
-      expect(set).toHaveBeenCalledWith(LAST_REPORTED_ZONE_KEY, LONDON);
-      expect(flag.done).toBe(false);
-      await respond(reportPoll, changesBody(13));
-      expect(flag.done).toBe(false);
-      const followUp = http.expectOne('/v1/changes?after=13');
-      await respond(followUp, changesBody(14, [putSettings(14, TOKYO)]));
-
-      http.expectNone('/v1/commands');
-      expect(flag.done).toBe(true);
-      expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 14 });
-      expect(store.state()?.settings.timeZone).toBe(TOKYO);
+    beforeEach(() => {
+      check = vi.fn<() => void>();
+      store.onSettingsCheck(check);
     });
 
-    it('posts at once with no automatic report in flight, and waits like send for a poll', async () => {
-      await begin(12);
-
-      const result = store.chooseTimeZone(TOKYO);
-      const flag = track(result);
-      const chosen = http.expectOne('/v1/commands');
-      expect(chosen.request.body).toMatchObject({ _tag: CommandTag.SetTimeZone, timeZone: TOKYO });
-      await respond(chosen, applied(13));
-
-      expect(flag.done).toBe(false);
-      await respond(http.expectOne('/v1/changes?after=12'), changesBody(13));
-      expect(flag.done).toBe(true);
-    });
-
-    it('holds the settings subject when the follow-up failed', async () => {
-      await begin(12);
-      const result = store.chooseTimeZone(TOKYO);
-      await respond(http.expectOne('/v1/commands'), applied(13));
-
-      await respond(http.expectOne('/v1/changes?after=12'), null, 503);
-
-      expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 13 });
-      expect(store.awaitingSync()).toEqual(new Set(['settings']));
-    });
-
-    it('writes nothing when the device has no zone', async () => {
-      await begin(12);
-
-      const result = store.chooseTimeZone(TOKYO);
-      await respond(http.expectOne('/v1/commands'), applied(13));
-      await respond(http.expectOne('/v1/changes?after=12'), changesBody(13));
-      await result;
-
-      expect(set).not.toHaveBeenCalled();
-    });
-
-    it('sends no automatic report during it, from a focus, a snapshot or a settings entry', async () => {
-      current.mockReturnValue(AMSTERDAM);
-      await begin(12);
-      const result = store.chooseTimeZone(TOKYO);
-      const flag = track(result);
-      const chosen = http.expectOne('/v1/commands');
-      current.mockReturnValue(LONDON);
-
-      window.dispatchEvent(new Event('focus'));
-      http.expectNone('/v1/commands');
-      await respond(
-        http.expectOne('/v1/changes?after=12'),
-        changesBody(13, [putSettings(13, 'Europe/Paris')]),
-      );
-      http.expectNone('/v1/commands');
-      await advance(POLL_INTERVAL_MS);
-      await respond(http.expectOne('/v1/changes?after=13'), expired(13), 410);
-      await respond(http.expectOne('/v1/snapshot'), snapshotBody(20));
-      http.expectNone('/v1/commands');
-      expect(flag.done).toBe(false);
-
-      await respond(chosen, { _tag: 'CommandRejected', reason: 'invalid_time_zone' }, 422);
-      expect(flag.done).toBe(true);
-    });
-
-    it('still records the device zone during it when it equals the server zone', async () => {
-      current.mockReturnValue(LONDON);
-      stored.set(LAST_REPORTED_ZONE_KEY, LONDON);
-      await begin(12);
-      const result = store.chooseTimeZone(TOKYO);
-      const chosen = http.expectOne('/v1/commands');
-      set.mockClear();
-
-      window.dispatchEvent(new Event('focus'));
-      await respond(
-        http.expectOne('/v1/changes?after=12'),
-        changesBody(13, [putSettings(13, LONDON)]),
-      );
-
-      expect(set).toHaveBeenCalledWith(LAST_REPORTED_ZONE_KEY, LONDON);
-      await respond(chosen, { _tag: 'CommandRejected', reason: 'invalid_time_zone' }, 422);
-      await result;
-    });
-
-    it('lets the automatic check report a later device zone change after it resolved', async () => {
-      current.mockReturnValue(AMSTERDAM);
-      await begin(12);
-      const result = store.chooseTimeZone(TOKYO);
-      await respond(http.expectOne('/v1/commands'), applied(13));
-      expect(stored.get(LAST_REPORTED_ZONE_KEY)).toBe(AMSTERDAM);
-      await respond(
-        http.expectOne('/v1/changes?after=12'),
-        changesBody(13, [putSettings(13, TOKYO)]),
-      );
-      await result;
-      current.mockReturnValue(LONDON);
-
-      window.dispatchEvent(new Event('focus'));
-
-      const report = http.expectOne('/v1/commands');
-      expect(report.request.body).toMatchObject({
-        _tag: CommandTag.SetTimeZone,
-        timeZone: LONDON,
-      });
-    });
-
-    it('resolves a Rejected invalid_time_zone at once, starts no poll and writes nothing', async () => {
-      current.mockReturnValue(LONDON);
-      stored.set(LAST_REPORTED_ZONE_KEY, LONDON);
-      await begin(12);
-
-      const result = store.chooseTimeZone('Mars/Olympus');
-      const flag = track(result);
-      await respond(
-        http.expectOne('/v1/commands'),
-        { _tag: 'CommandRejected', reason: 'invalid_time_zone' },
-        422,
-      );
-
-      expect(flag.done).toBe(true);
-      expect(await result).toEqual({
-        _tag: CommandOutcomeTag.Rejected,
-        reason: 'invalid_time_zone',
-      });
-      noRequests();
-      expect(set).not.toHaveBeenCalled();
-    });
-
-    it.each([
-      { name: 'Failed', body: null, status: 503 },
-      { name: 'KeyReused', body: { _tag: 'IdempotencyKeyReused' }, status: 409 },
-      { name: 'SignedOut', body: unauthorized, status: 401 },
-    ])('resolves a $name outcome at once and writes nothing', async ({ body, status }) => {
-      current.mockReturnValue(LONDON);
-      stored.set(LAST_REPORTED_ZONE_KEY, LONDON);
-      await begin(12);
-
-      const result = store.chooseTimeZone(TOKYO);
-      const flag = track(result);
-      await respond(http.expectOne('/v1/commands'), body, status);
-
-      expect(flag.done).toBe(true);
-      noRequests();
-      expect(set).not.toHaveBeenCalled();
-    });
-
-    it('writes nothing for a NotApplicable outcome but waits for the poll', async () => {
-      current.mockReturnValue(LONDON);
-      stored.set(LAST_REPORTED_ZONE_KEY, LONDON);
-      await begin(12);
-
-      const result = store.chooseTimeZone(TOKYO);
-      const flag = track(result);
-      await respond(http.expectOne('/v1/commands'), {
-        _tag: 'NotApplicable',
-        reason: 'expectation_failed',
-        reviewItemId: 'r9',
-      });
-
-      expect(set).not.toHaveBeenCalled();
-      expect(flag.done).toBe(false);
-      await respond(http.expectOne('/v1/changes?after=12'), changesBody(12));
-      expect(flag.done).toBe(true);
-    });
-
-    it('resolves at once and writes nothing when the store stopped before the response', async () => {
-      current.mockReturnValue(LONDON);
-      stored.set(LAST_REPORTED_ZONE_KEY, LONDON);
-      await begin(12);
-      const result = store.chooseTimeZone(TOKYO);
-      const flag = track(result);
-      const chosen = http.expectOne('/v1/commands');
-
-      store.stop();
-      await respond(chosen, applied(13));
-
-      expect(flag.done).toBe(true);
-      expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 13 });
-      expect(set).not.toHaveBeenCalled();
-      noRequests();
-    });
-
-    it('resolves at once and writes nothing more when the store stops while it waits', async () => {
-      current.mockReturnValue(LONDON);
-      stored.set(LAST_REPORTED_ZONE_KEY, LONDON);
-      await begin(12);
-      const result = store.chooseTimeZone(TOKYO);
-      const flag = track(result);
-      await respond(http.expectOne('/v1/commands'), applied(13));
-      const poll = http.expectOne('/v1/changes?after=12');
-      set.mockClear();
-
-      store.stop();
-      await advance(0);
-
-      expect(flag.done).toBe(true);
-      expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 13 });
-      expect(store.awaitingSync().size).toBe(0);
-      await respond(poll, changesBody(13, [putSettings(13, TOKYO)]));
-      expect(set).not.toHaveBeenCalled();
-    });
-
-    it('resolves and writes nothing when the store stops while it waits for the automatic report', async () => {
-      current.mockReturnValue(LONDON);
-      await begin(12);
-      const report = http.expectOne('/v1/commands');
-      const result = store.chooseTimeZone(TOKYO);
-      const flag = track(result);
-      await advance(0);
-
-      store.stop();
-      await respond(report, applied(13));
-      await advance(0);
-
-      for (const req of http.match('/v1/commands')) {
-        await respond(req, applied(14));
-      }
-
-      expect(flag.done).toBe(true);
-      expect(set).not.toHaveBeenCalled();
-      expect(await result).toMatchObject({ _tag: CommandOutcomeTag.Applied });
-      noRequests();
-    });
-  });
-
-  describe('time zone', () => {
-    it('reports a differing device zone, records it on Applied, and does not report again after the poll returns it', async () => {
-      current.mockReturnValue(LONDON);
-      await begin(12);
-
-      const report = http.expectOne('/v1/commands');
-      expect(report.request.body).toMatchObject({
-        _tag: CommandTag.SetTimeZone,
-        timeZone: LONDON,
-      });
-      await respond(report, { _tag: 'Applied', seq: 13 });
-
-      expect(stored.get(LAST_REPORTED_ZONE_KEY)).toBe(LONDON);
-      const poll = http.expectOne('/v1/changes?after=12');
-      set.mockClear();
-      await respond(poll, changesBody(13, [putSettings(13, LONDON)]));
-
-      expect(set).toHaveBeenCalledWith(LAST_REPORTED_ZONE_KEY, LONDON);
-      http.expectNone('/v1/commands');
-    });
-
-    it('records the reported zone at once for an automatic report, before the triggered poll settles', async () => {
-      current.mockReturnValue(LONDON);
-      await begin(12);
-
-      await respond(http.expectOne('/v1/commands'), applied(13));
-
-      expect(stored.get(LAST_REPORTED_ZONE_KEY)).toBe(LONDON);
-      http.expectOne('/v1/changes?after=12');
-    });
-
-    it('starts no poll for an automatic report that applied while hidden, and writes the zone', async () => {
-      setVisibility('hidden', false);
-      current.mockReturnValue(LONDON);
+    it('fires after every successful snapshot, and not after a failed one', async () => {
       store.start();
+      await respond(http.expectOne('/v1/snapshot'), null, 503);
+      expect(check).not.toHaveBeenCalled();
+      store.refresh();
+
       await respond(http.expectOne('/v1/snapshot'), snapshotBody(12));
-
-      await respond(http.expectOne('/v1/commands'), applied(13));
-
-      expect(stored.get(LAST_REPORTED_ZONE_KEY)).toBe(LONDON);
-      noRequests();
-      await advance(POLL_INTERVAL_MS * 3);
-      noRequests();
-    });
-
-    it('reads the last reported zone from the storage key', async () => {
-      current.mockReturnValue(LONDON);
-
-      await begin(12);
-
-      expect(get).toHaveBeenCalledWith(LAST_REPORTED_ZONE_KEY);
-    });
-
-    it('records the device zone and reports nothing when it equals the server zone', async () => {
-      current.mockReturnValue(AMSTERDAM);
-
-      await begin(12);
-
-      expect(set).toHaveBeenCalledWith(LAST_REPORTED_ZONE_KEY, AMSTERDAM);
-      http.expectNone('/v1/commands');
-    });
-
-    it('does not flip the zone back when this device already reported it', async () => {
-      stored.set(LAST_REPORTED_ZONE_KEY, LONDON);
-      current.mockReturnValue(LONDON);
-
-      await begin(12);
-
-      expect(set).not.toHaveBeenCalled();
-      http.expectNone('/v1/commands');
-    });
-
-    it('does nothing without a device zone', async () => {
-      current.mockReturnValue(undefined);
-
-      await begin(12);
-
-      expect(set).not.toHaveBeenCalled();
-      http.expectNone('/v1/commands');
-    });
-
-    it('runs the zone check after every successful snapshot', async () => {
-      await begin(12);
-      current.mockClear();
+      expect(check).toHaveBeenCalledTimes(1);
       await advance(POLL_INTERVAL_MS);
       await respond(http.expectOne('/v1/changes?after=12'), expired(12), 410);
-
       await respond(http.expectOne('/v1/snapshot'), snapshotBody(40));
 
-      expect(current).toHaveBeenCalledTimes(1);
+      expect(check).toHaveBeenCalledTimes(2);
     });
 
-    it('runs the zone check on focus when there is state and reports a changed zone', async () => {
+    it('fires once after a poll whose fresh entries hold a Settings change, even one that changed nothing', async () => {
       await begin(12);
-      current.mockReturnValue(LONDON);
+      check.mockClear();
+      await advance(POLL_INTERVAL_MS);
 
-      window.dispatchEvent(new Event('focus'));
+      await respond(
+        http.expectOne('/v1/changes?after=12'),
+        changesBody(14, [putSettings(13, 'Europe/Paris'), putSettings(14, AMSTERDAM)]),
+      );
+      expect(check).toHaveBeenCalledTimes(1);
+      await advance(POLL_INTERVAL_MS);
+      await respond(
+        http.expectOne('/v1/changes?after=14'),
+        changesBody(15, [putSettings(15, AMSTERDAM)]),
+      );
 
-      const report = http.expectOne('/v1/commands');
-      expect(report.request.body).toMatchObject({
-        _tag: CommandTag.SetTimeZone,
-        timeZone: LONDON,
-      });
+      expect(check).toHaveBeenCalledTimes(2);
     });
 
-    it('runs no zone check on focus without state', () => {
+    it('does not fire for a poll with only older Settings entries, other entities or no entries', async () => {
+      await begin(12);
+      check.mockClear();
+      await advance(POLL_INTERVAL_MS);
+
+      await respond(
+        http.expectOne('/v1/changes?after=12'),
+        changesBody(13, [putSettings(12, 'Europe/Paris'), putTask(13, 't13')]),
+      );
+      await advance(POLL_INTERVAL_MS);
+      await respond(http.expectOne('/v1/changes?after=13'), changesBody(13));
+
+      expect(check).not.toHaveBeenCalled();
+    });
+
+    it('fires on focus while started, even without state, and not for online, refresh or visibilitychange', async () => {
+      window.dispatchEvent(new Event('focus'));
+      expect(check).not.toHaveBeenCalled();
       store.start();
 
       window.dispatchEvent(new Event('focus'));
-
-      expect(current).not.toHaveBeenCalled();
-    });
-
-    it('runs no zone check for online, refresh or visibilitychange', async () => {
-      await begin(12);
-      current.mockClear();
-
+      expect(check).toHaveBeenCalledTimes(1);
+      await respond(http.expectOne('/v1/snapshot'), snapshotBody(12));
+      await respond(http.expectOne('/v1/changes?after=12'), changesBody(12));
+      check.mockClear();
       window.dispatchEvent(new Event('online'));
       store.refresh();
       setVisibility('visible');
-
-      expect(current).not.toHaveBeenCalled();
-    });
-
-    it('has at most one SetTimeZone in flight', async () => {
-      current.mockReturnValue(LONDON);
-      await begin(12);
-      http.expectOne('/v1/commands');
+      expect(check).not.toHaveBeenCalled();
 
       window.dispatchEvent(new Event('focus'));
-      window.dispatchEvent(new Event('focus'));
-
-      http.expectNone('/v1/commands');
+      expect(check).toHaveBeenCalledTimes(1);
     });
 
-    it('clears the in-flight flag when the report settles, so a later check can report again', async () => {
-      current.mockReturnValue(LONDON);
+    it('fires on a focus whose poll a resume poll in flight replaces', async () => {
       await begin(12);
-      await respond(http.expectOne('/v1/commands'), null, 503);
+      check.mockClear();
+      setVisibility('visible');
+      const poll = http.expectOne('/v1/changes?after=12');
 
       window.dispatchEvent(new Event('focus'));
 
-      http.expectOne('/v1/commands');
+      expect(check).toHaveBeenCalledTimes(1);
+      noRequests();
+      await respond(poll, changesBody(12));
     });
 
-    it.each([
-      { name: 'Applied', body: { _tag: 'Applied', seq: 13 }, status: 200 },
-      {
-        name: 'NotApplicable',
-        body: { _tag: 'NotApplicable', reason: 'expectation_failed', reviewItemId: 'r9' },
-        status: 200,
-      },
-      { name: 'Rejected', body: { _tag: 'CommandRejected', reason: 'invalid_date' }, status: 422 },
-    ])('records the reported zone for a $name outcome', async ({ body, status }) => {
-      current.mockReturnValue(LONDON);
+    it('does not fire for focus after stop or for a poll of an older generation', async () => {
       await begin(12);
+      window.dispatchEvent(new Event('focus'));
+      const oldPoll = http.expectOne('/v1/changes?after=12');
+      store.stop();
+      check.mockClear();
 
-      await respond(http.expectOne('/v1/commands'), body, status);
+      window.dispatchEvent(new Event('focus'));
+      store.start();
+      await respond(oldPoll, changesBody(13, [putSettings(13, AMSTERDAM)]));
 
-      expect(set).toHaveBeenCalledWith(LAST_REPORTED_ZONE_KEY, LONDON);
+      expect(check).not.toHaveBeenCalled();
     });
 
-    it.each([
-      { name: 'Failed', body: null, status: 503 },
-      { name: 'KeyReused', body: { _tag: 'IdempotencyKeyReused' }, status: 409 },
-      { name: 'SignedOut', body: unauthorized, status: 401 },
-    ])('records nothing for a $name outcome', async ({ body, status }) => {
-      current.mockReturnValue(LONDON);
+    it('stops calling a listener once it is removed', async () => {
+      const removed = vi.fn<() => void>();
+      const remove = store.onSettingsCheck(removed);
+      remove();
+
       await begin(12);
 
-      await respond(http.expectOne('/v1/commands'), body, status);
-
-      expect(set).not.toHaveBeenCalled();
+      expect(removed).not.toHaveBeenCalled();
+      expect(check).toHaveBeenCalledTimes(1);
     });
   });
 

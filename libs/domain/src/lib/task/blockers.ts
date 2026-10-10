@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MPL-2.0
 
+import { compareCodeUnits } from '../compare';
 import { TaskStatus, type BlockerLink, type Task } from './task';
 
-const compareStrings = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
-
 const byTitleThenId = (a: Task, b: Task): number =>
-  compareStrings(a.title, b.title) || compareStrings(a.id, b.id);
+  compareCodeUnits(a.title, b.title) || compareCodeUnits(a.id, b.id);
 
 const isActive = (task: Task): boolean =>
   task.status === TaskStatus.Open || task.status === TaskStatus.Delegated;
