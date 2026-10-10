@@ -13,6 +13,7 @@ import {
   ViewEncapsulation,
 } from '@angular/core';
 
+import { type Activation, activationOf } from '../activation/activation';
 import { Button, ButtonVariant } from '../button/button';
 import { Icon, IconName } from '../icon/icon';
 
@@ -52,6 +53,8 @@ export class UndoBar {
 
   protected readonly Icons = IconName;
 
+  protected readonly activationOf = activationOf;
+
   /** Whether the pointer is inside the bar, which holds the ring still like the Undo window's timer. */
   protected readonly paused = signal(false);
 
@@ -75,10 +78,10 @@ export class UndoBar {
   readonly undo = output<void>();
 
   /** Emits how Try again was activated: `keyboard` is true for Enter or Space, false for a pointer. */
-  readonly retry = output<{ readonly keyboard: boolean }>();
+  readonly retry = output<Activation>();
 
   /** Emits how Dismiss was activated: `keyboard` is true for Enter or Space, false for a pointer. */
-  readonly dismiss = output<{ readonly keyboard: boolean }>();
+  readonly dismiss = output<Activation>();
 
   readonly escape = output<void>();
 
