@@ -86,7 +86,7 @@ These are slice 1's agreements, in short:
 - The quick-add bar enters with `animate.enter="asys-rise"`: an 8px rise and a fade over `duration-quick`, `ease-out`.
 - The pill fades in with `animate.enter="asys-appear"`.
 - `asys-rise` and `asys-appear` are shared classes in `apps/pwa/src/styles.css`, because the Undo bar uses `asys-rise` too. The existing kill switches (`styles.css:209-224`) turn them off under reduced motion and in Voice only.
-- **Leaving is marked.** The pill, the bar and the Undo bar leave through a function-form `(animate.leave)`, not the string form `animate.leave="asys-leave"`, which sets no attribute. The function sets `data-leaving` on the node, fades it out through `Motion.play` (`MotionDuration.Quick`, `MotionEasing.Out`) and calls `animationComplete` in `finally`. Plan 1's exclusion then keeps a leaving pill from sharing `shell-capture` with the entering bar, which would make a navigation in that 150 ms skip its transition. `Motion.play` resolves at once when motion is not allowed, so the node goes at once.
+- **Leaving is marked.** The pill, the bar and the Undo bar leave through a function-form `(animate.leave)`, not the string form `animate.leave="asys-leave"`, which sets no attribute. The function calls `Motion.leave`, which sets `data-leaving` on the node, fades it out through `Motion.play` (`MotionDuration.Quick`, `MotionEasing.Out`) and calls `animationComplete` in `finally`. Plan 1's exclusion then keeps a leaving pill from sharing `shell-capture` with the entering bar, which would make a navigation in that 150 ms skip its transition. `Motion.play` resolves at once when motion is not allowed, so the node goes at once.
 
 ### 5. `DataStore` holds a Done before it is sent
 
@@ -210,7 +210,7 @@ The window is the only way back from a Done. A ReopenTask Command was offered on
 | t250 | The next content rises in (`duration-moderate`, `ease-out`) while the promoted row collapses (`duration-moderate`, `ease-out`) |
 | t500 | Settled |
 
-- **Collapse.** The row collapses through an `(animate.leave)` function. It measures the row's height, runs `Motion.play` from `height: h` to `0`, and calls `animationComplete` in `finally`. Without that call Angular waits 4000 ms before removing the row. Any ranked row that leaves this way collapses, not only the promoted one.
+- **Collapse.** The row collapses through an `(animate.leave)` function. It measures the row's height, then calls `Motion.leave`, which runs `Motion.play` from `height: h` to `0` and calls `animationComplete` in `finally`. Without that call Angular waits 4000 ms before removing the row. Any ranked row that leaves this way collapses, not only the promoted one.
 - **A Swipe Done** (plan 2) skips t0's check and t100, because the reveal already showed them. It gets no commit haptic. The next content rises in at once.
 - **A ranked row that is held** collapses the same way, and the top pick is unchanged.
 - **Undo** plays the reverse: the restored content rises in (`duration-moderate`, `ease-out`), the displaced top's row expands back from height 0 (`duration-moderate`, `ease-out`), and the bar leaves (the marked fade of decision 4). Now records which row to expand when the Done happens, because once Undo has released the hold the state already shows the restored Task.
@@ -340,7 +340,7 @@ Owns the new `layout/capture-flight.ts` and its spec, `ui/bottom-nav/bottom-nav.
 - `const flyCapture = (doc: Document, motion: Motion, from: DOMRectReadOnly, to: DOMRectReadOnly, text: string): Promise<void>`:
   - it appends `<span class="shell__ghost" aria-hidden="true">` with the text to `doc.body`, fixed at `from`'s box, `pointer-events: none`;
   - it plays a move to `to`'s centre with `scale` to 0.2 and opacity to 0 over the last third, with `{ duration: MotionDuration.Moderate, easing: MotionEasing.Emphasized }`;
-  - it removes the ghost in `finally`, also when `play` rejects.
+  - it removes the ghost in `finally`, whatever happens to the animation (`play` never rejects).
 
 **Shell.** After `submit`, when `motion.allowed()` and `visualViewport` exist and `tabInView` holds for the Inbox tab, the shell calls `flyCapture` without awaiting it. `BottomNav` gains `inboxTab(): HTMLElement | null`, which returns the Inbox link.
 
@@ -351,17 +351,17 @@ Owns the new `layout/capture-flight.ts` and its spec, `ui/bottom-nav/bottom-nav.
 
 **Tests.**
 - `bottom-nav.spec.ts` gains "re-creates the badge when the count rises": 1 to 2 gives a different node, 2 to 1 and 2 to 2 give the same node.
-- `capture-flight.spec.ts` covers `tabInView`'s table, checks that the `Motion` fake received `MotionDuration.Moderate` and `MotionEasing.Emphasized`, and checks that the ghost is gone after `play` resolves and after it rejects.
+- `capture-flight.spec.ts` covers `tabInView`'s table, checks that the `Motion` fake received `MotionDuration.Moderate` and `MotionEasing.Emphasized`, and checks that the ghost is gone after `play` resolves and when the real `Motion`'s `animate` throws.
 
 ### Unit 4: the pill and the bar
 
 Owns the `asys-rise` and `asys-appear` rules in `apps/pwa/src/styles.css`, the new `layout/shell-motion.ts` and `shell-motion.spec.ts`, and the bindings in `layout/shell-layout.ts`.
 - `@keyframes asys-rise { from { opacity: 0; translate: 0 var(--space-2); } }`, and `.asys-rise { animation: asys-rise var(--duration-quick) var(--ease-out); }`.
 - `@keyframes asys-appear { from { opacity: 0; } }`, and `.asys-appear` with the same timing.
-- `layout/shell-motion.ts` exports `const leaveMarked = (motion: Motion, event: AnimationCallbackEvent): Promise<void>`. It sets `data-leaving` on `event.target`, plays `[{ opacity: 1 }, { opacity: 0 }]` with `{ duration: MotionDuration.Quick, easing: MotionEasing.Out }`, and calls `event.animationComplete()` in `finally`.
+- `layout/shell-motion.ts` exports `const leaveMarked = (motion: Motion, event: AnimationCallbackEvent): Promise<void>`. It calls `motion.leave(event, [{ opacity: 1 }, { opacity: 0 }], { duration: MotionDuration.Quick, easing: MotionEasing.Out })`, which sets `data-leaving` on `event.target`, plays, and calls `event.animationComplete()` in `finally`.
 - `<asys-quick-add>` gets `animate.enter="asys-rise" (animate.leave)="leave($event)"`. The pill gets `animate.enter="asys-appear" (animate.leave)="leave($event)"`. The shell's `leave(event)` calls `leaveMarked(this.motion, event)`.
 
-**Tests.** `shell-motion.spec.ts` calls `leaveMarked` with a fake event and the `Motion` fake. `data-leaving` is set before `play` is called, and `animationComplete` is called once when `play` resolves and once when it rejects.
+**Tests.** `shell-motion.spec.ts` calls `leaveMarked` with a fake event and a `Motion` fake whose `play` is fake and whose `leave` is the real `Motion.prototype.leave`. `data-leaving` is set before `play` is called, and `animationComplete` is called once, after `play` resolves. A failing animation is the case of `motion.spec.ts`, because `play` never rejects.
 
 `animate.*` does nothing in jsdom, so `shell-layout.spec.ts`'s `pill()` and `bar()` checks after one `settle()` are unaffected. **Check:** `shell-motion.spec.ts`, then `pnpm exec nx build pwa` passes, then the existing `capture.spec.ts` and `phone-width.spec.ts` on the dev stack (`pnpm exec nx e2e pwa-e2e -- src/capture.spec.ts src/phone-width.spec.ts`). The motion-off assertions for the pill and the bar are unit 10's.
 
@@ -553,11 +553,10 @@ Owns `features/now/now.ts` and its spec, `ui/top-pick/top-pick.ts` and its spec,
 
 **`row-motion.ts`.**
 - `collapseRow(motion: Motion, event: AnimationCallbackEvent): Promise<void>`:
-  - it sets `data-leaving` on `event.target` and reads its `offsetHeight` as h;
-  - it plays `[{ height: h + 'px', overflow: 'clip' }, { height: '0px', overflow: 'clip' }]` with `{ duration: MotionDuration.Moderate, easing: MotionEasing.Out }`;
-  - it calls `event.animationComplete()` in `finally`.
-- `expandRow(motion: Motion, event: AnimationCallbackEvent): Promise<void>` plays from `0px` to h with the same timing.
-- jsdom never calls the template's animate functions, so `row-motion.spec.ts` tests these helpers directly, with a fake event. It checks that `animationComplete` is called once when `play` resolves and once when it rejects.
+  - it reads the `offsetHeight` of `event.target` as h;
+  - it calls `motion.leave(event, [{ height: h + 'px', overflow: 'clip' }, { height: '0px', overflow: 'clip' }], { duration: MotionDuration.Moderate, easing: MotionEasing.Out })`, which sets `data-leaving` on `event.target`, plays, and calls `event.animationComplete()` in `finally`.
+- `expandRow(motion: Motion, event: AnimationCallbackEvent): Promise<void>` plays from `0px` to h with the same timing, and calls `event.animationComplete()` in `finally`.
+- jsdom never calls the template's animate functions, so `row-motion.spec.ts` tests these helpers directly, with a fake event. It checks that `animationComplete` is called once, after `play` resolves.
 
 **Editor.**
 - `done(event)` reads `keyboard` from `activationOf(event)` (`event.detail === 0`). It returns when `actionsBusy()` or the Task is missing.

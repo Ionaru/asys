@@ -443,14 +443,10 @@ export class Now {
   }
 
   async #playRise(card: HTMLElement): Promise<void> {
-    try {
-      await this.#motion.play(card, RISE_KEYFRAMES, {
-        duration: MotionDuration.Moderate,
-        easing: MotionEasing.Out,
-      });
-    } catch {
-      // The rise is decoration, so a failed animation changes nothing.
-    }
+    await this.#motion.play(card, RISE_KEYFRAMES, {
+      duration: MotionDuration.Moderate,
+      easing: MotionEasing.Out,
+    });
   }
 
   #focusTopNow(): void {
