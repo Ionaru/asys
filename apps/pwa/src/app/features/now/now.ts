@@ -17,8 +17,8 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
+  canLogProgress,
   type Command,
-  CommandTag,
   formatMinutes,
   formatMoment,
   inboxTasks,
@@ -26,7 +26,6 @@ import {
   type RankedTask,
   reasonFact,
   type Task,
-  TaskStatus,
   toLocalDateTime,
   waitingSummary,
 } from '@asys/domain';
@@ -42,7 +41,11 @@ import { TaskMorph } from '../../core/platform/task-morph';
 import { Button, ButtonVariant } from '../../ui/button/button';
 import { IconName } from '../../ui/icon/icon';
 import { LoadState } from '../../ui/load-state/load-state';
-import { canLogProgress, LogProgressForm } from '../../ui/log-progress-form/log-progress-form';
+import {
+  estimateNowText,
+  LogProgressForm,
+  logProgressCommand,
+} from '../../ui/log-progress-form/log-progress-form';
 import { NowHeader } from '../../ui/now-header/now-header';
 import { PickerRow, PickerRowVariant } from '../../ui/picker-row/picker-row';
 import { SectionHeader } from '../../ui/section-header/section-header';
@@ -348,13 +351,7 @@ export class Now {
       return;
     }
     this.statusLine.set('');
-    const command: Command = {
-      _tag: CommandTag.LogProgress,
-      taskId,
-      remainingMinutes: minutes,
-      expect: { status: TaskStatus.Open },
-    };
-    const outcome = await this.#run(taskId, command);
+    const outcome = await this.#run(taskId, logProgressCommand(taskId, minutes));
     if (this.#destroyRef.destroyed) {
       return;
     }
@@ -362,7 +359,7 @@ export class Now {
       this.statusLine.set(outcomeMessage(outcome) ?? '');
       return;
     }
-    this.statusLine.set(`Estimate is now ${formatMinutes(minutes)}.`);
+    this.statusLine.set(estimateNowText(minutes));
     if (this.#logProgressFor() === taskId) {
       this.focusInside = false;
       this.#logProgressFor.set(null);
