@@ -74,6 +74,7 @@ export class Session {
   /** Records a successful sign-up, sign-in or recovery. */
   async signedIn(me?: Me): Promise<void> {
     this.#generation += 1;
+    this.#signOutReasonSignal.set(null);
     this.#storage.remove(LAST_REPORTED_ZONE_KEY);
 
     if (me === undefined) {

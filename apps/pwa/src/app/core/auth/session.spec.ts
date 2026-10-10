@@ -426,6 +426,23 @@ describe('Session', () => {
       expect(session.signOutReason()).toBeNull();
     });
 
+    it('without a Me clears a Chosen reason even when the server does not answer', async () => {
+      session.signedOut(SignOutReason.Chosen);
+      me.mockResolvedValueOnce(failed(AuthError.Network));
+
+      await session.signedIn();
+
+      expect(session.state()).toBe(SessionState.Unreachable);
+      expect(session.signOutReason()).toBeNull();
+
+      me.mockResolvedValueOnce(failed(AuthError.Unauthorized));
+
+      await session.check();
+
+      expect(session.state()).toBe(SessionState.SignedOut);
+      expect(session.signOutReason()).toBe(SignOutReason.Revoked);
+    });
+
     it('a revocation in the next session is not mistaken for the earlier Chosen sign-out', async () => {
       await session.signedIn(ada);
       session.signedOut(SignOutReason.Chosen);
