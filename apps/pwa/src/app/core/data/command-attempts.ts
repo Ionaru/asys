@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: EUPL-1.2
-import { inject, Service } from '@angular/core';
+import { inject, Service, signal } from '@angular/core';
 import type { Command } from '@asys/domain';
 
 import { CommandOutcomeTag, type CommandOutcome } from '../api/data-api';
@@ -37,7 +37,8 @@ interface Attempt {
 
 /**
  * The idempotency key of each command a screen is still trying to send, so a retry of the same
- * command reuses its key. Provide it per screen: `providers: [CommandAttempts]`.
+ * command reuses its key, and the subjects it has a send in flight for. Provide it per screen:
+ * `providers: [CommandAttempts]`.
  */
 @Service({ autoProvided: false })
 export class CommandAttempts {
@@ -46,6 +47,9 @@ export class CommandAttempts {
   readonly #dataStore = inject(DataStore);
 
   readonly #attempts = new Map<string, Attempt>();
+
+  /** How many sends are in flight for each subject; a subject with none is absent. */
+  readonly #inFlight = signal<ReadonlyMap<string, number>>(new Map());
 
   /** The key for this command: the one it already has, else a new one from `Ids.next()`. */
   keyFor(command: Command): string {
@@ -84,12 +88,51 @@ export class CommandAttempts {
     }
   }
 
-  /** Sends the command through `DataStore.send` with its key, then settles it with the outcome. */
-  async send(command: Command): Promise<CommandOutcome> {
-    const outcome = await this.#dataStore.send(command, this.keyFor(command));
+  /**
+   * Sends the command through `DataStore.send` with its key, then settles it with the outcome. The
+   * command's subject counts as in flight (see `busy`) from the call until the outcome, or a
+   * rejection, arrives.
+   */
+  send(command: Command): Promise<CommandOutcome> {
+    return this.track(commandSubject(command), async () => {
+      const outcome = await this.#dataStore.send(command, this.keyFor(command));
 
-    this.settle(command, outcome);
+      this.settle(command, outcome);
 
-    return outcome;
+      return outcome;
+    });
+  }
+
+  /**
+   * Runs the work with the subject counted as in flight until it settles or rejects, for a send
+   * that does not go through `send`, such as the time zone choice.
+   */
+  async track<T>(subject: string, work: () => Promise<T>): Promise<T> {
+    this.#inFlight.update((counts) => new Map(counts).set(subject, (counts.get(subject) ?? 0) + 1));
+
+    try {
+      return await work();
+    } finally {
+      this.#inFlight.update((counts) => {
+        const next = new Map(counts);
+        const remaining = (counts.get(subject) ?? 0) - 1;
+
+        if (remaining > 0) {
+          next.set(subject, remaining);
+        } else {
+          next.delete(subject);
+        }
+
+        return next;
+      });
+    }
+  }
+
+  /**
+   * Whether a send for this subject is in flight here, or `DataStore.awaitingSync()` holds it.
+   * Reactive: read it from a template or a `computed` to disable the subject's controls.
+   */
+  busy(subject: string): boolean {
+    return this.#inFlight().has(subject) || this.#dataStore.awaitingSync().has(subject);
   }
 }

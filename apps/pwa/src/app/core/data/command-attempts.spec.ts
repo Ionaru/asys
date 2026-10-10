@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: EUPL-1.2
+import { computed, Injector, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import {
   CommandTag,
@@ -21,8 +22,25 @@ const APPLIED: CommandOutcome = { _tag: CommandOutcomeTag.Applied, seq: 1 };
 
 const FAILED: CommandOutcome = { _tag: CommandOutcomeTag.Failed, status: 0 };
 
+/** A promise the test settles by hand. */
+const deferred = <T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason: unknown) => void;
+} => {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((resolveWith, rejectWith) => {
+    resolve = resolveWith;
+    reject = rejectWith;
+  });
+
+  return { promise, resolve, reject };
+};
+
 describe('CommandAttempts', () => {
   let attempts: CommandAttempts;
+  let awaitingSync: ReturnType<typeof signal<ReadonlySet<string>>>;
   let next: ReturnType<typeof vi.fn<() => string>>;
   let send: ReturnType<typeof vi.fn<(command: Command, key: string) => Promise<CommandOutcome>>>;
 
@@ -30,11 +48,12 @@ describe('CommandAttempts', () => {
     next = vi.fn<() => string>();
     next.mockReturnValueOnce('k1').mockReturnValueOnce('k2').mockReturnValueOnce('k3');
     send = vi.fn<(command: Command, key: string) => Promise<CommandOutcome>>();
+    awaitingSync = signal<ReadonlySet<string>>(new Set());
     TestBed.configureTestingModule({
       providers: [
         CommandAttempts,
         { provide: Ids, useValue: { next } },
-        { provide: DataStore, useValue: { send } },
+        { provide: DataStore, useValue: { send, awaitingSync } },
       ],
     });
     attempts = TestBed.inject(CommandAttempts);
@@ -197,5 +216,234 @@ describe('CommandAttempts', () => {
 
     expect(attempts.keyFor(first)).toBe('k1');
     expect(attempts.keyFor(second)).toBe('k2');
+  });
+
+  describe('busy', () => {
+    it('is false for a subject nothing was sent for', () => {
+      expect(attempts.busy('a')).toBe(false);
+    });
+
+    it('is true for the command subject while its send is in flight, and for no other', async () => {
+      const pending = deferred<CommandOutcome>();
+
+      send.mockReturnValue(pending.promise);
+
+      const sending = attempts.send(A);
+
+      expect(attempts.busy('a')).toBe(true);
+      expect(attempts.busy('b')).toBe(false);
+
+      pending.resolve(APPLIED);
+      await sending;
+    });
+
+    it('uses the link id as the subject of a RemoveBlocker and the Task id for an AddBlocker', async () => {
+      const pending = deferred<CommandOutcome>();
+
+      send.mockReturnValue(pending.promise);
+
+      const removing = attempts.send({ _tag: CommandTag.RemoveBlocker, linkId: 'l1' });
+
+      expect(attempts.busy('l1')).toBe(true);
+
+      pending.resolve(APPLIED);
+      await removing;
+
+      const adding = attempts.send({
+        _tag: CommandTag.AddBlocker,
+        linkId: 'l2',
+        taskId: 't1',
+        blockerId: 't2',
+      });
+
+      expect(attempts.busy('t1')).toBe(true);
+      expect(attempts.busy('t2')).toBe(false);
+      expect(attempts.busy('l2')).toBe(false);
+
+      await adding;
+    });
+
+    it.each<{ name: string; outcome: CommandOutcome }>([
+      { name: 'Applied', outcome: APPLIED },
+      { name: 'Failed', outcome: FAILED },
+    ])('is false again once the send resolves $name', async ({ outcome }) => {
+      const pending = deferred<CommandOutcome>();
+
+      send.mockReturnValue(pending.promise);
+
+      const sending = attempts.send(A);
+
+      pending.resolve(outcome);
+      await sending;
+
+      expect(attempts.busy('a')).toBe(false);
+    });
+
+    it('is false again once the send rejects, and the rejection reaches the caller', async () => {
+      const pending = deferred<CommandOutcome>();
+
+      send.mockReturnValue(pending.promise);
+
+      const sending = attempts.send(A);
+
+      expect(attempts.busy('a')).toBe(true);
+
+      pending.reject(new Error('offline'));
+
+      await expect(sending).rejects.toThrow('offline');
+      expect(attempts.busy('a')).toBe(false);
+    });
+
+    it('stays true until every overlapping send of one subject has settled', async () => {
+      const first = deferred<CommandOutcome>();
+      const second = deferred<CommandOutcome>();
+
+      send.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+
+      const sendingFirst = attempts.send(A);
+      const sendingSecond = attempts.send({ _tag: CommandTag.DropTask, taskId: 'a' });
+
+      first.resolve(APPLIED);
+      await sendingFirst;
+
+      expect(attempts.busy('a')).toBe(true);
+
+      second.resolve(APPLIED);
+      await sendingSecond;
+
+      expect(attempts.busy('a')).toBe(false);
+    });
+
+    it('counts the subjects of overlapping sends apart', async () => {
+      const first = deferred<CommandOutcome>();
+      const second = deferred<CommandOutcome>();
+
+      send.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+
+      const sendingA = attempts.send(A);
+      const sendingB = attempts.send(B);
+
+      first.resolve(APPLIED);
+      await sendingA;
+
+      expect(attempts.busy('a')).toBe(false);
+      expect(attempts.busy('b')).toBe(true);
+
+      second.resolve(APPLIED);
+      await sendingB;
+    });
+
+    it('is true while awaitingSync holds the subject, with nothing in flight', () => {
+      awaitingSync.set(new Set(['a']));
+
+      expect(attempts.busy('a')).toBe(true);
+      expect(attempts.busy('b')).toBe(false);
+
+      awaitingSync.set(new Set());
+
+      expect(attempts.busy('a')).toBe(false);
+    });
+
+    it('is true while in flight even when awaitingSync is empty, and while only awaitingSync holds it', async () => {
+      const pending = deferred<CommandOutcome>();
+
+      send.mockReturnValue(pending.promise);
+
+      const sending = attempts.send(A);
+
+      expect(awaitingSync().has('a')).toBe(false);
+      expect(attempts.busy('a')).toBe(true);
+
+      awaitingSync.set(new Set(['a']));
+      pending.resolve(APPLIED);
+      await sending;
+
+      expect(attempts.busy('a')).toBe(true);
+    });
+
+    it('does not see sends of another instance', async () => {
+      const other = Injector.create({
+        providers: [CommandAttempts],
+        parent: TestBed.inject(Injector),
+      }).get(CommandAttempts);
+      const pending = deferred<CommandOutcome>();
+
+      send.mockReturnValue(pending.promise);
+
+      const sending = other.send(A);
+
+      expect(other.busy('a')).toBe(true);
+      expect(attempts.busy('a')).toBe(false);
+
+      pending.resolve(APPLIED);
+      await sending;
+    });
+
+    it('is reactive: a computed over it follows the send', async () => {
+      const busy = TestBed.runInInjectionContext(() => computed(() => attempts.busy('a')));
+      const pending = deferred<CommandOutcome>();
+
+      send.mockReturnValue(pending.promise);
+
+      expect(busy()).toBe(false);
+
+      const sending = attempts.send(A);
+
+      expect(busy()).toBe(true);
+
+      pending.resolve(APPLIED);
+      await sending;
+
+      expect(busy()).toBe(false);
+
+      awaitingSync.set(new Set(['a']));
+
+      expect(busy()).toBe(true);
+    });
+  });
+
+  describe('track', () => {
+    it('counts the subject as in flight while the work runs and resolves its result', async () => {
+      const work = deferred<CommandOutcome>();
+      const tracking = attempts.track('settings', () => work.promise);
+
+      expect(attempts.busy('settings')).toBe(true);
+      expect(attempts.busy('a')).toBe(false);
+
+      work.resolve(APPLIED);
+
+      await expect(tracking).resolves.toBe(APPLIED);
+      expect(attempts.busy('settings')).toBe(false);
+    });
+
+    it('is false again once the work rejects, and the rejection reaches the caller', async () => {
+      const work = deferred<CommandOutcome>();
+      const tracking = attempts.track('settings', () => work.promise);
+
+      work.reject(new Error('offline'));
+
+      await expect(tracking).rejects.toThrow('offline');
+      expect(attempts.busy('settings')).toBe(false);
+    });
+
+    it('shares its count with a send for the same subject', async () => {
+      const work = deferred<CommandOutcome>();
+      const pending = deferred<CommandOutcome>();
+
+      send.mockReturnValue(pending.promise);
+
+      const tracking = attempts.track('a', () => work.promise);
+      const sending = attempts.send(A);
+
+      pending.resolve(APPLIED);
+      await sending;
+
+      expect(attempts.busy('a')).toBe(true);
+
+      work.resolve(APPLIED);
+      await tracking;
+
+      expect(attempts.busy('a')).toBe(false);
+    });
   });
 });

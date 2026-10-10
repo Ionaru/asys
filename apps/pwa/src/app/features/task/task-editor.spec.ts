@@ -608,6 +608,22 @@ describe('TaskEditor', () => {
       expect(send).toHaveBeenCalledTimes(1);
     });
 
+    it('disables Add a blocker while a Save is pending', async () => {
+      const { type, button, click, finish } = await setup();
+
+      await type('Title', 'Call Marit back');
+
+      expect(must(button('Add a blocker')).disabled).toBe(false);
+
+      await click(button('Save'));
+
+      expect(must(button('Add a blocker')).disabled).toBe(true);
+
+      await finish(0, FAILED);
+
+      expect(must(button('Add a blocker')).disabled).toBe(false);
+    });
+
     it('is disabled while the Task waits for the server, which is said next to the actions', async () => {
       const { type, saveButton, awaitingSync, settle, root } = await setup();
 
@@ -1393,6 +1409,29 @@ describe('TaskEditor', () => {
 
       expect(must(button('Add a blocker')).disabled).toBe(false);
       expect(must(candidate()).disabled).toBe(false);
+    });
+
+    it('disables Save, Done, Drop and Log progress while an Add a blocker send is pending', async () => {
+      const { root, text, button, click, type, finish } = await setup();
+      const actions = (): boolean[] =>
+        ['Save', 'Done', 'Log progress', 'Drop'].map((name) => must(button(name)).disabled);
+
+      await type('Title', 'Call Marit back');
+      await click(button('Add a blocker'));
+
+      expect(actions()).toEqual([false, false, false, false]);
+
+      await click(
+        Array.from(root().querySelectorAll<HTMLButtonElement>('button')).find(
+          (b) => text(b) === 'Water form',
+        ),
+      );
+
+      expect(actions()).toEqual([true, true, true, true]);
+
+      await finish(0, FAILED);
+
+      expect(actions()).toEqual([false, false, false, false]);
     });
 
     it('keeps an empty, displayed blocker message line with the status role', async () => {

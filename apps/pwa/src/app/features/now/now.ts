@@ -31,7 +31,7 @@ import {
   waitingSummary,
 } from '@asys/domain';
 
-import { CommandOutcomeTag, type CommandOutcome } from '../../core/api/data-api';
+import { CommandOutcomeTag } from '../../core/api/data-api';
 import { CommandAttempts } from '../../core/data/command-attempts';
 import { DataStore, SyncStatus, zoneOrUtc } from '../../core/data/data-store';
 import { DoneOrigin, DoneUndo } from '../../core/data/done-undo';
@@ -121,9 +121,6 @@ export class Now {
   protected readonly waitingExpanded = signal(false);
 
   protected readonly statusLine = signal('');
-
-  /** The Task ids with a Log progress send in flight. */
-  readonly #pendingIds = signal<ReadonlySet<string>>(new Set());
 
   /** Whether focus is inside the open Log progress form, tracked from its focus events. */
   protected focusInside = false;
@@ -257,7 +254,7 @@ export class Now {
 
   /** Whether a Done or Log progress for this Task is pending or waits for the server. */
   protected busy(taskId: string): boolean {
-    return this.#pendingIds().has(taskId) || this.dataStore.awaitingSync().has(taskId);
+    return this.#attempts.busy(taskId);
   }
 
   protected estimateText(task: Task): string {
@@ -354,7 +351,7 @@ export class Now {
       remainingMinutes: minutes,
       expect: { status: TaskStatus.Open },
     };
-    const outcome = await this.#run(taskId, command);
+    const outcome = await this.#attempts.send(command);
     if (this.#destroyRef.destroyed) {
       return;
     }
@@ -367,16 +364,6 @@ export class Now {
       this.focusInside = false;
       this.#logProgressFor.set(null);
       this.#focusTop();
-    }
-  }
-
-  /** Sends the command through its attempt and marks the Task pending meanwhile. */
-  async #run(taskId: string, command: Command): Promise<CommandOutcome> {
-    this.#pendingIds.update((ids) => new Set([...ids, taskId]));
-    try {
-      return await this.#attempts.send(command);
-    } finally {
-      this.#pendingIds.update((ids) => new Set([...ids].filter((id) => id !== taskId)));
     }
   }
 
