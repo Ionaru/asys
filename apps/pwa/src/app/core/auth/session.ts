@@ -12,6 +12,14 @@ export enum SessionState {
   Unreachable = 'unreachable',
 }
 
+/** Why the session ended, which decides where `App` sends the person next. */
+export enum SignOutReason {
+  /** The person asked for it, on the Account screen. */
+  Chosen = 'chosen',
+  /** The server ended it, or no longer knows it. */
+  Revoked = 'revoked',
+}
+
 /** How long `check()` waits for the server before reporting it unreachable. */
 export const SESSION_CHECK_TIMEOUT_MS = 10_000;
 
@@ -26,6 +34,8 @@ export class Session {
 
   readonly #meSignal = signal<Me | null>(null);
 
+  readonly #signOutReasonSignal = signal<SignOutReason | null>(null);
+
   #inFlight: Promise<void> | null = null;
 
   /** Bumped by `signedIn()` and `signedOut()`; answers from an older generation are dropped. */
@@ -34,6 +44,12 @@ export class Session {
   readonly state = this.#stateSignal.asReadonly();
 
   readonly me = this.#meSignal.asReadonly();
+
+  /**
+   * Why the session ended, or null while it has not. Chosen outranks Revoked until the next
+   * sign-in, which clears it, so a later revocation is never taken for a choice.
+   */
+  readonly signOutReason = this.#signOutReasonSignal.asReadonly();
 
   /** Asks the server who is signed in. Never rejects; concurrent calls share one request. */
   check(): Promise<void> {
@@ -55,6 +71,7 @@ export class Session {
   /** Records a successful sign-up, sign-in or recovery. */
   async signedIn(me?: Me): Promise<void> {
     this.#generation += 1;
+    this.#signOutReasonSignal.set(null);
     this.#reportedZone.clear();
 
     if (me === undefined) {
@@ -63,16 +80,28 @@ export class Session {
       return;
     }
 
-    this.#stateSignal.set(SessionState.SignedIn);
-    this.#meSignal.set(me);
+    this.#enter(me);
   }
 
-  /** Records that the session is gone. Harmless to repeat. */
-  signedOut(): void {
+  /** Records that the session is gone, and why. Harmless to repeat. */
+  signedOut(reason: SignOutReason): void {
     this.#generation += 1;
+    this.#record(reason);
     this.#stateSignal.set(SessionState.SignedOut);
     this.#meSignal.set(null);
     this.#reportedZone.clear();
+  }
+
+  #enter(me: Me): void {
+    this.#stateSignal.set(SessionState.SignedIn);
+    this.#meSignal.set(me);
+    this.#signOutReasonSignal.set(null);
+  }
+
+  #record(reason: SignOutReason): void {
+    if (this.#signOutReasonSignal() !== SignOutReason.Chosen) {
+      this.#signOutReasonSignal.set(reason);
+    }
   }
 
   #ask(): Promise<void> {
@@ -105,13 +134,13 @@ export class Session {
 
   #apply(result: AuthResult<Me>): void {
     if (result._tag === AuthResultTag.Ok) {
-      this.#stateSignal.set(SessionState.SignedIn);
-      this.#meSignal.set(result.value);
+      this.#enter(result.value);
 
       return;
     }
 
     if (result.error === AuthError.Unauthorized) {
+      this.#record(SignOutReason.Revoked);
       this.#stateSignal.set(SessionState.SignedOut);
       this.#meSignal.set(null);
 
