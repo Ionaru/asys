@@ -18,7 +18,8 @@ import { Button, ButtonSize, ButtonVariant } from '../button/button';
 import { EstimateField } from '../estimate-field/estimate-field';
 import { InlineConfirm } from '../inline-confirm/inline-confirm';
 import { Segmented } from '../segmented/segmented';
-import { SelectField, SelectOption } from '../select-field/select-field';
+import { areaSelectOptions, NO_AREA_LABEL } from '../select-field/area-options';
+import { SelectField } from '../select-field/select-field';
 
 /** The Triage choices for one Inbox Task. */
 export interface TriageDraft {
@@ -93,13 +94,10 @@ export class TriageCard {
   protected readonly areaName = computed(() => {
     const id = this.draft().areaId;
 
-    return this.areas().find((area) => area.id === id)?.name ?? 'No Area';
+    return this.areas().find((area) => area.id === id)?.name ?? NO_AREA_LABEL;
   });
 
-  protected readonly areaOptions = computed<readonly SelectOption[]>(() => [
-    { value: '', label: 'No Area' },
-    ...this.areas().map((area) => ({ value: area.id, label: area.name })),
-  ]);
+  protected readonly areaOptions = computed(() => areaSelectOptions(this.areas()));
 
   protected readonly incomplete = computed(() => this.reason() !== null);
 
