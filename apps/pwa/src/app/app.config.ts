@@ -17,6 +17,7 @@ import { Session } from './core/auth/session';
 import { unauthorizedInterceptor } from './core/auth/unauthorized.interceptor';
 import { Theme } from './core/platform/theme';
 import { onViewTransitionCreated } from './core/platform/view-transitions';
+import { preloadOnLaunch } from './preload-on-launch';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -30,6 +31,7 @@ export const appConfig: ApplicationConfig = {
     provideApi(),
     provideAppInitializer(() => {
       inject(Session).check();
+      preloadOnLaunch();
     }),
     provideAppInitializer(() => {
       inject(Theme);

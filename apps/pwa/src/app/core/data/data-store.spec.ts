@@ -10,6 +10,7 @@ import { TestBed } from '@angular/core/testing';
 import { CommandTag, type Command, type CompleteTask, type Instant } from '@asys/domain';
 
 import { CommandOutcomeTag, type CommandOutcome } from '../api/data-api';
+import { IGNORE_UNAUTHORIZED } from '../api/ignore-unauthorized';
 import { Clock } from '../platform/clock';
 import { DataStore, POLL_INTERVAL_MS, SyncStatus } from './data-store';
 
@@ -309,6 +310,188 @@ describe('DataStore', () => {
         expect.arrayContaining(['focus', 'online']),
       );
       expect(removeDocument.mock.calls.map(([type]) => type)).toContain('visibilitychange');
+    });
+
+    it('preloads the snapshot marked IGNORE_UNAUTHORIZED, staying Idle without state', () => {
+      store.preload();
+
+      const req = http.expectOne({ method: 'GET', url: '/v1/snapshot' });
+      expect(req.request.context.get(IGNORE_UNAUTHORIZED)).toBe(true);
+      expect(store.status()).toBe(SyncStatus.Idle);
+      expect(store.state()).toBeNull();
+    });
+
+    it('preloads once, and not at all while started', () => {
+      store.preload();
+      store.preload();
+      expect(http.match('/v1/snapshot')).toHaveLength(1);
+
+      store.start();
+      store.preload();
+
+      noRequests();
+    });
+
+    it('adopts a pending preload: sets Loading, sends no second request and takes its answer', async () => {
+      store.preload();
+      const preload = http.expectOne('/v1/snapshot');
+
+      store.start();
+
+      expect(store.status()).toBe(SyncStatus.Loading);
+      noRequests();
+
+      await respond(preload, snapshotBody(12, { tasks: [aTask('t1')] }));
+
+      expect(store.status()).toBe(SyncStatus.Ready);
+      expect(store.state()?.tasks.map((task) => task.id)).toEqual(['t1']);
+      noRequests();
+      await advance(POLL_INTERVAL_MS);
+      http.expectOne('/v1/changes?after=12');
+    });
+
+    it('adopts a preload that answered before start, and its answer waits for start', async () => {
+      store.preload();
+      await respond(http.expectOne('/v1/snapshot'), snapshotBody(12, { tasks: [aTask('t1')] }));
+
+      expect(store.status()).toBe(SyncStatus.Idle);
+      expect(store.state()).toBeNull();
+
+      store.start();
+
+      expect(store.status()).toBe(SyncStatus.Loading);
+      await advance(0);
+      expect(store.status()).toBe(SyncStatus.Ready);
+      expect(store.state()?.tasks.map((task) => task.id)).toEqual(['t1']);
+      noRequests();
+    });
+
+    it.each([
+      { name: 'a 401 Unauthorized', fail: (req: TestRequest) => respond(req, unauthorized, 401) },
+      { name: 'a 503', fail: (req: TestRequest) => respond(req, null, 503) },
+      { name: 'a network failure', fail: networkError },
+    ])('asks again, unmarked, when the adopted preload got $name', async ({ fail }) => {
+      store.preload();
+      const preload = http.expectOne('/v1/snapshot');
+      store.start();
+
+      await fail(preload);
+
+      expect(store.status()).toBe(SyncStatus.Loading);
+      const again = http.expectOne('/v1/snapshot');
+      expect(again.request.context.get(IGNORE_UNAUTHORIZED)).toBe(false);
+
+      await respond(again, snapshotBody(9, { tasks: [aTask('t1')] }));
+
+      expect(store.status()).toBe(SyncStatus.Ready);
+      expect(store.state()?.tasks.map((task) => task.id)).toEqual(['t1']);
+    });
+
+    it('asks again at once when the preload failed before start', async () => {
+      store.preload();
+      await respond(http.expectOne('/v1/snapshot'), unauthorized, 401);
+
+      store.start();
+      await advance(0);
+
+      const again = http.expectOne('/v1/snapshot');
+      expect(again.request.context.get(IGNORE_UNAUTHORIZED)).toBe(false);
+      await respond(again, snapshotBody(9));
+      expect(store.status()).toBe(SyncStatus.Ready);
+    });
+
+    it('becomes Failed as before when the request after a failed preload fails too', async () => {
+      store.preload();
+      const preload = http.expectOne('/v1/snapshot');
+      store.start();
+      await respond(preload, null, 503);
+
+      await respond(http.expectOne('/v1/snapshot'), null, 503);
+
+      expect(store.status()).toBe(SyncStatus.Failed);
+      await advance(POLL_INTERVAL_MS * 4);
+      noRequests();
+    });
+
+    it('requests afresh after discardPreload and ignores the discarded answer', async () => {
+      store.preload();
+      const discarded = http.expectOne('/v1/snapshot');
+
+      store.discardPreload();
+      store.start();
+
+      const fresh = http.expectOne('/v1/snapshot');
+      expect(fresh.request.context.get(IGNORE_UNAUTHORIZED)).toBe(false);
+
+      await respond(discarded, snapshotBody(5, { tasks: [aTask('old')] }));
+
+      expect(store.status()).toBe(SyncStatus.Loading);
+      expect(store.state()).toBeNull();
+      noRequests();
+
+      await respond(fresh, snapshotBody(9));
+
+      expect(store.status()).toBe(SyncStatus.Ready);
+      expect(store.state()?.tasks).toEqual([]);
+    });
+
+    it('never adopts a preload issued before stop', async () => {
+      store.preload();
+      const stale = http.expectOne('/v1/snapshot');
+      store.stop();
+
+      store.start();
+
+      const fresh = http.expectOne('/v1/snapshot');
+      expect(fresh.request.context.get(IGNORE_UNAUTHORIZED)).toBe(false);
+
+      await respond(stale, snapshotBody(5, { tasks: [aTask('old')] }));
+
+      expect(store.status()).toBe(SyncStatus.Loading);
+      expect(store.state()).toBeNull();
+
+      await respond(fresh, snapshotBody(9));
+
+      expect(store.state()?.tasks).toEqual([]);
+      await advance(POLL_INTERVAL_MS);
+      http.expectOne('/v1/changes?after=9');
+    });
+
+    it('never adopts a preload that answered before stop', async () => {
+      store.preload();
+      await respond(http.expectOne('/v1/snapshot'), snapshotBody(5, { tasks: [aTask('old')] }));
+      store.stop();
+
+      store.start();
+      await advance(0);
+
+      expect(store.state()).toBeNull();
+      await respond(http.expectOne('/v1/snapshot'), snapshotBody(9));
+      expect(store.state()?.tasks).toEqual([]);
+    });
+
+    it('asks nothing again when an adopted preload fails after stop', async () => {
+      store.preload();
+      const preload = http.expectOne('/v1/snapshot');
+      store.start();
+      store.stop();
+
+      await respond(preload, unauthorized, 401);
+
+      noRequests();
+      expect(store.status()).toBe(SyncStatus.Idle);
+    });
+
+    it('requests afresh on a start after stop, once the preload was adopted', async () => {
+      store.preload();
+      await respond(http.expectOne('/v1/snapshot'), snapshotBody(5));
+      store.start();
+      await advance(0);
+      store.stop();
+
+      store.start();
+
+      http.expectOne('/v1/snapshot');
     });
   });
 
