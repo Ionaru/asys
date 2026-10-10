@@ -8,6 +8,7 @@ import { CommandAttempts } from '../../core/data/command-attempts';
 import { SETTINGS_SUBJECT } from '../../core/data/command-subject';
 import { DataStore, SyncStatus } from '../../core/data/data-store';
 import { outcomeMessage } from '../../core/data/outcome-message';
+import { TimeZoneSync } from '../../core/data/time-zone-sync';
 import { DeviceZone } from '../../core/platform/device-zone';
 import { Button, ButtonVariant } from '../../ui/button/button';
 import { LoadState } from '../../ui/load-state/load-state';
@@ -50,6 +51,8 @@ export class Settings {
   readonly #deviceZoneService = inject(DeviceZone);
 
   readonly #attempts = inject(CommandAttempts);
+
+  readonly #timeZoneSync = inject(TimeZoneSync);
 
   protected readonly Status = SyncStatus;
 
@@ -119,7 +122,7 @@ export class Settings {
     this.statusLine.set('');
 
     const outcome = await this.#attempts.track(SETTINGS_SUBJECT, () =>
-      this.dataStore.chooseTimeZone(zone),
+      this.#timeZoneSync.choose(zone),
     );
 
     if (outcome._tag === CommandOutcomeTag.Applied) {

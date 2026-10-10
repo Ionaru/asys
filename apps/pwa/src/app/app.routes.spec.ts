@@ -9,6 +9,7 @@ import type { Instant } from '@asys/domain';
 import { routes } from './app.routes';
 import { Session, SessionState } from './core/auth/session';
 import { DataStore, SyncStatus } from './core/data/data-store';
+import { TimeZoneSync } from './core/data/time-zone-sync';
 import { Clock } from './core/platform/clock';
 import { DeviceZone } from './core/platform/device-zone';
 import { Ids } from './core/platform/ids';
@@ -44,11 +45,11 @@ const setup = async () => {
           awaitingSync: signal(new Set()),
           send: vi.fn(),
           refresh: vi.fn(),
-          chooseTimeZone: vi.fn(),
           start: vi.fn(),
           stop: vi.fn(),
         },
       },
+      { provide: TimeZoneSync, useValue: { choose: vi.fn() } },
       { provide: DeviceZone, useValue: { current: () => 'Europe/Amsterdam' } },
       { provide: Clock, useValue: { now: signal(NOW) } },
       { provide: Ids, useValue: { next: () => 'id' } },
