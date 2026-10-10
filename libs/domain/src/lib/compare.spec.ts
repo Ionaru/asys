@@ -26,16 +26,17 @@ describe('compareCodeUnits', () => {
 
   it('orders by code unit, not by code point', () => {
     const astral = '\u{1F600}';
-    const bmp = '｡';
+    const bmp = '\uFF61';
 
     expect(astral.codePointAt(0)).toBeGreaterThan(bmp.codePointAt(0) as number);
     expect(compareCodeUnits(astral, bmp)).toBe(-1);
     expect(compareCodeUnits(bmp, astral)).toBe(1);
   });
 
-  it('sorts a mixed list the same way every time', () => {
-    const list = ['b', 'a', 'B', '｡', '\u{1F600}', 'A', ''];
+  it('sorts a mixed list by code unit', () => {
+    const list = ['b', 'a', 'B', '\uFF61', '\u{1F600}', 'A', ''];
+    const sorted = ['', 'A', 'B', 'a', 'b', '\u{1F600}', '\uFF61'];
 
-    expect([...list].sort(compareCodeUnits)).toEqual(['', 'A', 'B', 'a', 'b', '\u{1F600}', '｡']);
+    expect([...list].sort(compareCodeUnits)).toEqual(sorted);
   });
 });
