@@ -78,6 +78,15 @@ describe('unauthorizedInterceptor', () => {
     expect(signedOut).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['POST', '/v1/auth/passkeys'],
+    ['DELETE', '/v1/auth/passkeys/cred-1'],
+  ])('leaves the session alone on a body-less 401 of %s %s', async (method, url) => {
+    await fail(method, url, 401, null);
+
+    expect(signedOut).not.toHaveBeenCalled();
+  });
+
   it.each([400, 403, 404, 409, 500])('leaves the session alone on a %i', async (status) => {
     await fail('POST', '/v1/auth/passkeys', status, null);
     await fail('GET', '/v1/auth/me', status, { _tag: 'Unauthorized' } as object | null);

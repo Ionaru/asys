@@ -126,7 +126,7 @@ const implement = (
   groupIdentifier: string,
   hooks: ErasedHooks,
   currentUserId: Effect.Effect<string, never, any>,
-  recheckSession: Effect.Effect<void, any, any> | undefined,
+  recheckSession: Effect.Effect<void, any, any>,
 ) =>
   HttpApiBuilder.group(api as HttpApi.HttpApi<string, ErasedGroup>, groupIdentifier, (handlers) =>
     handlers
@@ -212,13 +212,15 @@ export const makePasskeyHandlers = <
       HttpApiEndpoint.MiddlewareProvides<HttpApiGroup.Endpoints<Group>> | HttpRouter.Provided
     >;
     /**
-     * Optional: re-checks the signed-in session as the first step inside the unit of work of
-     * `add` and `remove`, before anything is written. Its failure is the session middleware's
-     * error: it rolls the unit back, and the endpoint answers with it as the middleware would.
-     * A host whose unit of work takes the lock its session revocations take uses it to refuse
-     * a request whose session was revoked while the request waited for that lock.
+     * Re-checks the signed-in session as the first step inside the unit of work of `add` and
+     * `remove`, before anything is written. Its failure is the session middleware's error: it
+     * rolls the unit back, and the endpoint answers with it as the middleware would. A host
+     * whose unit of work takes the lock its session revocations take uses it to refuse a
+     * request whose session was revoked while the request waited for that lock. It is required,
+     * so a host cannot leave the re-check out by accident; one with nothing to re-check passes
+     * `Effect.void`.
      */
-    readonly recheckSession?: Effect.Effect<
+    readonly recheckSession: Effect.Effect<
       void,
       HttpApiEndpoint.MiddlewareError<HttpApiGroup.Endpoints<Group>>,
       R5

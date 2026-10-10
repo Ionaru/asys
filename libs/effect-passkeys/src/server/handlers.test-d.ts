@@ -28,10 +28,13 @@ const onRegistered = () => Effect.succeed({ ok: true });
 
 const onAuthenticated = () => Effect.succeed({ name: 'n' });
 
+const recheckSession = Effect.void;
+
 test('hooks without services leave only the library services and the middleware', () => {
   const layer = makePasskeyHandlers(SampleApi, SamplePasskeys, {
     hooks: { onRegisterBegin, onRegistered, onAuthenticated },
     currentUserId,
+    recheckSession,
   });
 
   expectTypeOf<Layer.Services<typeof layer>>().toEqualTypeOf<Base>();
@@ -45,6 +48,7 @@ test('a hook that needs a service adds it to the requirements', () => {
       onAuthenticated,
     },
     currentUserId,
+    recheckSession,
   });
 
   expectTypeOf<Layer.Services<typeof layer>>().toEqualTypeOf<Base | Foo>();
@@ -58,6 +62,7 @@ test('onAuthenticated keeps the middleware service in the requirements, onRemove
       onAuthenticated: () => SampleUser.useSync((user) => ({ name: user.id })),
     },
     currentUserId,
+    recheckSession,
   });
   const removed = makePasskeyHandlers(SampleApi, SamplePasskeys, {
     hooks: {
@@ -67,6 +72,7 @@ test('onAuthenticated keeps the middleware service in the requirements, onRemove
       onRemoved: () => SampleUser.useSync(() => undefined),
     },
     currentUserId,
+    recheckSession,
   });
 
   expectTypeOf<Layer.Services<typeof authenticated>>().toEqualTypeOf<Base | SampleUser>();
@@ -97,6 +103,7 @@ test('hooks and recheckSession must match the group success and error types', ()
       onAuthenticated,
     },
     currentUserId,
+    recheckSession,
   });
 
   makePasskeyHandlers(SampleApi, SamplePasskeys, {
@@ -107,6 +114,7 @@ test('hooks and recheckSession must match the group success and error types', ()
       onAuthenticated,
     },
     currentUserId,
+    recheckSession,
   });
 
   makePasskeyHandlers(SampleApi, SamplePasskeys, {
@@ -114,5 +122,14 @@ test('hooks and recheckSession must match the group success and error types', ()
     currentUserId,
     // @ts-expect-error recheckSession may fail only with the session middleware's error
     recheckSession: Effect.fail(new SampleGone({})),
+  });
+});
+
+// oxlint-disable-next-line vitest/expect-expect -- the @ts-expect-error line is the assertion
+test('recheckSession is required', () => {
+  // @ts-expect-error a host must pass recheckSession, Effect.void when it has nothing to re-check
+  makePasskeyHandlers(SampleApi, SamplePasskeys, {
+    hooks: { onRegisterBegin, onRegistered, onAuthenticated },
+    currentUserId,
   });
 });
