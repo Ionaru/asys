@@ -49,10 +49,11 @@ Rejected: a `duration-slow` step. Nothing in the three plans needs it.
 **`Motion`** (`apps/pwa/src/app/core/platform/motion.ts`, a root `@Service()`) is the one way script code animates:
 - `reduced` is a live signal from a guarded `matchMedia('(prefers-reduced-motion: reduce)')`, the pattern of `core/platform/theme.ts:21-39`.
 - `allowed()` is false under reduced motion, in Voice only (`data-theme='drive'` on `<html>`), and where `Element.prototype.animate` is missing.
-- `play(el, keyframes, options)` resolves at once when motion is not allowed. Otherwise it resolves when the animation finishes, and it swallows an `AbortError`, so a cancelled animation never rejects.
+- `play(el, keyframes, options)` resolves at once when motion is not allowed. Otherwise it resolves when the animation finishes. It never rejects: it swallows an `AbortError`, so a cancelled animation counts as over, and it reports any other error (a bad keyframe makes `animate` throw) with `console.error` before it resolves, so a programming error stays visible to a developer and no caller needs a `catch`.
+- `leave(event, keyframes, options)` plays the exit of a node that Angular keeps while it leaves (the function form of `animate.leave`). It sets `data-leaving` on `event.target`, awaits `play`, and calls `event.animationComplete()` in a `finally`. `leaveMarked` and `collapseRow` are thin calls to it.
 - `play` accepts `var(--token)` for `duration` and `easing` and resolves it against `<html>`. Callers write `MotionDuration.Moderate` and `MotionEasing.Emphasized`, never a number.
 - **This contract binds plans 3 and 2.** `MotionDuration` and `MotionEasing` are exported from `motion.ts`, and `play` is the only code that reads a motion token in TypeScript. Callers never call `getComputedStyle` for a timing and never hold a fallback number or curve. A token that reads empty makes `play` resolve at once, so no caller needs one. Plan 3's `core/platform/motion-timing.ts` is therefore not built (plan 3 already drops it when `Motion` resolves tokens), and plan 2's SwipeActions passes the enums and drops its own token reading and fallbacks.
-- Specs replace it with a fake whose promise they control. jsdom has no `animate`, so the real `Motion` resolves at once there.
+- Specs replace it with a fake whose promise they control. jsdom has no `animate`, so the real `Motion` resolves at once there. A fake that serves `leaveMarked` or `collapseRow` also carries `leave`, and the real `Motion.prototype.leave` works over a fake `play`.
 
 **`Haptics`** (`core/platform/haptics.ts`, a root `@Service()`) has one method, `tick()`, a guarded `navigator.vibrate(HAPTIC_TICK_MS)`.
 - It is separate from `Motion`, because a haptic is not motion. Reduced motion does not silence it.
@@ -332,7 +333,11 @@ It injects `DOCUMENT` and `DestroyRef`, and compares `data-theme` with `ThemeNam
 | `finished` still pending | `play` has not resolved |
 | `finished` resolves | `play` resolves |
 | `finished` rejects with a `DOMException` named `AbortError` | `play` resolves |
-| `finished` rejects with any other error | `play` rejects with that error |
+| `finished` rejects with any other error | `play` resolves, and `console.error` is called with that error |
+| `el.animate` throws (a bad keyframe) | `play` resolves, and `console.error` is called with that error |
+| `leave` while allowed | `data-leaving` is set on `event.target` before `el.animate` is called, and `animationComplete` is called once, after `finished` resolves |
+| `leave` while not allowed | `data-leaving` is set, `el.animate` is not called, and `animationComplete` is called once |
+| `leave` when `el.animate` throws, or `finished` rejects with any other error | `leave` resolves, and `animationComplete` is called once |
 
 Tokens are read with `getComputedStyle(document.documentElement).getPropertyValue(name).trim()`.
 

@@ -14,8 +14,14 @@ const fakeEvent = (target: Element) => {
   };
 };
 
+// The real `leave` over a fake `play`: it only uses `this.play`.
 const fakeMotion = (play: (...args: unknown[]) => Promise<void>): Motion =>
-  ({ allowed: () => true, reduced: signal(false), play }) as unknown as Motion;
+  ({
+    allowed: () => true,
+    reduced: signal(false),
+    play,
+    leave: Motion.prototype.leave,
+  }) as unknown as Motion;
 
 describe('leaveMarked', () => {
   it('marks the node with data-leaving before it plays the fade-out', async () => {
@@ -67,16 +73,5 @@ describe('leaveMarked', () => {
     await leaving;
 
     expect(animationComplete).toHaveBeenCalledTimes(1);
-  });
-
-  it('resolves and calls animationComplete once when play rejects', async () => {
-    const el = document.createElement('div');
-    const { event, animationComplete } = fakeEvent(el);
-    const play = vi.fn(() => Promise.reject(new Error('boom')));
-
-    await expect(leaveMarked(fakeMotion(play), event)).resolves.toBe(undefined);
-
-    expect(animationComplete).toHaveBeenCalledTimes(1);
-    expect(el.hasAttribute('data-leaving')).toBe(true);
   });
 });

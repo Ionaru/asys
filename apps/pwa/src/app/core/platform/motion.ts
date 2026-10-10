@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { DOCUMENT } from '@angular/common';
 import { DestroyRef, Service, inject, signal } from '@angular/core';
-import type { Signal } from '@angular/core';
+import type { AnimationCallbackEvent, Signal } from '@angular/core';
 
 import { ThemeName } from './theme';
 
@@ -70,7 +70,11 @@ export class Motion {
     );
   }
 
-  /** Animates `el` and resolves when it ends or is cancelled; resolves at once when not allowed. */
+  /**
+   * Animates `el` and resolves when it ends or is cancelled; resolves at once when not allowed. It never
+   * rejects, because motion is decoration: an animation that fails to start or run is reported to the
+   * console, so a bad keyframe stays visible to a developer, and then counts as over.
+   */
   async play(
     el: Element,
     keyframes: Keyframe[] | PropertyIndexedKeyframes,
@@ -80,21 +84,39 @@ export class Motion {
       return;
     }
 
-    const resolved = this.#resolveOptions(options);
-
-    if (resolved === undefined) {
-      return;
-    }
-
     try {
-      await el.animate(keyframes, resolved).finished;
-    } catch (error) {
-      // A cancelled animation is not a failure for the caller.
-      if (error instanceof DOMException && error.name === 'AbortError') {
+      const resolved = this.#resolveOptions(options);
+
+      if (resolved === undefined) {
         return;
       }
 
-      throw error;
+      await el.animate(keyframes, resolved).finished;
+    } catch (error) {
+      // A cancelled animation is not a failure for the caller.
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        console.error(error);
+      }
+    }
+  }
+
+  /**
+   * Plays the exit of a node that Angular keeps while it leaves (the function form of `animate.leave`).
+   * It marks `event.target` with `data-leaving` first, so a view transition never sees the leaving node
+   * beside its replacement, plays, and then calls `animationComplete` once, also when motion is not
+   * allowed, or Angular would keep the node for 4000 ms.
+   */
+  async leave(
+    event: AnimationCallbackEvent,
+    keyframes: Keyframe[] | PropertyIndexedKeyframes,
+    options: KeyframeAnimationOptions,
+  ): Promise<void> {
+    event.target.setAttribute('data-leaving', '');
+
+    try {
+      await this.play(event.target, keyframes, options);
+    } finally {
+      event.animationComplete();
     }
   }
 
