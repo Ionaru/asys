@@ -314,12 +314,14 @@ describe('Account failures', () => {
       expect(hasButton('Try again')).toBe(false);
     });
 
-    it('shows no alert when removing a passkey fails', async () => {
+    it('shows no alert and no Try again when removing a passkey fails', async () => {
       const passkeys = vi.fn<AuthApi['passkeys']>(() =>
         Promise.resolve({ _tag: AuthResultTag.Ok, value: [PASSKEY] }),
       );
       const removePasskey = vi.fn<AuthApi['removePasskey']>(() => failed(AuthError.Unauthorized));
-      const { fixture, alert, button, click } = await setup({ api: { passkeys, removePasskey } });
+      const { fixture, alert, hasButton, button, click } = await setup({
+        api: { passkeys, removePasskey },
+      });
 
       fixture.detectChanges();
       await click(button('Remove Laptop'));
@@ -327,13 +329,16 @@ describe('Account failures', () => {
 
       expect(removePasskey).toHaveBeenCalledWith(PASSKEY.credentialId);
       expect(alert()).toBeNull();
+      expect(hasButton('Try again')).toBe(false);
     });
 
-    it('shows no alert when making new recovery codes fails', async () => {
+    it('shows no alert and no Try again when making new recovery codes fails', async () => {
       const regenerateRecoveryCodes = vi.fn<AuthApi['regenerateRecoveryCodes']>(() =>
         failed(AuthError.Unauthorized),
       );
-      const { fixture, alert, button, click } = await setup({ api: { regenerateRecoveryCodes } });
+      const { fixture, alert, hasButton, button, click } = await setup({
+        api: { regenerateRecoveryCodes },
+      });
 
       fixture.detectChanges();
       await click(button('Make new recovery codes'));
@@ -341,6 +346,7 @@ describe('Account failures', () => {
 
       expect(regenerateRecoveryCodes).toHaveBeenCalledTimes(1);
       expect(alert()).toBeNull();
+      expect(hasButton('Try again')).toBe(false);
     });
   });
 

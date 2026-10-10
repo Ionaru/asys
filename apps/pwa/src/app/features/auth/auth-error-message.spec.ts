@@ -6,10 +6,6 @@ import { messageForAuthError, type AuthErrorMessages } from './auth-error-messag
 const OTHER_ERRORS = Object.values(AuthError).filter((error) => error !== AuthError.Unauthorized);
 
 describe('messageForAuthError', () => {
-  it('covers every AuthError value', () => {
-    expect(Object.values(AuthError)).toHaveLength(OTHER_ERRORS.length + 1);
-  });
-
   it('says nothing for Unauthorized', () => {
     expect(messageForAuthError(AuthError.Unauthorized)).toBeNull();
   });
