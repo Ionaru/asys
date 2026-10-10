@@ -1345,6 +1345,25 @@ describe('TaskEditor', () => {
 
       expect(must(removes()[0]).disabled).toBe(true);
     });
+
+    it('keeps the other Remove, Save and Add a blocker enabled while one Remove is pending', async () => {
+      const { text, root, button, click, type, finish } = await setup({ state: LINKED });
+      const removes = (): HTMLButtonElement[] =>
+        Array.from(root().querySelectorAll<HTMLButtonElement>('button')).filter(
+          (b) => text(b) === 'Remove',
+        );
+
+      await type('Title', 'Call Marit back');
+      await click(removes()[0]);
+
+      expect(removes().map((b) => b.disabled)).toEqual([true, false]);
+      expect(must(button('Save')).disabled).toBe(false);
+      expect(must(button('Add a blocker')).disabled).toBe(false);
+
+      await finish(0, FAILED);
+
+      expect(removes().map((b) => b.disabled)).toEqual([false, false]);
+    });
   });
 
   describe('Add a blocker', () => {
