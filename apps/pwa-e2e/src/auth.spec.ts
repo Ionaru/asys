@@ -21,3 +21,13 @@ test('A seeded Capture is Applied', async ({ page }) => {
   const badge = page.getByRole('navigation', { name: 'Primary' }).locator('.asys-bottomnav__badge');
   await expect(badge).toHaveText('1');
 });
+
+test('Signing out from Account lands on /signin without a return URL', async ({ page }) => {
+  await page.goto('/account');
+  await expect(page.getByRole('heading', { level: 1, name: 'Account' })).toBeVisible();
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page).toHaveURL(/\/signin$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Sign in' })).toBeVisible();
+  const response = await page.context().request.get('/v1/snapshot');
+  expect(response.status()).toBe(401);
+});

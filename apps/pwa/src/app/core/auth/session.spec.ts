@@ -3,7 +3,13 @@ import { TestBed } from '@angular/core/testing';
 
 import { AuthApi, AuthError, AuthResultTag, type AuthResult, type Me } from '../api/auth-api';
 import { DeviceStorage } from '../platform/device-storage';
-import { LAST_REPORTED_ZONE_KEY, SESSION_CHECK_TIMEOUT_MS, Session, SessionState } from './session';
+import {
+  LAST_REPORTED_ZONE_KEY,
+  SESSION_CHECK_TIMEOUT_MS,
+  Session,
+  SessionState,
+  SignOutReason,
+} from './session';
 
 const ada: Me = { name: 'Ada', recoveryCodesLeft: 4 };
 
@@ -53,9 +59,10 @@ describe('Session', () => {
     localStorage.clear();
   });
 
-  it('starts Unknown with no Me', () => {
+  it('starts Unknown with no Me and no sign-out reason', () => {
     expect(session.state()).toBe(SessionState.Unknown);
     expect(session.me()).toBeNull();
+    expect(session.signOutReason()).toBeNull();
   });
 
   it('exposes the documented constants', () => {
@@ -82,6 +89,36 @@ describe('Session', () => {
 
       expect(session.state()).toBe(SessionState.SignedOut);
       expect(session.me()).toBeNull();
+    });
+
+    it('Unauthorized records Revoked', async () => {
+      me.mockResolvedValueOnce(ok(ada));
+      await session.check();
+      me.mockResolvedValueOnce(failed(AuthError.Unauthorized));
+
+      await session.check();
+
+      expect(session.signOutReason()).toBe(SignOutReason.Revoked);
+    });
+
+    it('Unauthorized after a Chosen sign-out leaves the reason Chosen', async () => {
+      await session.signedIn(ada);
+      session.signedOut(SignOutReason.Chosen);
+      me.mockResolvedValueOnce(failed(AuthError.Unauthorized));
+
+      await session.check();
+
+      expect(session.signOutReason()).toBe(SignOutReason.Chosen);
+    });
+
+    it('Ok after a sign-out clears the reason', async () => {
+      session.signedOut(SignOutReason.Chosen);
+      me.mockResolvedValueOnce(ok(ada));
+
+      await session.check();
+
+      expect(session.state()).toBe(SessionState.SignedIn);
+      expect(session.signOutReason()).toBeNull();
     });
 
     it.each([AuthError.Network, AuthError.Unexpected, AuthError.SignInFailed])(
@@ -218,7 +255,7 @@ describe('Session', () => {
       me.mockReturnValue(pending.promise);
 
       const done = session.check();
-      session.signedOut();
+      session.signedOut(SignOutReason.Revoked);
       pending.resolve(ok(ada));
       await done;
 
@@ -294,7 +331,7 @@ describe('Session', () => {
         const done = session.check().then(() => {
           settled = true;
         });
-        session.signedOut();
+        session.signedOut(SignOutReason.Revoked);
         await vi.advanceTimersByTimeAsync(SESSION_CHECK_TIMEOUT_MS);
         await done;
 
@@ -368,6 +405,36 @@ describe('Session', () => {
 
       expect(session.state()).toBe(SessionState.Unreachable);
     });
+
+    it.each([SignOutReason.Chosen, SignOutReason.Revoked])(
+      'with a Me clears a %s reason',
+      async (reason) => {
+        session.signedOut(reason);
+
+        await session.signedIn(grace);
+
+        expect(session.signOutReason()).toBeNull();
+      },
+    );
+
+    it('without a Me clears a Chosen reason once the server confirms the sign-in', async () => {
+      session.signedOut(SignOutReason.Chosen);
+      me.mockResolvedValue(ok(ada));
+
+      await session.signedIn();
+
+      expect(session.signOutReason()).toBeNull();
+    });
+
+    it('a revocation in the next session is not mistaken for the earlier Chosen sign-out', async () => {
+      await session.signedIn(ada);
+      session.signedOut(SignOutReason.Chosen);
+      await session.signedIn(grace);
+
+      session.signedOut(SignOutReason.Revoked);
+
+      expect(session.signOutReason()).toBe(SignOutReason.Revoked);
+    });
   });
 
   describe('signedOut', () => {
@@ -375,19 +442,42 @@ describe('Session', () => {
       await session.signedIn(ada);
       remove.mockClear();
 
-      session.signedOut();
+      session.signedOut(SignOutReason.Chosen);
 
       expect(session.state()).toBe(SessionState.SignedOut);
       expect(session.me()).toBeNull();
       expect(remove).toHaveBeenCalledWith(LAST_REPORTED_ZONE_KEY);
     });
 
-    it('is harmless when called twice', () => {
-      session.signedOut();
+    it.each([SignOutReason.Chosen, SignOutReason.Revoked])('records %s', async (reason) => {
+      await session.signedIn(ada);
 
-      expect(() => session.signedOut()).not.toThrow();
+      session.signedOut(reason);
+
+      expect(session.signOutReason()).toBe(reason);
+    });
+
+    it('is harmless when called twice', () => {
+      session.signedOut(SignOutReason.Revoked);
+
+      expect(() => session.signedOut(SignOutReason.Revoked)).not.toThrow();
       expect(session.state()).toBe(SessionState.SignedOut);
       expect(session.me()).toBeNull();
+      expect(session.signOutReason()).toBe(SignOutReason.Revoked);
+    });
+
+    it('keeps Chosen when Revoked follows it', () => {
+      session.signedOut(SignOutReason.Chosen);
+      session.signedOut(SignOutReason.Revoked);
+
+      expect(session.signOutReason()).toBe(SignOutReason.Chosen);
+    });
+
+    it('settles on Chosen when Revoked comes first', () => {
+      session.signedOut(SignOutReason.Revoked);
+      session.signedOut(SignOutReason.Chosen);
+
+      expect(session.signOutReason()).toBe(SignOutReason.Chosen);
     });
   });
 });
