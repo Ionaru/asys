@@ -2,9 +2,9 @@
 import { Location } from '@angular/common';
 import { inject } from '@angular/core';
 
-import { SIGNED_OUT_PATHS } from '../auth/safe-return-url';
-import { pathOf } from '../platform/url-path';
-import { DataStore } from './data-store';
+import { SIGNED_OUT_PATHS } from './core/auth/safe-return-url';
+import { DataStore } from './core/data/data-store';
+import { pathOf } from './core/platform/url-path';
 
 /** For an app initialiser: preloads the snapshot beside the session check, unless the launch lands on a sign-in screen. */
 export const preloadOnLaunch = (): void => {

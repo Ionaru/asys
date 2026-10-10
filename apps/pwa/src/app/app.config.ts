@@ -15,9 +15,9 @@ import { keepaliveInterceptor } from './core/api/keepalive';
 import { provideApi } from './core/api/provide-api';
 import { Session } from './core/auth/session';
 import { unauthorizedInterceptor } from './core/auth/unauthorized.interceptor';
-import { preloadOnLaunch } from './core/data/preload-on-launch';
 import { Theme } from './core/platform/theme';
 import { onViewTransitionCreated } from './core/platform/view-transitions';
+import { preloadOnLaunch } from './preload-on-launch';
 
 export const appConfig: ApplicationConfig = {
   providers: [

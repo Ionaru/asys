@@ -2,7 +2,7 @@
 import { MOCK_PLATFORM_LOCATION_CONFIG } from '@angular/common/testing';
 import { TestBed } from '@angular/core/testing';
 
-import { DataStore } from './data-store';
+import { DataStore } from './core/data/data-store';
 import { preloadOnLaunch } from './preload-on-launch';
 
 const launchAt = (url: string): ReturnType<typeof vi.fn<() => void>> => {
