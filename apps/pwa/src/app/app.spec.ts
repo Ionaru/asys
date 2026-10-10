@@ -32,6 +32,7 @@ const setup = async (initial: SessionState, url = '/now', realSession = false) =
   const syncedAt = signal<Instant | null>(null);
   const start = vi.fn<() => void>();
   const stop = vi.fn<() => void>();
+  const discardPreload = vi.fn<() => void>();
   const syncStart = vi.fn<() => void>();
   const syncStop = vi.fn<() => void>();
   const prompt = signal(false);
@@ -72,6 +73,7 @@ const setup = async (initial: SessionState, url = '/now', realSession = false) =
           inboxCount: signal(0),
           start,
           stop,
+          discardPreload,
         },
       },
       { provide: TimeZoneSync, useValue: { start: syncStart, stop: syncStop } },
@@ -121,6 +123,7 @@ const setup = async (initial: SessionState, url = '/now', realSession = false) =
     syncedAt,
     start,
     stop,
+    discardPreload,
     syncStart,
     syncStop,
     prompt,
@@ -142,14 +145,15 @@ describe('App', () => {
 
   describe('data store', () => {
     it('starts once when the session is signed in', async () => {
-      const { start, stop } = await setup(SessionState.SignedIn);
+      const { start, stop, discardPreload } = await setup(SessionState.SignedIn);
 
       expect(start).toHaveBeenCalledTimes(1);
       expect(stop).not.toHaveBeenCalled();
+      expect(discardPreload).not.toHaveBeenCalled();
     });
 
-    it('starts when the session becomes signed in', async () => {
-      const { sessionState, settle, start } = await setup(SessionState.Unknown);
+    it('starts, keeping the preload for it, when the session becomes signed in', async () => {
+      const { sessionState, settle, start, discardPreload } = await setup(SessionState.Unknown);
 
       expect(start).not.toHaveBeenCalled();
 
@@ -157,19 +161,54 @@ describe('App', () => {
       await settle();
 
       expect(start).toHaveBeenCalledTimes(1);
+      expect(discardPreload).not.toHaveBeenCalled();
     });
 
-    it('stops once when the session becomes signed out after a start', async () => {
-      const { sessionState, settle, start, stop } = await setup(SessionState.SignedIn);
+    it('stops once and discards the preload when the session becomes signed out after a start', async () => {
+      const { sessionState, settle, start, stop, discardPreload } = await setup(
+        SessionState.SignedIn,
+      );
 
       sessionState.set(SessionState.SignedOut);
       await settle();
 
       expect(stop).toHaveBeenCalledTimes(1);
       expect(start).toHaveBeenCalledTimes(1);
+      expect(discardPreload).toHaveBeenCalledTimes(1);
     });
 
-    it('does nothing when signed in becomes unreachable', async () => {
+    it.each([SessionState.SignedOut, SessionState.Unreachable])(
+      'discards the preload, starting and stopping nothing, when unknown becomes %s',
+      async (end) => {
+        const { sessionState, settle, start, stop, discardPreload } = await setup(
+          SessionState.Unknown,
+        );
+
+        sessionState.set(end);
+        await settle();
+
+        expect(discardPreload).toHaveBeenCalledTimes(1);
+        expect(start).not.toHaveBeenCalled();
+        expect(stop).not.toHaveBeenCalled();
+      },
+    );
+
+    it('discards the preload before it starts when unreachable becomes signed in', async () => {
+      const { sessionState, settle, start, discardPreload } = await setup(SessionState.Unknown);
+
+      sessionState.set(SessionState.Unreachable);
+      await settle();
+      sessionState.set(SessionState.SignedIn);
+      await settle();
+
+      expect(discardPreload).toHaveBeenCalledTimes(1);
+      expect(start).toHaveBeenCalledTimes(1);
+      expect(discardPreload.mock.invocationCallOrder[0]).toBeLessThan(
+        start.mock.invocationCallOrder[0] ?? 0,
+      );
+    });
+
+    it('neither starts again nor stops when signed in becomes unreachable', async () => {
       const { sessionState, settle, start, stop } = await setup(SessionState.SignedIn);
 
       sessionState.set(SessionState.Unreachable);

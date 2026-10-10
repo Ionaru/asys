@@ -84,6 +84,8 @@ export class App {
           this.#timeZoneSync.start();
           this.dataStore.start();
         } else if (current === SessionState.SignedOut) {
+          this.dataStore.discardPreload();
+
           if (started) {
             started = false;
             this.dataStore.stop();
@@ -93,6 +95,8 @@ export class App {
           if (before === SessionState.SignedIn || before === SessionState.Unreachable) {
             this.#leave();
           }
+        } else if (current === SessionState.Unreachable) {
+          this.dataStore.discardPreload();
         }
       });
     });

@@ -17,7 +17,6 @@ import {
   type ActiveHours,
   type Area,
   type AreaPatch,
-  type Command,
   CommandTag,
   type CreateArea,
   intervalFromTimes,
@@ -27,7 +26,7 @@ import {
   timeInputValue,
 } from '@asys/domain';
 
-import { CommandOutcomeTag, type CommandOutcome } from '../../core/api/data-api';
+import { CommandOutcomeTag } from '../../core/api/data-api';
 import { CommandAttempts } from '../../core/data/command-attempts';
 import { DataStore, SyncStatus } from '../../core/data/data-store';
 import { type DraftFields, followStore, settleSaved } from '../../core/data/draft-follow';
@@ -232,9 +231,6 @@ export class AreaEditor {
 
   protected readonly statusLine = signal('');
 
-  /** Whether a Save or Create send is in flight. */
-  readonly #sending = signal(false);
-
   /** The CreateArea still being tried after Failed, so a retry reuses its areaId. */
   readonly #pendingCreate = signal<CreateArea | null>(null);
 
@@ -280,19 +276,28 @@ export class AreaEditor {
     return baseline === null ? {} : buildAreaPatch(baseline, this.draft());
   });
 
+  /** The id of this Area, or of the one being created; null before a new Area has an id. */
+  readonly #subject = computed(() => this.areaId() ?? this.#pendingCreate()?.areaId ?? null);
+
   /** Whether this Area, or the one being created, waits for the server after an applied command. */
   protected readonly awaiting = computed(() => {
-    const id = this.areaId() ?? this.#pendingCreate()?.areaId ?? null;
+    const id = this.#subject();
 
     return id !== null && this.dataStore.awaitingSync().has(id);
+  });
+
+  /** Whether a Save or Create send is in flight for this Area, or it waits for the server. */
+  readonly #busy = computed(() => {
+    const id = this.#subject();
+
+    return id !== null && this.#attempts.busy(id);
   });
 
   protected readonly canSubmit = computed(
     () =>
       !this.needsName() &&
       !this.#hasErrors() &&
-      !this.#sending() &&
-      !this.awaiting() &&
+      !this.#busy() &&
       (this.areaId() === null ||
         (this.#baseline() !== null && Object.keys(this.#patch()).length > 0)),
   );
@@ -412,8 +417,9 @@ export class AreaEditor {
           };
 
     this.#pendingCreate.set(command);
+    this.statusLine.set('');
 
-    const outcome = await this.#runAction(command);
+    const outcome = await this.#attempts.send(command);
 
     if (this.#destroyRef.destroyed) {
       return;
@@ -440,7 +446,10 @@ export class AreaEditor {
     }
 
     const sent = this.draft();
-    const outcome = await this.#runAction({
+
+    this.statusLine.set('');
+
+    const outcome = await this.#attempts.send({
       _tag: CommandTag.UpdateArea,
       areaId,
       patch: buildAreaPatch(baseline, sent),
@@ -496,17 +505,5 @@ export class AreaEditor {
       ...draft,
       days: draft.days.map((rows, index) => (index === day ? change(rows) : rows)),
     }));
-  }
-
-  /** Sends a Save or Create through its attempt and marks it pending meanwhile. */
-  async #runAction(command: Command): Promise<CommandOutcome> {
-    this.statusLine.set('');
-    this.#sending.set(true);
-
-    try {
-      return await this.#attempts.send(command);
-    } finally {
-      this.#sending.set(false);
-    }
   }
 }

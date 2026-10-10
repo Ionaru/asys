@@ -74,7 +74,7 @@ Lint bans runtime imports of `@asys/contract`, `effect` and `@ionaru/effect-pass
 5. Sending from a screen:
    - Send with `CommandAttempts.send(command)`, which takes the command's key from `keyFor`, sends through `DataStore.send` and settles the attempt. Then show `outcomeMessage(outcome)`.
    - After every await, check `destroyRef.destroyed`.
-   - Disable the control while a send is pending or `awaitingSync()` holds its subject, and show `<p asys-sync-note>` (`ui/sync-note`) while it holds.
+   - Disable the control while `CommandAttempts.busy(subject)` holds, which is true while a send for the subject is in flight or `awaitingSync()` holds it, and show `<p asys-sync-note>` (`ui/sync-note`) while `awaitingSync()` holds it. `send` raises and lowers the in-flight count itself, so a screen keeps no pending signal of its own. A send that skips `CommandAttempts.send` (the time zone choice) wraps its work in `track(subject, work)`. The subject is the id `commandSubject(command)` returns.
    - A Done goes through `DoneUndo.complete(task, origin)` instead: it holds the Task for the Undo window and owns the key and the send. Quick add goes through `CaptureQueue.submit(text)`. Both are provided by the shell. Quick add's Add is `aria-disabled` while the field is empty, never `disabled`, so a tap never takes focus from the field.
    - There is no offline queue yet, except the in-memory held Done and `CaptureQueue`, which do not survive a reload; that comes in slice 4. Offline, a send fails with "cannot reach the server".
 

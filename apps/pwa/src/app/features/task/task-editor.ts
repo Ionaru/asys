@@ -36,7 +36,7 @@ import {
   TaskStatus,
 } from '@asys/domain';
 
-import { CommandOutcomeTag, type CommandOutcome } from '../../core/api/data-api';
+import { CommandOutcomeTag } from '../../core/api/data-api';
 import { CommandAttempts } from '../../core/data/command-attempts';
 import { DataStore, SyncStatus, zoneOrUtc } from '../../core/data/data-store';
 import { DoneOrigin, DoneUndo } from '../../core/data/done-undo';
@@ -65,8 +65,6 @@ import { SyncNote } from '../../ui/sync-note/sync-note';
 import { TextField } from '../../ui/text-field/text-field';
 import { byAreaName } from '../areas/area-order';
 import { buildTaskPatch, draftOf, TASK_DRAFT_FIELDS, type TaskDraft } from './task-patch';
-
-const NO_IDS: ReadonlySet<string> = new Set();
 
 const EMPTY_DRAFT: TaskDraft = {
   title: '',
@@ -162,14 +160,6 @@ export class TaskEditor {
    */
   protected readonly leaving = signal(false);
 
-  /** Whether a Save, Done, Drop or Log progress send is in flight. */
-  readonly #actionPending = signal(false);
-
-  readonly #removingIds = signal<ReadonlySet<string>>(NO_IDS);
-
-  /** Whether an Add blocker send is in flight; only one runs at a time. */
-  readonly #adding = signal(false);
-
   /** The AddBlocker commands still being tried, by blocker id, so a retry reuses its linkId. */
   readonly #addCommands = new Map<string, AddBlocker>();
 
@@ -257,10 +247,12 @@ export class TaskEditor {
     return baseline !== null && baseline.important !== null && this.#model().important === null;
   });
 
-  /** Whether Save, Done, Drop and Log progress are unavailable right now. */
+  /**
+   * Whether Save, Done, Drop, Log progress and Add blocker are unavailable right now: the Task is
+   * leaving, or a send for it is in flight or waits for the server.
+   */
   protected readonly actionsBusy = computed(
-    () =>
-      this.#actionPending() || this.leaving() || this.dataStore.awaitingSync().has(this.taskId()),
+    () => this.leaving() || this.#attempts.busy(this.taskId()),
   );
 
   protected readonly canSave = computed(
@@ -375,10 +367,6 @@ export class TaskEditor {
     );
   });
 
-  protected readonly addBusy = computed(
-    () => this.#adding() || this.leaving() || this.dataStore.awaitingSync().has(this.taskId()),
-  );
-
   constructor() {
     effect(() => {
       const task = this.#task();
@@ -389,9 +377,7 @@ export class TaskEditor {
 
   /** Whether this link's Remove is pending or waits for the server. */
   protected removeBusy(linkId: string): boolean {
-    return (
-      this.leaving() || this.#removingIds().has(linkId) || this.dataStore.awaitingSync().has(linkId)
-    );
+    return this.leaving() || this.#attempts.busy(linkId);
   }
 
   protected async save(): Promise<void> {
@@ -410,7 +396,7 @@ export class TaskEditor {
       patch: buildTaskPatch(baseline, sent),
       expect: { status: this.#expectedStatus },
     };
-    const outcome = await this.#runAction(command);
+    const outcome = await this.#attempts.send(command);
 
     if (this.#destroyRef.destroyed) {
       return;
@@ -464,7 +450,7 @@ export class TaskEditor {
     this.#clearMessages();
     this.leaving.set(true);
 
-    const outcome = await this.#runAction({
+    const outcome = await this.#attempts.send({
       _tag: CommandTag.DropTask,
       taskId: this.taskId(),
       expect: { status: TaskStatus.Open },
@@ -495,7 +481,7 @@ export class TaskEditor {
 
     this.#clearMessages();
 
-    const outcome = await this.#runAction(logProgressCommand(this.taskId(), minutes));
+    const outcome = await this.#attempts.send(logProgressCommand(this.taskId(), minutes));
 
     if (this.#destroyRef.destroyed) {
       return;
@@ -522,15 +508,8 @@ export class TaskEditor {
     }
 
     this.#clearMessages();
-    this.#removingIds.update((ids) => new Set([...ids, linkId]));
 
-    let outcome: CommandOutcome;
-
-    try {
-      outcome = await this.#attempts.send({ _tag: CommandTag.RemoveBlocker, linkId });
-    } finally {
-      this.#removingIds.update((ids) => new Set([...ids].filter((id) => id !== linkId)));
-    }
+    const outcome = await this.#attempts.send({ _tag: CommandTag.RemoveBlocker, linkId });
 
     if (this.#destroyRef.destroyed) {
       return;
@@ -544,7 +523,7 @@ export class TaskEditor {
   }
 
   protected async addBlocker(blockerId: string): Promise<void> {
-    if (this.addBusy()) {
+    if (this.actionsBusy()) {
       return;
     }
 
@@ -558,15 +537,8 @@ export class TaskEditor {
     };
 
     this.#addCommands.set(blockerId, command);
-    this.#adding.set(true);
 
-    let outcome: CommandOutcome;
-
-    try {
-      outcome = await this.#attempts.send(command);
-    } finally {
-      this.#adding.set(false);
-    }
+    const outcome = await this.#attempts.send(command);
 
     if (this.#destroyRef.destroyed) {
       return;
@@ -615,17 +587,6 @@ export class TaskEditor {
       this.#location.back();
     } else {
       void this.#router.navigateByUrl('/now', { replaceUrl: true });
-    }
-  }
-
-  /** Sends a Save, Done, Drop or Log progress and marks it pending meanwhile. */
-  async #runAction(command: Command): Promise<CommandOutcome> {
-    this.#actionPending.set(true);
-
-    try {
-      return await this.#attempts.send(command);
-    } finally {
-      this.#actionPending.set(false);
     }
   }
 
