@@ -13,9 +13,9 @@ const COPY_FAILED_MESSAGE = 'Could not copy. Select the codes instead.';
 export interface RecoveryCodesRef {
   readonly codes: Signal<readonly string[]>;
   readonly copyStatus: Signal<string | null>;
-  /** Shows a new set, clears the copy status and holds the update prompt unless it is held. */
+  /** Shows a new set, clears the copy status and holds the update prompt unless it already does. */
   show(codes: readonly string[]): void;
-  /** Clears the codes and the copy status and releases the hold. */
+  /** Clears the codes and the copy status and releases the hold, if there is one. */
   hide(): void;
   /** Writes the codes to the clipboard, one per line, and reports the outcome in `copyStatus`. */
   copy(): Promise<void>;
