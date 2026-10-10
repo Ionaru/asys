@@ -1,12 +1,19 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { CeremonyResultTag, type CeremonyResult } from '@ionaru/effect-passkeys/client';
+import type {
+  PublicKeyCredentialCreationOptionsJSON,
+  RegistrationResponseJSON,
+} from '@simplewebauthn/browser';
 
 import {
   AuthApi,
   AuthError,
   AuthResultTag,
   type AuthResult,
+  type CeremonyOptions,
+  type Passkey,
   type RecoveryCodes,
 } from '../../core/api/auth-api';
 import { PasskeyCeremony } from '../../core/api/passkey-ceremony';
@@ -14,6 +21,7 @@ import { Session } from '../../core/auth/session';
 import { CaptureQueue } from '../../core/data/capture-queue';
 import { DataStore } from '../../core/data/data-store';
 import { DoneUndo } from '../../core/data/done-undo';
+import { GENERIC_MESSAGE } from '../../core/data/outcome-message';
 import { AppUpdate } from '../../core/platform/app-update';
 import { Clock } from '../../core/platform/clock';
 import { DeviceZone } from '../../core/platform/device-zone';
@@ -47,13 +55,47 @@ const codesOk = (recoveryCodes: readonly string[]): AuthResult<RecoveryCodes> =>
   value: { recoveryCodes },
 });
 
+const failed = <T>(error: AuthError): Promise<AuthResult<T>> =>
+  Promise.resolve({ _tag: AuthResultTag.Failed, error });
+
+const PASSKEY: Passkey = {
+  credentialId: 'credential-1',
+  name: 'Laptop',
+  createdAt: 0,
+  lastUsedAt: null,
+  backedUp: false,
+};
+
+const BEGIN: AuthResult<CeremonyOptions<PublicKeyCredentialCreationOptionsJSON>> = {
+  _tag: AuthResultTag.Ok,
+  value: {
+    challengeId: 'challenge-1',
+    options: { challenge: 'challenge-bytes' } as PublicKeyCredentialCreationOptionsJSON,
+  },
+};
+
+const CEREMONY_OK: CeremonyResult<RegistrationResponseJSON> = {
+  _tag: CeremonyResultTag.Ok,
+  response: { id: 'credential-2' } as unknown as RegistrationResponseJSON,
+};
+
+type AuthApiSeams = Pick<
+  AuthApi,
+  'passkeys' | 'addOptions' | 'addPasskey' | 'removePasskey' | 'regenerateRecoveryCodes'
+>;
+
+interface Seams {
+  readonly api?: Partial<AuthApiSeams>;
+  readonly create?: PasskeyCeremony['create'];
+}
+
 const settle = async (): Promise<void> => {
   for (let round = 0; round < 3; round += 1) {
     await new Promise<void>((resolve) => setTimeout(resolve));
   }
 };
 
-const setup = async () => {
+const setup = async ({ api = {}, create = vi.fn() }: Seams = {}) => {
   const flush = vi.fn<() => Promise<void>>(() => Promise.resolve());
   const drain = vi.fn<() => Promise<void>>(() => Promise.resolve());
   const signOut = vi.fn<() => Promise<AuthResult<void>>>(() => Promise.resolve(OK));
@@ -75,9 +117,10 @@ const setup = async () => {
             Promise.resolve({ _tag: AuthResultTag.Failed, error: AuthError.Unauthorized }),
           signOut,
           regenerateRecoveryCodes: regenerate,
+          ...api,
         },
       },
-      { provide: PasskeyCeremony, useValue: { create: vi.fn(), supported: () => true } },
+      { provide: PasskeyCeremony, useValue: { create, supported: () => true } },
       { provide: AppUpdate, useValue: { hold, release } },
       { provide: DataStore, useValue: { state: signal(null) } },
       { provide: Clock, useValue: { now: () => 0 } },
@@ -110,21 +153,30 @@ const setup = async () => {
 
   const root = (): HTMLElement => fixture.nativeElement;
 
-  const button = (text: string): HTMLButtonElement | undefined =>
-    Array.from(root().querySelectorAll<HTMLButtonElement>('button')).find(
-      (b) => b.textContent?.trim() === text,
+  const button = (text: string): HTMLButtonElement =>
+    must(
+      Array.from(root().querySelectorAll<HTMLButtonElement>('button')).find(
+        (b) => b.textContent?.trim() === text,
+      ),
+      `${text} button`,
     );
 
-  const click = async (text: string): Promise<void> => {
-    must(button(text), `${text} button`).click();
+  const alert = (): string | null =>
+    root().querySelector('[role="alert"]')?.textContent?.trim() ?? null;
+
+  const hasButton = (text: string): boolean =>
+    Array.from(root().querySelectorAll('button')).some((b) => b.textContent?.trim() === text);
+
+  const click = async (target: HTMLButtonElement): Promise<void> => {
+    target.click();
     await fixture.whenStable();
     await settle();
     fixture.detectChanges();
   };
 
   const showCodes = async (): Promise<void> => {
-    await click('Make new recovery codes');
-    await click('Make new codes');
+    await click(button('Make new recovery codes'));
+    await click(button('Make new codes'));
   };
 
   const items = (): string[] =>
@@ -134,18 +186,20 @@ const setup = async () => {
 
   return {
     fixture,
+    root,
     flush,
     drain,
     signOut,
     signedOut,
     signOutButton,
+    button,
+    alert,
+    hasButton,
+    click,
     hold,
     release,
     check,
     regenerate,
-    root,
-    button,
-    click,
     showCodes,
     items,
     status,
@@ -259,6 +313,191 @@ describe('Account sign out', () => {
   });
 });
 
+describe('Account failures', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  describe('when the session ended (Unauthorized)', () => {
+    it('shows no alert and no Try again when loading the add options fails', async () => {
+      const addOptions = vi.fn<AuthApi['addOptions']>(() => failed(AuthError.Unauthorized));
+      const { fixture, alert, hasButton } = await setup({ api: { addOptions } });
+
+      fixture.detectChanges();
+
+      expect(addOptions).toHaveBeenCalledTimes(1);
+      expect(alert()).toBeNull();
+      expect(hasButton('Try again')).toBe(false);
+    });
+
+    it('shows no alert and no Try again when adding a passkey fails', async () => {
+      const addOptions = vi.fn<AuthApi['addOptions']>(() => Promise.resolve(BEGIN));
+      const addPasskey = vi.fn<AuthApi['addPasskey']>(() => failed(AuthError.Unauthorized));
+      const create = vi.fn<PasskeyCeremony['create']>(() => Promise.resolve(CEREMONY_OK));
+      const { fixture, alert, hasButton, button, click } = await setup({
+        api: { addOptions, addPasskey },
+        create,
+      });
+
+      fixture.detectChanges();
+      await click(button('Add a passkey'));
+
+      expect(addPasskey).toHaveBeenCalledTimes(1);
+      expect(alert()).toBeNull();
+      expect(hasButton('Try again')).toBe(false);
+    });
+
+    it('shows no alert and no Try again when removing a passkey fails', async () => {
+      const passkeys = vi.fn<AuthApi['passkeys']>(() =>
+        Promise.resolve({ _tag: AuthResultTag.Ok, value: [PASSKEY] }),
+      );
+      const removePasskey = vi.fn<AuthApi['removePasskey']>(() => failed(AuthError.Unauthorized));
+      const { fixture, alert, hasButton, button, click } = await setup({
+        api: { passkeys, removePasskey },
+      });
+
+      fixture.detectChanges();
+      await click(button('Remove Laptop'));
+      await click(button('Remove passkey'));
+
+      expect(removePasskey).toHaveBeenCalledWith(PASSKEY.credentialId);
+      expect(alert()).toBeNull();
+      expect(hasButton('Try again')).toBe(false);
+    });
+
+    it('shows no alert and no Try again when making new recovery codes fails', async () => {
+      const regenerateRecoveryCodes = vi.fn<AuthApi['regenerateRecoveryCodes']>(() =>
+        failed(AuthError.Unauthorized),
+      );
+      const { fixture, alert, hasButton, button, click } = await setup({
+        api: { regenerateRecoveryCodes },
+      });
+
+      fixture.detectChanges();
+      await click(button('Make new recovery codes'));
+      await click(button('Make new codes'));
+
+      expect(regenerateRecoveryCodes).toHaveBeenCalledTimes(1);
+      expect(alert()).toBeNull();
+      expect(hasButton('Try again')).toBe(false);
+    });
+  });
+
+  describe('when the server cannot be reached (Network)', () => {
+    it('shows GENERIC_MESSAGE and Try again when loading the add options fails, and Try again loads them again', async () => {
+      const addOptions = vi.fn<AuthApi['addOptions']>(() => failed(AuthError.Network));
+      const { fixture, alert, button, click } = await setup({ api: { addOptions } });
+
+      fixture.detectChanges();
+
+      expect(alert()).toBe(GENERIC_MESSAGE);
+
+      await click(button('Try again'));
+
+      expect(addOptions).toHaveBeenCalledTimes(2);
+    });
+
+    it('shows GENERIC_MESSAGE when adding a passkey fails', async () => {
+      const addOptions = vi.fn<AuthApi['addOptions']>(() => Promise.resolve(BEGIN));
+      const addPasskey = vi.fn<AuthApi['addPasskey']>(() => failed(AuthError.Network));
+      const create = vi.fn<PasskeyCeremony['create']>(() => Promise.resolve(CEREMONY_OK));
+      const { fixture, alert, button, click } = await setup({
+        api: { addOptions, addPasskey },
+        create,
+      });
+
+      fixture.detectChanges();
+      await click(button('Add a passkey'));
+
+      expect(addPasskey).toHaveBeenCalledTimes(1);
+      expect(alert()).toBe(GENERIC_MESSAGE);
+    });
+
+    it('shows GENERIC_MESSAGE when removing a passkey fails', async () => {
+      const passkeys = vi.fn<AuthApi['passkeys']>(() =>
+        Promise.resolve({ _tag: AuthResultTag.Ok, value: [PASSKEY] }),
+      );
+      const removePasskey = vi.fn<AuthApi['removePasskey']>(() => failed(AuthError.Network));
+      const { fixture, alert, button, click } = await setup({ api: { passkeys, removePasskey } });
+
+      fixture.detectChanges();
+      await click(button('Remove Laptop'));
+      await click(button('Remove passkey'));
+
+      expect(removePasskey).toHaveBeenCalledTimes(1);
+      expect(alert()).toBe(GENERIC_MESSAGE);
+    });
+
+    it('shows GENERIC_MESSAGE when making new recovery codes fails', async () => {
+      const regenerateRecoveryCodes = vi.fn<AuthApi['regenerateRecoveryCodes']>(() =>
+        failed<RecoveryCodes>(AuthError.Network),
+      );
+      const { fixture, alert, button, click } = await setup({ api: { regenerateRecoveryCodes } });
+
+      fixture.detectChanges();
+      await click(button('Make new recovery codes'));
+      await click(button('Make new codes'));
+
+      expect(regenerateRecoveryCodes).toHaveBeenCalledTimes(1);
+      expect(alert()).toBe(GENERIC_MESSAGE);
+    });
+  });
+
+  describe('specific messages', () => {
+    it('says a passkey that is the only one cannot be removed', async () => {
+      const passkeys = vi.fn<AuthApi['passkeys']>(() =>
+        Promise.resolve({ _tag: AuthResultTag.Ok, value: [PASSKEY] }),
+      );
+      const removePasskey = vi.fn<AuthApi['removePasskey']>(() => failed(AuthError.LastPasskey));
+      const { fixture, alert, button, click } = await setup({ api: { passkeys, removePasskey } });
+
+      fixture.detectChanges();
+      await click(button('Remove Laptop'));
+      await click(button('Remove passkey'));
+
+      expect(alert()).toBe('You cannot remove your only passkey.');
+    });
+
+    it.each([
+      [AuthError.ChallengeInvalid, 'Try again.'],
+      [AuthError.VerificationFailed, 'Try again.'],
+      [AuthError.AlreadyRegistered, 'This device already has a passkey for ASYS.'],
+    ])('says the add message for %s', async (error, message) => {
+      const addOptions = vi.fn<AuthApi['addOptions']>(() => Promise.resolve(BEGIN));
+      const addPasskey = vi.fn<AuthApi['addPasskey']>(() => failed(error));
+      const create = vi.fn<PasskeyCeremony['create']>(() => Promise.resolve(CEREMONY_OK));
+      const { fixture, alert, button, click } = await setup({
+        api: { addOptions, addPasskey },
+        create,
+      });
+
+      fixture.detectChanges();
+      await click(button('Add a passkey'));
+
+      expect(alert()).toBe(message);
+    });
+  });
+
+  describe('the passkeys list', () => {
+    it.each([AuthError.Unauthorized, AuthError.Network])(
+      'shows that it could not load, with Try again, on %s',
+      async (error) => {
+        const passkeys = vi.fn<AuthApi['passkeys']>(() => failed(error));
+        const { fixture, root, alert, button, click } = await setup({ api: { passkeys } });
+
+        fixture.detectChanges();
+
+        expect(root().textContent).toContain('Could not load your passkeys.');
+        expect(alert()).toBeNull();
+
+        await click(button('Try again'));
+
+        expect(passkeys).toHaveBeenCalledTimes(2);
+      },
+    );
+  });
+});
+
 describe('Account recovery codes', () => {
   afterEach(() => {
     document.body.innerHTML = '';
@@ -266,11 +505,11 @@ describe('Account recovery codes', () => {
   });
 
   it('asks before it makes new codes, and holds nothing yet', async () => {
-    const { regenerate, hold, button, click } = await setup();
+    const { regenerate, hold, button, hasButton, click } = await setup();
 
-    await click('Make new recovery codes');
+    await click(button('Make new recovery codes'));
 
-    expect(button('Make new codes')).toBeDefined();
+    expect(hasButton('Make new codes')).toBe(true);
     expect(regenerate).not.toHaveBeenCalled();
     expect(hold).not.toHaveBeenCalled();
   });
@@ -290,14 +529,14 @@ describe('Account recovery codes', () => {
   });
 
   it('shows a message and holds nothing when the new codes cannot be made', async () => {
-    const { regenerate, root, hold, items, showCodes } = await setup();
+    const { regenerate, alert, hold, items, showCodes } = await setup();
 
     regenerate.mockResolvedValueOnce({ _tag: AuthResultTag.Failed, error: AuthError.Network });
 
     await showCodes();
 
     expect(items()).toEqual([]);
-    expect(root().querySelector('p[role="alert"]')).not.toBeNull();
+    expect(alert()).toBe(GENERIC_MESSAGE);
     expect(hold).not.toHaveBeenCalled();
   });
 
@@ -313,10 +552,10 @@ describe('Account recovery codes', () => {
     const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined);
 
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
-    const { status, click, showCodes } = await setup();
+    const { status, button, click, showCodes } = await setup();
 
     await showCodes();
-    await click('Copy');
+    await click(button('Copy'));
 
     expect(writeText).toHaveBeenCalledExactlyOnceWith(CODES.join('\n'));
     expect(status()?.textContent?.trim()).toBe('Copied.');
@@ -328,10 +567,10 @@ describe('Account recovery codes', () => {
       .mockRejectedValue(new Error('denied'));
 
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
-    const { status, click, showCodes } = await setup();
+    const { status, button, click, showCodes } = await setup();
 
     await showCodes();
-    await click('Copy');
+    await click(button('Copy'));
 
     expect(status()?.textContent?.trim()).toBe('Could not copy. Select the codes instead.');
   });
@@ -340,11 +579,11 @@ describe('Account recovery codes', () => {
     const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined);
 
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
-    const { fixture, hold, release, items, status, click, showCodes } = await setup();
+    const { fixture, hold, release, items, status, button, click, showCodes } = await setup();
 
     await showCodes();
-    await click('Copy');
-    await click('Done');
+    await click(button('Copy'));
+    await click(button('Done'));
 
     expect(items()).toEqual([]);
     expect(status()).toBeNull();
@@ -357,10 +596,10 @@ describe('Account recovery codes', () => {
   });
 
   it('holds again for codes made after Done', async () => {
-    const { regenerate, hold, release, items, click, showCodes } = await setup();
+    const { regenerate, hold, release, items, button, click, showCodes } = await setup();
 
     await showCodes();
-    await click('Done');
+    await click(button('Done'));
     regenerate.mockResolvedValueOnce(codesOk(NEW_CODES));
     await showCodes();
 
@@ -393,8 +632,8 @@ describe('Account recovery codes', () => {
 
     regenerate.mockReturnValueOnce(pending.promise);
 
-    await click('Make new recovery codes');
-    must(button('Make new codes'), 'Make new codes button').click();
+    await click(button('Make new recovery codes'));
+    button('Make new codes').click();
     await settle();
     fixture.destroy();
 
