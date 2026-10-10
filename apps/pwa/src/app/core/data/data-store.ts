@@ -16,8 +16,13 @@ import {
   type PickResult,
 } from '@asys/domain';
 
-import { DataApi, CommandOutcomeTag, type CommandOutcome } from '../api/data-api';
-import { HttpOutcomeTag } from '../api/http-outcome';
+import {
+  DataApi,
+  CommandOutcomeTag,
+  type CommandOutcome,
+  type SnapshotData,
+} from '../api/data-api';
+import { HttpOutcomeTag, type HttpOutcome } from '../api/http-outcome';
 import { Clock } from '../platform/clock';
 import { Ids } from '../platform/ids';
 import { commandSubject } from './command-subject';
@@ -58,6 +63,12 @@ const isUnauthorized = (settled: Settled): boolean =>
 /** Whether a command outcome changed the server's state, so the store syncs past it. */
 export const isApplied = (outcome: CommandOutcome): boolean =>
   outcome._tag === CommandOutcomeTag.Applied || outcome._tag === CommandOutcomeTag.NotApplicable;
+
+/** A snapshot request issued before `start()`, with the generation it belongs to. */
+interface Preload {
+  readonly generation: number;
+  readonly outcome: Promise<HttpOutcome<SnapshotData>>;
+}
 
 /** A command waiting for the first request started after its response to settle. */
 interface Waiter {
@@ -131,6 +142,7 @@ export class DataStore {
   #waiters: Waiter[] = [];
   readonly #settingsChecks = new Set<() => void>();
   #timer: ReturnType<typeof setTimeout> | undefined;
+  #preload: Preload | null = null;
 
   readonly #onFocus = (): void => {
     this.#trigger(true);
@@ -150,7 +162,24 @@ export class DataStore {
     }
   };
 
-  /** Loads the snapshot and starts keeping it current. Does nothing when already started. */
+  /** Requests the snapshot ahead of `start()`, which adopts it; its 401 leaves the session alone. Does nothing when started or already preloaded. */
+  preload(): void {
+    if (this.#started || this.#preload?.generation === this.#generation) {
+      return;
+    }
+
+    this.#preload = {
+      generation: this.#generation,
+      outcome: this.#api.snapshot({ ignoreUnauthorized: true }),
+    };
+  }
+
+  /** Drops the preloaded snapshot request, so the next `start()` asks afresh. */
+  discardPreload(): void {
+    this.#preload = null;
+  }
+
+  /** Loads the snapshot, adopting a preload of this generation, and starts keeping it current. Does nothing when already started. */
   start(): void {
     if (this.#started) {
       return;
@@ -158,13 +187,17 @@ export class DataStore {
 
     this.#started = true;
 
+    const preload = this.#preload;
+
+    this.#preload = null;
+
     const view = this.#document.defaultView;
 
     view?.addEventListener('focus', this.#onFocus);
     view?.addEventListener('online', this.#onOnline);
     this.#document.addEventListener('visibilitychange', this.#onVisibilityChange);
 
-    this.#requestSnapshot(true);
+    this.#requestSnapshot(true, preload?.generation === this.#generation ? preload.outcome : null);
   }
 
   /** Drops everything the store holds and resolves every waiting command. Requests already out are ignored when they settle. */
@@ -365,7 +398,10 @@ export class DataStore {
     }
   }
 
-  #requestSnapshot(setLoading: boolean): void {
+  #requestSnapshot(
+    setLoading: boolean,
+    adopted: Promise<HttpOutcome<SnapshotData>> | null = null,
+  ): void {
     this.#clearTimer();
     this.#inFlight = true;
     this.#requestCount += 1;
@@ -378,7 +414,7 @@ export class DataStore {
 
     const generation = this.#generation;
 
-    void this.#api.snapshot().then((outcome) => {
+    void this.#snapshotOutcome(adopted, generation).then((outcome) => {
       if (generation !== this.#generation) {
         return;
       }
@@ -409,6 +445,22 @@ export class DataStore {
 
       this.#settle(settled);
     });
+  }
+
+  /** A fresh snapshot request, or the adopted one when it succeeded; a failed one is asked again unless the generation moved on. */
+  #snapshotOutcome(
+    adopted: Promise<HttpOutcome<SnapshotData>> | null,
+    generation: number,
+  ): Promise<HttpOutcome<SnapshotData>> {
+    if (adopted === null) {
+      return this.#api.snapshot();
+    }
+
+    return adopted.then((outcome) =>
+      outcome._tag === HttpOutcomeTag.Ok || generation !== this.#generation
+        ? outcome
+        : this.#api.snapshot(),
+    );
   }
 
   #requestPoll(): void {

@@ -24,7 +24,7 @@ import {
   TaskStatus,
 } from '@asys/domain';
 
-import { CommandOutcomeTag, type CommandOutcome } from '../../core/api/data-api';
+import { CommandOutcomeTag } from '../../core/api/data-api';
 import { CommandAttempts } from '../../core/data/command-attempts';
 import { DataStore, SyncStatus } from '../../core/data/data-store';
 import { outcomeMessage } from '../../core/data/outcome-message';
@@ -82,12 +82,6 @@ export class Inbox {
   private readonly reviewItems = viewChildren(ReviewItem);
 
   protected readonly statusLine = signal('');
-
-  /** The ids of the Tasks with a Triage or Drop send in flight. */
-  readonly #pendingTaskIds = signal<ReadonlySet<string>>(NO_IDS);
-
-  /** The ids of the Review items with a Dismiss send in flight. */
-  readonly #pendingReviewIds = signal<ReadonlySet<string>>(NO_IDS);
 
   readonly #deferred = signal<ReadonlySet<string>>(NO_IDS);
 
@@ -150,14 +144,12 @@ export class Inbox {
   protected readonly cardBusy = computed(() => {
     const id = this.#card()?.id;
 
-    return (
-      id !== undefined && (this.#pendingTaskIds().has(id) || this.dataStore.awaitingSync().has(id))
-    );
+    return id !== undefined && this.#attempts.busy(id);
   });
 
   /** Whether this Review item's Dismiss is pending or waits for the server. */
   protected reviewBusy(id: string): boolean {
-    return this.#pendingReviewIds().has(id) || this.dataStore.awaitingSync().has(id);
+    return this.#attempts.busy(id);
   }
 
   protected async triage(draft: TriageDraft): Promise<void> {
@@ -223,15 +215,7 @@ export class Inbox {
     const index = this.reviewRows().findIndex((row) => row.item.id === reviewItemId);
     const command: Command = { _tag: CommandTag.ResolveReviewItem, reviewItemId };
 
-    this.#pendingReviewIds.update((ids) => new Set([...ids, reviewItemId]));
-
-    let outcome: CommandOutcome;
-
-    try {
-      outcome = await this.#attempts.send(command);
-    } finally {
-      this.#pendingReviewIds.update((ids) => new Set([...ids].filter((id) => id !== reviewItemId)));
-    }
+    const outcome = await this.#attempts.send(command);
 
     if (this.#destroyRef.destroyed) {
       return;
@@ -257,15 +241,7 @@ export class Inbox {
 
   /** Sends a Triage or Drop for the card's Task and handles its outcome. */
   async #runForCard(taskId: string, command: Command): Promise<void> {
-    this.#pendingTaskIds.update((ids) => new Set([...ids, taskId]));
-
-    let outcome: CommandOutcome;
-
-    try {
-      outcome = await this.#attempts.send(command);
-    } finally {
-      this.#pendingTaskIds.update((ids) => new Set([...ids].filter((id) => id !== taskId)));
-    }
+    const outcome = await this.#attempts.send(command);
 
     if (this.#destroyRef.destroyed) {
       return;

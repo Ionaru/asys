@@ -14,6 +14,7 @@ import { dataChanges } from '../../../generated/api/fn/data/data-changes';
 import { dataRunCommand } from '../../../generated/api/fn/data/data-run-command';
 import { dataSnapshot } from '../../../generated/api/fn/data/data-snapshot';
 import { callApi, errorTagOf, HttpOutcomeTag, type HttpOutcome } from './http-outcome';
+import { IGNORE_UNAUTHORIZED } from './ignore-unauthorized';
 import { KEEPALIVE } from './keepalive';
 import {
   type CommandResultWire,
@@ -70,9 +71,14 @@ export const isRetryable = (tag: CommandOutcomeTag): boolean =>
 export class DataApi {
   readonly #api = inject(Api);
 
-  /** `GET /v1/snapshot`. */
-  async snapshot(): Promise<HttpOutcome<SnapshotData>> {
-    const outcome = await callApi(this.#api.invoke(dataSnapshot));
+  /** `GET /v1/snapshot`. With `ignoreUnauthorized`, its 401 leaves the session alone. */
+  async snapshot(options?: {
+    readonly ignoreUnauthorized?: boolean;
+  }): Promise<HttpOutcome<SnapshotData>> {
+    const context = options?.ignoreUnauthorized
+      ? new HttpContext().set(IGNORE_UNAUTHORIZED, true)
+      : undefined;
+    const outcome = await callApi(this.#api.invoke(dataSnapshot, undefined, context));
 
     if (outcome._tag === HttpOutcomeTag.Failed) {
       return outcome;
