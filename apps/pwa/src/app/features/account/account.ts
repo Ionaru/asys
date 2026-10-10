@@ -19,15 +19,16 @@ import { CaptureQueue } from '../../core/data/capture-queue';
 import { DataStore } from '../../core/data/data-store';
 import { DoneUndo } from '../../core/data/done-undo';
 import { GENERIC_MESSAGE } from '../../core/data/outcome-message';
-import { AppUpdate } from '../../core/platform/app-update';
 import { Clock } from '../../core/platform/clock';
 import { DeviceZone } from '../../core/platform/device-zone';
 import { Button, ButtonSize, ButtonVariant } from '../../ui/button/button';
 import { IconName } from '../../ui/icon/icon';
 import { TextField } from '../../ui/text-field/text-field';
+import { messageForAuthError, type AuthErrorMessages } from '../auth/auth-error-message';
 import { ceremonyOptions } from '../auth/ceremony-options';
 import { nameError } from '../auth/name-rule';
 import { MISCONFIGURED_MESSAGE, TRY_AGAIN_MESSAGE } from '../auth/passkey-messages';
+import { recoveryCodes } from '../auth/recovery-codes';
 
 const messageForFailure = (failure: PasskeyFailure): string | null => {
   switch (failure) {
@@ -44,18 +45,14 @@ const messageForFailure = (failure: PasskeyFailure): string | null => {
   }
 };
 
-const messageForAddError = (error: AuthError): string | null => {
-  switch (error) {
-    case AuthError.ChallengeInvalid:
-    case AuthError.VerificationFailed:
-      return TRY_AGAIN_MESSAGE;
-    case AuthError.AlreadyRegistered:
-      return 'This device already has a passkey for ASYS.';
-    case AuthError.Unauthorized:
-      return null;
-    default:
-      return GENERIC_MESSAGE;
-  }
+const ADD_ERROR_MESSAGES: AuthErrorMessages = {
+  [AuthError.ChallengeInvalid]: TRY_AGAIN_MESSAGE,
+  [AuthError.VerificationFailed]: TRY_AGAIN_MESSAGE,
+  [AuthError.AlreadyRegistered]: 'This device already has a passkey for ASYS.',
+};
+
+const REMOVE_ERROR_MESSAGES: AuthErrorMessages = {
+  [AuthError.LastPasskey]: 'You cannot remove your only passkey.',
 };
 
 /** The account screen: passkeys, recovery codes and sign out. */
@@ -69,8 +66,6 @@ export class Account {
   readonly #authApi = inject(AuthApi);
 
   readonly #ceremony = inject(PasskeyCeremony);
-
-  readonly #appUpdate = inject(AppUpdate);
 
   readonly #dataStore = inject(DataStore);
 
@@ -91,8 +86,6 @@ export class Account {
   protected readonly Size = ButtonSize;
 
   protected readonly Icons = IconName;
-
-  protected readonly AuthError = AuthError;
 
   private readonly passkeysHeading = viewChild<ElementRef<HTMLElement>>('passkeysHeading');
 
@@ -142,13 +135,15 @@ export class Account {
 
   protected readonly addOptions = this.addRef.options;
 
-  protected readonly shownAddMessage = computed(
-    () =>
-      this.#addMessage() ??
-      (this.addRef.error() === null || this.addRef.error() === AuthError.Unauthorized
-        ? null
-        : GENERIC_MESSAGE),
-  );
+  readonly #addLoadMessage = computed(() => {
+    const error = this.addRef.error();
+
+    return error === null ? null : messageForAuthError(error);
+  });
+
+  protected readonly addLoadFailed = computed(() => this.#addLoadMessage() !== null);
+
+  protected readonly shownAddMessage = computed(() => this.#addMessage() ?? this.#addLoadMessage());
 
   readonly #addModel = signal({ name: '' });
 
@@ -179,24 +174,17 @@ export class Account {
 
   protected readonly regenerating = signal(false);
 
-  protected readonly codes = signal<readonly string[]>([]);
+  readonly #recovery = recoveryCodes();
 
-  protected readonly copyStatus = signal<string | null>(null);
+  protected readonly codes = this.#recovery.codes;
+
+  protected readonly copyStatus = this.#recovery.copyStatus;
 
   protected readonly codesMessage = signal<string | null>(null);
-
-  #held = false;
 
   protected readonly signingOut = signal(false);
 
   protected readonly signOutMessage = signal<string | null>(null);
-
-  constructor() {
-    this.#destroyRef.onDestroy(() => {
-      this.codes.set([]);
-      this.#releaseHold();
-    });
-  }
 
   protected reload(): void {
     this.passkeys.reload();
@@ -221,11 +209,7 @@ export class Account {
         return;
       }
 
-      if (result.error === AuthError.LastPasskey) {
-        this.removeMessage.set('You cannot remove your only passkey.');
-      } else if (result.error !== AuthError.Unauthorized) {
-        this.removeMessage.set(GENERIC_MESSAGE);
-      }
+      this.removeMessage.set(messageForAuthError(result.error, REMOVE_ERROR_MESSAGES));
     } finally {
       this.removing.set(false);
     }
@@ -273,7 +257,7 @@ export class Account {
         return;
       }
 
-      this.#addMessage.set(messageForAddError(result.error));
+      this.#addMessage.set(messageForAuthError(result.error, ADD_ERROR_MESSAGES));
     } finally {
       this.adding.set(false);
     }
@@ -295,21 +279,13 @@ export class Account {
       }
 
       if (result._tag === AuthResultTag.Failed) {
-        if (result.error !== AuthError.Unauthorized) {
-          this.codesMessage.set(GENERIC_MESSAGE);
-        }
+        this.codesMessage.set(messageForAuthError(result.error));
 
         return;
       }
 
       this.confirmingCodes.set(false);
-      this.copyStatus.set(null);
-      this.codes.set(result.value.recoveryCodes);
-
-      if (!this.#held) {
-        this.#held = true;
-        this.#appUpdate.hold();
-      }
+      this.#recovery.show(result.value.recoveryCodes);
 
       await this.session.check();
     } finally {
@@ -319,19 +295,12 @@ export class Account {
     }
   }
 
-  protected async copy(): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(this.codes().join('\n'));
-      this.copyStatus.set('Copied.');
-    } catch {
-      this.copyStatus.set('Could not copy. Select the codes instead.');
-    }
+  protected copy(): Promise<void> {
+    return this.#recovery.copy();
   }
 
   protected hideCodes(): void {
-    this.codes.set([]);
-    this.copyStatus.set(null);
-    this.#releaseHold();
+    this.#recovery.hide();
   }
 
   protected async signOut(): Promise<void> {
@@ -357,13 +326,6 @@ export class Account {
       this.signOutMessage.set('Could not sign out. Try again.');
     } finally {
       this.signingOut.set(false);
-    }
-  }
-
-  #releaseHold(): void {
-    if (this.#held) {
-      this.#held = false;
-      this.#appUpdate.release();
     }
   }
 
