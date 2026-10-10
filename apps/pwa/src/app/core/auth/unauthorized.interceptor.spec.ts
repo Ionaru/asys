@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 import {
   HttpClient,
+  HttpContext,
   HttpErrorResponse,
   provideHttpClient,
   withInterceptors,
@@ -8,6 +9,7 @@ import {
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 
+import { IGNORE_UNAUTHORIZED } from '../api/ignore-unauthorized';
 import { Session } from './session';
 import { unauthorizedInterceptor } from './unauthorized.interceptor';
 
@@ -82,6 +84,25 @@ describe('unauthorizedInterceptor', () => {
     await fail(method, url, 401, { _tag: tag } as object | null);
 
     expect(signedOut).not.toHaveBeenCalled();
+  });
+
+  it('leaves the session alone on a 401 Unauthorized of a request marked IGNORE_UNAUTHORIZED, and rethrows it', async () => {
+    const result = new Promise<unknown>((resolve) => {
+      http
+        .get('/v1/snapshot', { context: new HttpContext().set(IGNORE_UNAUTHORIZED, true) })
+        .subscribe({ error: (error: unknown) => resolve(error) });
+    });
+
+    controller.expectOne('/v1/snapshot').flush({ _tag: 'Unauthorized' } as object | null, {
+      status: 401,
+      statusText: 'Unauthorized',
+    });
+    const error = await result;
+
+    expect(signedOut).not.toHaveBeenCalled();
+    expect(error).toBeInstanceOf(HttpErrorResponse);
+    expect((error as HttpErrorResponse).status).toBe(401);
+    expect((error as HttpErrorResponse).error).toEqual({ _tag: 'Unauthorized' });
   });
 
   it('leaves the session alone on a body-less 401 of another request', async () => {

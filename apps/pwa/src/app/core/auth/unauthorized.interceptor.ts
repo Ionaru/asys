@@ -9,6 +9,7 @@ import { inject } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
 
 import { errorTagOf } from '../api/http-outcome';
+import { IGNORE_UNAUTHORIZED } from '../api/ignore-unauthorized';
 import { Session } from './session';
 
 const PASSKEYS_PATH = '/v1/auth/passkeys';
@@ -32,8 +33,12 @@ const isPasskeyWrite = (request: HttpRequest<unknown>): boolean => {
   return request.method === 'DELETE' && path.startsWith(`${PASSKEYS_PATH}/`);
 };
 
-/** Turns a server-side sign-out (401 Unauthorized) into a local one. Always rethrows the error. */
+/** Turns a server-side sign-out (401 Unauthorized) into a local one, except for a request marked `IGNORE_UNAUTHORIZED`. Always rethrows the error. */
 export const unauthorizedInterceptor: HttpInterceptorFn = (request, next) => {
+  if (request.context.get(IGNORE_UNAUTHORIZED)) {
+    return next(request);
+  }
+
   const session = inject(Session);
 
   return next(request).pipe(
