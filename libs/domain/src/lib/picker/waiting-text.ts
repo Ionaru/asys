@@ -4,13 +4,13 @@ import { compareCodeUnits } from '../compare';
 import { BlockedReasonTag, type Task } from '../task';
 import {
   formatClock,
-  formatClockOn,
   formatDateSpec,
   toLocalDateTime,
   type Instant,
   type LocalDate,
   type TimeZone,
 } from '../time';
+import { formatClockOn } from '../time/display';
 import { ExclusionReasonTag, type ExclusionReason, type WaitingTask } from './picker';
 
 const blockedText = (taskIds: readonly string[], tasks: readonly Task[]): string | null => {

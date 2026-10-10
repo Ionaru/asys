@@ -2,13 +2,13 @@
 
 import type { Task } from '../task';
 import {
-  formatClockOn,
   formatDateSpec,
   toLocalDateTime,
   type Instant,
   type LocalDate,
   type TimeZone,
 } from '../time';
+import { formatClockOn } from '../time/display';
 import type { Reason } from './picker';
 
 const factOn = (task: Task, reason: Reason, today: () => LocalDate, timeZone: TimeZone): string => {

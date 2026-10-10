@@ -133,15 +133,12 @@ describe('pick converts only for a Task that needs it', () => {
     );
   });
 
-  it('keeps rejecting an invalid zone after Tasks that needed no conversion', () => {
+  it('keeps rejecting an invalid zone after a valid zone has been used', () => {
     const due = aTask({ id: 'x', due: { date: '2026-10-15' } });
-    expect(thrown(() => pick([due], links, AREAS, settings(BAD_ZONE), NOW))).toBeInstanceOf(
-      RangeError,
-    );
-    expect(pick(quiet, links, AREAS, settings(AMS), NOW).ranked).toHaveLength(3);
-    expect(thrown(() => pick([due], links, AREAS, settings(BAD_ZONE), NOW))).toBeInstanceOf(
-      RangeError,
-    );
+    const invalid = new RangeError(`Invalid time zone: ${BAD_ZONE}`);
+    expect(thrown(() => pick([due], links, AREAS, settings(BAD_ZONE), NOW))).toEqual(invalid);
+    expect(pick([due], links, AREAS, settings(AMS), NOW).ranked).toHaveLength(1);
+    expect(thrown(() => pick([due], links, AREAS, settings(BAD_ZONE), NOW))).toEqual(invalid);
   });
 });
 

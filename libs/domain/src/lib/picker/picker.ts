@@ -8,7 +8,6 @@ import {
   isAvailable,
   isInInbox,
   isOverdue,
-  isUrgentBy,
   deadlineIndex,
   Quadrant,
   TaskStatus,
@@ -17,6 +16,7 @@ import {
   type BlockerLink,
   type Task,
 } from '../task';
+import { isUrgentBy } from '../task/priority';
 import { addCalendarDays, availableFromInstant, toLocalDateTime, type Instant } from '../time';
 import { reasonTextOn } from './reason-text';
 import { waitingTextOn } from './waiting-text';
