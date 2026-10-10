@@ -25,6 +25,7 @@ import { DeviceZone } from '../../core/platform/device-zone';
 import { Button, ButtonSize, ButtonVariant } from '../../ui/button/button';
 import { IconName } from '../../ui/icon/icon';
 import { TextField } from '../../ui/text-field/text-field';
+import { messageForAuthError, type AuthErrorMessages } from '../auth/auth-error-message';
 import { ceremonyOptions } from '../auth/ceremony-options';
 import { nameError } from '../auth/name-rule';
 import { MISCONFIGURED_MESSAGE, TRY_AGAIN_MESSAGE } from '../auth/passkey-messages';
@@ -44,18 +45,14 @@ const messageForFailure = (failure: PasskeyFailure): string | null => {
   }
 };
 
-const messageForAddError = (error: AuthError): string | null => {
-  switch (error) {
-    case AuthError.ChallengeInvalid:
-    case AuthError.VerificationFailed:
-      return TRY_AGAIN_MESSAGE;
-    case AuthError.AlreadyRegistered:
-      return 'This device already has a passkey for ASYS.';
-    case AuthError.Unauthorized:
-      return null;
-    default:
-      return GENERIC_MESSAGE;
-  }
+const ADD_ERROR_MESSAGES: AuthErrorMessages = {
+  [AuthError.ChallengeInvalid]: TRY_AGAIN_MESSAGE,
+  [AuthError.VerificationFailed]: TRY_AGAIN_MESSAGE,
+  [AuthError.AlreadyRegistered]: 'This device already has a passkey for ASYS.',
+};
+
+const REMOVE_ERROR_MESSAGES: AuthErrorMessages = {
+  [AuthError.LastPasskey]: 'You cannot remove your only passkey.',
 };
 
 /** The account screen: passkeys, recovery codes and sign out. */
@@ -91,8 +88,6 @@ export class Account {
   protected readonly Size = ButtonSize;
 
   protected readonly Icons = IconName;
-
-  protected readonly AuthError = AuthError;
 
   private readonly passkeysHeading = viewChild<ElementRef<HTMLElement>>('passkeysHeading');
 
@@ -142,13 +137,15 @@ export class Account {
 
   protected readonly addOptions = this.addRef.options;
 
-  protected readonly shownAddMessage = computed(
-    () =>
-      this.#addMessage() ??
-      (this.addRef.error() === null || this.addRef.error() === AuthError.Unauthorized
-        ? null
-        : GENERIC_MESSAGE),
-  );
+  readonly #addLoadMessage = computed(() => {
+    const error = this.addRef.error();
+
+    return error === null ? null : messageForAuthError(error);
+  });
+
+  protected readonly addLoadFailed = computed(() => this.#addLoadMessage() !== null);
+
+  protected readonly shownAddMessage = computed(() => this.#addMessage() ?? this.#addLoadMessage());
 
   readonly #addModel = signal({ name: '' });
 
@@ -221,11 +218,7 @@ export class Account {
         return;
       }
 
-      if (result.error === AuthError.LastPasskey) {
-        this.removeMessage.set('You cannot remove your only passkey.');
-      } else if (result.error !== AuthError.Unauthorized) {
-        this.removeMessage.set(GENERIC_MESSAGE);
-      }
+      this.removeMessage.set(messageForAuthError(result.error, REMOVE_ERROR_MESSAGES));
     } finally {
       this.removing.set(false);
     }
@@ -273,7 +266,7 @@ export class Account {
         return;
       }
 
-      this.#addMessage.set(messageForAddError(result.error));
+      this.#addMessage.set(messageForAuthError(result.error, ADD_ERROR_MESSAGES));
     } finally {
       this.adding.set(false);
     }
@@ -295,9 +288,7 @@ export class Account {
       }
 
       if (result._tag === AuthResultTag.Failed) {
-        if (result.error !== AuthError.Unauthorized) {
-          this.codesMessage.set(GENERIC_MESSAGE);
-        }
+        this.codesMessage.set(messageForAuthError(result.error));
 
         return;
       }
