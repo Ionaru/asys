@@ -2,14 +2,8 @@
 import { TestBed } from '@angular/core/testing';
 
 import { AuthApi, AuthError, AuthResultTag, type AuthResult, type Me } from '../api/auth-api';
-import { DeviceStorage } from '../platform/device-storage';
-import {
-  LAST_REPORTED_ZONE_KEY,
-  SESSION_CHECK_TIMEOUT_MS,
-  Session,
-  SessionState,
-  SignOutReason,
-} from './session';
+import { ReportedZone } from '../platform/reported-zone';
+import { SESSION_CHECK_TIMEOUT_MS, Session, SessionState, SignOutReason } from './session';
 
 const ada: Me = { name: 'Ada', recoveryCodesLeft: 4 };
 
@@ -35,20 +29,20 @@ const defer = (): Deferred => {
 
 describe('Session', () => {
   let me: ReturnType<typeof vi.fn<() => Promise<AuthResult<Me>>>>;
-  let remove: ReturnType<typeof vi.fn<(key: string) => void>>;
-  let get: ReturnType<typeof vi.fn<(key: string) => string | null>>;
-  let set: ReturnType<typeof vi.fn<(key: string, value: string) => void>>;
+  let get: ReturnType<typeof vi.fn<() => string | null>>;
+  let set: ReturnType<typeof vi.fn<(zone: string) => void>>;
+  let clear: ReturnType<typeof vi.fn<() => void>>;
   let session: Session;
 
   beforeEach(() => {
     me = vi.fn<() => Promise<AuthResult<Me>>>();
-    remove = vi.fn<(key: string) => void>();
-    get = vi.fn<(key: string) => string | null>();
-    set = vi.fn<(key: string, value: string) => void>();
+    get = vi.fn<() => string | null>();
+    set = vi.fn<(zone: string) => void>();
+    clear = vi.fn<() => void>();
     TestBed.configureTestingModule({
       providers: [
         { provide: AuthApi, useValue: { me } },
-        { provide: DeviceStorage, useValue: { get, set, remove } },
+        { provide: ReportedZone, useValue: { get, set, clear } },
       ],
     });
     session = TestBed.inject(Session);
@@ -65,8 +59,7 @@ describe('Session', () => {
     expect(session.signOutReason()).toBeNull();
   });
 
-  it('exposes the documented constants', () => {
-    expect(LAST_REPORTED_ZONE_KEY).toBe('asys.timeZone.lastReported');
+  it('exposes the documented timeout', () => {
     expect(SESSION_CHECK_TIMEOUT_MS).toBe(10_000);
   });
 
@@ -143,7 +136,7 @@ describe('Session', () => {
       expect(session.me()).toEqual(ada);
     });
 
-    it('does not touch storage', async () => {
+    it('does not touch the reported zone', async () => {
       me.mockResolvedValue(ok(ada));
       await session.check();
       me.mockResolvedValue(failed(AuthError.Unauthorized));
@@ -151,7 +144,7 @@ describe('Session', () => {
 
       expect(get).not.toHaveBeenCalled();
       expect(set).not.toHaveBeenCalled();
-      expect(remove).not.toHaveBeenCalled();
+      expect(clear).not.toHaveBeenCalled();
     });
 
     it('is single-flight: a second call returns the same promise and makes one request', async () => {
@@ -367,16 +360,16 @@ describe('Session', () => {
   });
 
   describe('signedIn', () => {
-    it('with a Me removes the zone key, sets SignedIn and the Me, and makes no request', async () => {
+    it('with a Me clears the reported zone, sets SignedIn and the Me, and makes no request', async () => {
       await session.signedIn(grace);
 
-      expect(remove).toHaveBeenCalledWith(LAST_REPORTED_ZONE_KEY);
+      expect(clear).toHaveBeenCalledOnce();
       expect(session.state()).toBe(SessionState.SignedIn);
       expect(session.me()).toEqual(grace);
       expect(me).not.toHaveBeenCalled();
     });
 
-    it('without a Me removes the zone key and runs check, resolving when it settles', async () => {
+    it('without a Me clears the reported zone and runs check, resolving when it settles', async () => {
       const pending = defer();
       me.mockReturnValue(pending.promise);
       let settled = false;
@@ -386,7 +379,7 @@ describe('Session', () => {
       });
       await Promise.resolve();
 
-      expect(remove).toHaveBeenCalledWith(LAST_REPORTED_ZONE_KEY);
+      expect(clear).toHaveBeenCalledOnce();
       expect(me).toHaveBeenCalledTimes(1);
       expect(settled).toBe(false);
 
@@ -455,15 +448,15 @@ describe('Session', () => {
   });
 
   describe('signedOut', () => {
-    it('sets SignedOut, clears the Me and removes the zone key', async () => {
+    it('sets SignedOut, clears the Me and clears the reported zone', async () => {
       await session.signedIn(ada);
-      remove.mockClear();
+      clear.mockClear();
 
       session.signedOut(SignOutReason.Chosen);
 
       expect(session.state()).toBe(SessionState.SignedOut);
       expect(session.me()).toBeNull();
-      expect(remove).toHaveBeenCalledWith(LAST_REPORTED_ZONE_KEY);
+      expect(clear).toHaveBeenCalledOnce();
     });
 
     it.each([SignOutReason.Chosen, SignOutReason.Revoked])('records %s', async (reason) => {

@@ -8,9 +8,10 @@ import { App } from './app';
 import { AuthApi, type Me } from './core/api/auth-api';
 import { Session, SessionState, SignOutReason } from './core/auth/session';
 import { DataStore, SyncStatus } from './core/data/data-store';
+import { TimeZoneSync } from './core/data/time-zone-sync';
 import { AppUpdate } from './core/platform/app-update';
-import { DeviceStorage } from './core/platform/device-storage';
 import { DeviceZone } from './core/platform/device-zone';
+import { ReportedZone } from './core/platform/reported-zone';
 
 @Component({ template: '' })
 class Stub {}
@@ -31,13 +32,15 @@ const setup = async (initial: SessionState, url = '/now', realSession = false) =
   const syncedAt = signal<Instant | null>(null);
   const start = vi.fn<() => void>();
   const stop = vi.fn<() => void>();
+  const syncStart = vi.fn<() => void>();
+  const syncStop = vi.fn<() => void>();
   const prompt = signal(false);
   const reload = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
 
   const sessionProviders: Provider[] = realSession
     ? [
         { provide: AuthApi, useValue: { me: vi.fn() } },
-        { provide: DeviceStorage, useValue: { remove: vi.fn() } },
+        { provide: ReportedZone, useValue: { clear: vi.fn() } },
       ]
     : [
         {
@@ -71,6 +74,7 @@ const setup = async (initial: SessionState, url = '/now', realSession = false) =
           stop,
         },
       },
+      { provide: TimeZoneSync, useValue: { start: syncStart, stop: syncStop } },
       { provide: AppUpdate, useValue: { prompt, reload } },
       { provide: DeviceZone, useValue: { current: () => 'Europe/Amsterdam' } },
     ],
@@ -117,6 +121,8 @@ const setup = async (initial: SessionState, url = '/now', realSession = false) =
     syncedAt,
     start,
     stop,
+    syncStart,
+    syncStop,
     prompt,
     reload,
   };
@@ -181,6 +187,56 @@ describe('App', () => {
 
       expect(start).toHaveBeenCalledTimes(1);
       expect(stop).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('time zone sync', () => {
+    it('starts once when the session is signed in', async () => {
+      const { syncStart, syncStop } = await setup(SessionState.SignedIn);
+
+      expect(syncStart).toHaveBeenCalledOnce();
+      expect(syncStop).not.toHaveBeenCalled();
+    });
+
+    it('starts when the session becomes signed in', async () => {
+      const { sessionState, settle, syncStart } = await setup(SessionState.Unknown);
+
+      expect(syncStart).not.toHaveBeenCalled();
+
+      sessionState.set(SessionState.SignedIn);
+      await settle();
+
+      expect(syncStart).toHaveBeenCalledOnce();
+    });
+
+    it('stops once when the session becomes signed out after a start', async () => {
+      const { sessionState, settle, syncStart, syncStop } = await setup(SessionState.SignedIn);
+
+      sessionState.set(SessionState.SignedOut);
+      await settle();
+
+      expect(syncStop).toHaveBeenCalledOnce();
+      expect(syncStart).toHaveBeenCalledOnce();
+    });
+
+    it('does nothing when signed in becomes unreachable', async () => {
+      const { sessionState, settle, syncStart, syncStop } = await setup(SessionState.SignedIn);
+
+      sessionState.set(SessionState.Unreachable);
+      await settle();
+
+      expect(syncStart).toHaveBeenCalledOnce();
+      expect(syncStop).not.toHaveBeenCalled();
+    });
+
+    it('is neither started nor stopped when unknown becomes signed out', async () => {
+      const { sessionState, settle, syncStart, syncStop } = await setup(SessionState.Unknown);
+
+      sessionState.set(SessionState.SignedOut);
+      await settle();
+
+      expect(syncStart).not.toHaveBeenCalled();
+      expect(syncStop).not.toHaveBeenCalled();
     });
   });
 
