@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: EUPL-1.2
+import type { AnimationCallbackEvent } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { Motion, MotionDuration, MotionEasing } from './motion';
@@ -72,6 +73,29 @@ const stubAnimate = (
     writable: true,
   });
   return animate;
+};
+
+const stubAnimateThrowing = (error: unknown): ReturnType<typeof vi.fn<AnimateFn>> => {
+  const animate = vi.fn<AnimateFn>(() => {
+    throw error;
+  });
+  Object.defineProperty(Element.prototype, 'animate', {
+    value: animate,
+    configurable: true,
+    writable: true,
+  });
+  return animate;
+};
+
+const silenceConsoleError = () => vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+const fakeEvent = (target: Element) => {
+  const animationComplete = vi.fn();
+
+  return {
+    animationComplete,
+    event: { target, animationComplete } as unknown as AnimationCallbackEvent,
+  };
 };
 
 const setToken = (name: string, value: string): void => {
@@ -352,7 +376,8 @@ describe('Motion', () => {
       await expect(playing).resolves.toBeUndefined();
     });
 
-    it('resolves when finished rejects with an AbortError DOMException', async () => {
+    it('resolves without reporting anything when finished rejects with an AbortError DOMException', async () => {
+      const report = silenceConsoleError();
       const finished = defer();
       stubAnimate(finished.promise);
       stubReducedMotion(false);
@@ -362,9 +387,12 @@ describe('Motion', () => {
       finished.reject(new DOMException('The animation was cancelled', 'AbortError'));
 
       await expect(playing).resolves.toBeUndefined();
+
+      expect(report).not.toHaveBeenCalled();
     });
 
-    it('rejects with the same error when finished rejects with any other error', async () => {
+    it('resolves and reports the error when finished rejects with any other error', async () => {
+      const report = silenceConsoleError();
       stubReducedMotion(false);
       const motion = TestBed.inject(Motion);
       const el = document.createElement('div');
@@ -375,7 +403,9 @@ describe('Motion', () => {
       const playingFirst = motion.play(el, keyframes(), plain());
       first.reject(failure);
 
-      await expect(playingFirst).rejects.toBe(failure);
+      await expect(playingFirst).resolves.toBeUndefined();
+
+      expect(report).toHaveBeenCalledExactlyOnceWith(failure);
 
       const other = new DOMException('The animation is not usable', 'InvalidStateError');
       const second = defer();
@@ -383,7 +413,25 @@ describe('Motion', () => {
       const playingSecond = motion.play(el, keyframes(), plain());
       second.reject(other);
 
-      await expect(playingSecond).rejects.toBe(other);
+      await expect(playingSecond).resolves.toBeUndefined();
+
+      expect(report).toHaveBeenCalledTimes(2);
+      expect(report).toHaveBeenLastCalledWith(other);
+    });
+
+    it('resolves and reports the error when animate throws', async () => {
+      const report = silenceConsoleError();
+      const failure = new TypeError('Keyframes are not loosely sorted by offset');
+      const animate = stubAnimateThrowing(failure);
+      stubReducedMotion(false);
+      const motion = TestBed.inject(Motion);
+
+      await expect(
+        motion.play(document.createElement('div'), keyframes(), plain()),
+      ).resolves.toBeUndefined();
+
+      expect(animate).toHaveBeenCalledTimes(1);
+      expect(report).toHaveBeenCalledExactlyOnceWith(failure);
     });
 
     it('passes options other than duration and easing through untouched and keeps absent ones absent', async () => {
@@ -409,6 +457,113 @@ describe('Motion', () => {
         fill: 'forwards',
       });
       expect(Object.keys(animate.mock.calls[1]?.[1] ?? {})).toEqual(['fill']);
+    });
+  });
+
+  describe('leave', () => {
+    it('marks the target with data-leaving before it animates', async () => {
+      const el = document.createElement('div');
+      const { event } = fakeEvent(el);
+      let markedAtAnimate: boolean | undefined;
+      const animate = stubAnimate();
+      animate.mockImplementation(() => {
+        markedAtAnimate = el.hasAttribute('data-leaving');
+        return { finished: Promise.resolve() };
+      });
+      stubReducedMotion(false);
+      const motion = TestBed.inject(Motion);
+
+      await motion.leave(event, keyframes(), plain());
+
+      expect(animate).toHaveBeenCalledTimes(1);
+      expect(markedAtAnimate).toBe(true);
+      expect(el.getAttribute('data-leaving')).toBe('');
+    });
+
+    it('animates the target with the tokens resolved from the root element', async () => {
+      const animate = stubAnimate();
+      stubReducedMotion(false);
+      setToken('--duration-quick', '120ms');
+      setToken('--ease-out', 'cubic-bezier(0, 0, 0.2, 1)');
+      const motion = TestBed.inject(Motion);
+      const el = document.createElement('div');
+      const { event } = fakeEvent(el);
+      const frames = keyframes();
+
+      await motion.leave(event, frames, {
+        duration: MotionDuration.Quick,
+        easing: MotionEasing.Out,
+      });
+
+      expect(animate).toHaveBeenCalledExactlyOnceWith(frames, {
+        duration: 120,
+        easing: 'cubic-bezier(0, 0, 0.2, 1)',
+      });
+      expect(animate.mock.contexts[0]).toBe(el);
+    });
+
+    it('calls animationComplete once, and only after the animation has finished', async () => {
+      const finished = defer();
+      stubAnimate(finished.promise);
+      stubReducedMotion(false);
+      const motion = TestBed.inject(Motion);
+      const { event, animationComplete } = fakeEvent(document.createElement('div'));
+
+      const leaving = motion.leave(event, keyframes(), plain());
+      await flush();
+
+      expect(animationComplete).not.toHaveBeenCalled();
+
+      finished.resolve();
+      await leaving;
+
+      expect(animationComplete).toHaveBeenCalledTimes(1);
+    });
+
+    it('marks the target, skips animate and still calls animationComplete once while not allowed', async () => {
+      const animate = stubAnimate();
+      stubReducedMotion(true);
+      const motion = TestBed.inject(Motion);
+      const el = document.createElement('div');
+      const { event, animationComplete } = fakeEvent(el);
+
+      await expect(motion.leave(event, keyframes(), plain())).resolves.toBeUndefined();
+
+      expect(animate).not.toHaveBeenCalled();
+      expect(el.hasAttribute('data-leaving')).toBe(true);
+      expect(animationComplete).toHaveBeenCalledTimes(1);
+    });
+
+    it('resolves and calls animationComplete once when animate throws', async () => {
+      const report = silenceConsoleError();
+      const failure = new TypeError('Keyframes are not loosely sorted by offset');
+      stubAnimateThrowing(failure);
+      stubReducedMotion(false);
+      const motion = TestBed.inject(Motion);
+      const el = document.createElement('div');
+      const { event, animationComplete } = fakeEvent(el);
+
+      await expect(motion.leave(event, keyframes(), plain())).resolves.toBeUndefined();
+
+      expect(animationComplete).toHaveBeenCalledTimes(1);
+      expect(el.hasAttribute('data-leaving')).toBe(true);
+      expect(report).toHaveBeenCalledExactlyOnceWith(failure);
+    });
+
+    it('resolves and calls animationComplete once when finished rejects with any other error', async () => {
+      silenceConsoleError();
+      const finished = defer();
+      stubAnimate(finished.promise);
+      stubReducedMotion(false);
+      const motion = TestBed.inject(Motion);
+      const { event, animationComplete } = fakeEvent(document.createElement('div'));
+
+      const leaving = motion.leave(event, keyframes(), plain());
+      finished.reject(new Error('animation failed'));
+
+      await expect(leaving).resolves.toBeUndefined();
+
+      expect(animationComplete).toHaveBeenCalledTimes(1);
     });
   });
 });
