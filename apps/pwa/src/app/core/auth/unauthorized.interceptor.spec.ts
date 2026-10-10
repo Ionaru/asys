@@ -65,18 +65,6 @@ describe('unauthorizedInterceptor', () => {
     expect(signedOut).toHaveBeenCalledExactlyOnceWith(SignOutReason.Revoked);
   });
 
-  it('signs out on a body-less 401 of POST /v1/auth/passkeys', async () => {
-    await fail('POST', '/v1/auth/passkeys', 401, null);
-
-    expect(signedOut).toHaveBeenCalledExactlyOnceWith(SignOutReason.Revoked);
-  });
-
-  it('signs out on a body-less 401 of DELETE /v1/auth/passkeys/<id>', async () => {
-    await fail('DELETE', '/v1/auth/passkeys/cred-1', 401, null);
-
-    expect(signedOut).toHaveBeenCalledExactlyOnceWith(SignOutReason.Revoked);
-  });
-
   it.each([
     ['SignInFailed', 'POST', '/v1/auth/authenticate'],
     ['PasskeyVerificationFailed', 'POST', '/v1/auth/passkeys'],
@@ -107,6 +95,15 @@ describe('unauthorizedInterceptor', () => {
 
   it('leaves the session alone on a body-less 401 of another request', async () => {
     await fail('GET', '/v1/auth/me', 401, null);
+
+    expect(signedOut).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['POST', '/v1/auth/passkeys'],
+    ['DELETE', '/v1/auth/passkeys/cred-1'],
+  ])('leaves the session alone on a body-less 401 of %s %s', async (method, url) => {
+    await fail(method, url, 401, null);
 
     expect(signedOut).not.toHaveBeenCalled();
   });

@@ -3,13 +3,15 @@ import { Api, CurrentOwner, PasskeysGroup } from '@asys/contract';
 import { makePasskeyHandlers } from '@ionaru/effect-passkeys/server';
 import { Effect } from 'effect';
 import { revokeOtherSessions } from '../auth/account';
+import { requireLiveCurrentSession } from '../auth/sessions';
 import { signIn } from '../auth/sign-in';
 import { signUp, signUpBegin } from '../auth/sign-up';
 import { setSessionCookie } from './cookies';
 
 /**
  * The `passkeys` group over the passkey library: sign-up and sign-in set the session cookie,
- * and removing a passkey ends the Owner's other sessions. Database failures are defects.
+ * adding and removing a passkey re-check the session under the counter lock, and removing a
+ * passkey ends the Owner's other sessions. Database failures are defects.
  */
 export const PasskeysLive = makePasskeyHandlers(Api, PasskeysGroup, {
   hooks: {
@@ -29,4 +31,5 @@ export const PasskeysLive = makePasskeyHandlers(Api, PasskeysGroup, {
     onRemoved: revokeOtherSessions,
   },
   currentUserId: CurrentOwner.useSync((owner) => owner.ownerId),
+  recheckSession: requireLiveCurrentSession,
 });
