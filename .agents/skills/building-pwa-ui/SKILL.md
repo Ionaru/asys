@@ -89,7 +89,8 @@ Lint bans runtime imports of `@asys/contract`, `effect` and `@ionaru/effect-pass
 - `vi.mock` of relative imports is refused, so override a seam service with `{ provide: X, useValue }`. `features/now/now.spec.ts` is the model.
 - Use the real domain functions over a fixed state and clock.
 - Specs that render scripted motion provide a fake `Motion` whose `play` promise they control. The real one resolves at once in jsdom.
-- `HTMLElement.click()` dispatches a click with `detail: 0`, which a Done reads as a keyboard activation (focus goes to Undo). A pointer press in a spec dispatches `new MouseEvent('click', { bubbles: true, detail: 1 })`.
+- A click handler that must tell Enter or Space from a pointer calls `activationOf(event)` (`ui/activation`), which returns an `Activation` (`{ keyboard: boolean }`). Never read `event.detail` yourself, and type an output that carries it as `Activation`. A template cannot call an import, so the component exposes it as `protected readonly activationOf = activationOf`.
+- `HTMLElement.click()` dispatches a click with `detail: 0`, which `activationOf` reads as keyboard (a Done then moves focus to Undo). A pointer press in a spec dispatches `new MouseEvent('click', { bubbles: true, detail: 1 })`.
 
 ```bash
 pnpm exec nx run-many -t lint typecheck test build -p pwa

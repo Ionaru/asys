@@ -523,7 +523,7 @@ Owns `features/now/now.ts` and its spec, `ui/top-pick/top-pick.ts` and its spec,
 
 **TopPick.**
 - New input `completed = input<boolean>(false)`. When true, `.asys-top-pick__actions` shows `<p class="asys-top-pick__done">` with the check SVG and "Done" in `ink-muted`, in place of the buttons. The check's path has `pathLength="1"`, `stroke-dasharray: 1` and `animation: asys-check-draw var(--duration-quick) var(--ease-out)` from `stroke-dashoffset: 1`.
-- `done` becomes `output<{ readonly keyboard: boolean }>()`, emitting `{ keyboard: event.detail === 0 }`.
+- `done` becomes `output<Activation>()`, emitting `activationOf(event)` (`ui/activation`: `{ keyboard: event.detail === 0 }`).
 - Nothing wraps the article's content, so `<ng-content />` stays its last child.
 
 **Now.**
@@ -560,7 +560,7 @@ Owns `features/now/now.ts` and its spec, `ui/top-pick/top-pick.ts` and its spec,
 - jsdom never calls the template's animate functions, so `row-motion.spec.ts` tests these helpers directly, with a fake event. It checks that `animationComplete` is called once when `play` resolves and once when it rejects.
 
 **Editor.**
-- `done(event)` reads `keyboard` from `event.detail === 0`. It returns when `actionsBusy()` or the Task is missing.
+- `done(event)` reads `keyboard` from `activationOf(event)` (`event.detail === 0`). It returns when `actionsBusy()` or the Task is missing.
 - Otherwise it calls `clearMessages()`, `leaving.set(true)`, `doneUndo.complete(task, DoneOrigin.Button)`, `doneUndo.requestFocus()` when `keyboard`, then `leave()`.
 - `drop()` keeps `leaveWith`.
 
@@ -693,7 +693,7 @@ All twelve units were built in order, with units 1 and 2 built as one and units 
 - **The pill's label carries its own trailing space** in an interpolation (`'Capture '` while rows exist), so its accessible name is exactly "Capture 1 not captured" whatever the formatter does to the template.
 - **Pause reasons are cleared whenever no bar shows,** and `pause` is ignored then. A bar that is removed never reports `pointerleave` or `focusout`, so a stale reason would freeze the next window.
 - **The status region keys each notice by its `seq`** (`@for (notice of notices(); track notice.seq)`), so every notice is a new node and an identical second one is read again. Emptying the region and refilling it in `afterNextRender` happens inside one synchronous change-detection pass, so the accessibility tree would never see the empty state.
-- **The shell guards focus in the Undo bar.** Whenever the bar's layout changes or the bar goes while focus is in it, the shell checks after the render: focus that fell to the body (or onto the leaving bar) moves to the bar's first button while a bar shows, otherwise to the page as Escape does, and a Focus pause that no `focusout` will end is resumed. Dismiss and Try again emit `{ keyboard: event.detail === 0 }`, and after a pointer activation the guard never moves focus, because Chrome focuses a tapped button and a move to the first title would scroll a long list to the top. A failure that replaces a held Done while keyboard focus is on Undo therefore lands on the failure's first button.
+- **The shell guards focus in the Undo bar.** Whenever the bar's layout changes or the bar goes while focus is in it, the shell checks after the render: focus that fell to the body (or onto the leaving bar) moves to the bar's first button while a bar shows, otherwise to the page as Escape does, and a Focus pause that no `focusout` will end is resumed. Dismiss and Try again emit `activationOf(event)` (`{ keyboard: event.detail === 0 }`), and after a pointer activation the guard never moves focus, because Chrome focuses a tapped button and a move to the first title would scroll a long list to the top. A failure that replaces a held Done while keyboard focus is on Undo therefore lands on the failure's first button.
 - **A ranked row that collapses while it holds focus hands focus to the top pick,** which shows the same Task. Escape in the bar during a Done's exit focuses the promoted row just before it leaves.
 - **The Undo bar's host keeps its own `display: flex`.** `.shell__undo` sets no `display`, because its emulated selector would win over the bar's and stack Undo under the text. The Done text has `flex: 1 1 0`, so a long title ellipsises instead of pushing Undo to a second line.
 - **The Inbox badge pops only on a rise between two known counts.** `BottomNav.inboxCount` is `number | null`, and the shell passes null until the store has state, so the first count after load never pops, and the badge carries `animate.enter` only once the counter has moved. The template reads the counter with `@let` above the badge's `@if`, so the lazy `linkedSignal` also sees a count of 0 and a capture into an empty Inbox pops.
