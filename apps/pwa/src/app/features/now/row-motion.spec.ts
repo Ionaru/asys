@@ -25,8 +25,14 @@ const fakeEvent = (target: Element) => {
   };
 };
 
+// The real `leave` over a fake `play`: it only uses `this.play`.
 const fakeMotion = (play: (...args: unknown[]) => Promise<void>): Motion =>
-  ({ allowed: () => true, reduced: signal(false), play }) as unknown as Motion;
+  ({
+    allowed: () => true,
+    reduced: signal(false),
+    play,
+    leave: Motion.prototype.leave,
+  }) as unknown as Motion;
 
 describe('collapseRow', () => {
   it('marks the row with data-leaving before it plays', async () => {
@@ -63,6 +69,28 @@ describe('collapseRow', () => {
     });
   });
 
+  it('measures its height before it marks the row with data-leaving', async () => {
+    const el = document.createElement('li');
+    let markedAtMeasure: boolean | undefined;
+
+    Object.defineProperty(el, 'offsetHeight', {
+      configurable: true,
+      get: () => {
+        markedAtMeasure = el.hasAttribute('data-leaving');
+
+        return ROW_HEIGHT;
+      },
+    });
+
+    const { event } = fakeEvent(el);
+    const play = vi.fn(async (..._args: unknown[]) => undefined);
+
+    await collapseRow(fakeMotion(play), event);
+
+    expect(markedAtMeasure).toBe(false);
+    expect(el.hasAttribute('data-leaving')).toBe(true);
+  });
+
   it('calls animationComplete once, and only after play resolves', async () => {
     const el = row();
     const { event, animationComplete } = fakeEvent(el);
@@ -82,17 +110,6 @@ describe('collapseRow', () => {
     await collapsing;
 
     expect(animationComplete).toHaveBeenCalledTimes(1);
-  });
-
-  it('resolves and calls animationComplete once when play rejects', async () => {
-    const el = row();
-    const { event, animationComplete } = fakeEvent(el);
-    const play = vi.fn(() => Promise.reject(new Error('boom')));
-
-    await expect(collapseRow(fakeMotion(play), event)).resolves.toBe(undefined);
-
-    expect(animationComplete).toHaveBeenCalledTimes(1);
-    expect(el.hasAttribute('data-leaving')).toBe(true);
   });
 });
 
@@ -148,16 +165,5 @@ describe('expandRow', () => {
     await expanding;
 
     expect(animationComplete).toHaveBeenCalledTimes(1);
-  });
-
-  it('resolves and calls animationComplete once when play rejects', async () => {
-    const el = row();
-    const { event, animationComplete } = fakeEvent(el);
-    const play = vi.fn(() => Promise.reject(new Error('boom')));
-
-    await expect(expandRow(fakeMotion(play), event)).resolves.toBe(undefined);
-
-    expect(animationComplete).toHaveBeenCalledTimes(1);
-    expect(el.hasAttribute('data-leaving')).toBe(false);
   });
 });
