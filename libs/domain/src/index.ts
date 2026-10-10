@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
+export * from './lib/compare';
 export * from './lib/time';
 export * from './lib/area';
 export * from './lib/task';

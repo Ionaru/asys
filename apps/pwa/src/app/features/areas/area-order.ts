@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: EUPL-1.2
 
-// Code-unit order on purpose: localeCompare would differ per runtime locale.
-const compareCodeUnits = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+import { compareCodeUnits } from '@asys/domain';
 
 /** Orders Areas by name, then by id, for every list and choice of Areas. */
 export const byAreaName = (
