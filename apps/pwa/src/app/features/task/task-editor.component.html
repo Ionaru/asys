@@ -121,7 +121,7 @@
       asys-button
       type="button"
       [variant]="Variant.Secondary"
-      [disabled]="addBusy()"
+      [disabled]="actionsBusy()"
       (click)="pickerOpen.set(true)"
     >
       Add a blocker
@@ -138,7 +138,7 @@
                   asys-button
                   type="button"
                   [variant]="Variant.Quiet"
-                  [disabled]="addBusy()"
+                  [disabled]="actionsBusy()"
                   (click)="addBlocker(candidate.id)"
                 >
                   {{ candidate.title }}
