@@ -6,12 +6,6 @@
   padding-block-end: var(--space-5);
 }
 
-.sign-in__title {
-  margin: 0;
-  font-size: var(--font-size-title);
-  line-height: var(--line-height-title);
-}
-
 .sign-in__body,
 .sign-in__message {
   margin: 0;

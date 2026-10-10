@@ -1,6 +1,8 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
 <main class="asys-page sign-up">
-  <h1 #title class="sign-up__title" tabindex="-1">{{ heading() }}</h1>
+  <h1 #title class="asys-page__title asys-page__title--flush sign-up__title" tabindex="-1">
+    {{ heading() }}
+  </h1>
   @switch (step()) {
     @case (Step.Name) {
       <form class="sign-up__block" animate.enter="asys-enter" [formRoot]="nameForm">

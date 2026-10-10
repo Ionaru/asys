@@ -16,13 +16,6 @@ let nextId = 0;
   encapsulation: ViewEncapsulation.None,
   templateUrl: './date-spec-field.component.html',
   styles: `
-    .asys-date-spec {
-      margin: 0;
-      padding: 0;
-      border: 0;
-      min-width: 0;
-    }
-
     .asys-date-spec__row {
       display: flex;
       flex-wrap: wrap;

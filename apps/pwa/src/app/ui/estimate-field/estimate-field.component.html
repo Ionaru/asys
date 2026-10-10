@@ -1,12 +1,12 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
-<fieldset class="asys-estimate">
+<fieldset class="asys-fieldset-reset asys-estimate">
   <legend class="asys-estimate__legend">{{ legend() }}</legend>
   <div class="asys-estimate__chips">
     @for (chip of chips; track chip.minutes) {
       <button
         #chipButton
         type="button"
-        class="asys-estimate__chip asys-estimate__chip--num"
+        class="asys-num asys-estimate__chip asys-estimate__chip--num"
         [disabled]="disabled()"
         [attr.aria-pressed]="value() === chip.minutes ? 'true' : 'false'"
         [attr.aria-describedby]="messageId()"

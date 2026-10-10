@@ -75,18 +75,9 @@
   position: absolute;
   top: calc(var(--space-1) * -1.5);
   right: calc(var(--space-1) * -0.5);
-  min-width: calc(var(--line-height-label) + var(--space-1));
-  padding: 0 var(--space-1);
-  border-radius: var(--radius-pill);
   background: var(--ink);
   color: var(--paper);
   box-shadow: 0 0 0 2px var(--surface);
-  text-align: center;
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: var(--font-size-label);
-  line-height: var(--line-height-label);
-  font-weight: 700;
   letter-spacing: 0;
 }
 

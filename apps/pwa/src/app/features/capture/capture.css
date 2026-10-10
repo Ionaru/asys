@@ -1,11 +1,4 @@
 /* SPDX-License-Identifier: EUPL-1.2 */
-.capture__title {
-  margin: 0 0 var(--space-3);
-  font-size: var(--font-size-title);
-  line-height: var(--line-height-title);
-  font-weight: 700;
-}
-
 .capture__form {
   display: flex;
   flex-direction: column;

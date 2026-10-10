@@ -245,7 +245,7 @@ test('opens the top pick with Push and moves its title, then goes back with Pop'
     { name: 'task-title', tag: 'span', classes: 'asys-top-pick__title-text' },
   ]);
   expect(withName(push.newNames, 'task-title')).toEqual([
-    { name: 'task-title', tag: 'h1', classes: 'task-editor__title' },
+    { name: 'task-title', tag: 'h1', classes: 'asys-page__title task-editor__title' },
   ]);
 
   before = await recordCount(page);
@@ -255,7 +255,7 @@ test('opens the top pick with Push and moves its title, then goes back with Pop'
 
   expect(pop.kind).toBe('pop');
   expect(withName(pop.oldNames, 'task-title')).toEqual([
-    { name: 'task-title', tag: 'h1', classes: 'task-editor__title' },
+    { name: 'task-title', tag: 'h1', classes: 'asys-page__title task-editor__title' },
   ]);
   expect(withName(pop.newNames, 'task-title')).toEqual([
     { name: 'task-title', tag: 'span', classes: 'asys-top-pick__title-text' },
@@ -280,7 +280,7 @@ test("moves a ranked row's title into the editor", async ({ page }) => {
     { name: 'task-title', tag: 'span', classes: 'asys-picker-row__title' },
   ]);
   expect(withName(push.newNames, 'task-title')).toEqual([
-    { name: 'task-title', tag: 'h1', classes: 'task-editor__title' },
+    { name: 'task-title', tag: 'h1', classes: 'asys-page__title task-editor__title' },
   ]);
 });
 

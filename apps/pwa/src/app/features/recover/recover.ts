@@ -30,12 +30,6 @@ export const MAX_CODE_LENGTH = 64;
       flex-direction: column;
       gap: var(--space-4);
     }
-
-    .recover__title {
-      margin: 0;
-      font-size: var(--font-size-title);
-      line-height: var(--line-height-title);
-    }
   `,
 })
 export class Recover {

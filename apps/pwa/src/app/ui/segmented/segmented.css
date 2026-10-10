@@ -1,11 +1,4 @@
 /* SPDX-License-Identifier: EUPL-1.2 */
-.asys-segmented {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  min-width: 0;
-}
-
 .asys-segmented__legend {
   padding: 0;
   margin: 0 0 var(--space-2);

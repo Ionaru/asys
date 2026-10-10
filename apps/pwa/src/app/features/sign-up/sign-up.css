@@ -10,12 +10,6 @@
   padding-block-end: var(--space-5);
 }
 
-.sign-up__title {
-  margin: 0;
-  font-size: var(--font-size-title);
-  line-height: var(--line-height-title);
-}
-
 .sign-up__body,
 .sign-up__message {
   margin: 0;

@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
-<h1 class="capture__title">Capture</h1>
+<h1 class="asys-page__title capture__title">Capture</h1>
 <form class="capture__form" (submit)="add($event)">
   <asys-text-field label="Title" [value]="field()" (valueChange)="field.set($event)" />
   <button asys-button type="submit" [variant]="Variant.Primary" [disabled]="!canAdd()">Add</button>
