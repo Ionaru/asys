@@ -22,7 +22,6 @@ import { AuthApi, AuthError, AuthResultTag } from '../../core/api/auth-api';
 import { PasskeyCeremony } from '../../core/api/passkey-ceremony';
 import { Session, SessionState } from '../../core/auth/session';
 import { GENERIC_MESSAGE } from '../../core/data/outcome-message';
-import { AppUpdate } from '../../core/platform/app-update';
 import { DeviceZone } from '../../core/platform/device-zone';
 import { Button, ButtonVariant } from '../../ui/button/button';
 import { IconName } from '../../ui/icon/icon';
@@ -30,6 +29,7 @@ import { TextField } from '../../ui/text-field/text-field';
 import { ceremonyOptions } from '../auth/ceremony-options';
 import { nameError } from '../auth/name-rule';
 import { MISCONFIGURED_MESSAGE, TRY_AGAIN_MESSAGE } from '../auth/passkey-messages';
+import { recoveryCodes } from '../auth/recovery-codes';
 
 /** The screens of the sign-up flow. */
 export enum SignUpStep {
@@ -73,8 +73,6 @@ export class SignUp {
 
   readonly #session = inject(Session);
 
-  readonly #appUpdate = inject(AppUpdate);
-
   readonly #deviceZone = inject(DeviceZone);
 
   readonly #router = inject(Router);
@@ -92,21 +90,21 @@ export class SignUp {
   /** The Sign-up token: a credential, kept in memory only. */
   #token = '';
 
-  #held = false;
-
   #signedInPromise: Promise<void> | null = null;
 
   protected readonly step = signal(SignUpStep.LinkInvalid);
 
   protected readonly submittedName = signal('');
 
-  protected readonly codes = signal<readonly string[]>([]);
+  readonly #recovery = recoveryCodes();
+
+  protected readonly codes = this.#recovery.codes;
 
   protected readonly busy = signal(false);
 
   readonly #message = signal<string | null>(null);
 
-  protected readonly copyStatus = signal<string | null>(null);
+  protected readonly copyStatus = this.#recovery.copyStatus;
 
   protected readonly heading = computed(() => {
     switch (this.step()) {
@@ -209,15 +207,6 @@ export class SignUp {
 
       this.title()?.nativeElement.focus();
     });
-
-    this.#destroyRef.onDestroy(() => {
-      this.codes.set([]);
-
-      if (this.#held) {
-        this.#held = false;
-        this.#appUpdate.release();
-      }
-    });
   }
 
   protected discard(): void {
@@ -272,10 +261,8 @@ export class SignUp {
       }
 
       if (result._tag === AuthResultTag.Ok) {
-        this.codes.set(result.value.recoveryCodes);
+        this.#recovery.show(result.value.recoveryCodes);
         this.step.set(SignUpStep.Codes);
-        this.#appUpdate.hold();
-        this.#held = true;
         this.#signedInPromise = this.#session.signedIn();
 
         return;
@@ -304,13 +291,8 @@ export class SignUp {
     }
   }
 
-  protected async copy(): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(this.codes().join('\n'));
-      this.copyStatus.set('Copied.');
-    } catch {
-      this.copyStatus.set('Could not copy. Select the codes instead.');
-    }
+  protected copy(): Promise<void> {
+    return this.#recovery.copy();
   }
 
   protected async finish(): Promise<void> {
