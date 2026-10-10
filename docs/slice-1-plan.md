@@ -637,7 +637,7 @@ Re-planned and built on 2026-10-03, in two commits: the passkey library (4a), th
 - **Creation.** A 32-byte token, sent as base64url and stored as its SHA-256 hex, valid for 30 days.
 - **Sliding.** A request with less than 29 days left renews the session to 30 days from now and re-sends the cookie, so at most once a day. There is no absolute cap.
 - **Revocation.** Removing a passkey, regenerating the recovery codes, or signing in with a recovery code signs out every other session. Sign-out deletes the current one, and prune deletes expired ones.
-- **Re-check under the lock.** The middleware checks a session before the handler runs, so a credential change re-checks it after taking the counter lock, the lock every revocation takes. A revoked request then answers 401: regenerating the codes fails with `Unauthorized`, and adding or removing a passkey dies with it, because the library's unit of work cannot carry the error; it still answers itself as an empty 401. Domain commands carry no credential power and are not re-checked.
+- **Re-check under the lock.** The middleware checks a session before the handler runs, so a credential change re-checks it after taking the counter lock, the lock every revocation takes. A revoked request then fails with `Unauthorized` and answers the tagged 401 the middleware answers. Regenerating the codes re-checks in its own transaction. Adding and removing a passkey re-check through the library's `recheckSession`, which runs first inside the unit of work, so nothing is written and the transaction rolls back. Domain commands carry no credential power and are not re-checked.
 
 **Sign-up and recovery**
 - **The Sign-up link.** `signup-link` pre-allocates the owner id and stores the token's hash under it. The library's register endpoints carry the token.
@@ -647,7 +647,7 @@ Re-planned and built on 2026-10-03, in two commits: the passkey library (4a), th
 - **ASYS's side of the library.**
   - `PasskeyStoreLive` over drizzle and row-level security. Its writes take the counter lock, and a duplicate credential id is caught outside its savepoint.
   - A `PasskeyUnitOfWork` that is `withOwner` plus the counter lock.
-  - The hooks: sign-up gated by the link, the owner created with the first passkey, a session on sign-in, and the other sessions revoked when a passkey is removed.
+  - The hooks: sign-up gated by the link, the owner created with the first passkey, a session on sign-in, and the other sessions revoked when a passkey is removed. `recheckSession` is `requireLiveSession` for the request's session.
 
 **Tables and functions**
 
@@ -697,7 +697,7 @@ Re-planned and built on 2026-10-03. Ten probes ran first, and their facts are li
 - **One boundary.** `apps/pwa/src/app/core/api` is the only place that imports the generated code: functions by their own file (a barrel import would bundle every operation), models type-only. `wire.ts` holds a compile-time guard: `Wire<T>` maps enums to their literal values, drops `readonly` and maps `any` to `unknown`, and `SHAPES` requires `Equals<Wire<Generated>, Wire<Domain>>` for the Task, the Snapshot parts, every ChangeEntry and Command member, the command result and Me, so contract drift fails `pwa:typecheck`. `ReviewItem.payload` is unchecked by design.
 - **Services.** `DataApi` (snapshot, changes, runCommand) and `AuthApi` (one method per auth operation) return promises that never reject. Command outcomes are `Applied`, `NotApplicable`, `Rejected`, `KeyReused`, `SignedOut` or `Failed { status }`; auth errors map on the body's `_tag`, never on the status alone.
 
-**The 401 rule.** A 401 means signed out only when its body is `{ "_tag": "Unauthorized" }`, or when it is the body-less 401 of a passkey add or remove whose session was revoked. `SignInFailed` and `PasskeyVerificationFailed` are 401s that mean no such thing. An HTTP interceptor applies the rule and passes every error on unchanged.
+**The 401 rule.** A 401 means signed out only when its body is `{ "_tag": "Unauthorized" }`. `SignInFailed` and `PasskeyVerificationFailed` are 401s that mean no such thing, and a body-less 401 is no sign-out either. An HTTP interceptor applies the rule and passes every error on unchanged.
 
 **Session and routes.** `Session` asks `GET /v1/auth/me` at startup without blocking it, with a 10 s timeout: SignedIn, SignedOut, or Unreachable (a late answer still applies). `signedInGuard` admits SignedIn and Unreachable and sends SignedOut visitors to `/signin?returnUrl=…`; `signedOutGuard` sends SignedIn visitors to `/now`, except on `/signup`. `safeReturnUrl` accepts only same-origin paths that are not sign-in screens.
 

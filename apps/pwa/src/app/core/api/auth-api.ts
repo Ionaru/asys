@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: EUPL-1.2
-import { HttpStatusCode } from '@angular/common/http';
 import { inject, Service } from '@angular/core';
 import type {
   AuthenticationResponseJSON,
@@ -93,11 +92,7 @@ const ERROR_BY_TAG: Readonly<Record<string, AuthError>> = {
 
 const failed = <T>(error: AuthError): AuthResult<T> => ({ _tag: AuthResultTag.Failed, error });
 
-const errorOf = (
-  status: number,
-  errorTag: string | null,
-  bodylessUnauthorized: boolean,
-): AuthError => {
+const errorOf = (status: number, errorTag: string | null): AuthError => {
   const known = errorTag === null ? undefined : ERROR_BY_TAG[errorTag];
 
   if (known !== undefined) {
@@ -106,10 +101,6 @@ const errorOf = (
 
   if (status === 0) {
     return AuthError.Network;
-  }
-
-  if (bodylessUnauthorized && status === HttpStatusCode.Unauthorized && errorTag === null) {
-    return AuthError.Unauthorized;
   }
 
   return AuthError.Unexpected;
@@ -196,30 +187,26 @@ export class AuthApi {
       this.#api.invoke(passkeysAdd, {
         body: { challengeId, response: toWire(response), ...(name === undefined ? {} : { name }) },
       }),
-      true,
     );
   }
 
   /** `DELETE /v1/auth/passkeys/<credentialId>`. */
   removePasskey(credentialId: string): Promise<AuthResult<void>> {
-    return this.#runVoid(this.#api.invoke(passkeysRemove, { credentialId }), true);
+    return this.#runVoid(this.#api.invoke(passkeysRemove, { credentialId }));
   }
 
-  async #run<T>(call: Promise<T>, bodylessUnauthorized = false): Promise<AuthResult<T>> {
+  async #run<T>(call: Promise<T>): Promise<AuthResult<T>> {
     const outcome = await callApi(call);
 
     if (outcome._tag === HttpOutcomeTag.Ok) {
       return { _tag: AuthResultTag.Ok, value: outcome.value };
     }
 
-    return failed(errorOf(outcome.status, outcome.errorTag, bodylessUnauthorized));
+    return failed(errorOf(outcome.status, outcome.errorTag));
   }
 
   /** The generated void calls keep the text body of the response, so the value is dropped here. */
-  #runVoid(call: Promise<void>, bodylessUnauthorized = false): Promise<AuthResult<void>> {
-    return this.#run(
-      call.then(() => undefined),
-      bodylessUnauthorized,
-    );
+  #runVoid(call: Promise<void>): Promise<AuthResult<void>> {
+    return this.#run(call.then(() => undefined));
   }
 }

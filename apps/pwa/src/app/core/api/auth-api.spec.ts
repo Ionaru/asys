@@ -51,8 +51,6 @@ interface Call {
   readonly url: string;
   /** Text-body operations are flushed with JSON strings. */
   readonly text: boolean;
-  /** Whether a body-less 401 means the session was revoked mid-call. */
-  readonly revocable: boolean;
 }
 
 const calls: readonly Call[] = [
@@ -62,7 +60,6 @@ const calls: readonly Call[] = [
     method: 'POST',
     url: '/v1/auth/register/options',
     text: false,
-    revocable: false,
   },
   {
     name: 'register',
@@ -70,7 +67,6 @@ const calls: readonly Call[] = [
     method: 'POST',
     url: '/v1/auth/register',
     text: false,
-    revocable: false,
   },
   {
     name: 'authenticateOptions',
@@ -78,7 +74,6 @@ const calls: readonly Call[] = [
     method: 'POST',
     url: '/v1/auth/authenticate/options',
     text: false,
-    revocable: false,
   },
   {
     name: 'authenticate',
@@ -86,7 +81,6 @@ const calls: readonly Call[] = [
     method: 'POST',
     url: '/v1/auth/authenticate',
     text: false,
-    revocable: false,
   },
   {
     name: 'recover',
@@ -94,7 +88,6 @@ const calls: readonly Call[] = [
     method: 'POST',
     url: '/v1/auth/recover',
     text: false,
-    revocable: false,
   },
   {
     name: 'me',
@@ -102,7 +95,6 @@ const calls: readonly Call[] = [
     method: 'GET',
     url: '/v1/auth/me',
     text: false,
-    revocable: false,
   },
   {
     name: 'signOut',
@@ -110,7 +102,6 @@ const calls: readonly Call[] = [
     method: 'POST',
     url: '/v1/auth/signout',
     text: true,
-    revocable: false,
   },
   {
     name: 'regenerateRecoveryCodes',
@@ -118,7 +109,6 @@ const calls: readonly Call[] = [
     method: 'POST',
     url: '/v1/auth/recovery-codes',
     text: false,
-    revocable: false,
   },
   {
     name: 'passkeys',
@@ -126,7 +116,6 @@ const calls: readonly Call[] = [
     method: 'GET',
     url: '/v1/auth/passkeys',
     text: false,
-    revocable: false,
   },
   {
     name: 'addOptions',
@@ -134,7 +123,6 @@ const calls: readonly Call[] = [
     method: 'POST',
     url: '/v1/auth/passkeys/options',
     text: false,
-    revocable: false,
   },
   {
     name: 'addPasskey',
@@ -142,7 +130,6 @@ const calls: readonly Call[] = [
     method: 'POST',
     url: '/v1/auth/passkeys',
     text: false,
-    revocable: true,
   },
   {
     name: 'removePasskey',
@@ -150,7 +137,6 @@ const calls: readonly Call[] = [
     method: 'DELETE',
     url: '/v1/auth/passkeys/cred-1',
     text: true,
-    revocable: true,
   },
 ];
 
@@ -376,6 +362,7 @@ describe('AuthApi', () => {
 
         it.each([
           ['a body-less 400', 400, null],
+          ['a body-less 401', 401, null],
           ['a body-less 403', 403, null],
           ['a 500', 500, null],
           ['a 500 with an unknown tag', 500, { _tag: 'Boom' }],
@@ -387,21 +374,6 @@ describe('AuthApi', () => {
 
           expect(await result).toEqual(failed(AuthError.Unexpected));
         });
-
-        it(
-          call.revocable
-            ? 'maps a body-less 401 to Unauthorized'
-            : 'maps a body-less 401 to Unexpected',
-          async () => {
-            const result = call.run(api);
-
-            flushError(call, 401, null);
-
-            expect(await result).toEqual(
-              failed(call.revocable ? AuthError.Unauthorized : AuthError.Unexpected),
-            );
-          },
-        );
 
         it('never rejects', async () => {
           const result = call.run(api);

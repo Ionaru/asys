@@ -1,8 +1,15 @@
 // SPDX-License-Identifier: MIT
 
 import { Context, Effect, type Layer } from 'effect';
+import { HttpApiError } from 'effect/http-api';
 import { expectTypeOf, test } from 'vitest';
-import { SampleApi, SampleAuth, SamplePasskeys, SampleUser } from '../api/sample-api.fixture';
+import {
+  SampleApi,
+  SampleAuth,
+  SampleGone,
+  SamplePasskeys,
+  SampleUser,
+} from '../api/sample-api.fixture';
 import { PasskeyChallenges } from './challenges';
 import { PasskeyConfig } from './config';
 import { makePasskeyHandlers } from './handlers';
@@ -66,8 +73,22 @@ test('onAuthenticated keeps the middleware service in the requirements, onRemove
   expectTypeOf<Layer.Services<typeof removed>>().toEqualTypeOf<Base>();
 });
 
+test('recheckSession adds its services to the requirements, less the middleware service', () => {
+  const layer = makePasskeyHandlers(SampleApi, SamplePasskeys, {
+    hooks: { onRegisterBegin, onRegistered, onAuthenticated },
+    currentUserId,
+    recheckSession: Effect.gen(function* () {
+      yield* SampleUser;
+      yield* Foo;
+      return yield* Effect.fail(new HttpApiError.Unauthorized({}));
+    }),
+  });
+
+  expectTypeOf<Layer.Services<typeof layer>>().toEqualTypeOf<Base | Foo>();
+});
+
 // oxlint-disable-next-line vitest/expect-expect -- the @ts-expect-error lines are the assertions
-test('hooks must match the group success and error types', () => {
+test('hooks and recheckSession must match the group success and error types', () => {
   makePasskeyHandlers(SampleApi, SamplePasskeys, {
     hooks: {
       onRegisterBegin,
@@ -86,5 +107,12 @@ test('hooks must match the group success and error types', () => {
       onAuthenticated,
     },
     currentUserId,
+  });
+
+  makePasskeyHandlers(SampleApi, SamplePasskeys, {
+    hooks: { onRegisterBegin, onRegistered, onAuthenticated },
+    currentUserId,
+    // @ts-expect-error recheckSession may fail only with the session middleware's error
+    recheckSession: Effect.fail(new SampleGone({})),
   });
 });

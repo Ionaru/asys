@@ -126,6 +126,7 @@ const implement = (
   groupIdentifier: string,
   hooks: ErasedHooks,
   currentUserId: Effect.Effect<string, never, any>,
+  recheckSession: Effect.Effect<void, any, any> | undefined,
 ) =>
   HttpApiBuilder.group(api as HttpApi.HttpApi<string, ErasedGroup>, groupIdentifier, (handlers) =>
     handlers
@@ -160,11 +161,11 @@ const implement = (
       .handle('add', ({ payload }) =>
         Effect.gen(function* () {
           const userId = yield* currentUserId;
-          return yield* finishAddPasskey(userId, {
-            challengeId: payload.challengeId,
-            response: payload.response,
-            name: payload.name,
-          });
+          return yield* finishAddPasskey(
+            userId,
+            { challengeId: payload.challengeId, response: payload.response, name: payload.name },
+            recheckSession,
+          );
         }),
       )
       .handle('list', () =>
@@ -176,7 +177,7 @@ const implement = (
       .handle('remove', ({ params }) =>
         Effect.gen(function* () {
           const userId = yield* currentUserId;
-          return yield* removePasskey(userId, params.credentialId, hooks.onRemoved);
+          return yield* removePasskey(userId, params.credentialId, hooks.onRemoved, recheckSession);
         }),
       ),
   );
@@ -186,8 +187,9 @@ const implement = (
 /**
  * Builds the handler layer for the passkey group inside the host's API. Serve it with
  * `HttpApiBuilder.layer(Api)` and pass `passkeyRouterConfig` as the router config.
- * The middleware's provides are excluded only from `onRemoved`'s requirements, because the
- * other hooks run on public endpoints where the middleware does not run.
+ * The middleware's provides are excluded only from the requirements of `onRemoved` and
+ * `recheckSession`, because the other hooks run on public endpoints where the middleware does
+ * not run.
  */
 export const makePasskeyHandlers = <
   ApiId extends string,
@@ -197,6 +199,7 @@ export const makePasskeyHandlers = <
   R2 = never,
   R3 = never,
   R4 = never,
+  R5 = never,
 >(
   api: HttpApi.HttpApi<ApiId, Groups>,
   group: Group,
@@ -207,6 +210,18 @@ export const makePasskeyHandlers = <
       string,
       never,
       HttpApiEndpoint.MiddlewareProvides<HttpApiGroup.Endpoints<Group>> | HttpRouter.Provided
+    >;
+    /**
+     * Optional: re-checks the signed-in session as the first step inside the unit of work of
+     * `add` and `remove`, before anything is written. Its failure is the session middleware's
+     * error: it rolls the unit back, and the endpoint answers with it as the middleware would.
+     * A host whose unit of work takes the lock its session revocations take uses it to refuse
+     * a request whose session was revoked while the request waited for that lock.
+     */
+    readonly recheckSession?: Effect.Effect<
+      void,
+      HttpApiEndpoint.MiddlewareError<HttpApiGroup.Endpoints<Group>>,
+      R5
     >;
   },
 ): Layer.Layer<
@@ -219,7 +234,14 @@ export const makePasskeyHandlers = <
   | HttpApiEndpoint.Middleware<HttpApiGroup.Endpoints<Group>>
   | Exclude<R1 | R2 | R3, HttpRouter.Provided>
   | Exclude<
-      R4,
+      R4 | R5,
       HttpRouter.Provided | HttpApiEndpoint.MiddlewareProvides<HttpApiGroup.Endpoints<Group>>
     >
-> => implement(api, group.identifier, options.hooks as ErasedHooks, options.currentUserId) as never;
+> =>
+  implement(
+    api,
+    group.identifier,
+    options.hooks as ErasedHooks,
+    options.currentUserId,
+    options.recheckSession,
+  ) as never;

@@ -63,18 +63,6 @@ describe('unauthorizedInterceptor', () => {
     expect(signedOut).toHaveBeenCalledTimes(1);
   });
 
-  it('signs out on a body-less 401 of POST /v1/auth/passkeys', async () => {
-    await fail('POST', '/v1/auth/passkeys', 401, null);
-
-    expect(signedOut).toHaveBeenCalledTimes(1);
-  });
-
-  it('signs out on a body-less 401 of DELETE /v1/auth/passkeys/<id>', async () => {
-    await fail('DELETE', '/v1/auth/passkeys/cred-1', 401, null);
-
-    expect(signedOut).toHaveBeenCalledTimes(1);
-  });
-
   it.each([
     ['SignInFailed', 'POST', '/v1/auth/authenticate'],
     ['PasskeyVerificationFailed', 'POST', '/v1/auth/passkeys'],
