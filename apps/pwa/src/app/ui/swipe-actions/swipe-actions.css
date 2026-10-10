@@ -1,0 +1,77 @@
+/* SPDX-License-Identifier: EUPL-1.2 */
+/*
+ * z-index: 0 makes each host its own stacking context, so the reveal, surface and reason-chip
+ * z-indexes below never compete with other rows or the shell's fixed bars. A focused host lifts to 1
+ * so the next row does not cover its focus ring.
+ */
+.asys-swipe {
+  position: relative;
+  z-index: 0;
+  display: block;
+  overflow: clip;
+  overflow-clip-margin: 4px;
+}
+
+.asys-swipe:focus-within {
+  z-index: 1;
+}
+
+.asys-swipe__surface {
+  position: relative;
+  z-index: 1;
+  touch-action: pan-y pinch-zoom;
+}
+
+.asys-swipe__reveal {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-inline: var(--space-4);
+  background: var(--sunken);
+  color: var(--ink-muted);
+  font-size: var(--font-size-label);
+  line-height: var(--line-height-label);
+  font-weight: 700;
+}
+
+/* Needed because display: flex above would otherwise beat the browser's own [hidden] rule. */
+.asys-swipe__reveal[hidden] {
+  display: none;
+}
+
+.asys-swipe__reveal--end {
+  justify-content: flex-start;
+}
+
+.asys-swipe__reveal--start {
+  justify-content: flex-end;
+}
+
+.asys-swipe--armed .asys-swipe__reveal--end {
+  background: var(--signal);
+  color: var(--on-signal);
+}
+
+.asys-swipe--armed .asys-swipe__reveal--start {
+  background: var(--signal-soft);
+  color: var(--on-signal-soft);
+}
+
+.asys-swipe__reveal--start[data-reason] {
+  z-index: 2;
+  background: transparent;
+}
+
+.asys-swipe__reveal--start[data-reason] > span {
+  background: var(--sunken);
+  color: var(--ink-muted);
+  font-size: var(--font-size-reason);
+  line-height: var(--line-height-reason);
+  font-weight: 400;
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+}

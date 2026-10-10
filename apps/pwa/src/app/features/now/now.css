@@ -24,6 +24,18 @@ asys-now-header {
   margin: 0;
 }
 
+.now__top-swipe {
+  border-radius: var(--radius-lg);
+}
+
+/* flow-root keeps the form's top margin inside the row's ground instead of letting it collapse through. */
+.now__row-form {
+  display: flow-root;
+  padding: 0 var(--space-4) var(--space-3);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
 asys-section-header {
   margin: var(--space-5) 0 0;
 }

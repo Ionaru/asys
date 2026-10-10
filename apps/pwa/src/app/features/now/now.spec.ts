@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: EUPL-1.2
-import { computed, ErrorHandler, signal, type AnimationCallbackEvent } from '@angular/core';
+import {
+  computed,
+  ErrorHandler,
+  signal,
+  type AnimationCallbackEvent,
+  type DebugElement,
+} from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import {
   CommandTag,
@@ -27,6 +34,7 @@ import { Clock } from '../../core/platform/clock';
 import { Ids } from '../../core/platform/ids';
 import { Motion, MotionDuration, MotionEasing } from '../../core/platform/motion';
 import { TaskMorph } from '../../core/platform/task-morph';
+import { SwipeActions } from '../../ui/swipe-actions/swipe-actions';
 import { Now } from './now';
 
 const ZONE = 'Europe/Amsterdam';
@@ -229,6 +237,8 @@ const fakeAnimationEvent = (height = 56) => {
   };
 };
 
+const swipeOf = (el: DebugElement): SwipeActions => el.componentInstance as SwipeActions;
+
 const setup = async (options: SetupOptions = {}) => {
   const state = signal<DomainState | null>(options.state === undefined ? FULL : options.state);
   const status = signal<SyncStatus>(options.status ?? SyncStatus.Ready);
@@ -378,6 +388,30 @@ const setup = async (options: SetupOptions = {}) => {
     );
   const waitingSummaryText = (): string | undefined =>
     root().querySelector('asys-section-header .asys-section-header__summary')?.textContent?.trim();
+  const swipes = (): DebugElement[] => fixture.debugElement.queryAll(By.directive(SwipeActions));
+  const swipe = (id: string): DebugElement =>
+    must(
+      swipes().find((s) => swipeOf(s).taskId() === id),
+      `swipe for ${id}`,
+    );
+  const topSwipe = (): DebugElement =>
+    must(fixture.debugElement.query(By.css('asys-swipe-actions.now__top-swipe')), 'top swipe');
+  // As the gesture would: a commit of the swipe for `id` emits the id it recorded, here `emitted`.
+  const swipeEnd = async (id: string, emitted = id): Promise<void> => {
+    swipeOf(swipe(id)).commitEnd.emit(emitted);
+    await settle();
+  };
+  const swipeStart = async (id: string, emitted = id): Promise<void> => {
+    swipeOf(swipe(id)).commitStart.emit(emitted);
+    await settle();
+  };
+  const rowLink = (id: string): HTMLAnchorElement =>
+    must(
+      rows().find((a) => a.getAttribute('href') === `/tasks/${id}`),
+      `row link for ${id}`,
+    );
+  const rowItem = (id: string): HTMLElement =>
+    must(rowLink(id).closest('li'), `row item for ${id}`);
 
   return {
     fixture,
@@ -421,6 +455,13 @@ const setup = async (options: SetupOptions = {}) => {
     waitingList,
     waitingRows,
     waitingSummaryText,
+    swipes,
+    swipe,
+    topSwipe,
+    swipeEnd,
+    swipeStart,
+    rowLink,
+    rowItem,
   };
 };
 
@@ -2074,6 +2115,421 @@ describe('Now', () => {
 
       expect(topTitle().textContent?.trim()).toBe('Steady one');
       expect(form()).toBeNull();
+    });
+  });
+
+  describe('swipes', () => {
+    const LOG_15: Command = {
+      _tag: CommandTag.LogProgress,
+      taskId: 'dentist',
+      remainingMinutes: 15,
+      expect: { status: TaskStatus.Open },
+    };
+
+    const inputsOf = (el: DebugElement) => ({
+      taskId: swipeOf(el).taskId(),
+      startEnabled: swipeOf(el).startEnabled(),
+      disabled: swipeOf(el).disabled(),
+    });
+
+    const idsRanked = (now: () => { ranked: readonly { task: Task }[] }): string[] =>
+      now().ranked.map((r) => r.task.id);
+
+    it('wraps the top pick card and each ranked row in a swipe, and keeps the rows in rank order', async () => {
+      const { root, rows, rankedList, topPick } = await setup();
+      const top = must(root().querySelector('asys-swipe-actions.now__top-swipe'));
+      const items = Array.from(
+        root().querySelectorAll('ul.now__list:not(.now__list--waiting) > li'),
+      );
+
+      expect(top.querySelector('article.asys-top-pick')).not.toBeNull();
+      expect(top.contains(topPick())).toBe(true);
+      expect(rankedList()).not.toBeNull();
+      expect(items).toHaveLength(2);
+      expect(items.map((li) => li.querySelectorAll('asys-swipe-actions').length)).toEqual([1, 1]);
+      expect(
+        items.map((li) => li.querySelectorAll('asys-swipe-actions a.asys-picker-row').length),
+      ).toEqual([1, 1]);
+      expect(items.map((li) => li.querySelectorAll('a.asys-picker-row').length)).toEqual([1, 1]);
+      expect(root().querySelectorAll('asys-swipe-actions')).toHaveLength(3);
+      expect(rows().map((a) => a.getAttribute('href'))).toEqual([
+        '/tasks/dentist',
+        '/tasks/plants',
+      ]);
+    });
+
+    it('does not wrap the Waiting rows', async () => {
+      const { root, waitingHeader, waitingList, waitingRows, click } = await setup();
+
+      await click(must(waitingHeader()));
+
+      expect(waitingRows()).toHaveLength(2);
+      expect(must(waitingList()).querySelectorAll('asys-swipe-actions')).toHaveLength(0);
+      expect(root().querySelectorAll('asys-swipe-actions')).toHaveLength(3);
+    });
+
+    it('gives each swipe its Task, enables Log progress only where the Estimate leaves room, and disables none', async () => {
+      const { swipes } = await setup();
+
+      expect(swipes().map(inputsOf)).toEqual([
+        { taskId: 'invoice', startEnabled: true, disabled: false },
+        { taskId: 'dentist', startEnabled: true, disabled: false },
+        { taskId: 'plants', startEnabled: false, disabled: false },
+      ]);
+    });
+
+    describe('toward the end', () => {
+      it('hands the top pick to DoneUndo as a Swipe Done, and hands over to the next top pick', async () => {
+        const { doneUndo, send, swipeEnd, topTitle, topLink } = await setup();
+
+        await swipeEnd('invoice');
+
+        expect(doneUndo.complete).toHaveBeenCalledExactlyOnceWith(INVOICE, DoneOrigin.Swipe);
+        expect(send).not.toHaveBeenCalled();
+        expect(topTitle().textContent?.trim()).toBe('Call the dentist');
+        expect(document.activeElement).toBe(topLink());
+      });
+
+      it('hands a ranked row to DoneUndo as a Swipe Done, without the card leaving', async () => {
+        const { doneUndo, send, swipeEnd, topPick } = await setup();
+
+        // No assertion on which Task is the top pick afterwards: Report was blocked by Dentist.
+        await swipeEnd('dentist');
+
+        expect(doneUndo.complete).toHaveBeenCalledExactlyOnceWith(DENTIST, DoneOrigin.Swipe);
+        expect(send).not.toHaveBeenCalled();
+        expect(must(topPick()).hasAttribute('data-leaving')).toBe(false);
+      });
+
+      it.each(['flights', 'nope'])('does nothing for %j, which is not ranked', async (id) => {
+        const { doneUndo, send, swipeEnd } = await setup();
+
+        await swipeEnd('dentist', id);
+
+        expect(doneUndo.complete).not.toHaveBeenCalled();
+        expect(doneUndo.requestFocus).not.toHaveBeenCalled();
+        expect(send).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('toward the start', () => {
+      it('opens the Log progress form inside the row, with the hint for its Estimate, and focuses its input', async () => {
+        const { root, topPick, swipe, swipeStart, rowItem, formInput } = await setup();
+
+        await swipeStart('dentist');
+
+        const rowForm = must(rowItem('dentist').querySelector('.now__row-form'));
+        const form = must(rowForm.querySelector('asys-log-progress-form'));
+
+        expect(rowForm.querySelector('.asys-field__hint')?.textContent?.trim()).toBe(
+          'Whole minutes, less than 20 min.',
+        );
+        expect(document.activeElement).toBe(formInput());
+        expect(rowForm.contains(formInput())).toBe(true);
+        // The form sits after the swipe, not inside it, so a press in the form never starts a swipe.
+        expect(swipe('dentist').nativeElement.contains(form)).toBe(false);
+        expect(
+          swipe('dentist').nativeElement.compareDocumentPosition(form) &
+            Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+        expect(must(topPick()).querySelector('asys-log-progress-form')).toBeNull();
+        expect(root().querySelectorAll('asys-log-progress-form')).toHaveLength(1);
+      });
+
+      it('sends the LogProgress command for the row and, once applied, closes the form, announces the Estimate and focuses the row link', async () => {
+        const {
+          state,
+          sends,
+          send,
+          statusLine,
+          swipeStart,
+          typeIntoForm,
+          click,
+          formButton,
+          form,
+          rowLink,
+          settle,
+        } = await setup();
+
+        await swipeStart('dentist');
+        await typeIntoForm('15');
+        await click(formButton('Save'));
+
+        expect(send).toHaveBeenCalledExactlyOnceWith(LOG_15, 'key-1');
+
+        must(sends[0]).resolve(APPLIED);
+        state.update((s) => ({
+          ...must(s),
+          tasks: must(s).tasks.map((t) => (t.id === 'dentist' ? { ...t, estimateMinutes: 15 } : t)),
+        }));
+        await settle();
+
+        expect(form()).toBeNull();
+        expect(statusLine().textContent?.trim()).toBe('Estimate is now 15 min.');
+        expect(
+          rowLink('dentist').querySelector('.asys-picker-row__estimate')?.textContent?.trim(),
+        ).toBe('15 min');
+        expect(document.activeElement).toBe(rowLink('dentist'));
+      });
+
+      it('closes with Cancel and focuses the row link', async () => {
+        const { swipeStart, click, formButton, form, rowLink } = await setup();
+
+        await swipeStart('dentist');
+        await click(formButton('Cancel'));
+
+        expect(form()).toBeNull();
+        expect(document.activeElement).toBe(rowLink('dentist'));
+      });
+
+      it('closes with Escape and focuses the row link', async () => {
+        const { swipeStart, formInput, form, rowLink, settle } = await setup();
+
+        await swipeStart('dentist');
+        must(formInput()).dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+        );
+        await settle();
+
+        expect(form()).toBeNull();
+        expect(document.activeElement).toBe(rowLink('dentist'));
+      });
+
+      it('moves the form from the top pick to the row', async () => {
+        const { root, topPick, topButton, swipeStart, rowItem, formInput, click } = await setup();
+
+        await click(topButton('Log progress'));
+
+        expect(must(topPick()).querySelector('asys-log-progress-form')).not.toBeNull();
+
+        await swipeStart('dentist');
+
+        expect(must(topPick()).querySelector('asys-log-progress-form')).toBeNull();
+        expect(
+          rowItem('dentist').querySelector('.now__row-form asys-log-progress-form'),
+        ).not.toBeNull();
+        expect(root().querySelectorAll('asys-log-progress-form')).toHaveLength(1);
+        expect(topButton('Log progress')).toBeDefined();
+        expect(document.activeElement).toBe(formInput());
+      });
+    });
+
+    describe('a row form', () => {
+      it('stays open, with its text and focus, when the top pick changes by itself', async () => {
+        const steady = task({ id: 'steady', title: 'Steady one', createdAt: 1 });
+        const early = task({
+          id: 'early',
+          title: 'Early bird',
+          important: false,
+          due: { date: '2026-10-04', time: '10:15' },
+          estimateMinutes: 20,
+          createdAt: 2,
+        });
+        const calm = task({
+          id: 'calm',
+          title: 'Calm one',
+          important: false,
+          estimateMinutes: 20,
+          createdAt: 3,
+        });
+        const state = domainState([steady, early, calm]);
+        const later = T0 + 16 * MINUTE;
+        const rankedAt = (at: Instant): string[] =>
+          pick(state.tasks, state.links, state.areas, state.settings, at).ranked.map(
+            (r) => r.task.id,
+          );
+
+        // A ranking change would show up here, as a failure of the setup and not of Now.
+        expect(rankedAt(T0)[0]).toBe('steady');
+        expect(rankedAt(T0).slice(1)).toContain('calm');
+        expect(rankedAt(later)[0]).toBe('early');
+        expect(rankedAt(later).slice(1)).toContain('calm');
+
+        const {
+          clockNow,
+          topPick,
+          topTitle,
+          swipeStart,
+          typeIntoForm,
+          rowItem,
+          form,
+          formInput,
+          settle,
+        } = await setup({ state });
+
+        await swipeStart('calm');
+        await typeIntoForm('7');
+
+        expect(topTitle().textContent?.trim()).toBe('Steady one');
+        expect(document.activeElement).toBe(formInput());
+
+        clockNow.set(later);
+        await settle();
+
+        expect(topTitle().textContent?.trim()).toBe('Early bird');
+        expect(form()).not.toBeNull();
+        expect(rowItem('calm').querySelector('.now__row-form')?.contains(form())).toBe(true);
+        expect(must(formInput()).value).toBe('7');
+        expect(document.activeElement).toBe(formInput());
+        expect(must(topPick()).querySelector('asys-log-progress-form')).toBeNull();
+      });
+
+      it('closes when its Task leaves the ranking, and focus from inside it goes to the top pick title', async () => {
+        const { state, now, root, topLink, swipeStart, formInput, settle } = await setup();
+
+        await swipeStart('dentist');
+
+        expect(document.activeElement).toBe(formInput());
+
+        state.set(without(FULL, 'dentist'));
+        await settle();
+
+        expect(idsRanked(now)).not.toContain('dentist');
+        expect(root().querySelector('asys-log-progress-form')).toBeNull();
+        expect(topLink().getAttribute('href')).toBe(`/tasks/${idsRanked(now)[0]}`);
+        expect(document.activeElement).toBe(topLink());
+      });
+
+      it('closes when its Task becomes the top pick, and focus from inside it goes to the new top pick title', async () => {
+        const { state, root, topButton, topLink, swipeStart, formInput, settle } = await setup();
+
+        await swipeStart('dentist');
+
+        expect(document.activeElement).toBe(formInput());
+
+        state.set(without(FULL, 'invoice'));
+        await settle();
+
+        expect(topLink().getAttribute('href')).toBe('/tasks/dentist');
+        expect(root().querySelector('asys-log-progress-form')).toBeNull();
+        expect(topButton('Log progress')).toBeDefined();
+        expect(document.activeElement).toBe(topLink());
+      });
+    });
+
+    describe('the disabled input', () => {
+      it('is true for a row while its LogProgress send is pending and while it awaits the server, and false otherwise', async () => {
+        const {
+          sends,
+          awaitingSync,
+          swipes,
+          swipe,
+          swipeStart,
+          typeIntoForm,
+          click,
+          formButton,
+          settle,
+        } = await setup();
+        const disabled = (id: string): boolean => swipeOf(swipe(id)).disabled();
+
+        expect(swipes().map((s) => swipeOf(s).disabled())).toEqual([false, false, false]);
+
+        await swipeStart('dentist');
+        await typeIntoForm('15');
+        await click(formButton('Save'));
+
+        expect(disabled('dentist')).toBe(true);
+        expect(disabled('invoice')).toBe(false);
+        expect(disabled('plants')).toBe(false);
+
+        must(sends[0]).resolve(FAILED);
+        await settle();
+
+        expect(disabled('dentist')).toBe(false);
+
+        awaitingSync.set(new Set(['dentist']));
+        await settle();
+
+        expect(disabled('dentist')).toBe(true);
+        expect(disabled('invoice')).toBe(false);
+        expect(disabled('plants')).toBe(false);
+
+        awaitingSync.set(new Set());
+        await settle();
+
+        expect(disabled('dentist')).toBe(false);
+      });
+
+      it('is true for the top pick while the leaving card is displayed after a Done press, and false again once it has gone', async () => {
+        const { motion, topPick, topSwipe, topButton, press, settle } = await setup({
+          allowed: true,
+          hold: true,
+        });
+        const disabled = (): boolean => swipeOf(topSwipe()).disabled();
+
+        expect(disabled()).toBe(false);
+
+        await press(topButton('Done'));
+
+        expect(must(topPick()).hasAttribute('data-leaving')).toBe(true);
+        expect(swipeOf(topSwipe()).taskId()).toBe('invoice');
+        expect(disabled()).toBe(true);
+
+        motion.release();
+        await settle();
+
+        expect(must(topPick()).hasAttribute('data-leaving')).toBe(false);
+        expect(swipeOf(topSwipe()).taskId()).toBe('dentist');
+        expect(disabled()).toBe(false);
+      });
+    });
+
+    describe('focus after Done toward the end on a row', () => {
+      it('goes to the next row when focus was on the row', async () => {
+        const { swipeEnd, rowLink } = await setup();
+
+        rowLink('dentist').focus();
+        await swipeEnd('dentist');
+
+        expect(document.activeElement).toBe(rowLink('plants'));
+      });
+
+      it('goes to the previous row when focus was on the last row', async () => {
+        const { swipeEnd, rowLink } = await setup();
+
+        rowLink('plants').focus();
+        await swipeEnd('plants');
+
+        expect(document.activeElement).toBe(rowLink('dentist'));
+      });
+
+      it('goes to the top pick title when focus was on the only row', async () => {
+        const { swipeEnd, rowLink, topLink } = await setup({
+          state: domainState([INVOICE, DENTIST]),
+        });
+
+        rowLink('dentist').focus();
+        await swipeEnd('dentist');
+
+        expect(topLink().getAttribute('href')).toBe('/tasks/invoice');
+        expect(document.activeElement).toBe(topLink());
+      });
+
+      it('does not move when focus was elsewhere', async () => {
+        const { doneUndo, swipeEnd, heading } = await setup();
+
+        heading().focus();
+        await swipeEnd('dentist');
+
+        expect(doneUndo.complete).toHaveBeenCalledExactlyOnceWith(DENTIST, DoneOrigin.Swipe);
+        expect(document.activeElement).toBe(heading());
+      });
+
+      it('does nothing for a row whose Done is refused, and leaves focus on its link', async () => {
+        const { doneUndo, awaitingSync, swipe, swipeEnd, rowLink, settle } = await setup();
+
+        awaitingSync.set(new Set(['dentist']));
+        await settle();
+        rowLink('dentist').focus();
+
+        // The swipe is disabled, but the output is fired directly, as a late commit could.
+        expect(swipeOf(swipe('dentist')).disabled()).toBe(true);
+
+        await swipeEnd('dentist');
+
+        expect(doneUndo.complete).not.toHaveBeenCalled();
+        expect(document.activeElement).toBe(rowLink('dentist'));
+      });
     });
   });
 

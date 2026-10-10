@@ -586,6 +586,57 @@ If the initial bundle crosses 500 kB, stop and decide with the maintainer. Do no
 - `pnpm exec nx format:check --all`
 - A grep for the em-dash character in the two skills finds nothing.
 
+## Built on 2026-10-10
+
+All five units were built in order on top of plans 1 and 3. Each unit's source and its tests were written separately from one contract, and every new test was seen to fail on an assertion by breaking what it covers. The maintainer confirmed decision 8's move-resets rule on 2026-10-10 (fact 16), so no existing form test changed its expected result. Plan 1's design-system amendment had been accepted, so decision 12 does not apply.
+
+### Departures from the plan
+
+- **The check is the Icon component's.** The plan assumed no icon set and an inline SVG. The design system port of 2026-10-09 brought Font Awesome, so the Done reveal draws `<asys-icon [name]="IconName.Check" />`, which takes the reveal's colour: `ink-muted`, then `on-signal` once armed.
+- **SwipeActions keeps its template and styles in files of their own** (`swipe-actions.component.html`, `swipe-actions.css`), as the `angular-component-files` rule asks of a component file of 100 lines or more.
+- **Each swipe host is its own stacking context.** In the plan, the surfaces (`z-index: 1`) and a focused host (`z-index: 2`) join the page's stacking context. The shell's fixed bars (quick add, the Undo bar, the bottom nav) have no z-index, so a row would paint over them unless the page is a stacking context. In Chromium 141, `view-transition-name: page` on `.shell__page` makes it one (checked in a scratch page), but other browsers could not be checked here. So `.asys-swipe` sets `z-index: 0`, which keeps the reveals, the surface and the reason chip inside it, and a focused host lifts to `z-index: 1`.
+- **The row form's ground is a `flow-root`.** Without it, the form's top margin collapsed through `.now__row-form` and left a 12px strip of page background between the row and the form. `swipe.spec.ts` case 8 now checks that the form starts where the row ends.
+- **Focus after a row's swipe Done moves at once,** before the row is rendered away, not after the next render. Otherwise the collapse's own rule (focus inside a leaving row goes to the top pick) could run after it and win. The neighbour is read before the Done, because `complete` takes the Task out of `listed()` at once.
+- **`canLogProgress` comes from the domain.** Pull request #20 moved it to `task-commands.ts`, with `MIN_LOGGABLE_ESTIMATE`, while this plan was built. Now's `canLogProgress(taskId)` applies it to the Task with that id.
+- **A swipe Done on a ranked row can change the top pick.** A Done blocker no longer blocks, so in the spec's fixture `report` becomes the top pick once `dentist` is held. Unit 3's case 5 checks that the card does not leave, not which Task it shows.
+- **SwipeActions also** catches a rejected `play`, whose end state is already written, so `settling` never sticks. A primary `pointerdown` that finds an earlier locked gesture still recorded (its `pointerup` and `pointercancel` both lost) resets it first.
+- **e2e.** `settle()` leaves out the Undo ring's fill, which runs for the whole 5 s window. Cases 1 and 2 hover Undo before pressing it, so the window cannot end mid-assertion. Case 1 also checks the reveals at rest and the status line, and case 7 the armed class and the spring back after the cancel.
+- **Extra spec cases.** `swipe-actions.spec.ts` has 92 cases for unit 2's 26, adding among others the rubber band toward a disabled end, the dead-zone boundaries on both sides, 299 against 300 ms of suppression, other pointers' events and the listener removal. Now's spec adds a refused Done on a busy row, which neither completes nor moves focus.
+- **The Done button's exit is clipped by the wrapper.** The card now slides out inside the top pick's own box. Before, nothing clipped it, so it widened the page while it played.
+
+### Verification (2026-10-10)
+
+- **Proving the tests can fail.**
+  - Unit 1: `>=` to `>` in the distance rule failed "Distance, end", "Distance, start" and "Locked ignores dy".
+  - Unit 2: dropping `preventDefault()` failed the two click-suppression cases. Emitting after an id change failed two "Task that changes under the gesture" cases. Dropping the haptic failed four cases, and dropping the rubber band seven.
+  - Unit 3: sourcing the form from the top pick again failed the case where a row form survives a change of the top pick. Dropping the focus move failed three focus cases, a Button origin failed two, and Cancel focusing the top pick's button failed the Cancel and Escape cases.
+  - Unit 4, through styles injected in a scratch run: `touch-action: none` failed cases 4 and 6, `overflow: visible` case 7 (`scrollWidth` 696 against 412), plain `pan-y` case 6, and no `[hidden]` rule cases 1, 3 and 9. Without `flow-root`, case 8 failed (the form at 427 against the row's end at 415).
+- **Gate, on the branch merged with main at `7091f93`.** `nx run-many -t lint`, `typecheck`, `build` and `test --skip-nx-cache` passed for all seven projects, with 2472 PWA tests in 78 files. `tsc -p scripts/tsconfig.json`, `nx run server:openapi`, `nx format:check --all`, `check-spdx` and `palettes --check` passed. `check-licenses` could not run against the stubbed icon packages (below), and `reuse lint` was not available. This change adds no dependency, and CI runs both.
+- **Bundle.** Measured with stub icons (below), the initial total went from 604.24 kB on main to 613.95 kB (161.24 kB transferred), +9.71 kB, with no budget warning. The real build of main (`d4528c1`, from CI's `build-image` log) is 612.40 kB, so with the real icons the total should be about 622 kB, under the 625 kB warning. Minified with esbuild, `swipe-actions.css` is 1.16 kB and `now.css` 0.62 kB, both under the 4 kB `anyComponentStyle` warning.
+- **End-to-end.** `swipe.spec.ts` passed its nine cases four times in a row on the dev stack, and the full dev-stack suite passed with 50 tests. The image suite was not run (below).
+- **The environment.** The container had no Font Awesome token, so the two Pro icon packages were installed as local stubs with placeholder glyphs (never committed). That is why `check-licenses` and the image build could not run, and why the bundle figures above are estimates. Chromium 141 ran through a local browser-path shim, because Playwright 1.63 pins Chromium 153.
+
+### Facts checked while building
+
+1. Confirmed. CDP touch reaches the page as `pointerType: 'touch'` with `isPrimary` true. A vertical drag scrolls (`pointercancel` after one move) and a horizontal one does not, so case 4 uses the CDP drag.
+2. Confirmed. A two-point `dispatchTouchEvent` pinch zooms with `isMobile` (`visualViewport.scale` 1 to 5).
+3. Confirmed. The sign-up fixture works with `hasTouch` and `isMobile`.
+4. Chrome sent no `click` at all after a locked horizontal drag, whether it sprang back, committed right or committed left. A tap did send one. Suppression stays as a defence, and unit 2's case 12 is its proof.
+5. to 8. On the device: open.
+9. In Chromium the focused row's ring shows whole, its bottom edge over the next row (checked on a screenshot). Safari's `overflow-clip-margin`: open.
+10. On the device: open.
+11. Not observed directly. The e2e passes with motion on in Chromium 141, where `Motion.play` runs the exit and the spring back on `translate`, but no case watches the frames. Chrome Android: open.
+12. One spec at a time: `pnpm exec nx test pwa --include=app/<path>.spec.ts`, with the path relative to `apps/pwa/src`.
+13. TalkBack: open.
+14. Confirmed. For a Swipe, Now's `done` has no leaving phase, so the next render shows the next content, and SwipeActions resets in that same render. `done` moves no focus for a ranked Task that is not `displayed()`'s (unit 3 case 16, focus on the heading).
+15. The CDP session still dispatches touch after a same-origin `page.reload()`. Tests still open it after their last reload.
+16. Confirmed by the maintainer on 2026-10-10: a form closes when its Task moves between the top pick and the rows.
+
+### Known limits
+
+- Facts 5 to 8, 10, 11 (Chrome Android) and 13 need the installed PWA on a phone.
+- The image-stack suite and `check-licenses` were not run locally; CI's `e2e-image` and `licences` jobs run them. The real bundle size is CI's to confirm.
+
 ## Out of scope
 
 - **A one-time hint** that teaches the swipe. Decide it after the on-device check.
