@@ -1087,6 +1087,237 @@ describe('DataStore', () => {
       noRequests();
     });
 
+    describe('resume triggers', () => {
+      const focus = (): void => {
+        window.dispatchEvent(new Event('focus'));
+      };
+
+      const visible = (): void => {
+        setVisibility('visible');
+      };
+
+      it.each([
+        { name: 'visibilitychange then focus', first: visible, second: focus },
+        { name: 'focus then visibilitychange', first: focus, second: visible },
+      ])('sends one request in total for $name from idle', async ({ first, second }) => {
+        await begin(12);
+        await advance(1_000);
+
+        first();
+        const poll = http.expectOne('/v1/changes?after=12');
+        second();
+        noRequests();
+        await respond(poll, changesBody(12));
+
+        noRequests();
+        await advance(POLL_INTERVAL_MS - 1);
+        noRequests();
+        await advance(1);
+        http.expectOne('/v1/changes?after=12');
+        noRequests();
+      });
+
+      it('sends one request in total for a resume that fires both listeners twice', async () => {
+        await begin(12);
+        await advance(1_000);
+        visible();
+        focus();
+        await respond(http.expectOne('/v1/changes?after=12'), changesBody(12));
+        noRequests();
+
+        visible();
+        const second = http.expectOne('/v1/changes?after=12');
+        focus();
+        visible();
+        noRequests();
+        await respond(second, changesBody(12));
+
+        noRequests();
+      });
+
+      it('still runs the zone check on a focus whose poll it does not repeat', async () => {
+        await begin(12);
+        current.mockReturnValue(LONDON);
+        visible();
+        const poll = http.expectOne('/v1/changes?after=12');
+
+        focus();
+
+        const report = http.expectOne('/v1/commands');
+        expect(report.request.body).toMatchObject({
+          _tag: CommandTag.SetTimeZone,
+          timeZone: LONDON,
+        });
+        noRequests();
+        await respond(poll, changesBody(12));
+      });
+
+      it('queues one follow-up for refresh() during a resume poll', async () => {
+        await begin(12);
+        await advance(1_000);
+        visible();
+        const poll = http.expectOne('/v1/changes?after=12');
+        focus();
+        store.refresh();
+        noRequests();
+
+        await respond(poll, changesBody(12));
+
+        const followUp = http.expectOne('/v1/changes?after=12');
+        noRequests();
+        await respond(followUp, changesBody(12));
+        noRequests();
+      });
+
+      it('queues one follow-up for online during a resume poll', async () => {
+        await begin(12);
+        await advance(1_000);
+        visible();
+        const poll = http.expectOne('/v1/changes?after=12');
+        focus();
+        window.dispatchEvent(new Event('online'));
+        noRequests();
+
+        await respond(poll, changesBody(12));
+
+        const followUp = http.expectOne('/v1/changes?after=12');
+        noRequests();
+        await respond(followUp, changesBody(12));
+        noRequests();
+      });
+
+      it('queues one follow-up for a focus and a visibilitychange during a refresh() poll', async () => {
+        await begin(12);
+        await advance(1_000);
+        store.refresh();
+        const poll = http.expectOne('/v1/changes?after=12');
+        focus();
+        visible();
+        noRequests();
+
+        await respond(poll, changesBody(12));
+
+        const followUp = http.expectOne('/v1/changes?after=12');
+        noRequests();
+        await respond(followUp, changesBody(12));
+        noRequests();
+      });
+
+      it('queues one follow-up for a focus during a timer poll, after a resume poll settled', async () => {
+        await begin(12);
+        await advance(1_000);
+        visible();
+        await respond(http.expectOne('/v1/changes?after=12'), changesBody(12));
+        await advance(POLL_INTERVAL_MS);
+        const timerPoll = http.expectOne('/v1/changes?after=12');
+
+        focus();
+        noRequests();
+        await respond(timerPoll, changesBody(12));
+
+        const followUp = http.expectOne('/v1/changes?after=12');
+        noRequests();
+        await respond(followUp, changesBody(12));
+        noRequests();
+      });
+
+      it('queues one follow-up for a focus during the follow-up of a resume poll', async () => {
+        await begin(12);
+        await advance(1_000);
+        visible();
+        const poll = http.expectOne('/v1/changes?after=12');
+        store.refresh();
+        await respond(poll, changesBody(12));
+        const followUp = http.expectOne('/v1/changes?after=12');
+
+        focus();
+        noRequests();
+        await respond(followUp, changesBody(12));
+
+        const last = http.expectOne('/v1/changes?after=12');
+        noRequests();
+        await respond(last, changesBody(12));
+        noRequests();
+      });
+
+      it('runs the forced follow-up of an Applied send made during a resume poll', async () => {
+        await begin(12);
+        await advance(1_000);
+        visible();
+        const poll = http.expectOne('/v1/changes?after=12');
+        focus();
+        const result = store.send(capture, 'key-1');
+        const flag = track(result);
+        await respond(http.expectOne('/v1/commands'), applied(13));
+
+        await respond(poll, changesBody(12));
+
+        expect(flag.done).toBe(false);
+        const followUp = http.expectOne('/v1/changes?after=12');
+        await respond(followUp, changesBody(13));
+        expect(flag.done).toBe(true);
+        noRequests();
+      });
+
+      it('queues one follow-up for a focus during the snapshot of start', async () => {
+        store.start();
+        const snapshot = http.expectOne('/v1/snapshot');
+        focus();
+        visible();
+        noRequests();
+
+        await respond(snapshot, snapshotBody(12));
+
+        http.expectOne('/v1/changes?after=12');
+        noRequests();
+      });
+
+      it('retries a failed first snapshot once for a visibilitychange and a focus', async () => {
+        store.start();
+        await networkError(http.expectOne('/v1/snapshot'));
+
+        visible();
+        const retry = http.expectOne('/v1/snapshot');
+        focus();
+        noRequests();
+        await networkError(retry);
+
+        noRequests();
+        expect(store.status()).toBe(SyncStatus.Failed);
+      });
+
+      it('sets no timer after a 401 Unauthorized on a resume poll', async () => {
+        await begin(12);
+        await advance(1_000);
+        visible();
+        const poll = http.expectOne('/v1/changes?after=12');
+        focus();
+
+        await respond(poll, unauthorized, 401);
+
+        noRequests();
+        await advance(POLL_INTERVAL_MS * 4);
+        noRequests();
+      });
+
+      it('forgets that a resume poll is in flight on stop', async () => {
+        await begin(12);
+        await advance(1_000);
+        visible();
+        http.expectOne('/v1/changes?after=12');
+
+        store.stop();
+        store.start();
+        const snapshot = http.expectOne('/v1/snapshot');
+        focus();
+        noRequests();
+        await respond(snapshot, snapshotBody(20));
+
+        http.expectOne('/v1/changes?after=20');
+        noRequests();
+      });
+    });
+
     it('never overlaps a poll with the snapshot: a trigger during the snapshot waits for it', async () => {
       store.start();
       const snapshot = http.expectOne('/v1/snapshot');
