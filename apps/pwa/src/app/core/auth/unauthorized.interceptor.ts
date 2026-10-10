@@ -4,7 +4,7 @@ import { inject } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
 
 import { errorTagOf } from '../api/http-outcome';
-import { Session } from './session';
+import { Session, SignOutReason } from './session';
 
 /**
  * Turns a server-side sign-out (a 401 with the Unauthorized tag) into a local one. Always
@@ -20,7 +20,7 @@ export const unauthorizedInterceptor: HttpInterceptorFn = (request, next) => {
         error.status === HttpStatusCode.Unauthorized &&
         errorTagOf(error.error) === 'Unauthorized'
       ) {
-        session.signedOut();
+        session.signedOut(SignOutReason.Revoked);
       }
 
       return throwError(() => error);
