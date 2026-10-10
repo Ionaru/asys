@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
+import { compareCodeUnits } from '../compare';
 import { TaskStatus, type BlockerLink, type Task } from './task';
 
 export enum BlockedReasonTag {
@@ -31,8 +32,7 @@ export const blockedReasons = (
     }
   }
   if (ids.size === 0) return [];
-  // Code-unit order on purpose: localeCompare would differ per runtime locale.
-  const taskIds = [...ids].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  const taskIds = [...ids].sort(compareCodeUnits);
   return [{ _tag: BlockedReasonTag.BlockedBy, taskIds }];
 };
 
