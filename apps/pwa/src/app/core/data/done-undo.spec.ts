@@ -659,6 +659,16 @@ describe('DoneUndo', () => {
       expect(doneUndo.pending()).toBeNull();
     });
 
+    it('ignores retry after dismiss, because the failed Task is forgotten with the failure', async () => {
+      await sendAWith(FAILED);
+      doneUndo.dismiss();
+      doneUndo.retry();
+
+      expect(hold).toHaveBeenCalledTimes(1);
+      expect(doneUndo.pending()).toBeNull();
+      expect(doneUndo.failure()).toBeNull();
+    });
+
     it('clears the failure when another Task is completed', async () => {
       await sendAWith(FAILED);
       doneUndo.complete(B, DoneOrigin.Button);
