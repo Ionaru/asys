@@ -179,6 +179,48 @@ textarea.asys-field__input,
   padding-block-start: var(--space-6);
 }
 
+/* A screen's title. The flush modifier drops the space below it, for screens that space their blocks with a gap. */
+.asys-page__title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
+  font-weight: 700;
+}
+
+.asys-page__title--flush {
+  margin: 0;
+}
+
+/* The status line under a title. It takes no room while it is empty. */
+.asys-page__status {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+}
+
+.asys-page__status:empty {
+  margin: 0;
+}
+
+/* The pill that holds a count. Use it with asys-num, and set the colours in the component. */
+.asys-count {
+  min-width: calc(var(--line-height-label) + var(--space-1));
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-pill);
+  text-align: center;
+  font-size: var(--font-size-label);
+  line-height: var(--line-height-label);
+  font-weight: 700;
+}
+
+/* Takes the browser's border, padding and margin off a fieldset. */
+.asys-fieldset-reset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
 /* Motion used by animate.enter and animate.leave. */
 @keyframes asys-fade-in {
   from {

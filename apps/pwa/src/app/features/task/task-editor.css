@@ -1,21 +1,4 @@
 /* SPDX-License-Identifier: EUPL-1.2 */
-.task-editor__title {
-  margin: 0 0 var(--space-3);
-  font-size: var(--font-size-title);
-  line-height: var(--line-height-title);
-  font-weight: 700;
-}
-
-.task-editor__status {
-  margin: 0 0 var(--space-3);
-  font-size: var(--font-size-body);
-  line-height: var(--line-height-body);
-}
-
-.task-editor__status:empty {
-  margin: 0;
-}
-
 .task-editor__badges {
   display: flex;
   flex-wrap: wrap;

@@ -9,7 +9,7 @@ import { Icon, IconName } from '../icon/icon';
   imports: [Icon],
   template: `<asys-icon [name]="IconName.Plus" /><span class="asys-capture__label">Capture</span>
     @if (count() > 0) {
-      &ngsp;<span class="asys-capture__count"
+      &ngsp;<span class="asys-num asys-count asys-capture__count"
         >{{ count() }}<span class="asys-visually-hidden"> not captured</span></span
       >
     }`,
@@ -47,17 +47,8 @@ import { Icon, IconName } from '../icon/icon';
     }
 
     .asys-capture__count {
-      min-width: calc(var(--line-height-label) + var(--space-1));
-      padding: 0 var(--space-1);
-      border-radius: var(--radius-pill);
       background: var(--on-signal);
       color: var(--signal);
-      text-align: center;
-      font-family: var(--font-mono);
-      font-variant-numeric: tabular-nums;
-      font-size: var(--font-size-label);
-      line-height: var(--line-height-label);
-      font-weight: 700;
     }
 
     [data-theme='drive'] .asys-capture {

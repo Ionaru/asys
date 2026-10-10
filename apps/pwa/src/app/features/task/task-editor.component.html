@@ -1,14 +1,14 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
 <h1
   #heading
-  class="task-editor__title"
+  class="asys-page__title task-editor__title"
   tabindex="-1"
   [attr.data-task-id]="taskId()"
   [attr.data-morph]="morph() ? '' : null"
 >
   {{ headingText() }}
 </h1>
-<p class="task-editor__status" role="status">{{ statusLine() }}</p>
+<p class="asys-page__status task-editor__status" role="status">{{ statusLine() }}</p>
 @if (view(); as v) {
   @if (overdue() || blocked()) {
     <p class="task-editor__badges">

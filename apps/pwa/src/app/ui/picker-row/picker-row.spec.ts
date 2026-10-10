@@ -169,17 +169,17 @@ describe('PickerRow', () => {
     const sideClasses = (): string[] =>
       Array.from(q('.asys-picker-row__side')?.children ?? [], (c) => c.className);
 
-    expect(sideClasses()).toEqual(['asys-picker-row__estimate']);
+    expect(sideClasses()).toEqual(['asys-num asys-picker-row__estimate']);
 
     host.overdue.set(true);
     await fixture.whenStable();
 
-    expect(sideClasses()).toEqual(['asys-picker-row__estimate']);
+    expect(sideClasses()).toEqual(['asys-num asys-picker-row__estimate']);
 
     host.quadrant.set(undefined);
     await fixture.whenStable();
 
-    expect(sideClasses()).toEqual(['asys-picker-row__estimate']);
+    expect(sideClasses()).toEqual(['asys-num asys-picker-row__estimate']);
     expect(q('.asys-picker-row__side')?.textContent?.trim()).toBe('25 min');
   });
 
