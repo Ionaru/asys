@@ -18,7 +18,6 @@ import {
 import { RouterLink } from '@angular/router';
 import {
   canLogProgress,
-  type Command,
   formatMinutes,
   formatMoment,
   inboxTasks,
@@ -30,7 +29,7 @@ import {
   waitingSummary,
 } from '@asys/domain';
 
-import { CommandOutcomeTag, type CommandOutcome } from '../../core/api/data-api';
+import { CommandOutcomeTag } from '../../core/api/data-api';
 import { CommandAttempts } from '../../core/data/command-attempts';
 import { DataStore, SyncStatus, zoneOrUtc } from '../../core/data/data-store';
 import { DoneOrigin, DoneUndo } from '../../core/data/done-undo';
@@ -128,9 +127,6 @@ export class Now {
   protected readonly waitingExpanded = signal(false);
 
   protected readonly statusLine = signal('');
-
-  /** The Task ids with a Log progress send in flight. */
-  readonly #pendingIds = signal<ReadonlySet<string>>(new Set());
 
   /** Whether focus is inside the open Log progress form, tracked from its focus events. */
   protected focusInside = false;
@@ -275,7 +271,7 @@ export class Now {
 
   /** Whether a Done or Log progress for this Task is pending or waits for the server. */
   protected busy(taskId: string): boolean {
-    return this.#pendingIds().has(taskId) || this.dataStore.awaitingSync().has(taskId);
+    return this.#attempts.busy(taskId);
   }
 
   /** The stored Estimate of the Task in minutes, or null when it has none or is not in the state. */
@@ -410,7 +406,7 @@ export class Now {
       return;
     }
     this.statusLine.set('');
-    const outcome = await this.#run(taskId, logProgressCommand(taskId, minutes));
+    const outcome = await this.#attempts.send(logProgressCommand(taskId, minutes));
     if (this.#destroyRef.destroyed) {
       return;
     }
@@ -437,16 +433,6 @@ export class Now {
       this.#doneUndo.pending()?.taskId === taskId ||
       this.leaving()?.task.id === taskId
     );
-  }
-
-  /** Sends the command through its attempt and marks the Task pending meanwhile. */
-  async #run(taskId: string, command: Command): Promise<CommandOutcome> {
-    this.#pendingIds.update((ids) => new Set([...ids, taskId]));
-    try {
-      return await this.#attempts.send(command);
-    } finally {
-      this.#pendingIds.update((ids) => new Set([...ids].filter((id) => id !== taskId)));
-    }
   }
 
   /** Records which row to expand if this Done is undone; nothing when there is none. */
@@ -512,14 +498,10 @@ export class Now {
   }
 
   async #playRise(card: HTMLElement): Promise<void> {
-    try {
-      await this.#motion.play(card, RISE_KEYFRAMES, {
-        duration: MotionDuration.Moderate,
-        easing: MotionEasing.Out,
-      });
-    } catch {
-      // The rise is decoration, so a failed animation changes nothing.
-    }
+    await this.#motion.play(card, RISE_KEYFRAMES, {
+      duration: MotionDuration.Moderate,
+      easing: MotionEasing.Out,
+    });
   }
 
   #focusTopNow(): void {

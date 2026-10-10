@@ -17,7 +17,7 @@ import {
   type RecoveryCodes,
 } from '../../core/api/auth-api';
 import { PasskeyCeremony } from '../../core/api/passkey-ceremony';
-import { Session } from '../../core/auth/session';
+import { Session, SignOutReason } from '../../core/auth/session';
 import { CaptureQueue } from '../../core/data/capture-queue';
 import { DataStore } from '../../core/data/data-store';
 import { DoneUndo } from '../../core/data/done-undo';
@@ -45,6 +45,15 @@ const deferred = <T>() => {
 };
 
 const OK: AuthResult<void> = { _tag: AuthResultTag.Ok, value: undefined };
+
+const CODES = ['aaaa-1111', 'bbbb-2222', 'cccc-3333', 'dddd-4444'];
+
+const NEW_CODES = ['eeee-5555', 'ffff-6666'];
+
+const codesOk = (recoveryCodes: readonly string[]): AuthResult<RecoveryCodes> => ({
+  _tag: AuthResultTag.Ok,
+  value: { recoveryCodes },
+});
 
 const failed = <T>(error: AuthError): Promise<AuthResult<T>> =>
   Promise.resolve({ _tag: AuthResultTag.Failed, error });
@@ -90,7 +99,13 @@ const setup = async ({ api = {}, create = vi.fn() }: Seams = {}) => {
   const flush = vi.fn<() => Promise<void>>(() => Promise.resolve());
   const drain = vi.fn<() => Promise<void>>(() => Promise.resolve());
   const signOut = vi.fn<() => Promise<AuthResult<void>>>(() => Promise.resolve(OK));
-  const signedOut = vi.fn<() => void>();
+  const signedOut = vi.fn<(reason: SignOutReason) => void>();
+  const hold = vi.fn<() => void>();
+  const release = vi.fn<() => void>();
+  const check = vi.fn<() => Promise<void>>(() => Promise.resolve());
+  const regenerate = vi.fn<() => Promise<AuthResult<RecoveryCodes>>>(() =>
+    Promise.resolve(codesOk(CODES)),
+  );
 
   TestBed.configureTestingModule({
     providers: [
@@ -101,11 +116,12 @@ const setup = async ({ api = {}, create = vi.fn() }: Seams = {}) => {
           addOptions: () =>
             Promise.resolve({ _tag: AuthResultTag.Failed, error: AuthError.Unauthorized }),
           signOut,
+          regenerateRecoveryCodes: regenerate,
           ...api,
         },
       },
       { provide: PasskeyCeremony, useValue: { create, supported: () => true } },
-      { provide: AppUpdate, useValue: { hold: vi.fn(), release: vi.fn() } },
+      { provide: AppUpdate, useValue: { hold, release } },
       { provide: DataStore, useValue: { state: signal(null) } },
       { provide: Clock, useValue: { now: () => 0 } },
       { provide: DeviceZone, useValue: { current: () => 'UTC' } },
@@ -113,7 +129,7 @@ const setup = async ({ api = {}, create = vi.fn() }: Seams = {}) => {
         provide: Session,
         useValue: {
           me: signal({ name: 'Jeroen', recoveryCodesLeft: 3 }),
-          check: vi.fn(() => Promise.resolve()),
+          check,
           signedOut,
         },
       },
@@ -158,6 +174,16 @@ const setup = async ({ api = {}, create = vi.fn() }: Seams = {}) => {
     fixture.detectChanges();
   };
 
+  const showCodes = async (): Promise<void> => {
+    await click(button('Make new recovery codes'));
+    await click(button('Make new codes'));
+  };
+
+  const items = (): string[] =>
+    Array.from(root().querySelectorAll('ol.asys-num li')).map((li) => li.textContent?.trim() ?? '');
+
+  const status = (): HTMLElement | null => root().querySelector('p[role="status"]');
+
   return {
     fixture,
     root,
@@ -170,6 +196,13 @@ const setup = async ({ api = {}, create = vi.fn() }: Seams = {}) => {
     alert,
     hasButton,
     click,
+    hold,
+    release,
+    check,
+    regenerate,
+    showCodes,
+    items,
+    status,
   };
 };
 
@@ -192,7 +225,19 @@ describe('Account sign out', () => {
     const order = [flush, drain, signOut].map((spy) => must(spy.mock.invocationCallOrder[0]));
 
     expect(order).toEqual([...order].sort((a, b) => a - b));
-    expect(signedOut).toHaveBeenCalledTimes(1);
+    expect(signedOut).toHaveBeenCalledExactlyOnceWith(SignOutReason.Chosen);
+  });
+
+  it('ends the session as Chosen when the server no longer knows it', async () => {
+    const { fixture, signOut, signedOut, signOutButton } = await setup();
+
+    signOut.mockResolvedValueOnce({ _tag: AuthResultTag.Failed, error: AuthError.Unauthorized });
+
+    signOutButton().click();
+    await fixture.whenStable();
+    await settle();
+
+    expect(signedOut).toHaveBeenCalledExactlyOnceWith(SignOutReason.Chosen);
   });
 
   it('does not sign out while the flush is pending, nor drain before it resolves', async () => {
@@ -462,5 +507,152 @@ describe('Account failures', () => {
         expect(passkeys).toHaveBeenCalledTimes(2);
       },
     );
+  });
+});
+
+describe('Account recovery codes', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+    Reflect.deleteProperty(navigator, 'clipboard');
+  });
+
+  it('asks before it makes new codes, and holds nothing yet', async () => {
+    const { regenerate, hold, button, hasButton, click } = await setup();
+
+    await click(button('Make new recovery codes'));
+
+    expect(hasButton('Make new codes')).toBe(true);
+    expect(regenerate).not.toHaveBeenCalled();
+    expect(hold).not.toHaveBeenCalled();
+  });
+
+  it('shows the new codes in order, holds the update prompt and checks the session', async () => {
+    const { root, hold, release, check, items, showCodes } = await setup();
+
+    await showCodes();
+
+    expect(items()).toEqual(CODES);
+    expect(root().textContent).toContain(
+      'These codes are shown only now. Keep them somewhere safe.',
+    );
+    expect(hold).toHaveBeenCalledTimes(1);
+    expect(release).not.toHaveBeenCalled();
+    expect(check).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a message and holds nothing when the new codes cannot be made', async () => {
+    const { regenerate, alert, hold, items, showCodes } = await setup();
+
+    regenerate.mockResolvedValueOnce({ _tag: AuthResultTag.Failed, error: AuthError.Network });
+
+    await showCodes();
+
+    expect(items()).toEqual([]);
+    expect(alert()).toBe(GENERIC_MESSAGE);
+    expect(hold).not.toHaveBeenCalled();
+  });
+
+  it('shows no status message at first', async () => {
+    const { status, showCodes } = await setup();
+
+    await showCodes();
+
+    expect(status()).toBeNull();
+  });
+
+  it('Copy writes the codes joined by newlines and shows Copied.', async () => {
+    const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined);
+
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const { status, button, click, showCodes } = await setup();
+
+    await showCodes();
+    await click(button('Copy'));
+
+    expect(writeText).toHaveBeenCalledExactlyOnceWith(CODES.join('\n'));
+    expect(status()?.textContent?.trim()).toBe('Copied.');
+  });
+
+  it('Copy shows the failure text when the write is rejected', async () => {
+    const writeText = vi
+      .fn<(text: string) => Promise<void>>()
+      .mockRejectedValue(new Error('denied'));
+
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const { status, button, click, showCodes } = await setup();
+
+    await showCodes();
+    await click(button('Copy'));
+
+    expect(status()?.textContent?.trim()).toBe('Could not copy. Select the codes instead.');
+  });
+
+  it('Done clears the codes and the copy status and releases the hold once', async () => {
+    const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined);
+
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const { fixture, hold, release, items, status, button, click, showCodes } = await setup();
+
+    await showCodes();
+    await click(button('Copy'));
+    await click(button('Done'));
+
+    expect(items()).toEqual([]);
+    expect(status()).toBeNull();
+    expect(hold).toHaveBeenCalledTimes(1);
+    expect(release).toHaveBeenCalledTimes(1);
+
+    fixture.destroy();
+
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('holds again for codes made after Done', async () => {
+    const { regenerate, hold, release, items, button, click, showCodes } = await setup();
+
+    await showCodes();
+    await click(button('Done'));
+    regenerate.mockResolvedValueOnce(codesOk(NEW_CODES));
+    await showCodes();
+
+    expect(items()).toEqual(NEW_CODES);
+    expect(hold).toHaveBeenCalledTimes(2);
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases the hold once when the screen is destroyed with codes on it', async () => {
+    const { fixture, hold, release, showCodes } = await setup();
+
+    await showCodes();
+    fixture.destroy();
+
+    expect(hold).toHaveBeenCalledTimes(1);
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not release when no codes were shown', async () => {
+    const { fixture, release } = await setup();
+
+    fixture.destroy();
+
+    expect(release).not.toHaveBeenCalled();
+  });
+
+  it('holds nothing when it is destroyed while the new codes are pending', async () => {
+    const { fixture, regenerate, hold, release, button, click } = await setup();
+    const pending = deferred<AuthResult<RecoveryCodes>>();
+
+    regenerate.mockReturnValueOnce(pending.promise);
+
+    await click(button('Make new recovery codes'));
+    button('Make new codes').click();
+    await settle();
+    fixture.destroy();
+
+    pending.resolve(codesOk(CODES));
+    await settle();
+
+    expect(hold).not.toHaveBeenCalled();
+    expect(release).not.toHaveBeenCalled();
   });
 });

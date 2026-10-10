@@ -57,6 +57,8 @@ const makeHarness = () => {
   const registerBeginPayloads: Array<unknown> = [];
   const registered: Array<{ verified: VerifiedRegistration; payload: unknown }> = [];
   const removed: Array<{ removed: RemovedPasskey; sawUser: string }> = [];
+  /** Users whose session `recheckSession` refuses. */
+  const revoked = new Set<string>();
 
   const handlers = makePasskeyHandlers(SampleApi, SamplePasskeys, {
     hooks: {
@@ -84,6 +86,9 @@ const makeHarness = () => {
         }),
     },
     currentUserId: SampleUser.useSync((user) => user.id),
+    recheckSession: SampleUser.use((user) =>
+      revoked.has(user.id) ? Effect.fail(new HttpApiError.Unauthorized({})) : Effect.void,
+    ),
   });
 
   const app = HttpApiBuilder.layer(SampleApi).pipe(
@@ -172,6 +177,7 @@ const makeHarness = () => {
     registerBeginPayloads,
     registered,
     removed,
+    revoked,
     registerUser,
     addPasskey,
   };
@@ -372,6 +378,36 @@ describe('protected endpoints', () => {
 
       expect(unknown.status).toBe(404);
       expect(unknown.body).toEqual({ _tag: 'PasskeyUnknownCredential' });
+    }));
+});
+
+describe('recheckSession', () => {
+  it('answers add with the middleware error when the recheck fails and stores nothing', () =>
+    withHarness(async ({ store, registerUser, addPasskey, revoked }) => {
+      await registerUser();
+      revoked.add('user-1');
+
+      const { reply, credential } = await addPasskey('Laptop');
+
+      expect(reply.status).toBe(401);
+      expect(reply.body).toEqual({ _tag: 'Unauthorized' });
+      expect(store.passkeys.has(credential.id)).toBe(false);
+    }));
+
+  it('answers remove with the middleware error when the recheck fails and removes nothing', () =>
+    withHarness(async ({ send, store, registerUser, addPasskey, removed, revoked }) => {
+      const first = await registerUser();
+      await addPasskey('Laptop');
+      revoked.add('user-1');
+
+      const reply = await send('DELETE', `/v1/auth/passkeys/${first.id}`, {
+        cookie: 'sid=user-1',
+      });
+
+      expect(reply.status).toBe(401);
+      expect(reply.body).toEqual({ _tag: 'Unauthorized' });
+      expect(store.passkeys.has(first.id)).toBe(true);
+      expect(removed).toEqual([]);
     }));
 });
 

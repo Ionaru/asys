@@ -223,18 +223,23 @@ export const beginAddPasskey = (
     return { challengeId: options.challenge, options };
   });
 
-/** Verifies the registration of one more passkey and stores it. */
-export const finishAddPasskey = (
+/**
+ * Verifies the registration of one more passkey and stores it. `recheck` runs first inside
+ * the unit of work, before the passkey is stored, so its failure stores nothing and is
+ * returned unchanged.
+ */
+export const finishAddPasskey = <E = never, R = never>(
   userId: string,
   input: {
     readonly challengeId: string;
     readonly response: RegistrationResponse;
     readonly name?: string;
   },
+  recheck: Effect.Effect<void, E, R> = Effect.void,
 ): Effect.Effect<
   Passkey,
-  PasskeyChallengeInvalid | PasskeyVerificationFailed | PasskeyAlreadyRegistered,
-  PasskeyConfig | PasskeyChallenges | PasskeyStore | PasskeyUnitOfWork
+  PasskeyChallengeInvalid | PasskeyVerificationFailed | PasskeyAlreadyRegistered | E,
+  R | PasskeyConfig | PasskeyChallenges | PasskeyStore | PasskeyUnitOfWork
 > =>
   Effect.gen(function* () {
     const config = yield* PasskeyConfig;
@@ -260,7 +265,10 @@ export const finishAddPasskey = (
       createdAt: now,
       lastUsedAt: null,
     };
-    const created = yield* unitOfWork.run(userId, store.createPasskey(passkey));
+    const created = yield* unitOfWork.run(
+      userId,
+      Effect.andThen(recheck, store.createPasskey(passkey)),
+    );
     if (created === CreatePasskeyResult.Duplicate) {
       return yield* Effect.fail(new PasskeyAlreadyRegistered());
     }
@@ -284,17 +292,19 @@ export const listPasskeys = (
   });
 
 /**
- * Removes one of the user's passkeys. `onRemoved` runs inside the same unit of work, after
- * the deletion.
+ * Removes one of the user's passkeys. `recheck` runs first inside the unit of work, so its
+ * failure removes nothing and is returned unchanged. `onRemoved` runs inside the same unit of
+ * work, after the deletion.
  */
-export const removePasskey = <R = never>(
+export const removePasskey = <R = never, E = never, R2 = never>(
   userId: string,
   credentialId: string,
   onRemoved?: (removed: RemovedPasskey) => Effect.Effect<void, never, R>,
+  recheck: Effect.Effect<void, E, R2> = Effect.void,
 ): Effect.Effect<
   void,
-  PasskeyUnknownCredential | PasskeyLastCredential,
-  R | PasskeyConfig | PasskeyStore | PasskeyUnitOfWork
+  PasskeyUnknownCredential | PasskeyLastCredential | E,
+  R | R2 | PasskeyConfig | PasskeyStore | PasskeyUnitOfWork
 > =>
   Effect.gen(function* () {
     const config = yield* PasskeyConfig;
@@ -303,6 +313,7 @@ export const removePasskey = <R = never>(
     yield* unitOfWork.run(
       userId,
       Effect.gen(function* () {
+        yield* recheck;
         const result = yield* store.deletePasskey(userId, credentialId, config.keepLastPasskey);
         if (result === DeletePasskeyResult.NotFound) {
           return yield* Effect.fail(new PasskeyUnknownCredential());

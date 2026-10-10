@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { randomUUID } from 'node:crypto';
+import { CurrentOwner } from '@asys/contract';
 import type { Instant } from '@asys/domain';
 import { and, eq, gt, ne } from 'drizzle-orm';
 import { Clock, Effect } from 'effect';
@@ -103,6 +104,19 @@ export const requireLiveSession = (sessionId: string) =>
       .pipe(Effect.orDie);
     if (rows.length === 0) return yield* new HttpApiError.Unauthorized();
   });
+
+/**
+ * `requireLiveSession` for the request's `CurrentOwner`: the passkey library's
+ * `recheckSession`, which runs first inside the unit of work of adding or removing a passkey,
+ * after its counter lock. A session revoked while the request waited for the lock fails with
+ * `Unauthorized`, which the endpoint answers as the middleware does. Database failures are
+ * defects.
+ */
+export const requireLiveCurrentSession: Effect.Effect<
+  void,
+  HttpApiError.Unauthorized,
+  Db | CurrentOwner
+> = CurrentOwner.use((owner) => requireLiveSession(owner.sessionId));
 
 /** Deletes one session of the owner, under the owner's counter lock. */
 export const deleteSession = (ownerId: string, sessionId: string) =>

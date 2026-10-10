@@ -44,7 +44,7 @@ export enum PickerRowVariant {
       </span>
     </span>
     <span class="asys-picker-row__side">
-      <span class="asys-picker-row__estimate">{{ estimate() }}</span>
+      <span class="asys-num asys-picker-row__estimate">{{ estimate() }}</span>
     </span>
   `,
   styleUrl: './picker-row.css',

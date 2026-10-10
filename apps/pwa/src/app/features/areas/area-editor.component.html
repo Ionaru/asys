@@ -1,6 +1,6 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
-<h1 class="area-editor__title">{{ heading() }}</h1>
-<p class="area-editor__status" role="status">{{ statusLine() }}</p>
+<h1 class="asys-page__title area-editor__title">{{ heading() }}</h1>
+<p class="asys-page__status area-editor__status" role="status">{{ statusLine() }}</p>
 @if (dataStore.state() === null) {
   <asys-load-state [failed]="dataStore.status() === Status.Failed" (retry)="dataStore.refresh()" />
 } @else if (areaId() === null || area() !== undefined) {
@@ -8,7 +8,7 @@
     <asys-text-field label="Name" [value]="draft().name" (valueChange)="setName($event)" />
     <p class="area-editor__hint">An end of 00:00 means the end of the day.</p>
     @for (day of dayViews(); track day.index) {
-      <fieldset class="area-editor__day">
+      <fieldset class="asys-fieldset-reset area-editor__day">
         <legend class="asys-field__label">{{ day.name }}</legend>
         @for (row of day.rows; track $index; let rowIndex = $index) {
           <div class="area-editor__row">

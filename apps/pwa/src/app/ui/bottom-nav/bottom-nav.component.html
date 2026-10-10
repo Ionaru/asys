@@ -39,11 +39,16 @@
       @if ((inboxCount() ?? 0) > 0) {
         @for (key of [popKey]; track key) {
           @if (popKey > 0) {
-            <span class="asys-bottomnav__badge" aria-hidden="true" animate.enter="asys-pop">{{
+            <span
+              class="asys-num asys-count asys-bottomnav__badge"
+              aria-hidden="true"
+              animate.enter="asys-pop"
+              >{{ inboxCount() }}</span
+            >
+          } @else {
+            <span class="asys-num asys-count asys-bottomnav__badge" aria-hidden="true">{{
               inboxCount()
             }}</span>
-          } @else {
-            <span class="asys-bottomnav__badge" aria-hidden="true">{{ inboxCount() }}</span>
           }
         }
       }

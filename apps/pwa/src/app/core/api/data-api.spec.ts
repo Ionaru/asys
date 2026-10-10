@@ -14,6 +14,7 @@ import {
 import { provideApiConfiguration } from '../../../generated/api/api-configuration';
 import { CommandOutcomeTag, DataApi } from './data-api';
 import { HttpOutcomeTag } from './http-outcome';
+import { IGNORE_UNAUTHORIZED } from './ignore-unauthorized';
 import { KEEPALIVE } from './keepalive';
 
 const task = {
@@ -154,6 +155,28 @@ describe('DataApi', () => {
 
       expect(await result).toEqual({ _tag: HttpOutcomeTag.Failed, status: 0, errorTag: null });
     });
+
+    it.each([
+      ['no options', undefined, false],
+      ['empty options', {}, false],
+      ['ignoreUnauthorized false', { ignoreUnauthorized: false }, false],
+      ['ignoreUnauthorized true', { ignoreUnauthorized: true }, true],
+    ])(
+      'marks the request IGNORE_UNAUTHORIZED as asked, with %s',
+      async (_name, options, marked) => {
+        const result = api.snapshot(options);
+
+        const req = http.expectOne({ method: 'GET', url: '/v1/snapshot' });
+        expect(req.request.context.get(IGNORE_UNAUTHORIZED)).toBe(marked);
+        req.flush({ _tag: 'Unauthorized' } as object | null, { status: 401, statusText: 'Error' });
+
+        expect(await result).toEqual({
+          _tag: HttpOutcomeTag.Failed,
+          status: 401,
+          errorTag: 'Unauthorized',
+        });
+      },
+    );
   });
 
   describe('changes', () => {

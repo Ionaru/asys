@@ -4,16 +4,6 @@ asys-now-header {
   margin: 0 0 var(--space-3);
 }
 
-.now__status {
-  margin: 0 0 var(--space-3);
-  font-size: var(--font-size-body);
-  line-height: var(--line-height-body);
-}
-
-.now__status:empty {
-  margin: 0;
-}
-
 .now__list {
   margin: var(--space-4) 0 0;
   padding: 0;

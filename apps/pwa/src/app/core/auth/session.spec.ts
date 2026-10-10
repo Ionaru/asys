@@ -2,8 +2,8 @@
 import { TestBed } from '@angular/core/testing';
 
 import { AuthApi, AuthError, AuthResultTag, type AuthResult, type Me } from '../api/auth-api';
-import { DeviceStorage } from '../platform/device-storage';
-import { LAST_REPORTED_ZONE_KEY, SESSION_CHECK_TIMEOUT_MS, Session, SessionState } from './session';
+import { ReportedZone } from '../platform/reported-zone';
+import { SESSION_CHECK_TIMEOUT_MS, Session, SessionState, SignOutReason } from './session';
 
 const ada: Me = { name: 'Ada', recoveryCodesLeft: 4 };
 
@@ -29,20 +29,20 @@ const defer = (): Deferred => {
 
 describe('Session', () => {
   let me: ReturnType<typeof vi.fn<() => Promise<AuthResult<Me>>>>;
-  let remove: ReturnType<typeof vi.fn<(key: string) => void>>;
-  let get: ReturnType<typeof vi.fn<(key: string) => string | null>>;
-  let set: ReturnType<typeof vi.fn<(key: string, value: string) => void>>;
+  let get: ReturnType<typeof vi.fn<() => string | null>>;
+  let set: ReturnType<typeof vi.fn<(zone: string) => void>>;
+  let clear: ReturnType<typeof vi.fn<() => void>>;
   let session: Session;
 
   beforeEach(() => {
     me = vi.fn<() => Promise<AuthResult<Me>>>();
-    remove = vi.fn<(key: string) => void>();
-    get = vi.fn<(key: string) => string | null>();
-    set = vi.fn<(key: string, value: string) => void>();
+    get = vi.fn<() => string | null>();
+    set = vi.fn<(zone: string) => void>();
+    clear = vi.fn<() => void>();
     TestBed.configureTestingModule({
       providers: [
         { provide: AuthApi, useValue: { me } },
-        { provide: DeviceStorage, useValue: { get, set, remove } },
+        { provide: ReportedZone, useValue: { get, set, clear } },
       ],
     });
     session = TestBed.inject(Session);
@@ -53,13 +53,13 @@ describe('Session', () => {
     localStorage.clear();
   });
 
-  it('starts Unknown with no Me', () => {
+  it('starts Unknown with no Me and no sign-out reason', () => {
     expect(session.state()).toBe(SessionState.Unknown);
     expect(session.me()).toBeNull();
+    expect(session.signOutReason()).toBeNull();
   });
 
-  it('exposes the documented constants', () => {
-    expect(LAST_REPORTED_ZONE_KEY).toBe('asys.timeZone.lastReported');
+  it('exposes the documented timeout', () => {
     expect(SESSION_CHECK_TIMEOUT_MS).toBe(10_000);
   });
 
@@ -84,6 +84,36 @@ describe('Session', () => {
       expect(session.me()).toBeNull();
     });
 
+    it('Unauthorized records Revoked', async () => {
+      me.mockResolvedValueOnce(ok(ada));
+      await session.check();
+      me.mockResolvedValueOnce(failed(AuthError.Unauthorized));
+
+      await session.check();
+
+      expect(session.signOutReason()).toBe(SignOutReason.Revoked);
+    });
+
+    it('Unauthorized after a Chosen sign-out leaves the reason Chosen', async () => {
+      await session.signedIn(ada);
+      session.signedOut(SignOutReason.Chosen);
+      me.mockResolvedValueOnce(failed(AuthError.Unauthorized));
+
+      await session.check();
+
+      expect(session.signOutReason()).toBe(SignOutReason.Chosen);
+    });
+
+    it('Ok after a sign-out clears the reason', async () => {
+      session.signedOut(SignOutReason.Chosen);
+      me.mockResolvedValueOnce(ok(ada));
+
+      await session.check();
+
+      expect(session.state()).toBe(SessionState.SignedIn);
+      expect(session.signOutReason()).toBeNull();
+    });
+
     it.each([AuthError.Network, AuthError.Unexpected, AuthError.SignInFailed])(
       '%s becomes Unreachable',
       async (error) => {
@@ -106,7 +136,7 @@ describe('Session', () => {
       expect(session.me()).toEqual(ada);
     });
 
-    it('does not touch storage', async () => {
+    it('does not touch the reported zone', async () => {
       me.mockResolvedValue(ok(ada));
       await session.check();
       me.mockResolvedValue(failed(AuthError.Unauthorized));
@@ -114,7 +144,7 @@ describe('Session', () => {
 
       expect(get).not.toHaveBeenCalled();
       expect(set).not.toHaveBeenCalled();
-      expect(remove).not.toHaveBeenCalled();
+      expect(clear).not.toHaveBeenCalled();
     });
 
     it('is single-flight: a second call returns the same promise and makes one request', async () => {
@@ -218,7 +248,7 @@ describe('Session', () => {
       me.mockReturnValue(pending.promise);
 
       const done = session.check();
-      session.signedOut();
+      session.signedOut(SignOutReason.Revoked);
       pending.resolve(ok(ada));
       await done;
 
@@ -294,7 +324,7 @@ describe('Session', () => {
         const done = session.check().then(() => {
           settled = true;
         });
-        session.signedOut();
+        session.signedOut(SignOutReason.Revoked);
         await vi.advanceTimersByTimeAsync(SESSION_CHECK_TIMEOUT_MS);
         await done;
 
@@ -330,16 +360,16 @@ describe('Session', () => {
   });
 
   describe('signedIn', () => {
-    it('with a Me removes the zone key, sets SignedIn and the Me, and makes no request', async () => {
+    it('with a Me clears the reported zone, sets SignedIn and the Me, and makes no request', async () => {
       await session.signedIn(grace);
 
-      expect(remove).toHaveBeenCalledWith(LAST_REPORTED_ZONE_KEY);
+      expect(clear).toHaveBeenCalledOnce();
       expect(session.state()).toBe(SessionState.SignedIn);
       expect(session.me()).toEqual(grace);
       expect(me).not.toHaveBeenCalled();
     });
 
-    it('without a Me removes the zone key and runs check, resolving when it settles', async () => {
+    it('without a Me clears the reported zone and runs check, resolving when it settles', async () => {
       const pending = defer();
       me.mockReturnValue(pending.promise);
       let settled = false;
@@ -349,7 +379,7 @@ describe('Session', () => {
       });
       await Promise.resolve();
 
-      expect(remove).toHaveBeenCalledWith(LAST_REPORTED_ZONE_KEY);
+      expect(clear).toHaveBeenCalledOnce();
       expect(me).toHaveBeenCalledTimes(1);
       expect(settled).toBe(false);
 
@@ -368,26 +398,96 @@ describe('Session', () => {
 
       expect(session.state()).toBe(SessionState.Unreachable);
     });
+
+    it.each([SignOutReason.Chosen, SignOutReason.Revoked])(
+      'with a Me clears a %s reason',
+      async (reason) => {
+        session.signedOut(reason);
+
+        await session.signedIn(grace);
+
+        expect(session.signOutReason()).toBeNull();
+      },
+    );
+
+    it('without a Me clears a Chosen reason once the server confirms the sign-in', async () => {
+      session.signedOut(SignOutReason.Chosen);
+      me.mockResolvedValue(ok(ada));
+
+      await session.signedIn();
+
+      expect(session.signOutReason()).toBeNull();
+    });
+
+    it('without a Me clears a Chosen reason even when the server does not answer', async () => {
+      session.signedOut(SignOutReason.Chosen);
+      me.mockResolvedValueOnce(failed(AuthError.Network));
+
+      await session.signedIn();
+
+      expect(session.state()).toBe(SessionState.Unreachable);
+      expect(session.signOutReason()).toBeNull();
+
+      me.mockResolvedValueOnce(failed(AuthError.Unauthorized));
+
+      await session.check();
+
+      expect(session.state()).toBe(SessionState.SignedOut);
+      expect(session.signOutReason()).toBe(SignOutReason.Revoked);
+    });
+
+    it('a revocation in the next session is not mistaken for the earlier Chosen sign-out', async () => {
+      await session.signedIn(ada);
+      session.signedOut(SignOutReason.Chosen);
+      await session.signedIn(grace);
+
+      session.signedOut(SignOutReason.Revoked);
+
+      expect(session.signOutReason()).toBe(SignOutReason.Revoked);
+    });
   });
 
   describe('signedOut', () => {
-    it('sets SignedOut, clears the Me and removes the zone key', async () => {
+    it('sets SignedOut, clears the Me and clears the reported zone', async () => {
       await session.signedIn(ada);
-      remove.mockClear();
+      clear.mockClear();
 
-      session.signedOut();
+      session.signedOut(SignOutReason.Chosen);
 
       expect(session.state()).toBe(SessionState.SignedOut);
       expect(session.me()).toBeNull();
-      expect(remove).toHaveBeenCalledWith(LAST_REPORTED_ZONE_KEY);
+      expect(clear).toHaveBeenCalledOnce();
+    });
+
+    it.each([SignOutReason.Chosen, SignOutReason.Revoked])('records %s', async (reason) => {
+      await session.signedIn(ada);
+
+      session.signedOut(reason);
+
+      expect(session.signOutReason()).toBe(reason);
     });
 
     it('is harmless when called twice', () => {
-      session.signedOut();
+      session.signedOut(SignOutReason.Revoked);
 
-      expect(() => session.signedOut()).not.toThrow();
+      expect(() => session.signedOut(SignOutReason.Revoked)).not.toThrow();
       expect(session.state()).toBe(SessionState.SignedOut);
       expect(session.me()).toBeNull();
+      expect(session.signOutReason()).toBe(SignOutReason.Revoked);
+    });
+
+    it('keeps Chosen when Revoked follows it', () => {
+      session.signedOut(SignOutReason.Chosen);
+      session.signedOut(SignOutReason.Revoked);
+
+      expect(session.signOutReason()).toBe(SignOutReason.Chosen);
+    });
+
+    it('settles on Chosen when Revoked comes first', () => {
+      session.signedOut(SignOutReason.Revoked);
+      session.signedOut(SignOutReason.Chosen);
+
+      expect(session.signOutReason()).toBe(SignOutReason.Chosen);
     });
   });
 });

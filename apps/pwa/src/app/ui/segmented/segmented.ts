@@ -13,7 +13,7 @@ let nextId = 0;
   imports: [FieldError],
   encapsulation: ViewEncapsulation.None,
   template: `
-    <fieldset class="asys-segmented">
+    <fieldset class="asys-fieldset-reset asys-segmented">
       <legend class="asys-segmented__legend">{{ legend() }}</legend>
       <div class="asys-segmented__options">
         <button

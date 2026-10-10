@@ -19,7 +19,7 @@ import { withOwner } from '../db/with-owner';
 import { scopedOwner } from '../test/owners';
 import { stillRunningAfterHalfSecond } from '../test/sign-up';
 import { PasskeyStoreLive } from './passkey-store';
-import { createSession } from './sessions';
+import { createSession, requireLiveCurrentSession } from './sessions';
 import { PasskeyUnitOfWorkLive } from './unit-of-work';
 
 // These tests run against the real database (docker compose).
@@ -83,11 +83,11 @@ const passkeyCount = (ownerId: string) =>
     }),
   );
 
-/** Whether an exit is a defect only, and that defect is an `Unauthorized`. */
-const diedUnauthorized = <A, E>(exit: Exit.Exit<A, E>) =>
+/** Whether an exit is a typed failure only, and that failure is an `Unauthorized`. */
+const failedUnauthorized = <A, E>(exit: Exit.Exit<A, E>) =>
   Exit.isFailure(exit) &&
-  Cause.hasDies(exit.cause) &&
-  !Cause.hasFails(exit.cause) &&
+  Cause.hasFails(exit.cause) &&
+  !Cause.hasDies(exit.cause) &&
   Cause.squash(exit.cause) instanceof HttpApiError.Unauthorized;
 
 layer(
@@ -175,7 +175,7 @@ layer(
     15_000,
   );
 
-  it.effect('a run with the CurrentOwner of a live session runs the effect', () =>
+  it.effect('a run that starts with the session re-check of a live session runs the effect', () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(T);
       const unitOfWork = yield* PasskeyUnitOfWork;
@@ -183,35 +183,39 @@ layer(
       const session = yield* newSession(a);
 
       const result = yield* unitOfWork
-        .run(a, Effect.succeed('ran'))
+        .run(a, requireLiveCurrentSession.pipe(Effect.as('ran')))
         .pipe(Effect.provideService(CurrentOwner, { ownerId: a, sessionId: session.sessionId }));
 
       assert.strictEqual(result, 'ran');
     }),
   );
 
-  it.effect('a run with the CurrentOwner of a deleted session dies of Unauthorized', () =>
-    Effect.gen(function* () {
-      yield* TestClock.setTime(T);
-      const unitOfWork = yield* PasskeyUnitOfWork;
-      const a = yield* scopedOwner();
-      const session = yield* newSession(a);
-      yield* removeSession(a, session.sessionId);
-      const ran = yield* Ref.make(false);
+  it.effect(
+    'a run that starts with the session re-check of a deleted session fails with Unauthorized',
+    () =>
+      Effect.gen(function* () {
+        yield* TestClock.setTime(T);
+        const unitOfWork = yield* PasskeyUnitOfWork;
+        const a = yield* scopedOwner();
+        const session = yield* newSession(a);
+        yield* removeSession(a, session.sessionId);
+        const ran = yield* Ref.make(false);
 
-      const exit = yield* Effect.exit(
-        unitOfWork
-          .run(a, Ref.set(ran, true))
-          .pipe(Effect.provideService(CurrentOwner, { ownerId: a, sessionId: session.sessionId })),
-      );
+        const exit = yield* Effect.exit(
+          unitOfWork
+            .run(a, requireLiveCurrentSession.pipe(Effect.andThen(Ref.set(ran, true))))
+            .pipe(
+              Effect.provideService(CurrentOwner, { ownerId: a, sessionId: session.sessionId }),
+            ),
+        );
 
-      assert.isTrue(diedUnauthorized(exit));
-      assert.isFalse(yield* Ref.get(ran));
-    }),
+        assert.isTrue(failedUnauthorized(exit));
+        assert.isFalse(yield* Ref.get(ran));
+      }),
   );
 
   it.effect(
-    'a run of a session revoked while it waited for the lock dies of Unauthorized',
+    'the session re-check of a session revoked while the run waited for the lock fails with Unauthorized and writes nothing',
     () =>
       Effect.gen(function* () {
         yield* TestClock.setTime(T);
@@ -238,7 +242,12 @@ layer(
         const run = yield* Effect.forkChild(
           Effect.exit(
             unitOfWork
-              .run(a, store.createPasskey(storedPasskey(a)))
+              .run(
+                a,
+                requireLiveCurrentSession.pipe(
+                  Effect.andThen(store.createPasskey(storedPasskey(a))),
+                ),
+              )
               .pipe(
                 Effect.provideService(CurrentOwner, { ownerId: a, sessionId: session.sessionId }),
               ),
@@ -250,7 +259,7 @@ layer(
         const exit = yield* Fiber.join(run);
 
         assert.isTrue(waiting);
-        assert.isTrue(diedUnauthorized(exit));
+        assert.isTrue(failedUnauthorized(exit));
         assert.strictEqual(yield* passkeyCount(a), 0);
       }),
     15_000,

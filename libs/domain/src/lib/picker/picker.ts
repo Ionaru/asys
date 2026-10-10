@@ -8,7 +8,6 @@ import {
   isAvailable,
   isInInbox,
   isOverdue,
-  isUrgentAt,
   deadlineIndex,
   Quadrant,
   TaskStatus,
@@ -17,9 +16,10 @@ import {
   type BlockerLink,
   type Task,
 } from '../task';
-import { availableFromInstant, type Instant } from '../time';
-import { reasonText } from './reason-text';
-import { waitingText } from './waiting-text';
+import { isUrgentBy } from '../task/priority';
+import { addCalendarDays, availableFromInstant, toLocalDateTime, type Instant } from '../time';
+import { reasonTextOn } from './reason-text';
+import { waitingTextOn } from './waiting-text';
 
 export enum ExclusionReasonTag {
   NotYetAvailable = 'NotYetAvailable',
@@ -82,6 +82,15 @@ const compareRanked = (a: RankedTask, b: RankedTask): number => {
   return compareCreated(a.task, b.task);
 };
 
+// Derives a value on first use and keeps it. A value that throws is not kept, so it throws again.
+const lazily = <T>(derive: () => T): (() => T) => {
+  let derived: { readonly value: T } | undefined;
+  return () => {
+    derived ??= { value: derive() };
+    return derived.value;
+  };
+};
+
 export const pick = (
   tasks: readonly Task[],
   links: readonly BlockerLink[],
@@ -90,12 +99,23 @@ export const pick = (
   now: Instant,
 ): PickResult => {
   const tz = settings.timeZone;
+  // Derived at the first Task that needs them, because a Task that needs no conversion must not
+  // reject an invalid zone, now or Urgency window.
+  const today = lazily(() => toLocalDateTime(now, tz).date);
+  const urgencyCutoff = lazily(() => addCalendarDays(now, settings.urgencyWindowDays, tz));
   const deadlines = deadlineIndex(tasks, links, tz);
   const areasById = new Map(areas.map((area) => [area.id, area]));
+  const inHoursByArea = new Map<string, boolean>();
   const inHours = (task: Task): boolean => {
     if (task.areaId === null) return true;
     const area = areasById.get(task.areaId);
-    return area === undefined || isWithinActiveHours(area, now, tz);
+    if (area === undefined) return true;
+    let within = inHoursByArea.get(area.id);
+    if (within === undefined) {
+      within = isWithinActiveHours(area, now, tz);
+      inHoursByArea.set(area.id, within);
+    }
+    return within;
   };
 
   const ranked: RankedTask[] = [];
@@ -104,14 +124,14 @@ export const pick = (
     if (!inHours(task)) continue;
     if (isAvailable(task, tasks, links, now, tz)) {
       const start = deadlines.latestStart(task);
-      const urgent = isUrgentAt(start, now, settings);
+      const urgent = isUrgentBy(start, urgencyCutoff);
       const reason: Reason = {
         overdue: isOverdue(task, now, tz),
         quadrant: quadrant(task.important === true, urgent),
         urgent,
         latestStart: start,
       };
-      ranked.push({ task, reason, reasonText: reasonText(task, reason, now, tz) });
+      ranked.push({ task, reason, reasonText: reasonTextOn(task, reason, today, tz) });
     } else if (task.status === TaskStatus.Open && !isInInbox(task)) {
       const reasons: ExclusionReason[] = [];
       if (task.availableFrom !== null) {
@@ -119,7 +139,7 @@ export const pick = (
         if (now < from) reasons.push({ _tag: ExclusionReasonTag.NotYetAvailable, from });
       }
       reasons.push(...blockedReasons(task, tasks, links));
-      waiting.push({ task, reasons, reasonText: waitingText(task, reasons, tasks, now, tz) });
+      waiting.push({ task, reasons, reasonText: waitingTextOn(task, reasons, tasks, today, tz) });
     }
   }
   ranked.sort(compareRanked);

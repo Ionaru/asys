@@ -2,4 +2,5 @@
 
 export * from './local-date';
 export * from './zoned';
-export * from './display';
+// Named, so formatClockOn (the Picker's form of formatClock) stays inside the library.
+export { formatClock, formatDateSpec, formatDay, formatMinutes, formatMoment } from './display';

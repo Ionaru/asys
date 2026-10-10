@@ -5,14 +5,15 @@ import { Router, RouterOutlet } from '@angular/router';
 import { isValidTimeZone } from '@asys/domain';
 
 import { SIGNED_OUT_PATHS } from './core/auth/safe-return-url';
-import { Session, SessionState } from './core/auth/session';
+import { Session, SessionState, SignOutReason } from './core/auth/session';
 import { DataStore, SyncStatus } from './core/data/data-store';
+import { TimeZoneSync } from './core/data/time-zone-sync';
 import { AppUpdate } from './core/platform/app-update';
 import { DeviceZone } from './core/platform/device-zone';
 import { pathOf } from './core/platform/url-path';
 import { Button, ButtonSize, ButtonVariant } from './ui/button/button';
 
-/** The root: update prompt, connection banners, the data store's lifecycle and the sign-out redirect. */
+/** The root: update prompt, connection banners, the data store's and time zone sync's lifecycle, and the sign-out redirect. */
 @Component({
   selector: 'app-root',
   imports: [RouterOutlet, Button],
@@ -27,6 +28,8 @@ export class App {
   protected readonly appUpdate = inject(AppUpdate);
 
   readonly #router = inject(Router);
+
+  readonly #timeZoneSync = inject(TimeZoneSync);
 
   readonly #deviceZone = inject(DeviceZone);
 
@@ -78,16 +81,22 @@ export class App {
 
         if (current === SessionState.SignedIn) {
           started = true;
+          this.#timeZoneSync.start();
           this.dataStore.start();
         } else if (current === SessionState.SignedOut) {
+          this.dataStore.discardPreload();
+
           if (started) {
             started = false;
             this.dataStore.stop();
+            this.#timeZoneSync.stop();
           }
 
           if (before === SessionState.SignedIn || before === SessionState.Unreachable) {
             this.#leave();
           }
+        } else if (current === SessionState.Unreachable) {
+          this.dataStore.discardPreload();
         }
       });
     });
@@ -120,7 +129,7 @@ export class App {
     }
 
     const tree =
-      path === '/account'
+      this.session.signOutReason() === SignOutReason.Chosen
         ? this.#router.createUrlTree(['/signin'])
         : this.#router.createUrlTree(['/signin'], { queryParams: { returnUrl: url } });
 

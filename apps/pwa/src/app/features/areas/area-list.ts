@@ -13,7 +13,7 @@ import { byAreaName } from './area-order';
   selector: 'app-area-list',
   imports: [Button, LoadState, RouterLink],
   template: `
-    <h1 class="area-list__title">Areas</h1>
+    <h1 class="asys-page__title area-list__title">Areas</h1>
     <p class="area-list__status" role="status"></p>
     @if (dataStore.state() !== null) {
       @if (rows().length > 0) {

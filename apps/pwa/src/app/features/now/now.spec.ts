@@ -221,6 +221,8 @@ interface SetupOptions {
   readonly hold?: boolean;
   /** The value of `DoneUndo.undone` when Now is created. */
   readonly undone?: DoneUndone | null;
+  /** Whether Now gets the real `Motion` instead of the fake; `allowed` and `hold` then do nothing. */
+  readonly realMotion?: boolean;
 }
 
 const fakeAnimationEvent = (height = 56) => {
@@ -306,10 +308,20 @@ const setup = async (options: SetupOptions = {}) => {
       provideRouter([]),
       { provide: DataStore, useValue: { state, status, awaitingSync, now, send, refresh } },
       { provide: DoneUndo, useValue: doneUndo },
-      {
-        provide: Motion,
-        useValue: { allowed: () => options.allowed ?? false, reduced: signal(false), play },
-      },
+      ...(options.realMotion === true
+        ? []
+        : [
+            {
+              provide: Motion,
+              useValue: {
+                allowed: () => options.allowed ?? false,
+                reduced: signal(false),
+                play,
+                // The real `leave` over the fake `play`: it only uses `this.play`.
+                leave: Motion.prototype.leave,
+              },
+            },
+          ]),
       { provide: Clock, useValue: { now: clockNow } },
       { provide: Ids, useValue: { next } },
       { provide: ErrorHandler, useValue: { handleError } },
@@ -1405,6 +1417,47 @@ describe('Now', () => {
       expect(doneUndo.requestFocus).toHaveBeenCalledTimes(1);
       expect(topTitle().textContent?.trim()).toBe('Call the dentist');
       expect(document.activeElement).not.toBe(topLink());
+    });
+
+    describe('when the real Motion cannot animate the card', () => {
+      afterEach(() => {
+        vi.restoreAllMocks();
+        Reflect.deleteProperty(Element.prototype, 'animate');
+        document.documentElement.style.removeProperty('--duration-quick');
+        document.documentElement.style.removeProperty('--ease-in');
+      });
+
+      it('still ends the exit, so the card shows the next top pick and is not inert', async () => {
+        const failure = new TypeError('Keyframes are not loosely sorted by offset');
+        const report = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        const animate = vi.fn(() => {
+          throw failure;
+        });
+
+        Object.defineProperty(Element.prototype, 'animate', {
+          value: animate,
+          configurable: true,
+          writable: true,
+        });
+        // Without these tokens the real Motion resolves at once and never reaches `animate`.
+        document.documentElement.style.setProperty('--duration-quick', '120ms');
+        document.documentElement.style.setProperty('--ease-in', 'cubic-bezier(0.3, 0, 0.8, 0.15)');
+
+        const { doneUndo, topPick, topTitle, topLink, topButton, press } = await setup({
+          realMotion: true,
+        });
+
+        await press(topButton('Done'));
+
+        expect(animate).toHaveBeenCalledTimes(1);
+        expect(doneUndo.complete).toHaveBeenCalledTimes(1);
+        expect(must(topPick()).hasAttribute('inert')).toBe(false);
+        expect(must(topPick()).hasAttribute('data-leaving')).toBe(false);
+        expect(must(topPick()).querySelector('.asys-top-pick__done')).toBeNull();
+        expect(topTitle().textContent?.trim()).toBe('Call the dentist');
+        expect(document.activeElement).toBe(topLink());
+        expect(report).toHaveBeenCalledExactlyOnceWith(failure);
+      });
     });
 
     it('does nothing for a second Done of the Task that is leaving', async () => {

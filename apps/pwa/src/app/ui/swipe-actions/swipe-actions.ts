@@ -345,17 +345,13 @@ export class SwipeActions {
     // The final state is written first, so with motion off (where play resolves at once) it is in place.
     surface.style.translate = slideOff ? `${width}px` : '';
 
-    try {
-      await this.#motion.play(
-        surface,
-        [{ translate: `${offset}px` }, { translate: slideOff ? `${width}px` : '0px' }],
-        slideOff
-          ? { duration: MotionDuration.Quick, easing: MotionEasing.In }
-          : { duration: MotionDuration.Moderate, easing: MotionEasing.Out },
-      );
-    } catch {
-      // The animation is decoration, so one that fails changes nothing about the outcome.
-    }
+    await this.#motion.play(
+      surface,
+      [{ translate: `${offset}px` }, { translate: slideOff ? `${width}px` : '0px' }],
+      slideOff
+        ? { duration: MotionDuration.Quick, easing: MotionEasing.In }
+        : { duration: MotionDuration.Moderate, easing: MotionEasing.Out },
+    );
 
     if (this.#destroyRef.destroyed) {
       return;

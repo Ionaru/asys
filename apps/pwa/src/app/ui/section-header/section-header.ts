@@ -28,7 +28,7 @@ let nextId = 0;
           <span class="asys-section-header__title"
             >{{ title() }}
             @if (count() > 0) {
-              <span class="asys-section-header__count">{{ count() }}</span>
+              <span class="asys-num asys-section-header__count">{{ count() }}</span>
             }
           </span>
           @if (summary(); as text) {

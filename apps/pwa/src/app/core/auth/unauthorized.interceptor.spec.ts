@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 import {
   HttpClient,
+  HttpContext,
   HttpErrorResponse,
   provideHttpClient,
   withInterceptors,
@@ -8,16 +9,17 @@ import {
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 
-import { Session } from './session';
+import { IGNORE_UNAUTHORIZED } from '../api/ignore-unauthorized';
+import { Session, SignOutReason } from './session';
 import { unauthorizedInterceptor } from './unauthorized.interceptor';
 
 describe('unauthorizedInterceptor', () => {
   let http: HttpClient;
   let controller: HttpTestingController;
-  let signedOut: ReturnType<typeof vi.fn<() => void>>;
+  let signedOut: ReturnType<typeof vi.fn<(reason: SignOutReason) => void>>;
 
   beforeEach(() => {
-    signedOut = vi.fn<() => void>();
+    signedOut = vi.fn<(reason: SignOutReason) => void>();
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(withInterceptors([unauthorizedInterceptor])),
@@ -54,25 +56,13 @@ describe('unauthorizedInterceptor', () => {
   it('signs out on a 401 with the Unauthorized tag', async () => {
     await fail('GET', '/v1/auth/me', 401, { _tag: 'Unauthorized' } as object | null);
 
-    expect(signedOut).toHaveBeenCalledTimes(1);
+    expect(signedOut).toHaveBeenCalledExactlyOnceWith(SignOutReason.Revoked);
   });
 
   it('signs out on a 401 whose text body is a JSON string with the Unauthorized tag', async () => {
     await fail('POST', '/v1/auth/signout', 401, JSON.stringify({ _tag: 'Unauthorized' }));
 
-    expect(signedOut).toHaveBeenCalledTimes(1);
-  });
-
-  it('signs out on a body-less 401 of POST /v1/auth/passkeys', async () => {
-    await fail('POST', '/v1/auth/passkeys', 401, null);
-
-    expect(signedOut).toHaveBeenCalledTimes(1);
-  });
-
-  it('signs out on a body-less 401 of DELETE /v1/auth/passkeys/<id>', async () => {
-    await fail('DELETE', '/v1/auth/passkeys/cred-1', 401, null);
-
-    expect(signedOut).toHaveBeenCalledTimes(1);
+    expect(signedOut).toHaveBeenCalledExactlyOnceWith(SignOutReason.Revoked);
   });
 
   it.each([
@@ -84,8 +74,36 @@ describe('unauthorizedInterceptor', () => {
     expect(signedOut).not.toHaveBeenCalled();
   });
 
+  it('leaves the session alone on a 401 Unauthorized of a request marked IGNORE_UNAUTHORIZED, and rethrows it', async () => {
+    const result = new Promise<unknown>((resolve) => {
+      http
+        .get('/v1/snapshot', { context: new HttpContext().set(IGNORE_UNAUTHORIZED, true) })
+        .subscribe({ error: (error: unknown) => resolve(error) });
+    });
+
+    controller.expectOne('/v1/snapshot').flush({ _tag: 'Unauthorized' } as object | null, {
+      status: 401,
+      statusText: 'Unauthorized',
+    });
+    const error = await result;
+
+    expect(signedOut).not.toHaveBeenCalled();
+    expect(error).toBeInstanceOf(HttpErrorResponse);
+    expect((error as HttpErrorResponse).status).toBe(401);
+    expect((error as HttpErrorResponse).error).toEqual({ _tag: 'Unauthorized' });
+  });
+
   it('leaves the session alone on a body-less 401 of another request', async () => {
     await fail('GET', '/v1/auth/me', 401, null);
+
+    expect(signedOut).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['POST', '/v1/auth/passkeys'],
+    ['DELETE', '/v1/auth/passkeys/cred-1'],
+  ])('leaves the session alone on a body-less 401 of %s %s', async (method, url) => {
+    await fail(method, url, 401, null);
 
     expect(signedOut).not.toHaveBeenCalled();
   });

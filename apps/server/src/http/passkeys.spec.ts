@@ -32,6 +32,43 @@ const TIMEOUT = 30_000;
 const SESSION_SET_COOKIE =
   /^__Host-asys_session=[A-Za-z0-9_-]{43}; Max-Age=2592000; Path=\/; HttpOnly; Secure; SameSite=Lax$/;
 
+/**
+ * Deletes the session of `cookie` the way a revocation does, inside a transaction that holds
+ * the owner's counter lock. The transaction commits on `commit`, or when the scope closes.
+ */
+const revokeUnderOwnerLock = (cookie: string) =>
+  Effect.gen(function* () {
+    const found = yield* lookupSession(hashToken(cookieValueOf(cookie)));
+    if (found === undefined) {
+      return yield* Effect.die('The session of the cookie was not found');
+    }
+
+    const holding = yield* Deferred.make<void>();
+    const release = yield* Deferred.make<void>();
+    const holder = yield* Effect.forkChild(
+      withOwner(
+        found.ownerId,
+        Effect.gen(function* () {
+          yield* lockCounter;
+          const db = yield* Db;
+          yield* db.delete(sessions).where(eq(sessions.id, found.id));
+          yield* Deferred.succeed(holding, undefined);
+          yield* Deferred.await(release);
+        }),
+      ),
+    );
+    yield* Effect.addFinalizer(() => Deferred.succeed(release, undefined));
+    yield* Deferred.await(holding);
+
+    return {
+      commit: Deferred.succeed(release, undefined).pipe(Effect.andThen(Fiber.join(holder))),
+    };
+  });
+
+/** Whether `fiber` is still running half a second later, on the real clock. */
+const stillWaitingAfterHalfSecond = (fiber: Fiber.Fiber<unknown, unknown>) =>
+  Effect.sleep('500 millis').pipe(Effect.map(() => fiber.pollUnsafe() === undefined));
+
 layer(appDatabase(), { excludeTestServices: true })('passkey endpoints', (it) => {
   it.effect(
     'refuses a passkey removal from a foreign origin and keeps the passkey',
@@ -284,7 +321,7 @@ layer(appDatabase(), { excludeTestServices: true })('passkey endpoints', (it) =>
   );
 
   it.effect(
-    'answers an empty 401 and keeps both passkeys when the session is revoked while the removal waits for the owner lock',
+    'answers 401 Unauthorized and keeps both passkeys when the session is revoked while the removal waits for the owner lock',
     () =>
       Effect.gen(function* () {
         const http = yield* makeHttp();
@@ -295,40 +332,17 @@ layer(appDatabase(), { excludeTestServices: true })('passkey endpoints', (it) =>
         assert.strictEqual(signedIn.status, 200);
         const otherCookie = cookiePairOf(signedIn.setCookies[0]);
 
-        const found = yield* lookupSession(hashToken(cookieValueOf(cookie)));
-        if (found === undefined) {
-          return yield* Effect.die('The session of the cookie was not found');
-        }
-
-        const holding = yield* Deferred.make<void>();
-        const release = yield* Deferred.make<void>();
-        const holder = yield* Effect.forkChild(
-          withOwner(
-            found.ownerId,
-            Effect.gen(function* () {
-              yield* lockCounter;
-              const db = yield* Db;
-              yield* db.delete(sessions).where(eq(sessions.id, found.id));
-              yield* Deferred.succeed(holding, undefined);
-              yield* Deferred.await(release);
-            }),
-          ),
-        );
-        yield* Effect.addFinalizer(() => Deferred.succeed(release, undefined));
-        yield* Deferred.await(holding);
-
+        const revocation = yield* revokeUnderOwnerLock(cookie);
         const removal = yield* Effect.forkChild(
           http.send(`/v1/auth/passkeys/${added.credential.id}`, { method: 'DELETE', cookie }),
         );
-        yield* Effect.sleep('500 millis');
-        const waiting = removal.pollUnsafe() === undefined;
-        yield* Deferred.succeed(release, undefined);
-        yield* Fiber.join(holder);
+        const waiting = yield* stillWaitingAfterHalfSecond(removal);
+        yield* revocation.commit;
         const reply = yield* Fiber.join(removal);
 
         assert.isTrue(waiting);
         assert.strictEqual(reply.status, 401);
-        assert.strictEqual(reply.text, '');
+        assert.deepStrictEqual(reply.json, { _tag: 'Unauthorized' });
 
         const listed = yield* http.send('/v1/auth/passkeys', { cookie: otherCookie });
         const ids = (listed.json as ReadonlyArray<{ credentialId: string }>).map(
@@ -338,6 +352,46 @@ layer(appDatabase(), { excludeTestServices: true })('passkey endpoints', (it) =>
         assert.strictEqual(ids.length, 2);
         assert.isTrue(ids.includes(credential.id));
         assert.isTrue(ids.includes(added.credential.id));
+        const me = yield* http.send('/v1/auth/me', { cookie: otherCookie });
+        assert.strictEqual(me.status, 200);
+      }),
+    15_000,
+  );
+
+  it.effect(
+    'answers 401 Unauthorized and adds no passkey when the session is revoked while the addition waits for the owner lock',
+    () =>
+      Effect.gen(function* () {
+        const http = yield* makeHttp();
+        const { cookie, authenticator, credential } = yield* signUpOverHttp(http);
+        const signedIn = yield* signInOverHttp(http, authenticator, credential);
+        assert.strictEqual(signedIn.status, 200);
+        const otherCookie = cookiePairOf(signedIn.setCookies[0]);
+        const begun = yield* http.send('/v1/auth/passkeys/options', { method: 'POST', cookie });
+        const challenge = challengeOf(begun, 'passkeys/options');
+        const { response } = authenticator.register(challenge.options);
+
+        const revocation = yield* revokeUnderOwnerLock(cookie);
+        const addition = yield* Effect.forkChild(
+          http.send('/v1/auth/passkeys', {
+            cookie,
+            body: { challengeId: challenge.challengeId, response },
+          }),
+        );
+        const waiting = yield* stillWaitingAfterHalfSecond(addition);
+        yield* revocation.commit;
+        const reply = yield* Fiber.join(addition);
+
+        assert.isTrue(waiting);
+        assert.strictEqual(reply.status, 401);
+        assert.deepStrictEqual(reply.json, { _tag: 'Unauthorized' });
+
+        const listed = yield* http.send('/v1/auth/passkeys', { cookie: otherCookie });
+        const ids = (listed.json as ReadonlyArray<{ credentialId: string }>).map(
+          (passkey) => passkey.credentialId,
+        );
+        assert.strictEqual(listed.status, 200);
+        assert.deepStrictEqual(ids, [credential.id]);
         const me = yield* http.send('/v1/auth/me', { cookie: otherCookie });
         assert.strictEqual(me.status, 200);
       }),

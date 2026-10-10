@@ -3,11 +3,12 @@ import { Component, computed, inject, linkedSignal, signal } from '@angular/core
 import { RouterLink } from '@angular/router';
 import { CommandTag } from '@asys/domain';
 
-import { CommandOutcomeTag, type CommandOutcome } from '../../core/api/data-api';
+import { CommandOutcomeTag } from '../../core/api/data-api';
 import { CommandAttempts } from '../../core/data/command-attempts';
 import { SETTINGS_SUBJECT } from '../../core/data/command-subject';
 import { DataStore, SyncStatus } from '../../core/data/data-store';
 import { outcomeMessage } from '../../core/data/outcome-message';
+import { TimeZoneSync } from '../../core/data/time-zone-sync';
 import { DeviceZone } from '../../core/platform/device-zone';
 import { Button, ButtonVariant } from '../../ui/button/button';
 import { LoadState } from '../../ui/load-state/load-state';
@@ -51,6 +52,8 @@ export class Settings {
 
   readonly #attempts = inject(CommandAttempts);
 
+  readonly #timeZoneSync = inject(TimeZoneSync);
+
   protected readonly Status = SyncStatus;
 
   protected readonly Variant = ButtonVariant;
@@ -60,9 +63,6 @@ export class Settings {
   protected readonly urgencyOptions = URGENCY_OPTIONS;
 
   protected readonly statusLine = signal('');
-
-  /** Whether an Urgency window or time zone send is in flight. */
-  readonly #pending = signal(false);
 
   readonly #storedUrgency = computed(() =>
     String(this.dataStore.state()?.settings.urgencyWindowDays ?? ''),
@@ -88,9 +88,7 @@ export class Settings {
     return stored !== undefined && device !== undefined && device !== stored ? device : null;
   });
 
-  protected readonly busy = computed(
-    () => this.#pending() || this.dataStore.awaitingSync().has(SETTINGS_SUBJECT),
-  );
+  protected readonly busy = computed(() => this.#attempts.busy(SETTINGS_SUBJECT));
 
   /** Sends the chosen Urgency window. */
   protected async chooseUrgency(value: string): Promise<void> {
@@ -101,8 +99,9 @@ export class Settings {
       return;
     }
 
-    const command = { _tag: CommandTag.SetUrgencyWindow, days } as const;
-    const outcome = await this.#run(() => this.#attempts.send(command));
+    this.statusLine.set('');
+
+    const outcome = await this.#attempts.send({ _tag: CommandTag.SetUrgencyWindow, days });
 
     if (outcome._tag === CommandOutcomeTag.Applied) {
       this.statusLine.set('Urgency window saved.');
@@ -120,7 +119,11 @@ export class Settings {
       return;
     }
 
-    const outcome = await this.#run(() => this.dataStore.chooseTimeZone(zone));
+    this.statusLine.set('');
+
+    const outcome = await this.#attempts.track(SETTINGS_SUBJECT, () =>
+      this.#timeZoneSync.choose(zone),
+    );
 
     if (outcome._tag === CommandOutcomeTag.Applied) {
       this.statusLine.set('Time zone saved.');
@@ -129,17 +132,5 @@ export class Settings {
 
     this.zoneValue.set(this.#storedZone());
     this.statusLine.set(outcomeMessage(outcome) ?? '');
-  }
-
-  /** Runs a send, marking it pending meanwhile. */
-  async #run(send: () => Promise<CommandOutcome>): Promise<CommandOutcome> {
-    this.statusLine.set('');
-    this.#pending.set(true);
-
-    try {
-      return await send();
-    } finally {
-      this.#pending.set(false);
-    }
   }
 }

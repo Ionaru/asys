@@ -10,7 +10,7 @@ import { Button, ButtonVariant } from '../../ui/button/button';
   imports: [Button, RouterLink],
   template: `
     <main class="asys-page recovered">
-      <h1 class="recovered__title">You are signed in</h1>
+      <h1 class="asys-page__title asys-page__title--flush recovered__title">You are signed in</h1>
       <p class="recovered__body">
         You signed in with a recovery code. Add a passkey now, and remove any you lost.
       </p>
@@ -25,12 +25,6 @@ import { Button, ButtonVariant } from '../../ui/button/button';
       align-items: flex-start;
       gap: var(--space-4);
       padding-block-end: var(--space-5);
-    }
-
-    .recovered__title {
-      margin: 0;
-      font-size: var(--font-size-title);
-      line-height: var(--line-height-title);
     }
 
     .recovered__body {

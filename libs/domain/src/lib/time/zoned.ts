@@ -22,16 +22,26 @@ export interface LocalDateTime {
   readonly minuteOfDay: number;
 }
 
+// Zones that passed the check. Only valid strings are stored: the server and the contract filter
+// call isValidTimeZone with user input, so remembering rejected strings would let that input grow
+// the set. Valid names match case-insensitively, so the set is also capped and starts over when full.
+const MAX_REMEMBERED_ZONES = 256;
+
+const validTimeZones = new Set<string>();
+
 export const isValidTimeZone = (timeZone: string): boolean => {
   if (typeof timeZone !== 'string' || timeZone.startsWith('+') || timeZone.startsWith('-')) {
     return false;
   }
+  if (validTimeZones.has(timeZone)) return true;
   try {
     new Temporal.ZonedDateTime(0n, timeZone);
-    return true;
   } catch {
     return false;
   }
+  if (validTimeZones.size >= MAX_REMEMBERED_ZONES) validTimeZones.clear();
+  validTimeZones.add(timeZone);
+  return true;
 };
 
 const assertTimeZone = (timeZone: TimeZone): void => {

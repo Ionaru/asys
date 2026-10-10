@@ -73,8 +73,6 @@
 }
 
 .asys-picker-row__estimate {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
   font-size: var(--font-size-time);
   line-height: var(--line-height-body-strong);
   font-weight: 500;

@@ -36,9 +36,11 @@ The entry is typechecked and tested but not emitted by `build` until the library
 | `authenticateOptions`  | POST `/authenticate/options`     | `{ challengeId, options }`                                                                                    |
 | `authenticate`         | POST `/authenticate`             | the host's success; 400, 401, 404 unknown credential, the host's errors                                       |
 | `addOptions` (session) | POST `/passkeys/options`         | `{ challengeId, options }`                                                                                    |
-| `add` (session)        | POST `/passkeys`                 | 201 with the passkey; 400, 401, 409                                                                           |
+| `add` (session)        | POST `/passkeys`                 | 201 with the passkey; 400, 401, 409, the middleware's error from `recheckSession`                             |
 | `list` (session)       | GET `/passkeys`                  | the user's passkeys                                                                                           |
-| `remove` (session)     | DELETE `/passkeys/:credentialId` | 204; 404, 409 when it is the last passkey                                                                     |
+| `remove` (session)     | DELETE `/passkeys/:credentialId` | 204; 404, 409 when it is the last passkey, the middleware's error from `recheckSession`                       |
+
+The four session endpoints also answer the session middleware's error whenever the middleware refuses the request.
 
 Every begin answer is `{ challengeId, options }`: hand `options` to `@simplewebauthn/browser` and send `challengeId` back with the finish request. `options` is schema-typed as an object with a `challenge`; at runtime it is passed through as JSON.
 
@@ -53,16 +55,17 @@ On the server the host supplies four services and the hooks:
   - `createPasskey(passkey)`: `Created`, or `Duplicate` when the credential id is already stored;
   - `updateCounter(credentialId, expected, next, usedAt)`: a compare-and-set, `true` when it changed the row (counters are unsigned 32-bit values, so store them in a 64-bit column);
   - `deletePasskey(userId, credentialId, keepLast)`: atomic; `NotFound`, `LastPasskey` (nothing deleted) or `Deleted`.
-- **`PasskeyUnitOfWork`**: `run(userId, effect)` runs work atomically for one user, typically a database transaction. Sign-in runs the counter update and the host's `onAuthenticated` in one run; adding and removing a passkey run in one too. `PasskeyUnitOfWork.none` runs the effect as is.
+- **`PasskeyUnitOfWork`**: `run(userId, effect)` runs work atomically for one user, typically a database transaction. Sign-in runs the counter update and the host's `onAuthenticated` in one run; adding and removing a passkey run in one too, starting with `recheckSession`. Failures of the effect must pass through unchanged. `PasskeyUnitOfWork.none` runs the effect as is.
 - **`PasskeyChallenges`**: `PasskeyChallenges.memory()` keeps challenges in memory for 5 minutes, takes each once, and partitions them by purpose (at most 1,000 each), so a flood of anonymous sign-in starts cannot evict a registration in progress. A server with several processes provides a shared store instead.
-- **The hooks**, given to `makePasskeyHandlers(api, group, { hooks, currentUserId })`:
+- **The hooks**, given to `makePasskeyHandlers(api, group, { hooks, currentUserId, recheckSession })`:
   - `onRegisterBegin(payload)`: check the host's payload (an invitation token, a name) and return `{ userId, userName }`. The user id must identify a new account, never an existing one; it becomes the WebAuthn user handle (at most 64 UTF-8 bytes).
   - `onRegistered(registration, payload)`: create the account with its first passkey (`registration.passkey`), usually start a session, and return the host's success value. The library stores nothing here, so the account and its first passkey can be written in one transaction. The host must store the passkey under a unique credential id and fail with `PasskeyAlreadyRegistered` when it is a duplicate: only the store can tell.
   - `onAuthenticated(passkey)`: start a session and return the host's success value. It runs inside the unit of work, after the counter update.
   - `onRemoved?(removed)`: optional, inside the removal's unit of work; it may use the services the session middleware provides, for example to end the user's other sessions.
   - `currentUserId`: an Effect that reads the signed-in user's id from the services the session middleware provides.
+  - `recheckSession`: an Effect that re-checks the signed-in session as the first step inside the unit of work of adding and removing a passkey, before anything is written. It may use the services the session middleware provides and may fail only with the middleware's error. That failure rolls the unit back, and the endpoint answers with it as the middleware would. A host whose unit of work takes the lock its session revocations take uses it to refuse a request whose session was revoked while the request waited for that lock. It is required, so a host cannot leave the re-check out by accident; a host with nothing to re-check passes `Effect.void`.
 
-The handler layer requires the four services, the session middleware's implementation and whatever the hooks need.
+The handler layer requires the four services, the session middleware's implementation and whatever the hooks and `recheckSession` need.
 
 **Router configuration.** Effect's router skips path parameters longer than 100 characters, while credential ids may have up to 1,366. Pass `passkeyRouterConfig` as `routerConfig` to `HttpRouter.serve` and `HttpRouter.toWebHandler`, or removing a passkey with a long id answers 404.
 
@@ -90,6 +93,7 @@ const Api = HttpApi.make('app').add(Passkeys /* , other groups */);
 const PasskeysLive = makePasskeyHandlers(Api, Passkeys, {
   hooks: { onRegisterBegin, onRegistered, onAuthenticated, onRemoved },
   currentUserId: CurrentUser.useSync((user) => user.id),
+  recheckSession: CurrentUser.use((user) => requireLiveSession(user.sessionId)),
 });
 ```
 

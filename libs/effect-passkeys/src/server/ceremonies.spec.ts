@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 import { assert, describe, it } from '@effect/vitest';
-import { Cause, Effect, Exit, Layer, Result } from 'effect';
+import { Cause, Data, Effect, Exit, Layer, Result } from 'effect';
 import { TestClock } from 'effect/testing';
 import type { PasskeyChallenge } from '../api/schemas';
 import { makeMemoryPasskeyStore } from '../testing/memory-store';
@@ -34,6 +34,16 @@ const configValues: PasskeyConfigValues = {
 };
 
 const base64url = (text: string): string => Buffer.from(text).toString('base64url');
+
+/** What a host's re-check fails with in these tests. */
+class Revoked extends Data.TaggedError('Revoked') {}
+
+/** A re-check that records the run it saw and fails with `Revoked`. */
+const failingRecheck = (seen: Array<string | undefined>) =>
+  Effect.gen(function* () {
+    seen.push(yield* CurrentRun);
+    return yield* new Revoked();
+  });
 
 interface CreationOptions {
   readonly challenge: string;
@@ -908,6 +918,54 @@ describe('finishAddPasskey', () => {
     }).pipe(Effect.provide(env.layer));
   });
 
+  it.effect('runs the recheck inside the run of the user and stores nothing when it fails', () => {
+    const env = makeEnv();
+    const seen: Array<string | undefined> = [];
+
+    return Effect.gen(function* () {
+      env.store.userNames.set('user-1', 'Ann');
+      const challenge = yield* beginAddPasskey('user-1');
+      const { response, credential } = env.authenticator.register(challenge.options);
+
+      const tag = yield* failureTag(
+        finishAddPasskey(
+          'user-1',
+          { challengeId: challenge.challengeId, response },
+          failingRecheck(seen),
+        ),
+      );
+
+      assert.strictEqual(tag, 'Revoked');
+      assert.deepStrictEqual(seen, ['user-1']);
+      assert.deepStrictEqual(env.unitOfWork.runs, ['user-1']);
+      assert.isFalse(env.store.passkeys.has(credential.id));
+      assert.isUndefined(env.store.calls.find((call) => call.method === 'createPasskey'));
+    }).pipe(Effect.provide(env.layer));
+  });
+
+  it.effect('runs a recheck that passes before it stores the passkey', () => {
+    const env = makeEnv();
+    const storedBefore: Array<boolean> = [];
+
+    return Effect.gen(function* () {
+      env.store.userNames.set('user-1', 'Ann');
+      const challenge = yield* beginAddPasskey('user-1');
+      const { response, credential } = env.authenticator.register(challenge.options);
+
+      const passkey = yield* finishAddPasskey(
+        'user-1',
+        { challengeId: challenge.challengeId, response },
+        Effect.sync(() => {
+          storedBefore.push(env.store.passkeys.has(credential.id));
+        }),
+      );
+
+      assert.deepStrictEqual(storedBefore, [false]);
+      assert.strictEqual(passkey.credentialId, credential.id);
+      assert.isTrue(env.store.passkeys.has(credential.id));
+    }).pipe(Effect.provide(env.layer));
+  });
+
   it.effect('uses the default name when none is given', () => {
     const env = makeEnv();
 
@@ -1083,6 +1141,55 @@ describe('removePasskey', () => {
       assert.deepStrictEqual(removed, [{ userId: 'user-1', credentialId: 'a', run: 'user-1' }]);
       assert.isFalse(env.store.passkeys.has('a'));
       assert.deepStrictEqual(env.unitOfWork.runs, ['user-1']);
+    }).pipe(Effect.provide(env.layer));
+  });
+
+  it.effect('runs the recheck inside the run of the user and removes nothing when it fails', () => {
+    const env = makeEnv();
+    env.store.passkeys.set('a', storedPasskey('a'));
+    env.store.passkeys.set('b', storedPasskey('b'));
+    const seen: Array<string | undefined> = [];
+    let called = false;
+
+    return Effect.gen(function* () {
+      const tag = yield* failureTag(
+        removePasskey(
+          'user-1',
+          'a',
+          () =>
+            Effect.sync(() => {
+              called = true;
+            }),
+          failingRecheck(seen),
+        ),
+      );
+
+      assert.strictEqual(tag, 'Revoked');
+      assert.deepStrictEqual(seen, ['user-1']);
+      assert.deepStrictEqual(env.unitOfWork.runs, ['user-1']);
+      assert.isTrue(env.store.passkeys.has('a'));
+      assert.isFalse(called);
+    }).pipe(Effect.provide(env.layer));
+  });
+
+  it.effect('runs a recheck that passes before it removes the passkey', () => {
+    const env = makeEnv();
+    env.store.passkeys.set('a', storedPasskey('a'));
+    env.store.passkeys.set('b', storedPasskey('b'));
+    const presentBefore: Array<boolean> = [];
+
+    return Effect.gen(function* () {
+      yield* removePasskey(
+        'user-1',
+        'a',
+        undefined,
+        Effect.sync(() => {
+          presentBefore.push(env.store.passkeys.has('a'));
+        }),
+      );
+
+      assert.deepStrictEqual(presentBefore, [true]);
+      assert.isFalse(env.store.passkeys.has('a'));
     }).pipe(Effect.provide(env.layer));
   });
 

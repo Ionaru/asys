@@ -2,7 +2,15 @@
 
 import { compareCodeUnits } from '../compare';
 import { BlockedReasonTag, type Task } from '../task';
-import { formatClock, formatDateSpec, toLocalDateTime, type Instant, type TimeZone } from '../time';
+import {
+  formatClock,
+  formatDateSpec,
+  toLocalDateTime,
+  type Instant,
+  type LocalDate,
+  type TimeZone,
+} from '../time';
+import { formatClockOn } from '../time/display';
 import { ExclusionReasonTag, type ExclusionReason, type WaitingTask } from './picker';
 
 const blockedText = (taskIds: readonly string[], tasks: readonly Task[]): string | null => {
@@ -26,14 +34,25 @@ export const waitingText = (
   now: Instant,
   timeZone: TimeZone,
 ): string => {
+  return waitingTextOn(task, reasons, tasks, () => toLocalDateTime(now, timeZone).date, timeZone);
+};
+
+/** waitingText for a caller that explains many Tasks at one now. `today` returns now's local date, so the caller can derive it once; it is called only when the text needs it. */
+export const waitingTextOn = (
+  task: Task,
+  reasons: readonly ExclusionReason[],
+  tasks: readonly Task[],
+  today: () => LocalDate,
+  timeZone: TimeZone,
+): string => {
   const parts: string[] = [];
   for (const reason of reasons) {
     switch (reason._tag) {
       case ExclusionReasonTag.NotYetAvailable:
         parts.push(
           task.availableFrom !== null
-            ? `Available from ${formatDateSpec(task.availableFrom, toLocalDateTime(now, timeZone).date)}`
-            : `Available from ${formatClock(reason.from, now, timeZone)}`,
+            ? `Available from ${formatDateSpec(task.availableFrom, today())}`
+            : `Available from ${formatClockOn(reason.from, today, timeZone)}`,
         );
         break;
       case BlockedReasonTag.BlockedBy: {
