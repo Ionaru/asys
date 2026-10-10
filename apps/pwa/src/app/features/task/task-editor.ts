@@ -45,6 +45,7 @@ import { outcomeMessage } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
 import { Ids } from '../../core/platform/ids';
 import { TaskMorph } from '../../core/platform/task-morph';
+import { activationOf } from '../../ui/activation/activation';
 import { Button, ButtonSize, ButtonVariant } from '../../ui/button/button';
 import { DateSpecField } from '../../ui/date-spec-field/date-spec-field';
 import { EstimateField } from '../../ui/estimate-field/estimate-field';
@@ -447,7 +448,7 @@ export class TaskEditor {
     this.leaving.set(true);
     this.#doneUndo.complete(task, DoneOrigin.Button);
 
-    if (event.detail === 0) {
+    if (activationOf(event).keyboard) {
       this.#doneUndo.requestFocus();
     }
 

@@ -59,7 +59,7 @@
           [icon]="Icons.Check"
           class="asys-top-pick__main-action"
           [disabled]="actionsDisabled()"
-          (click)="done.emit({ keyboard: $event.detail === 0 })"
+          (click)="done.emit(activationOf($event))"
         >
           Done
         </button>

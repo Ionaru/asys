@@ -2,6 +2,7 @@
 import { Component, signal, viewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
+import type { Activation } from '../activation/activation';
 import { UndoBar, UndoBarVariant } from './undo-bar';
 
 @Component({
@@ -49,9 +50,9 @@ class Host {
   readonly voidPayloads: unknown[] = [];
 
   /** The payloads `retry` and `dismiss` emitted, in order. */
-  readonly retryPayloads: { readonly keyboard: boolean }[] = [];
+  readonly retryPayloads: Activation[] = [];
 
-  readonly dismissPayloads: { readonly keyboard: boolean }[] = [];
+  readonly dismissPayloads: Activation[] = [];
 
   readonly pointer: boolean[] = [];
 
@@ -67,11 +68,11 @@ class Host {
     this.voidPayloads.push(payload);
   }
 
-  onRetry(payload: { readonly keyboard: boolean }): void {
+  onRetry(payload: Activation): void {
     this.retryPayloads.push(payload);
   }
 
-  onDismiss(payload: { readonly keyboard: boolean }): void {
+  onDismiss(payload: Activation): void {
     this.dismissPayloads.push(payload);
   }
 }

@@ -11,6 +11,7 @@ import {
 import { RouterLink } from '@angular/router';
 import { Quadrant } from '@asys/domain';
 
+import { type Activation, activationOf } from '../activation/activation';
 import { Button, ButtonSize, ButtonVariant } from '../button/button';
 import { Fact } from '../fact/fact';
 import { Icon, IconName } from '../icon/icon';
@@ -39,6 +40,8 @@ export class TopPick {
 
   protected readonly Icons = IconName;
 
+  protected readonly activationOf = activationOf;
+
   readonly title = input.required<string>();
 
   readonly reason = input.required<string>();
@@ -66,7 +69,7 @@ export class TopPick {
   /** Shows a drawn check and "Done" in place of the actions while the card leaves. */
   readonly completed = input<boolean>(false);
 
-  readonly done = output<{ readonly keyboard: boolean }>();
+  readonly done = output<Activation>();
 
   readonly logProgress = output<void>();
 

@@ -43,7 +43,7 @@
         class="asys-undo__action"
         [variant]="Variants.Secondary"
         [icon]="Icons.RotateRight"
-        (click)="retry.emit({ keyboard: $event.detail === 0 })"
+        (click)="retry.emit(activationOf($event))"
       >
         Try again
       </button>
@@ -53,7 +53,7 @@
       type="button"
       class="asys-undo__action"
       [variant]="Variants.Quiet"
-      (click)="dismiss.emit({ keyboard: $event.detail === 0 })"
+      (click)="dismiss.emit(activationOf($event))"
     >
       Dismiss
     </button>
@@ -67,7 +67,7 @@
       type="button"
       class="asys-undo__action"
       [variant]="Variants.Quiet"
-      (click)="dismiss.emit({ keyboard: $event.detail === 0 })"
+      (click)="dismiss.emit(activationOf($event))"
     >
       Dismiss
     </button>
