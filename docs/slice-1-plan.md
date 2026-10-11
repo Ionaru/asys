@@ -6,7 +6,7 @@ This plan cuts [Slice 1 of the MVP plan](mvp-plan.md#slice-1-foundations-and-the
 - The installed packages were checked the same day.
 - An adversarial review then checked it, and its confirmed findings are folded in.
 
-Pieces 1 to 4 were specified in full here; pieces 5 to 7 were outlined only as far as they constrained the earlier pieces, and each got a re-plan before it started. All seven are built, and the phone check of piece 7 passed on 2026-10-04.
+Pieces 1 to 4 were specified in full here; pieces 5 to 7 were outlined only as far as they constrained the earlier pieces, and each got a re-plan before it started. All seven are built, and the phone check of piece 7 passed on 2026-10-04. [Pulled ahead before slice 2](#pulled-ahead-before-slice-2) lists what the work built after slice 1 left open.
 
 ## Working agreements
 
@@ -874,6 +874,42 @@ Planned and built on 2026-10-04. A research workflow drafted the plan and a crit
 - pnpm in the image is checked only by npm's registry integrity, and the image digests are updated by hand.
 - `migrate` runs in one transaction without a lock, so two migrators at once are not safe; the stack runs one.
 - In an Android work profile the installed PWA does not show up as a share target, while the personal profile works. Not investigated; likely causes are a work-profile install that is a home-screen shortcut rather than a WebAPK, or the profile's management policy.
+
+## Pulled ahead before slice 2
+
+Three pieces of work outside the slice plan were built after slice 1, each from a plan of its own:
+- **View transitions and the motion foundation**, built on 2026-10-05 (pull request #3): the motion tokens, the `Motion`, `Haptics` and `TaskMorph` seams, kill switches that also reach view transitions, and router view transitions (tab, Push, Pop and Swap) with the Task title moving between Now and the editor.
+- **Capture and Done animations**, built on 2026-10-06 (pull request #5): quick add keeps the keyboard up and `CaptureQueue` sends captures in the background, keeping a failed one as a Not captured row; Done is instant, held by `DoneUndo` behind a 5-second Undo bar, and sent when the bar closes or by a keepalive request when the page goes away. The Inbox route became lazy-loaded to keep the initial bundle under its warning.
+- **Swipe to Done**, built on 2026-10-10 (pull request #24): a right swipe on the top pick or a ranked row in Now marks the Task Done through `DoneUndo`, and a left swipe opens Log progress.
+
+Their plans were removed on 2026-10-11, once built. Their decisions, departures and verification stay in git history (for example `git show 1a47bfd:docs/swipe-to-done-plan.md`), and the rules the code follows are in `CONTEXT.md` and the `building-pwa-ui` and `writing-e2e-specs` skills. What the work left open is below.
+
+**Known limits**
+- A held Done lives in memory only. A crash, or a kill that fires neither `visibilitychange` nor `pagehide`, loses it, and the Task is Open again on the next load. Only the newest Done can be undone: a second Done sends the first at once. Slice 4's outbox replaces this.
+- Not captured rows are in memory too, so a reload or a sign-out loses them; sign-out waits for sends in flight, not for rows nobody retried. While quick add is open with rows, the last row of a long list can sit under them, because the page padding does not grow with them.
+- After an Applied Done whose follow-up poll failed, the Task stays out of Now until a poll succeeds.
+- The 5-second Undo window meets WCAG 2.2.1 (Timing Adjustable) by judgement, not by an audit: focus in the bar or a pointer resting on it pauses the window. If an audit disagrees, the remedy is a longer window or a persistent bar. A ReopenTask Command was offered on 2026-10-05 and declined.
+- In dev mode every skipped view transition (None, reduced motion, Voice only, an interrupted one) logs a rejected `ready` with `console.error`. The production build logs nothing.
+- A poll that re-ranks Now during a swipe springs the swipe back, or resets it once its exit ends, and nothing tells the person why.
+- The left swipe's reveal reads "Needs an Estimate" for an Estimate of 1 min as well as for a missing one.
+- The e2e suites run Chromium only, so view transitions and the swipe are unchecked on Safari and iOS, `overflow-clip-margin` for a focused row's ring included. iOS has no `navigator.vibrate`, so it gets no haptics.
+
+**Open checks on the phone.** These need the installed PWA on an Android phone. Record each outcome here in a docs-only commit.
+- **Quick add.** A tap on Add keeps the keyboard up through its `mousedown` `preventDefault()`; if not, refocus synchronously in the click handler. Gboard shows a send key for `enterkeyhint="send"`, and several captures in a row by that key alone keep the keyboard up.
+- **The capture flight.** Whether the Inbox tab is inside `visualViewport` while the keyboard is up (if it never is, the flight runs only with the keyboard down), and whether the badge's lag after the flight is noticeable.
+- **The held Done** survives backgrounding followed by a kill from the app switcher, through the keepalive send on `visibilitychange`.
+- **Done's motion.** No frame shows the old content at full opacity between the slide-out and the rise-in. In Voice only the Undo bar sits at the bottom of the screen.
+- **Haptics.** The Done button's tick (`HAPTIC_TICK_MS`, 15 ms) feels right, the swipe's arm and disarm ticks feel distinct, and the first swipe after launch gives none.
+- **View transitions.** The back gesture plays Chrome's own animation, Angular starts none, and no stale `data-transition` stays on `<html>`. The `task-title` morph between the top pick's and the editor's text sizes does not stretch; if it does, try `height: 100%; object-fit: none; object-position: left top` on the `task-title` old and new images, or drop the `[data-morph]` rule and keep Push and Pop. Tabs, Push and Pop hold 60 fps with a long Now in a remote DevTools trace; if they do not, Push and Pop fall back to Swap in the kind matrix.
+- **The swipe.** Android's edge back gesture leaves alone a swipe that starts just past `EDGE_DEAD_ZONE_PX` (24 px); raise it if not. The thresholds in `swipe-decision.ts` (40% of the width, a 0.6 px/ms fling past 64 px, a 10 px slop and a 1.5 axis ratio) feel right. Tracking holds 60 fps with its direct DOM writes, the row's pressed `signal-soft` ground does not show for the whole drag, and `Motion.play` animates `translate` in Chrome Android.
+- **TalkBack.** A double tap gives `click` a `detail` of 0, so a Done moves focus to Undo and pauses the window; if not, screen-reader users on touch rely on the status region and the pointer pause. A one-finger swipe should never reach the page, and the buttons stay the path either way.
+
+**Waiting on the maintainer.** The design-system note from the Done work goes into the design system artifact only with a go-ahead: "Not captured rows are a temporary inline surface for a capture that failed while the app is open. Slice 4's outbox replaces them with the Queued chip, and failed replays still become Review items. The Undo bar shows the Task title on one line with an ellipsis, an exception to the two-line rule for Task titles in Now, because the bar is chrome and the full title is announced in the status region." The motion amendment, with its Undo bar and Swipe entries, was accepted and applied on 2026-10-05.
+
+**Later work**
+- A one-time hint that teaches the swipe, decided after the phone check. Revisit the "Needs an Estimate" copy with it.
+- An optimistic Inbox count for queued captures, only if the phone check shows the badge lagging.
+- Shared CSS, second phase (the first was pull request #27): a shared legend, the segmented and Estimate chip buttons, and a common base for the quadrant and status chips. Unified legends give the date-spec and Area editor legends `padding: 0` and a `space-2` margin, a visible change, so it needs a go-ahead.
 
 ## Facts checked on 2026-09-30
 
