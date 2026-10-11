@@ -12,7 +12,7 @@ Slice 1 (the Task loop: capture, triage, Now, Areas and Settings, passkey sign-i
 - [`docs/adr/`](docs/adr): the architecture decisions.
 - [`docs/mvp-plan.md`](docs/mvp-plan.md): the slices and stages, and what each holds.
 - [`docs/scenarios.md`](docs/scenarios.md): the real-life acceptance scenarios, mirrored by `libs/domain/src/scenarios/`.
-- [`docs/slice-1-plan.md`](docs/slice-1-plan.md): how slice 1 was built, its decisions and its known limits.
+- [`docs/slice-1-plan.md`](docs/slice-1-plan.md): how slice 1 was built, its decisions and its known limits, and what the work pulled ahead before slice 2 left open.
 - [`docs/research/`](docs/research): the studies behind some decisions.
 - [`AGENTS.md`](AGENTS.md): the conventions for working in this repository, for people and coding agents alike. Task recipes live in [`.agents/skills/`](.agents/skills).
 

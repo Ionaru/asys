@@ -150,10 +150,10 @@ test.describe('under reduced motion', () => {
       () => typeof (document as Document & { activeViewTransition?: unknown }).activeViewTransition,
     );
     testInfo.annotations.push({
-      type: 'fact-12',
+      type: 'active-view-transition',
       description: `typeof document.activeViewTransition: ${kind}`,
     });
-    console.log(`fact 12: typeof document.activeViewTransition is ${kind}`);
+    console.log(`active view transition: typeof document.activeViewTransition is ${kind}`);
 
     const capture = page.getByRole('button', { name: 'Capture', exact: true });
     const quickAdd = page.locator('asys-quick-add');

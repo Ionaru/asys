@@ -225,8 +225,8 @@ test('Done survives an immediate reload', async ({ page }, testInfo) => {
 
   const applied = (await snapshot(page)).seq - seqBefore;
   const fact = `lifecycle events seen while reloading once: ${lifecycle}; POSTs to /v1/commands seen by Playwright after that reload: ${posts}; Commands the server applied: ${applied}; a second reload was needed: ${reloadedTwice}`;
-  testInfo.annotations.push({ type: 'fact-14', description: fact });
-  console.log(`fact 14: ${fact}`);
+  testInfo.annotations.push({ type: 'keepalive-on-reload', description: fact });
+  console.log(`keepalive on reload: ${fact}`);
 });
 
 test('Enter on Done moves focus to Undo, and Escape to the next title', async ({ page }) => {
