@@ -20,14 +20,15 @@ The type styles are not DTCG typography tokens, because the line heights are rem
 
 ## CSS
 
-`nx run design-tokens:css` (cached) runs `tz build -c libs/design-tokens/terrazzo.config.mts` from the workspace root and writes `dist/libs/design-tokens/css/tokens.css`. It has four blocks:
+`nx run design-tokens:css` (cached) runs `tz build -c libs/design-tokens/terrazzo.config.mts` from the workspace root and writes `dist/libs/design-tokens/css/tokens.css`. It has thirteen blocks:
 
 - `:root, [data-theme="light"]`: the base tokens and Evergreen Light;
 - `@media (prefers-color-scheme: dark)` for `:root:not([data-theme])`: Evergreen Dark;
 - `[data-theme="dark"]`: Evergreen Dark;
-- `[data-theme="drive"]`: Evergreen Voice, with `--shadow-sheet: none` taken from the extension.
+- `[data-theme="drive"]`: Evergreen Voice, with `--shadow-sheet: none` taken from the extension;
+- `[data-palette="<palette>"][data-theme="<theme>"]` for Harbour, Moss and Graphite in Light, Dark and Voice only: that palette's colours and sheet shadow. The PWA sets `data-palette` to the palette of the Current Area (`Theme.setPalette`); Evergreen has no attribute. They outrank the `:root` and `[data-theme]` blocks by specificity, and never match together with the media block, which needs `data-theme` absent, so the order of the blocks does not matter. The Voice only blocks wait for slice 2 to set `data-theme="drive"`. A resolver context without a block fails the build.
 
-The variables are the leaf names. Colours are hex (`legacyHex`) and alpha shadows are hex-8. Each token's description is printed as a comment above it. Only Evergreen is emitted until the appearance settings exist.
+The variables are the leaf names. Colours are hex (`legacyHex`) and alpha shadows are hex-8. Each token's description is printed as a comment above it; the production build of the PWA minifies the file, which drops them.
 
 The build resolves aliases in all 12 contexts but lints only the default one, so colour values in the other contexts are checked by `scripts/palettes.mts` only. The build does not check the references in the typography extension.
 
@@ -35,7 +36,7 @@ The build resolves aliases in all 12 contexts but lints only the default one, so
 
 `fonts/` holds the three variable fonts the `font-sans` and `font-mono` extension names: `AtkinsonHyperlegibleNext-Variable.woff2`, `AtkinsonHyperlegibleNext-Italic-Variable.woff2` and `AtkinsonHyperlegibleMono-Variable.woff2`. They come from `github.com/googlefonts/atkinson-hyperlegible-next` at commit `7925f50f649b3813257faf2f4c0b381011f434f1` and `github.com/googlefonts/atkinson-hyperlegible-next-mono` at `154d50362016cc3e873eb21d242cd0772384c8f9` (`fonts/webfonts/*[wght].woff2`), renamed to the names the extension uses. They are under OFL-1.1, recorded in `REUSE.toml`. `css/fonts.css` declares them with `@font-face`.
 
-To add a palette, add its inputs to `PALETTES` in `scripts/palettes.mts` and run `node scripts/palettes.mts`. It refuses a palette that breaks a contrast pair, writes the palette's three files, and adds its contexts, name and ground to the resolver. Review the palette in all three themes, then add it to the design system's Personalisation table and copy the palette files and the resolver into the artifact.
+To add a palette, add its inputs to `PALETTES` in `scripts/palettes.mts` and run `node scripts/palettes.mts`. It refuses a palette that breaks a contrast pair, writes the palette's three files, and adds its contexts, name and ground to the resolver. Then add it to `Palette` in `terrazzo.config.mts`, or the CSS build fails for want of its blocks, and, so that an Area can take it, to the domain's `Palette` enum, the `palette` database enum (with a migration) and the Area editor's choices. Review the palette in all three themes, then add it to the design system's Personalisation table and copy the palette files and the resolver into the artifact.
 
 The design system artifact stays the source of truth. Its page reads only its own `tokens.json` grammar, so it keeps that file, and exporting now means converting it into `base.tokens.json` and `themes/*.tokens.json`:
 

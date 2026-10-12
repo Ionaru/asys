@@ -84,8 +84,9 @@ Lint bans runtime imports of `@asys/contract`, `effect` and `@ionaru/effect-pass
 
 1. Add `{ name, accent, highlight, ground }` to `PALETTES` in `scripts/palettes.mts`.
 2. Run `node scripts/palettes.mts`. It enforces the contrast pairs (4.5 for text, 3 for lines, 7 for text in drive) and writes the token files and resolver contexts.
-3. Update the "12 contexts" count in the design-tokens README, ADR 0013 and `terrazzo.config.mts`.
-4. Never hand-edit the generated `palettes/*.tokens.json` or `asys.resolver.json`.
+3. Add it to `Palette` in `libs/design-tokens/terrazzo.config.mts`, which emits its `[data-palette][data-theme]` blocks; the CSS build fails while a resolver context has none. So that an Area can take it, add it to the domain's `Palette` enum, the `palette` pgEnum in `apps/server/src/db/schema.ts` (with a migration, `adding-an-owned-table`) and the Area editor's options.
+4. Update the "12 contexts" count in the design-tokens README, ADR 0013 and `terrazzo.config.mts`.
+5. Never hand-edit the generated `palettes/*.tokens.json` or `asys.resolver.json`.
 
 ## Tests and checks
 

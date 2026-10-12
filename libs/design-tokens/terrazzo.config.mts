@@ -5,11 +5,26 @@
 // Terrazzo resolves `tokens` and `outDir` against the working directory, not against this file.
 import { defineConfig } from '@terrazzo/cli';
 import css from '@terrazzo/plugin-css';
+import type { Permutation } from '@terrazzo/plugin-css';
 
+// The resolver's context names (<palette>-<theme>) for the default palette. The other palettes are built from `Palette` and `Theme` below.
 enum Scheme {
   Light = 'evergreen-light',
   Dark = 'evergreen-dark',
   Drive = 'evergreen-drive',
+}
+
+// The palettes that a `data-palette` attribute selects. Evergreen has no attribute: it is the `:root` look.
+enum Palette {
+  Harbour = 'harbour',
+  Moss = 'moss',
+  Graphite = 'graphite',
+}
+
+enum Theme {
+  Light = 'light',
+  Dark = 'dark',
+  Drive = 'drive',
 }
 
 const EXTENSION_KEY = 'io.github.ionaru.asys';
@@ -37,7 +52,22 @@ const wrapInMedia =
   (contents: string): string =>
     `${query} {\n  ${selector} {\n    ${contents}\n  }\n}`;
 
-// Applying every context makes Terrazzo resolve its aliases, so a dangling reference in any of the 12 fails the build. Terrazzo itself only does it for the default context and the ones a permutation names.
+// One block per other palette and theme. They outrank the `:root` and `[data-theme]` blocks by specificity, and never match together with the media block, which needs `data-theme` absent, so the order of the blocks does not matter.
+const palettePermutations = Object.values(Palette).flatMap((palette) =>
+  Object.values(Theme).map((theme): Permutation => ({
+    input: { scheme: `${palette}-${theme}` },
+    include: SCHEME_TOKENS,
+    prepare: wrap(`[data-palette="${palette}"][data-theme="${theme}"]`),
+  })),
+);
+
+// The contexts that have a CSS block. A palette added to the resolver but not to `Palette` would select nothing, so the build fails instead.
+const COVERED_SCHEMES: ReadonlySet<string> = new Set([
+  ...Object.values(Scheme),
+  ...palettePermutations.map((permutation) => permutation.input.scheme),
+]);
+
+// Applying every context makes Terrazzo resolve its aliases, so a dangling reference in any of the 12 contexts fails the build. Terrazzo itself only does it for the default context and the ones a permutation names. A context without a CSS block fails it too.
 // `Plugin` comes from `@terrazzo/parser`, which pnpm does not expose at the workspace root, so the type is taken from the CSS plugin's return type.
 const allContextsResolve = (): ReturnType<typeof css> => ({
   name: 'asys:all-contexts-resolve',
@@ -52,6 +82,12 @@ const allContextsResolve = (): ReturnType<typeof css> => ({
     }
 
     for (const input of inputs) {
+      if (!COVERED_SCHEMES.has(input['scheme'] ?? '')) {
+        throw new Error(
+          `The resolver context ${input['scheme']} has no CSS block: add its palette to Palette in terrazzo.config.mts.`,
+        );
+      }
+
       resolver.apply(input);
     }
   },
@@ -88,6 +124,7 @@ export default defineConfig({
           include: SCHEME_TOKENS,
           prepare: wrap('[data-theme="drive"]'),
         },
+        ...palettePermutations,
       ],
     }),
   ],

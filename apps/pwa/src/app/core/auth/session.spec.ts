@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { AuthApi, AuthError, AuthResultTag, type AuthResult, type Me } from '../api/auth-api';
 import { AreaPickStore } from '../data/area-pick-store';
 import { ReportedZone } from '../platform/reported-zone';
+import { Theme } from '../platform/theme';
 import { SESSION_CHECK_TIMEOUT_MS, Session, SessionState, SignOutReason } from './session';
 
 const ada: Me = { name: 'Ada', recoveryCodesLeft: 4 };
@@ -34,6 +35,7 @@ describe('Session', () => {
   let set: ReturnType<typeof vi.fn<(zone: string) => void>>;
   let clear: ReturnType<typeof vi.fn<() => void>>;
   let clearPick: ReturnType<typeof vi.fn<() => void>>;
+  let clearPalette: ReturnType<typeof vi.fn<() => void>>;
   let session: Session;
 
   beforeEach(() => {
@@ -42,11 +44,13 @@ describe('Session', () => {
     set = vi.fn<(zone: string) => void>();
     clear = vi.fn<() => void>();
     clearPick = vi.fn<() => void>();
+    clearPalette = vi.fn<() => void>();
     TestBed.configureTestingModule({
       providers: [
         { provide: AuthApi, useValue: { me } },
         { provide: ReportedZone, useValue: { get, set, clear } },
         { provide: AreaPickStore, useValue: { clear: clearPick } },
+        { provide: Theme, useValue: { clearPalette } },
       ],
     });
     session = TestBed.inject(Session);
@@ -373,6 +377,14 @@ describe('Session', () => {
       expect(me).not.toHaveBeenCalled();
     });
 
+    it('keeps the palette', async () => {
+      await session.signedIn(grace);
+      me.mockResolvedValue(ok(ada));
+      await session.signedIn();
+
+      expect(clearPalette).not.toHaveBeenCalled();
+    });
+
     it('keeps the Area pick on this device', async () => {
       await session.signedIn(grace);
       me.mockResolvedValue(ok(ada));
@@ -480,6 +492,18 @@ describe('Session', () => {
         session.signedOut(reason);
 
         expect(clearPick).toHaveBeenCalledOnce();
+      },
+    );
+
+    it.each([SignOutReason.Chosen, SignOutReason.Revoked])(
+      'forgets the palette once for %s',
+      async (reason) => {
+        await session.signedIn(ada);
+        clearPalette.mockClear();
+
+        session.signedOut(reason);
+
+        expect(clearPalette).toHaveBeenCalledOnce();
       },
     );
 

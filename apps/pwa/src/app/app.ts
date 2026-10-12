@@ -10,10 +10,11 @@ import { DataStore, SyncStatus } from './core/data/data-store';
 import { TimeZoneSync } from './core/data/time-zone-sync';
 import { AppUpdate } from './core/platform/app-update';
 import { DeviceZone } from './core/platform/device-zone';
+import { Theme } from './core/platform/theme';
 import { pathOf } from './core/platform/url-path';
 import { Button, ButtonSize, ButtonVariant } from './ui/button/button';
 
-/** The root: update prompt, connection banners, the data store's and time zone sync's lifecycle, and the sign-out redirect. */
+/** The root: update prompt, connection banners, the data store's and time zone sync's lifecycle, the sign-out redirect, and the Current Area's palette. */
 @Component({
   selector: 'app-root',
   imports: [RouterOutlet, Button],
@@ -32,6 +33,8 @@ export class App {
   readonly #timeZoneSync = inject(TimeZoneSync);
 
   readonly #deviceZone = inject(DeviceZone);
+
+  readonly #theme = inject(Theme);
 
   protected readonly State = SessionState;
 
@@ -99,6 +102,20 @@ export class App {
           this.dataStore.discardPreload();
         }
       });
+    });
+
+    effect(() => {
+      const state = this.dataStore.state();
+      const current = this.dataStore.currentArea();
+
+      if (state === null || current === null) {
+        return;
+      }
+
+      const id = current.areaIds.length === 1 ? current.areaIds[0] : undefined;
+      const palette = state.areas.find((area) => area.id === id)?.palette ?? null;
+
+      untracked(() => this.#theme.setPalette(palette));
     });
 
     const view = inject(DOCUMENT).defaultView;

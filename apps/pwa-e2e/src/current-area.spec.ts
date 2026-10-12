@@ -37,6 +37,21 @@ const select = (page: Page) => page.getByRole('combobox', { name: 'Current Area'
 
 const state = (page: Page) => page.locator('.asys-area-pick__state');
 
+const palette = (page: Page) => page.locator('html');
+
+const paper = (page: Page): Promise<string> =>
+  page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue('--paper').trim(),
+  );
+
+/** The content of the theme-color meta whose media matches the page's colour scheme. */
+const themeColour = (page: Page): Promise<string | null> =>
+  page.evaluate(() => {
+    const metas = [...document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')];
+    const match = metas.find((meta) => meta.media !== '' && window.matchMedia(meta.media).matches);
+    return (match ?? metas.find((meta) => meta.media === '') ?? null)?.content ?? null;
+  });
+
 test('A Saturday pick of Work shows its Tasks until midnight, survives a reload and ends by itself', async ({
   page,
 }) => {
@@ -50,8 +65,17 @@ test('A Saturday pick of Work shows its Tasks until midnight, survives a reload 
   await expect(otherAreas(page).getByRole('button', { name: 'Work 1' })).toBeVisible();
   await expect(state(page)).toHaveText('Automatic');
 
+  // Personal is current and seeded with Harbour: the look follows it.
+  await expect(palette(page)).toHaveAttribute('data-palette', 'harbour');
+  const harbourPaper = await paper(page);
+  expect(harbourPaper).not.toBe('');
+  await expect.poll(() => themeColour(page)).toBe(harbourPaper);
+
   await select(page).selectOption({ label: 'Work' });
   await expect(shown(page, WORK_TASK)).toBeVisible();
+  await expect(palette(page)).not.toHaveAttribute('data-palette');
+  await expect.poll(() => paper(page)).not.toBe(harbourPaper);
+  await expect.poll(() => themeColour(page)).toBe(await paper(page));
   await expect(shown(page, PERSONAL_TASK)).toHaveCount(0);
   await expect(page.locator('.now__status')).toHaveText('Work picked until midnight');
   await expect(state(page)).toHaveText('Picked');
@@ -80,8 +104,15 @@ test('A weekday tap on an Other Areas button picks Personal until 18:00, where i
   await expect(shown(page, PERSONAL_TASK)).toHaveCount(0);
   await expect(otherAreas(page).getByRole('button', { name: 'Personal 1' })).toBeVisible();
 
+  // Work has no palette: the default look.
+  await expect(palette(page)).not.toHaveAttribute('data-palette');
+  const weekdayPaper = await paper(page);
+  expect(weekdayPaper).not.toBe('');
+
   await otherAreas(page).getByRole('button', { name: 'Personal 1' }).click();
   await expect(shown(page, PERSONAL_TASK)).toBeVisible();
+  await expect(palette(page)).toHaveAttribute('data-palette', 'harbour');
+  await expect.poll(() => paper(page)).not.toBe(weekdayPaper);
   await expect(shown(page, WORK_TASK)).toHaveCount(0);
   await expect(page.locator('.now__status')).toHaveText('Personal picked until 18:00');
   await expect(select(page)).toBeFocused();

@@ -4,6 +4,7 @@ import { inject, Service, signal } from '@angular/core';
 import { AuthApi, AuthError, AuthResultTag, type AuthResult, type Me } from '../api/auth-api';
 import { AreaPickStore } from '../data/area-pick-store';
 import { ReportedZone } from '../platform/reported-zone';
+import { Theme } from '../platform/theme';
 
 /** What the PWA knows about the sign-in. */
 export enum SessionState {
@@ -32,6 +33,8 @@ export class Session {
   readonly #reportedZone = inject(ReportedZone);
 
   readonly #areaPickStore = inject(AreaPickStore);
+
+  readonly #theme = inject(Theme);
 
   readonly #stateSignal = signal(SessionState.Unknown);
 
@@ -94,6 +97,7 @@ export class Session {
     this.#meSignal.set(null);
     this.#reportedZone.clear();
     this.#areaPickStore.clear();
+    this.#theme.clearPalette();
   }
 
   #enter(me: Me): void {

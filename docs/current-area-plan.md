@@ -278,7 +278,7 @@ Skills: `building-pwa-ui`, `writing-e2e-specs`.
   - **Its value.** It passes the palette of the single Current Area, or null.
   - **Cold start.** It skips while `state()` is null, so a cold start never overwrites the stored palette.
   - **Tests.** `app.spec` gains cases for it.
-- **Budget.** Record the initial bundle size after the palette blocks against the 650 kB warning that piece 2 set (decision 8).
+- **Budget.** Record the initial bundle size after the palette blocks against the 650 kB warning that piece 2 set (decision 8). It is 637.31 kB with the nine blocks, `Theme`'s palette and the effect in `App` (measured on 2026-10-12).
 - **Tests:**
   - `theme.spec`: the attribute and its removal, a fresh and a stale stored palette, the metas, and sign-out;
   - `pnpm exec nx run design-tokens:css`, then inspect for the Harbour blocks;
