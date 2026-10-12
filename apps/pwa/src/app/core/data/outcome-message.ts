@@ -39,6 +39,7 @@ const rejectedMessage = (reason: RejectedReason): string => {
     case RejectedReason.DuplicateId:
     case RejectedReason.InvalidNotes:
     case RejectedReason.InvalidPrivacy:
+    case RejectedReason.InvalidPalette:
       return GENERIC_MESSAGE;
   }
 };

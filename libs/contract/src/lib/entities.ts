@@ -2,7 +2,13 @@
 
 import { IsoWeekday } from '@asys/domain';
 import { Schema } from 'effect';
-import { PrivacySchema, TaskKindSchema, TaskStatusSchema, VoiceSchema } from './enums';
+import {
+  PaletteSchema,
+  PrivacySchema,
+  TaskKindSchema,
+  TaskStatusSchema,
+  VoiceSchema,
+} from './enums';
 import { DateSpecSchema, InstantSchema, TextSchema, UuidSchema } from './primitives';
 
 export const MinuteIntervalSchema = Schema.Tuple([Schema.Finite, Schema.Finite]).annotate({
@@ -54,6 +60,7 @@ export const AreaSchema = Schema.Struct({
   name: TextSchema,
   activeHours: ActiveHoursSchema,
   defaultPrivacy: Schema.NullOr(PrivacySchema),
+  palette: Schema.NullOr(PaletteSchema),
   version: Schema.Int,
 }).annotate({ identifier: 'Area' });
 

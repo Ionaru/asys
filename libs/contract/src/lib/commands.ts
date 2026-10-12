@@ -3,7 +3,7 @@
 import { CommandTag, type Command } from '@asys/domain';
 import { Schema } from 'effect';
 import { ActiveHoursSchema } from './entities';
-import { PrivacySchema, TaskStatusSchema } from './enums';
+import { PaletteSchema, PrivacySchema, TaskStatusSchema } from './enums';
 import { DateSpecSchema, TextSchema, UuidSchema } from './primitives';
 
 /*
@@ -34,6 +34,7 @@ export const AreaPatchSchema = Schema.Struct({
   name: Schema.optionalKey(TextSchema),
   activeHours: Schema.optionalKey(ActiveHoursSchema),
   defaultPrivacy: Schema.optionalKey(Schema.NullOr(PrivacySchema)),
+  palette: Schema.optionalKey(Schema.NullOr(PaletteSchema)),
 }).annotate({ identifier: 'AreaPatch' });
 
 /** A Command member, named `<Tag>Command` in the OpenAPI document. */
@@ -96,6 +97,7 @@ export const CommandSchema = Schema.Union([
     name: TextSchema,
     activeHours: ActiveHoursSchema,
     defaultPrivacy: Schema.NullOr(PrivacySchema),
+    palette: Schema.optionalKey(Schema.NullOr(PaletteSchema)),
   }),
   command(CommandTag.UpdateArea, {
     idempotencyKey: UuidSchema,

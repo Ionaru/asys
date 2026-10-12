@@ -3,15 +3,17 @@
 import { Schema } from 'effect';
 import {
   PERSONAL_ACTIVE_HOURS,
+  Palette,
   Privacy,
   TaskKind,
   TaskStatus,
   Voice,
   WORK_ACTIVE_HOURS,
+  type Area,
   type Task,
 } from '@asys/domain';
 import { describe, expect, it } from 'vitest';
-import { ActiveHoursSchema, TaskSchema } from './entities';
+import { ActiveHoursSchema, AreaSchema, TaskSchema } from './entities';
 
 const id = '00000000-0000-4000-8000-000000000001';
 
@@ -107,5 +109,41 @@ describe('ActiveHoursSchema', () => {
     expect(() =>
       decode({ ...(json(WORK_ACTIVE_HOURS) as object), 1: [[480, 1080, 1200]] }),
     ).toThrow(Schema.SchemaError);
+  });
+});
+
+describe('AreaSchema', () => {
+  const decode = Schema.decodeUnknownSync(AreaSchema);
+
+  const area: Area = {
+    id: areaId,
+    name: 'Personal',
+    activeHours: PERSONAL_ACTIVE_HOURS,
+    defaultPrivacy: null,
+    palette: Palette.Harbour,
+    version: 1,
+  };
+
+  it('decodes a palette to the enum value', () => {
+    const decoded = decode(json(area));
+
+    expect(decoded.palette).toBe(Palette.Harbour);
+    expect(decoded).toStrictEqual(area);
+  });
+
+  it('decodes a null palette', () => {
+    expect(decode(json({ ...area, palette: null })).palette).toBeNull();
+  });
+
+  it('rejects an Area without a palette', () => {
+    const { palette: _palette, ...rest } = area;
+
+    expect(() => decode(json(rest))).toThrow(Schema.SchemaError);
+  });
+
+  it('rejects an unknown palette', () => {
+    expect(() => decode({ ...(json(area) as object), palette: 'pink' })).toThrow(
+      Schema.SchemaError,
+    );
   });
 });

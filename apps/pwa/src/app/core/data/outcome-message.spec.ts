@@ -47,6 +47,7 @@ describe('outcomeMessage', () => {
     [RejectedReason.DuplicateId, GENERIC],
     [RejectedReason.InvalidNotes, GENERIC],
     [RejectedReason.InvalidPrivacy, GENERIC],
+    [RejectedReason.InvalidPalette, GENERIC],
   ])('Rejected %s says its sentence', (reason, message) => {
     expect(outcomeMessage(rejected(reason))).toBe(message);
   });

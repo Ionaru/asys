@@ -19,6 +19,7 @@ const area = (id: string, name: string, activeHours = WORK_ACTIVE_HOURS): Area =
   name,
   activeHours,
   defaultPrivacy: null,
+  palette: null,
   version: 1,
 });
 

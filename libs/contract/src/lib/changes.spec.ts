@@ -4,6 +4,7 @@ import { Schema } from 'effect';
 import {
   ChangeEntity,
   ChangeOp,
+  Palette,
   Privacy,
   TaskKind,
   TaskStatus,
@@ -55,6 +56,7 @@ const area: Area = {
   name: 'Work',
   activeHours: WORK_ACTIVE_HOURS,
   defaultPrivacy: Privacy.Private,
+  palette: Palette.Harbour,
   version: 1,
 };
 

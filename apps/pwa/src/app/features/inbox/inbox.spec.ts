@@ -57,6 +57,7 @@ const area = (id: string, name: string): Area => ({
   name,
   activeHours: WORK_ACTIVE_HOURS,
   defaultPrivacy: null,
+  palette: null,
   version: 1,
 });
 

@@ -10,6 +10,7 @@ import {
   type ActiveHours,
 } from './active-hours';
 import { seedAreas, type Area } from './area';
+import { Palette } from './palette';
 import { Privacy } from '../task/task';
 
 const AMS = 'Europe/Amsterdam';
@@ -86,6 +87,7 @@ describe('seedAreas', () => {
         name: 'Work',
         activeHours: WORK_ACTIVE_HOURS,
         defaultPrivacy: null,
+        palette: null,
         version: 1,
       },
       {
@@ -93,6 +95,7 @@ describe('seedAreas', () => {
         name: 'Personal',
         activeHours: PERSONAL_ACTIVE_HOURS,
         defaultPrivacy: Privacy.Hidden,
+        palette: Palette.Harbour,
         version: 1,
       },
     ]);

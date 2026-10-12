@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
-import { isValidActiveHours, type ActiveHours, type Area } from '../area';
+import { isValidActiveHours, Palette, type ActiveHours, type Area } from '../area';
 import { Privacy } from '../task';
 import { IsoWeekday, type Instant } from '../time';
 import {
@@ -26,6 +26,10 @@ const isValidName = (name: unknown): name is string => {
 
 const isValidPrivacy = (value: unknown): value is Privacy | null => {
   return value === null || Object.values(Privacy).includes(value as Privacy);
+};
+
+const isValidPalette = (value: unknown): value is Palette | null => {
+  return value === null || Object.values(Palette).includes(value as Palette);
 };
 
 const WEEKDAYS = [
@@ -73,10 +77,13 @@ export const createArea = (
   command: CreateArea,
   _now: Instant,
 ): TransitionResult => {
-  const { areaId, name, activeHours, defaultPrivacy } = command;
+  const { areaId, name, activeHours, defaultPrivacy, palette } = command;
   if (!isValidName(name)) return rejected(RejectedReason.InvalidName);
   if (!isValidActiveHours(activeHours)) return rejected(RejectedReason.InvalidActiveHours);
   if (!isValidPrivacy(defaultPrivacy)) return rejected(RejectedReason.InvalidPrivacy);
+  if (palette !== undefined && !isValidPalette(palette)) {
+    return rejected(RejectedReason.InvalidPalette);
+  }
   if (state.areas.some((a) => a.id === areaId)) return rejected(RejectedReason.DuplicateId);
   return {
     _tag: TransitionResultTag.Applied,
@@ -90,6 +97,7 @@ export const createArea = (
           name: name.trim(),
           activeHours: normaliseActiveHours(activeHours),
           defaultPrivacy,
+          palette: palette ?? null,
           version: 1,
         },
       },
@@ -111,6 +119,9 @@ export const updateArea = (
   if (present(patch, 'defaultPrivacy') && !isValidPrivacy(patch.defaultPrivacy)) {
     return rejected(RejectedReason.InvalidPrivacy);
   }
+  if (present(patch, 'palette') && !isValidPalette(patch.palette)) {
+    return rejected(RejectedReason.InvalidPalette);
+  }
   const current = state.areas.find((a) => a.id === areaId);
   if (current === undefined) return rejected(RejectedReason.NotFound);
   if (expect?.version !== undefined && expect.version !== current.version) {
@@ -128,10 +139,12 @@ export const updateArea = (
     defaultPrivacy: present(patch, 'defaultPrivacy')
       ? (patch.defaultPrivacy as Privacy | null)
       : current.defaultPrivacy,
+    palette: present(patch, 'palette') ? (patch.palette as Palette | null) : current.palette,
   };
   if (
     next.name === current.name &&
     next.defaultPrivacy === current.defaultPrivacy &&
+    next.palette === current.palette &&
     sameActiveHours(next.activeHours, current.activeHours)
   ) {
     return { _tag: TransitionResultTag.Applied, changes: [] };

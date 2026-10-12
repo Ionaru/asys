@@ -66,6 +66,7 @@ export const areaToRow = (ownerId: string, area: Area): typeof areas.$inferInser
   name: area.name,
   activeHours: area.activeHours,
   defaultPrivacy: area.defaultPrivacy,
+  palette: area.palette,
   version: area.version,
 });
 
@@ -74,6 +75,7 @@ export const rowToArea = (row: typeof areas.$inferSelect): Area => ({
   name: row.name,
   activeHours: row.activeHours,
   defaultPrivacy: row.defaultPrivacy,
+  palette: row.palette,
   version: row.version,
 });
 

@@ -50,7 +50,7 @@ One instance of a recurring Task, Activity or Occasion; editing one Occurrence n
 _Avoid_: Iteration, instance
 
 **Area**:
-A broad group that Tasks, Activities and Occasions belong to, such as Work, Personal or Recruitment.
+A broad group that Tasks, Activities and Occasions belong to, such as Work, Personal or Recruitment. Each Area can have one of the curated palettes; ASYS takes the palette of the Current Area when there is exactly one.
 _Avoid_: Project, list, category
 
 **Active hours**:

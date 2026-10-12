@@ -84,7 +84,15 @@ export const appendChanges = (ownerId: string, lastSeq: number, changes: Readonl
   });
 
 const rowToEntry = (row: typeof changeLog.$inferSelect): ChangeEntry => {
-  const { seq, entity, op, entityId, data } = row;
+  const { seq, entity, op, entityId } = row;
+  // Area entries written before Area.palette existed have no `palette` key; read them as null.
+  const data =
+    entity === ChangeEntity.Area &&
+    typeof row.data === 'object' &&
+    row.data !== null &&
+    !('palette' in row.data)
+      ? { ...row.data, palette: null }
+      : row.data;
   const raw =
     entity === ChangeEntity.Settings
       ? { seq, entity, op, after: data }

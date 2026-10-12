@@ -151,6 +151,7 @@ const area = (id: string, name: string): Area => ({
   name,
   activeHours: ALL_DAY,
   defaultPrivacy: null,
+  palette: null,
   version: 1,
 });
 
@@ -2756,6 +2757,7 @@ describe('Now', () => {
       name: 'Work',
       activeHours: WEEKDAY_HOURS([[480, 1080]]),
       defaultPrivacy: null,
+      palette: null,
       version: 1,
     };
 
@@ -2772,6 +2774,7 @@ describe('Now', () => {
         [IsoWeekday.Sunday]: [[0, 1440]],
       },
       defaultPrivacy: null,
+      palette: null,
       version: 1,
     };
 

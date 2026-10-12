@@ -108,7 +108,7 @@ Decided by the maintainer on 2026-10-11. A line under the ranking reads, for exa
 ### 7. A palette per Area
 
 `Area.palette` is one of the curated palettes, or null.
-- **What null means.** Null is the default look: Evergreen today, and the account's palette once the appearance settings exist. So null and an explicit Evergreen are kept apart.
+- **What null means.** Null is the default look: Evergreen today, and the User's palette once the appearance settings exist. So null and an explicit Evergreen are kept apart.
 - **Seed.** Personal gets Harbour, which is cool where Evergreen is warm. Work stays null.
 - **The look.** ASYS takes the palette of the Current Area when exactly one Area is current, and the default look otherwise.
 - **Never colour alone.** The chip always names the side.
@@ -245,14 +245,14 @@ Skills: `adding-a-domain-command` (the CreateArea and UpdateArea payloads change
   - **Docs.** CHANGELOG 0.6.0 and `RULES_VERSION`.
 - **Contract.**
   - **`PaletteSchema`.** It is declared once in `libs/contract/src/lib/enums.ts`, and `'Palette'` joins the expected names in `openapi-components.spec.ts:106`.
-  - **`AreaSchema.palette`.** It decodes a missing key as null. Area entries written to the change log before the migration still decode (`apps/server/src/changes/change-log.ts:93`), and the type stays `Palette | null`, so the `entities.test-d.ts` lockstep holds.
+  - **`AreaSchema.palette`.** A required `Schema.NullOr(PaletteSchema)`, so the type stays `Palette | null` and the `entities.test-d.ts` lockstep holds. Built differently from the plan's first draft, which decoded a missing key as null: in effect 4.0.0 a decoding default makes the key optional on the encoded side, so the OpenAPI document and the generated PWA client would mark `palette` optional and break `SHAPES` in `wire.ts`. The change log is the only place the server decodes a stored Area, so `rowToEntry` in `apps/server/src/changes/change-log.ts` reads an Area entry written before the migration with `palette: null` instead.
   - **The other schemas.** `AreaPatchSchema` and CreateArea gain the field; it is optional in CreateArea.
 - **Server.**
   - **The column.** A nullable `palette` pgEnum column on `areas` (`apps/server/src/db/schema.ts:101-115`), following `privacy`, with rows in `schema-enums.spec.ts` and `schema-enums.test-d.ts`.
   - **The migration.** It comes from `drizzle-kit generate`, with the SPDX header added by hand, followed by the `--name should_be_empty` check. The previous release ignores the column.
   - **Code.** `db/mappers.ts`, `commands/persist-changes.ts` and `commands/load-state.ts` carry the field. `mappers.spec.ts` is updated, and `run-command.spec.ts` gains a round trip.
 - **PWA.**
-  - **The wire.** `core/api/wire.ts` `SHAPES`, and `fromWire` reads a missing palette as null, for a rollback.
+  - **The wire.** `core/api/wire.ts` `SHAPES` holds unchanged, and `core/api/data-api.ts` reads a missing palette as null in the snapshot's Areas and in Area change entries, for a rollback in which a cached new PWA talks to an older server.
   - **The Area editor** (`features/areas/area-editor.ts`, `area-editor.component.html`) gains a palette select: "Default look (Evergreen)" first, then the four palettes.
   - **The editor's fields.** `AREA_DRAFT_FIELDS` (line 176) and `buildAreaPatch` (line 183) carry the palette, and the pending-create retry check (line 410) compares it.
 - **After the deploy,** the maintainer picks Harbour for Personal.
@@ -327,7 +327,7 @@ Then the rest of CI:
   - Area names on ranked rows;
   - capture taking the Current Area;
   - "copy to days" in the Area editor.
-- **The order between an Area's palette and the account's,** once the appearance settings exist. An Area palette of null will follow the account.
+- **The order between an Area's palette and the User's,** once the appearance settings exist. An Area palette of null will follow the User's.
 
 ## Known limits, expected
 
@@ -335,6 +335,7 @@ Then the rest of CI:
 - **A pick on a day the clocks change.** An interval start in the hour the clocks skip or repeat (02:00 to 03:00 in Amsterdam) is read as one wall-clock time, so a pick can end up to an hour off when the picked Area's hours start in that hour. Found in the piece 1 review on 2026-10-12.
 - **Ambiguous moments.** When Areas overlap, or none is current, the look is the default; the chip names the Areas.
 - **Where Evergreen stays.** The splash (the manifest's `theme_color`), the moment before Angular boots, and any launch without a stored palette from the last hour.
+- **A palette after a rollback and a roll-forward.** An Area changed while the previous release ran has change-log entries without a palette, which the next release reads as none, though the row keeps its palette. A device that syncs through those entries shows the default look for that Area until it next loads a snapshot, at the latest on its next launch. Found in the piece 4 review on 2026-10-12.
 - **Other Areas names only Overdue.** A Task of the other side that is urgent but not yet Overdue shows only in the count.
 
 ## Risks
@@ -359,8 +360,8 @@ Installed: `@terrazzo/cli`, `@terrazzo/plugin-css` and `@terrazzo/parser` 2.7.1,
 - **Android work profile.** No web API tells a PWA which profile it runs in. [Work-profile detection](https://developers.google.com/android/management/work-profile-detection) is a native API. That is absence of evidence, not proof.
 - **Custom properties on a subtree** re-theme only that subtree, but `color-scheme` paints the canvas only from the root, and `theme-color` is page-level. This plan sets the palette on `<html>` only, for that reason.
 
-### Facts to check while building
+### Facts checked while building, on 2026-10-12
 
-- Effect v4's decoding default for a missing key in `AreaSchema` (piece 4), against the installed `effect` package.
-- Whether `plugin-css` 2.7.1 can leave out the description comments for some permutations (piece 5).
-- `drizzle-kit generate` for a nullable pgEnum column added to an existing table (piece 4).
+- **A decoding default for a missing key** (piece 4), against the installed `effect` 4.0.0. `Schema.withDecodingDefaultKey(Effect.succeed(null))` decodes a missing key as null, keeps a given value, rejects an unknown one and encodes null as null. Its JSON Schema leaves the key out of `required` (`toJsonSchemaDocument`), because the encoded side is an `optionalKey`, so the field would be optional in the OpenAPI document. Piece 4 keeps `AreaSchema.palette` required for that reason.
+- **Description comments** (piece 5). `@terrazzo/plugin-css` 2.7.1 has no option to leave them out (`CSSPluginOptions` and `Permutation` in `dist/lib.d.ts`). They do not reach users: `tokens.css` is one of the PWA's `styles`, and the production build minifies it, which drops comments. The palette blocks keep them.
+- **`drizzle-kit generate`** (piece 4) for a nullable pgEnum column on an existing table writes `CREATE TYPE "palette" AS ENUM(...)` and `ALTER TABLE "areas" ADD COLUMN "palette" "palette"`, and nothing else. The grants on `areas` are table-wide, so it needs no companion migration.

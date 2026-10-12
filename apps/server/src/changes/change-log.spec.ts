@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { randomUUID } from 'node:crypto';
-import { ChangesExpired, TaskSchema } from '@asys/contract';
+import { AreaSchema, ChangesExpired, TaskSchema } from '@asys/contract';
 import {
   ChangeEntity,
   ChangeOp,
+  Palette,
   TaskKind,
   TaskStatus,
   WORK_ACTIVE_HOURS,
@@ -15,9 +16,9 @@ import {
 } from '@asys/domain';
 import { assert, layer } from '@effect/vitest';
 import { Cause, Deferred, Effect, Exit, Fiber, Schema } from 'effect';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { Db, appDatabase, ownerDatabase } from '../db/database';
-import { changeLog } from '../db/schema';
+import { changeCounters, changeLog } from '../db/schema';
 import { findSqlError } from '../db/sql-error';
 import { withOwner } from '../db/with-owner';
 import { newOwner, removeOwner } from '../test/owners';
@@ -239,6 +240,7 @@ layer(appDatabase())('changesSince', (it) => {
         name: 'An area',
         activeHours: WORK_ACTIVE_HOURS,
         defaultPrivacy: null,
+        palette: Palette.Moss,
         version: 1,
       };
       const item: ReviewItem = {
@@ -271,6 +273,54 @@ layer(appDatabase())('changesSince', (it) => {
         result.entries,
         changes.map((change, index) => ({ ...change, seq: index + 1 })),
       );
+    }),
+  );
+
+  it.effect('reads an Area entry stored without a palette key with palette null', () =>
+    Effect.gen(function* () {
+      const owner = yield* newOwner();
+      const old: Area = {
+        id: randomUUID(),
+        name: 'Old area',
+        activeHours: WORK_ACTIVE_HOURS,
+        defaultPrivacy: null,
+        palette: null,
+        version: 1,
+      };
+      const kept: Area = { ...old, id: randomUUID(), name: 'New area', palette: Palette.Moss };
+      // As an earlier release wrote it: the encoded Area has no palette key.
+      const { palette: _palette, ...legacyData } = Schema.encodeSync(AreaSchema)(old);
+      assert.isFalse('palette' in legacyData);
+      yield* withOwner(
+        owner,
+        Effect.gen(function* () {
+          const db = yield* Db;
+          const counter = yield* lockCounter;
+          yield* db.insert(changeLog).values({
+            ownerId: owner,
+            seq: counter.lastSeq + 1,
+            entity: ChangeEntity.Area,
+            entityId: old.id,
+            op: ChangeOp.Put,
+            data: legacyData,
+          });
+          yield* db
+            .update(changeCounters)
+            .set({ lastSeq: counter.lastSeq + 1 })
+            .where(eq(changeCounters.ownerId, owner));
+        }),
+      );
+      yield* append(owner, [
+        { entity: ChangeEntity.Area, op: ChangeOp.Put, id: kept.id, after: kept },
+      ]);
+
+      const result = yield* changesSince(owner, 0);
+
+      yield* removeOwner(owner);
+      assert.deepStrictEqual(result.entries, [
+        { seq: 1, entity: ChangeEntity.Area, op: ChangeOp.Put, id: old.id, after: old },
+        { seq: 2, entity: ChangeEntity.Area, op: ChangeOp.Put, id: kept.id, after: kept },
+      ]);
     }),
   );
 

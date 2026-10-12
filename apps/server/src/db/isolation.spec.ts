@@ -96,6 +96,7 @@ layer(appDatabase())('as asys_app', (it) => {
           name: 'an area',
           activeHours: WORK_ACTIVE_HOURS,
           defaultPrivacy: null,
+          palette: null,
           version: 1,
         }),
       );

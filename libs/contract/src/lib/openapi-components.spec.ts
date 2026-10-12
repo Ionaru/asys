@@ -104,6 +104,7 @@ const expectedNames = [
   'TaskStatus',
   'Voice',
   'Privacy',
+  'Palette',
   'NotApplicableReason',
   'RejectedReason',
 ];

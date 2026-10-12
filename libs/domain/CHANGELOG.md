@@ -4,6 +4,20 @@
 
 `RULES_VERSION` in `src/lib/rules-version.ts` names the rules a front-end derives its values with. Any change to a rule is at least a minor version (ADR 0003).
 
+## 0.6.0 (2026-10-12)
+
+A palette per Area.
+
+### Areas
+
+- An Area has a palette: one of the curated palettes `evergreen`, `harbour`, `moss` and `graphite`, or none, which means the default look. None and an explicit `evergreen` are kept apart, so an Area without a palette follows the User's palette once the appearance settings exist.
+- The seeded Personal Area has `harbour`, and Work has none. Only Users created from now on get it.
+
+### Commands
+
+- **Create Area** takes an optional palette; leaving it out gives none. An unknown palette is Rejected `invalid_palette`, checked after the name, the Active hours and the default Privacy, and before the duplicate id.
+- **Update Area** can set a palette or clear it to none, and an unknown one is Rejected `invalid_palette`. Setting the palette an Area already has changes nothing.
+
 ## 0.5.0 (2026-10-12)
 
 The Current Area: the Areas whose Tasks Now ranks, a pick that overrides them, and a count of the Tasks the other Areas hold.

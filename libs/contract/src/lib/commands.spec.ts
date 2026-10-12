@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 import { Schema } from 'effect';
-import { CommandTag, Privacy, TaskStatus, WORK_ACTIVE_HOURS } from '@asys/domain';
+import { CommandTag, Palette, Privacy, TaskStatus, WORK_ACTIVE_HOURS } from '@asys/domain';
 import { describe, expect, it } from 'vitest';
 import { CommandSchema, commandMeta, toDomainCommand, type CommandRequest } from './commands';
 
@@ -68,12 +68,13 @@ const requests: readonly CommandRequest[] = [
     name: 'Work',
     activeHours: WORK_ACTIVE_HOURS,
     defaultPrivacy: Privacy.Private,
+    palette: Palette.Moss,
   },
   {
     _tag: CommandTag.UpdateArea,
     idempotencyKey: key,
     areaId: uuid(2),
-    patch: { name: 'Renamed', activeHours: WORK_ACTIVE_HOURS, defaultPrivacy: null },
+    patch: { name: 'Renamed', activeHours: WORK_ACTIVE_HOURS, defaultPrivacy: null, palette: null },
     expect: { version: 2 },
   },
   { _tag: CommandTag.SetTimeZone, idempotencyKey: key, timeZone: 'Europe/Amsterdam' },
@@ -112,6 +113,62 @@ describe('CommandSchema', () => {
     const request = { ...requests[1], estimateMinutes: 2.5 };
 
     expect(decode(json(request))).toStrictEqual(request);
+  });
+
+  describe('palette', () => {
+    const createArea = requests[8] as Extract<CommandRequest, { _tag: CommandTag.CreateArea }>;
+
+    const updateArea = requests[9] as Extract<CommandRequest, { _tag: CommandTag.UpdateArea }>;
+
+    it('decodes a CreateArea without a palette to one with no palette key', () => {
+      const { palette: _palette, ...request } = createArea;
+
+      const decoded = decode(json(request));
+
+      expect('palette' in decoded).toBe(false);
+      expect(decoded).toStrictEqual(request);
+    });
+
+    it('decodes a CreateArea with palette moss to Palette.Moss', () => {
+      const decoded = decode(json({ ...createArea, palette: 'moss' }));
+
+      expect(decoded).toMatchObject({ palette: Palette.Moss });
+    });
+
+    it('decodes a CreateArea with a null palette', () => {
+      expect(decode(json({ ...createArea, palette: null }))).toMatchObject({ palette: null });
+    });
+
+    it('rejects a CreateArea with an unknown palette', () => {
+      expect(() => decode(json({ ...createArea, palette: 'pink' }))).toThrow(Schema.SchemaError);
+    });
+
+    it('decodes an UpdateArea patch with only a palette', () => {
+      const request = { ...updateArea, patch: { palette: Palette.Graphite } };
+
+      expect(decode(json(request))).toStrictEqual(request);
+    });
+
+    it('decodes an UpdateArea patch with a null palette', () => {
+      const request = { ...updateArea, patch: { palette: null } };
+
+      expect(decode(json(request))).toStrictEqual(request);
+    });
+
+    it('decodes an UpdateArea patch without a palette to one with no palette key', () => {
+      const request = { ...updateArea, patch: { name: 'Home' } };
+
+      const decoded = decode(json(request)) as typeof updateArea;
+
+      expect('palette' in decoded.patch).toBe(false);
+      expect(decoded).toStrictEqual(request);
+    });
+
+    it('rejects an UpdateArea patch with an unknown palette', () => {
+      expect(() => decode(json({ ...updateArea, patch: { palette: 'pink' } }))).toThrow(
+        Schema.SchemaError,
+      );
+    });
   });
 
   it('rejects a CaptureTask without an idempotency key', () => {

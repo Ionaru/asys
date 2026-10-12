@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { aState, anArea } from '../../test/builders';
-import { PERSONAL_ACTIVE_HOURS, WORK_ACTIVE_HOURS, type ActiveHours } from '../area';
+import { PERSONAL_ACTIVE_HOURS, WORK_ACTIVE_HOURS, type ActiveHours, Palette } from '../area';
 import { Privacy } from '../task';
 import {
   type AreaPatch,
@@ -51,6 +51,7 @@ describe('createArea', () => {
       name: string;
       activeHours: ActiveHours;
       defaultPrivacy: Privacy | null;
+      palette: Palette | null;
     }> = {},
     areas = [] as ReturnType<typeof anArea>[],
   ) =>
@@ -80,6 +81,7 @@ describe('createArea', () => {
             name: 'Home',
             activeHours: PERSONAL_ACTIVE_HOURS,
             defaultPrivacy: Privacy.Hidden,
+            palette: null,
             version: 1,
           },
         },
@@ -99,6 +101,51 @@ describe('createArea', () => {
   it('accepts a null default privacy', () => {
     const [change] = changesOf(create({ defaultPrivacy: null }));
     expect(change).toMatchObject({ after: { defaultPrivacy: null } });
+  });
+
+  it('stores a null palette when none is given', () => {
+    const [change] = changesOf(create());
+    expect(change).toMatchObject({ after: { palette: null } });
+  });
+
+  it.each([Palette.Evergreen, Palette.Harbour, Palette.Moss, Palette.Graphite])(
+    'stores the %s palette',
+    (palette) => {
+      const [change] = changesOf(create({ palette }));
+      expect(change).toMatchObject({ after: { palette } });
+    },
+  );
+
+  it('stores an explicit null palette', () => {
+    const [change] = changesOf(create({ palette: null }));
+    expect(change).toMatchObject({ after: { palette: null } });
+  });
+
+  it('rejects an unknown palette with invalid_palette', () => {
+    expect(create({ palette: 'pink' as unknown as Palette })).toEqual(
+      rejected(RejectedReason.InvalidPalette),
+    );
+  });
+
+  it('reports invalid_name before invalid_palette', () => {
+    expect(create({ name: '', palette: 'pink' as unknown as Palette })).toEqual(
+      rejected(RejectedReason.InvalidName),
+    );
+  });
+
+  it('reports invalid_privacy before invalid_palette', () => {
+    expect(
+      create({
+        defaultPrivacy: 'secret' as unknown as Privacy,
+        palette: 'pink' as unknown as Palette,
+      }),
+    ).toEqual(rejected(RejectedReason.InvalidPrivacy));
+  });
+
+  it('reports invalid_palette before duplicate_id', () => {
+    expect(create({ palette: 'pink' as unknown as Palette }, [anArea({ id: 'home' })])).toEqual(
+      rejected(RejectedReason.InvalidPalette),
+    );
   });
 
   it('rejects an empty name with invalid_name', () => {
@@ -173,6 +220,7 @@ describe('updateArea', () => {
             name: 'Office',
             activeHours: WORK_ACTIVE_HOURS,
             defaultPrivacy: null,
+            palette: null,
             version: 2,
           },
         },
@@ -221,6 +269,44 @@ describe('updateArea', () => {
     expect(update({ defaultPrivacy: 'secret' as unknown as Privacy })).toEqual(
       rejected(RejectedReason.InvalidPrivacy),
     );
+  });
+
+  it('sets a palette', () => {
+    expect(update({ palette: Palette.Harbour })).toMatchObject({
+      changes: [{ after: { palette: Palette.Harbour, version: 2 } }],
+    });
+  });
+
+  it('clears a palette with null', () => {
+    const area = anArea({ id: 'work', palette: Palette.Moss });
+    expect(update({ palette: null }, undefined, [area])).toMatchObject({
+      changes: [{ after: { palette: null, version: 2 } }],
+    });
+  });
+
+  it('applies nothing when a null palette is cleared again', () => {
+    expect(update({ palette: null })).toEqual({ _tag: TransitionResultTag.Applied, changes: [] });
+  });
+
+  it('applies nothing when the patch repeats the current palette', () => {
+    const area = anArea({ id: 'work', palette: Palette.Moss });
+    expect(update({ palette: Palette.Moss }, undefined, [area])).toEqual({
+      _tag: TransitionResultTag.Applied,
+      changes: [],
+    });
+  });
+
+  it('rejects an unknown palette with invalid_palette', () => {
+    expect(update({ palette: 'pink' as unknown as Palette })).toEqual(
+      rejected(RejectedReason.InvalidPalette),
+    );
+  });
+
+  it('keeps the palette when only the name changes', () => {
+    const area = anArea({ id: 'work', palette: Palette.Graphite });
+    expect(update({ name: 'Home' }, undefined, [area])).toMatchObject({
+      changes: [{ after: { name: 'Home', palette: Palette.Graphite, version: 2 } }],
+    });
   });
 
   it('rejects an empty name with invalid_name', () => {
