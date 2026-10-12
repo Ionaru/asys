@@ -63,10 +63,18 @@ describe('seed Active hours', () => {
     expect(WORK_ACTIVE_HOURS[7]).toEqual([]);
   });
 
-  it('gives Personal the whole day on every weekday', () => {
-    for (const day of weekdays) {
-      expect(PERSONAL_ACTIVE_HOURS[day]).toEqual([[0, 1440]]);
+  it('gives Personal 00:00 to 08:00 and 18:00 to 24:00 on Monday to Friday', () => {
+    for (const day of [1, 2, 3, 4, 5] as const) {
+      expect(PERSONAL_ACTIVE_HOURS[day]).toEqual([
+        [0, 480],
+        [1080, 1440],
+      ]);
     }
+  });
+
+  it('gives Personal the whole day on Saturday and Sunday', () => {
+    expect(PERSONAL_ACTIVE_HOURS[6]).toEqual([[0, 1440]]);
+    expect(PERSONAL_ACTIVE_HOURS[7]).toEqual([[0, 1440]]);
   });
 });
 

@@ -373,7 +373,7 @@ People, company names and email addresses in the examples are invented.
 - Task 'Ask Iris for the caterer's quote', Area Work (Active hours weekdays 8 to 18), Due 2026-11-04, Estimate 10 min, Delegated by hand to Iris de Boer on 2026-11-02. Asked whether its first Check-in is by message or by phone, the User picks by phone, so that Check-in, due at the default one day before the Task's Due (2026-11-03), needs Out loud.
 - Task 'Approve expense claims', Area Work, Due 2026-11-03 18:00, Estimate 10 min, Importance Important, needs no Voice.
 - Task 'Plan the team offsite', Area Work, with the Subtasks 'Phone the venue' (Estimate 10 min, Importance Important, needs Out loud, set on the Subtask itself, since Subtasks do not inherit a Voice) and 'Update the offsite budget sheet' (Estimate 15 min, Importance not Important, needs no Voice).
-- The drive lies inside both Areas' Active hours; a later drive needs those hours extended to cover it, since outside them the Picker leaves an Area's Tasks out.
+- The drive lies inside both Areas' Active hours; a later drive needs those hours extended to cover it, since outside them the Picker leaves an Area's Tasks out unless that Area is picked as the Current Area in Now.
 
 **Acceptance criteria:**
 1. On Tuesday 3 November at 17:20 the Picker ranks 'Call Bram after his first day' and the Check-in for 'Ask Iris for the caterer's quote', and no Task that needs no Voice; 'Approve expense claims', although urgent, is listed under Not here ('needs no Voice; Drive home is Voice only until 17:45') and is not shown above the ranking, and from 17:45 it is ranked again.

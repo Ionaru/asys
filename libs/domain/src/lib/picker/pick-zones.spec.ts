@@ -29,6 +29,7 @@ import {
   ExclusionReasonTag,
   pick,
   type ExclusionReason,
+  type OtherArea,
   type PickResult,
   type RankedTask,
   type Reason,
@@ -187,10 +188,18 @@ const pickPerTask = (
   const areasById = new Map(areas.map((area) => [area.id, area]));
   const ranked: RankedTask[] = [];
   const waiting: WaitingTask[] = [];
+  const counted = new Map<string, { count: number; overdue: number }>();
   for (const task of tasks) {
     const area = task.areaId === null ? undefined : areasById.get(task.areaId);
-    if (area !== undefined && !isWithinActiveHours(area, now, tz)) continue;
+    const inArea = () => area === undefined || isWithinActiveHours(area, now, tz);
     if (isAvailable(task, tasks, links, now, tz)) {
+      if (area !== undefined && !inArea()) {
+        const entry = counted.get(area.id) ?? { count: 0, overdue: 0 };
+        entry.count += 1;
+        if (isOverdue(task, now, tz)) entry.overdue += 1;
+        counted.set(area.id, entry);
+        continue;
+      }
       const start = deadlines.latestStart(task);
       const urgent = isUrgentAt(start, now, settings);
       const reason: Reason = {
@@ -201,6 +210,7 @@ const pickPerTask = (
       };
       ranked.push({ task, reason, reasonText: reasonText(task, reason, now, tz) });
     } else if (task.status === TaskStatus.Open && !isInInbox(task)) {
+      if (!inArea()) continue;
       const reasons: ExclusionReason[] = [];
       if (task.availableFrom !== null) {
         const from = availableFromInstant(task.availableFrom, tz);
@@ -210,7 +220,14 @@ const pickPerTask = (
       waiting.push({ task, reasons, reasonText: waitingText(task, reasons, tasks, now, tz) });
     }
   }
-  return { ranked, waiting };
+  const otherAreas: OtherArea[] = [...counted].map(([areaId, entry]) => ({ areaId, ...entry }));
+  otherAreas.sort((a, b) => {
+    const nameA = areasById.get(a.areaId)?.name ?? '';
+    const nameB = areasById.get(b.areaId)?.name ?? '';
+    if (nameA !== nameB) return nameA < nameB ? -1 : 1;
+    return a.areaId < b.areaId ? -1 : a.areaId > b.areaId ? 1 : 0;
+  });
+  return { ranked, waiting, otherAreas };
 };
 
 const outcome = (run: () => PickResult) => {
@@ -218,7 +235,11 @@ const outcome = (run: () => PickResult) => {
     [...list].sort((a, b) => (a.task.id < b.task.id ? -1 : a.task.id > b.task.id ? 1 : 0));
   try {
     const result = run();
-    return { ranked: byId(result.ranked), waiting: byId(result.waiting) };
+    return {
+      ranked: byId(result.ranked),
+      waiting: byId(result.waiting),
+      otherAreas: result.otherAreas,
+    };
   } catch (error) {
     return { error: String(error) };
   }

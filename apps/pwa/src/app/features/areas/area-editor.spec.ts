@@ -354,7 +354,13 @@ describe('AreaEditor', () => {
     it('shows the hours as time-input rows, with an end of 1440 as 00:00', async () => {
       const { rows } = await setup({ areaId: 'personal' });
 
-      for (const legend of DAYS) {
+      for (const legend of DAYS.slice(0, 5)) {
+        expect(rows(legend)).toEqual([
+          ['00:00', '08:00'],
+          ['18:00', '00:00'],
+        ]);
+      }
+      for (const legend of DAYS.slice(5)) {
         expect(rows(legend)).toEqual([['00:00', '00:00']]);
       }
     });

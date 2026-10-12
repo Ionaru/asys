@@ -337,6 +337,7 @@ Then the rest of CI:
 ## Known limits, expected
 
 - **The midnight cliff.** A Work pick at 23:50 lasts 10 minutes, and work past midnight needs a fresh pick.
+- **A pick on a day the clocks change.** An interval start in the hour the clocks skip or repeat (02:00 to 03:00 in Amsterdam) is read as one wall-clock time, so a pick can end up to an hour off when the picked Area's hours start in that hour. Found in the piece 1 review on 2026-10-12.
 - **Ambiguous moments.** When Areas overlap, or none is current, the look is the default; the chip names the Areas.
 - **Where Evergreen stays.** The splash (the manifest's `theme_color`), the moment before Angular boots, and any launch without a stored palette from the last hour.
 - **Other Areas names only Overdue.** A Task of the other side that is urgent but not yet Overdue shows only in the count.

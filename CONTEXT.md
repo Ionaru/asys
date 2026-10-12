@@ -54,7 +54,11 @@ A broad group that Tasks, Activities and Occasions belong to, such as Work, Pers
 _Avoid_: Project, list, category
 
 **Active hours**:
-The times an Area is in use, such as weekdays 8 to 18 for Work; outside them the Picker leaves that Area's Tasks out.
+The times an Area is in use, such as weekdays 8 to 18 for Work; outside them the Picker leaves that Area's Tasks out, unless you picked it as the Current Area.
+
+**Current Area**:
+The Areas whose Tasks Now ranks: the one you picked in Now, kept on that device until it next comes into its Active hours and at the latest until midnight, otherwise every Area within Active hours. Tasks without an Area are always ranked. Now counts the Available Tasks left out only because of their Area, and how many of them are Overdue, without ranking them. It never changes Available, Urgency, Quadrant or Privacy, never reaches Google, and ASYS never moves anything because of it.
+_Avoid_: Mode, work mode, personal mode, profile, workspace, focus
 
 **Person**:
 Someone your work involves, such as an employee or an applicant; a Person is never a User of ASYS.
@@ -215,7 +219,7 @@ An Inbox entry ASYS creates when something needs your decision, such as a cancel
 Giving an Inbox Task its Importance and Estimate, which moves it out of the Inbox.
 
 **Picker**:
-The answer to "what should I do now?": the Available Tasks that fit the current Gap, Place, Current voice and Active hours, ranked by Urgency and Importance, each with a reason; while Voice only holds, only Tasks that need a Voice are ranked. Tasks left out only because of their Place, their Voice or Voice only are listed under **Not here** with the reason, and the urgent ones among them are shown above the ranking, except while Voice only holds. It can be filtered to the Tasks that need exactly a given Voice. Shown as **Now** in the app.
+The answer to "what should I do now?": the Available Tasks that fit the current Gap, Place, Current voice and Current Area, ranked by Urgency and Importance, each with a reason; while Voice only holds, only Tasks that need a Voice are ranked. Tasks left out only because of their Place, their Voice or Voice only are listed under **Not here** with the reason, and the urgent ones among them are shown above the ranking, except while Voice only holds. It can be filtered to the Tasks that need exactly a given Voice. Shown as **Now** in the app.
 
 **Waiting**:
 The Open, triaged Tasks that are not Available, listed under Now with why they wait: not yet Available, or Blocked by other Tasks. They are not ranked.

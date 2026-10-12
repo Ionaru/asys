@@ -114,7 +114,7 @@ describe('AreaList', () => {
     );
     const [personal, work] = items();
 
-    expect(text(personal)).toBe('PersonalEvery day, all day');
+    expect(text(personal)).toBe('PersonalMon–Fri 00:00–08:00, 18:00–24:00 · Sat–Sun, all day');
     expect(text(work)).toBe('WorkMon–Fri 08:00–18:00');
   });
 

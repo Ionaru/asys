@@ -7,6 +7,7 @@ import {
   availableFromInstant,
   dueInstant,
   isValidTimeZone,
+  localMinuteInstant,
   startOfDay,
   toLocalDateTime,
 } from './zoned';
@@ -274,6 +275,52 @@ describe('day boundaries across zones', () => {
         expect(availableFromInstant({ date }, tz)).toBeLessThan(dueInstant({ date }, tz));
       }),
       { numRuns: 200 },
+    );
+  });
+});
+
+describe('localMinuteInstant', () => {
+  it.each([
+    ['2026-10-12', 480, '2026-10-12T06:00:00.000Z'],
+    ['2026-10-12', 1080, '2026-10-12T16:00:00.000Z'],
+    ['2026-10-12', 0, '2026-10-11T22:00:00.000Z'],
+    ['2026-10-12', 1440, '2026-10-12T22:00:00.000Z'],
+  ])('resolves %s minute %i to %s', (date, minute, iso) => {
+    expect(localMinuteInstant(date, minute, AMS)).toBe(at(iso));
+  });
+
+  it('resolves a fold wall time to the earlier instant', () => {
+    expect(localMinuteInstant('2026-10-25', 150, AMS)).toBe(at('2026-10-25T00:30:00.000Z'));
+  });
+
+  it('makes minute 1440 the end of the 25 hour fall-back day', () => {
+    expect(localMinuteInstant('2026-10-25', 1440, AMS)).toBe(at('2026-10-25T23:00:00.000Z'));
+  });
+
+  it('resolves a gap wall time to the later instant', () => {
+    expect(localMinuteInstant('2026-03-29', 150, AMS)).toBe(at('2026-03-29T01:30:00.000Z'));
+  });
+
+  it('makes minute 1440 equal the start of the next date', () => {
+    expect(localMinuteInstant('2026-03-29', 1440, AMS)).toBe(startOfDay('2026-03-30', AMS));
+    expect(localMinuteInstant('2026-12-31', 1440, AMS)).toBe(startOfDay('2027-01-01', AMS));
+  });
+
+  it.each([1441, -1, 1.5])('rejects minute %d', (minute) => {
+    expect(() => localMinuteInstant('2026-10-12', minute, AMS)).toThrow(
+      new RangeError(`Invalid minute of the day: ${minute}`),
+    );
+  });
+
+  it('rejects an invalid date', () => {
+    expect(() => localMinuteInstant('2026-02-30', 480, AMS)).toThrow(
+      new RangeError('Invalid local date: 2026-02-30'),
+    );
+  });
+
+  it('rejects an invalid time zone', () => {
+    expect(() => localMinuteInstant('2026-10-12', 480, 'Mars/Olympus')).toThrow(
+      new RangeError('Invalid time zone: Mars/Olympus'),
     );
   });
 });

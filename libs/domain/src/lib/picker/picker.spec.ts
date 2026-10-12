@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MPL-2.0
 
 import { describe, expect, it } from 'vitest';
-import { seedAreas } from '../area';
+import { seedAreas, type Area } from '../area';
 import type { Settings } from '../settings';
 import type { Task } from '../task';
-import { aLink, aTask } from '../../test/builders';
+import { aLink, aTask, anArea } from '../../test/builders';
 import { pick, ExclusionReasonTag } from './picker';
 import { BlockedReasonTag } from '../task/blocked';
 import { Quadrant } from '../task/priority';
@@ -381,7 +381,7 @@ describe('pick exclusions', () => {
     'lists a %s Task in neither list',
     (status) => {
       const result = run([aTask({ id: 'x', status })]);
-      expect(result).toEqual({ ranked: [], waiting: [] });
+      expect(result).toEqual({ ranked: [], waiting: [], otherAreas: [] });
     },
   );
 
@@ -407,7 +407,11 @@ describe('pick active hours', () => {
 
   it('lists an Available Task of an Area outside its active hours in neither list', () => {
     const result = inAreas([aTask({ id: 'w', areaId: 'work' })], [], SATURDAY);
-    expect(result).toEqual({ ranked: [], waiting: [] });
+    expect(result).toEqual({
+      ranked: [],
+      waiting: [],
+      otherAreas: [{ areaId: 'work', count: 1, overdue: 0 }],
+    });
   });
 
   it('lists a Blocked Task of an Area outside its active hours in neither list', () => {
@@ -416,6 +420,7 @@ describe('pick active hours', () => {
     const result = inAreas([blocked, blocker], [aLink('blocked', 'blocker')], SATURDAY);
     expect(ids(result.ranked)).toEqual(['blocker']);
     expect(result.waiting).toEqual([]);
+    expect(result.otherAreas).toEqual([]);
   });
 
   it('lists a not yet available Task of an Area outside its active hours in neither list', () => {
@@ -424,7 +429,7 @@ describe('pick active hours', () => {
       areaId: 'work',
       availableFrom: { date: '2026-10-15', time: '09:00' },
     });
-    expect(inAreas([w], [], SATURDAY)).toEqual({ ranked: [], waiting: [] });
+    expect(inAreas([w], [], SATURDAY)).toEqual({ ranked: [], waiting: [], otherAreas: [] });
   });
 
   it('ranks Tasks in personal hours, without an Area, and with an unknown Area', () => {
@@ -439,5 +444,147 @@ describe('pick active hours', () => {
   it('ranks a work Task during work hours', () => {
     const result = inAreas([aTask({ id: 'w', areaId: 'work' })], [], MONDAY);
     expect(ids(result.ranked)).toEqual(['w']);
+  });
+});
+
+describe('pick Current Area', () => {
+  const areas = seedAreas({ workId: 'work', personalId: 'personal' });
+  const SATURDAY = at('2026-10-10T08:00:00.000Z');
+  const MONDAY_10 = at('2026-10-12T08:00:00.000Z');
+  const inAreas = (
+    tasks: readonly Task[],
+    now: number,
+    currentAreaIds?: readonly string[],
+    links: ReturnType<typeof aLink>[] = [],
+    over: readonly Area[] = areas,
+  ) => pick(tasks, links, over, SETTINGS, now, currentAreaIds);
+
+  it('counts an Available Task left out by its Area when currentAreaIds is omitted', () => {
+    const result = inAreas([aTask({ id: 'w', areaId: 'work' })], SATURDAY);
+    expect(result).toEqual({
+      ranked: [],
+      waiting: [],
+      otherAreas: [{ areaId: 'work', count: 1, overdue: 0 }],
+    });
+  });
+
+  it('counts the Overdue Tasks among those counted', () => {
+    const late = aTask({
+      id: 'late',
+      areaId: 'work',
+      due: { date: '2026-10-09', time: '17:00' },
+    });
+    const result = inAreas([late, aTask({ id: 'fine', areaId: 'work' })], SATURDAY);
+    expect(result.otherAreas).toEqual([{ areaId: 'work', count: 2, overdue: 1 }]);
+  });
+
+  it('does not count an Inbox, a Done, a Dropped or a Delegated Task', () => {
+    const tasks = [
+      aTask({ id: 'inbox', areaId: 'work', important: null }),
+      aTask({ id: 'done', areaId: 'work', status: TaskStatus.Done }),
+      aTask({ id: 'dropped', areaId: 'work', status: TaskStatus.Dropped }),
+      aTask({ id: 'delegated', areaId: 'work', status: TaskStatus.Delegated }),
+    ];
+    expect(inAreas(tasks, SATURDAY)).toEqual({ ranked: [], waiting: [], otherAreas: [] });
+  });
+
+  it('does not count a Blocked Task, and ranks its blocker', () => {
+    const blocked = aTask({ id: 'blocked', areaId: 'work' });
+    const blocker = aTask({ id: 'blocker' });
+    const result = inAreas([blocked, blocker], SATURDAY, undefined, [aLink('blocked', 'blocker')]);
+    expect(ids(result.ranked)).toEqual(['blocker']);
+    expect(result.waiting).toEqual([]);
+    expect(result.otherAreas).toEqual([]);
+  });
+
+  it('does not count a Task that is not yet Available', () => {
+    const w = aTask({
+      id: 'w',
+      areaId: 'work',
+      availableFrom: { date: '2026-10-15', time: '09:00' },
+    });
+    expect(inAreas([w], SATURDAY)).toEqual({ ranked: [], waiting: [], otherAreas: [] });
+  });
+
+  it('ranks the Tasks of the given Areas, and every Task without or with an unknown Area', () => {
+    const tasks = [
+      aTask({ id: 'work', areaId: 'work', createdAt: 1 }),
+      aTask({ id: 'personal', areaId: 'personal', createdAt: 2 }),
+      aTask({ id: 'none', areaId: null, createdAt: 3 }),
+      aTask({ id: 'gone', areaId: 'gone', createdAt: 4 }),
+    ];
+    const result = inAreas(tasks, SATURDAY, ['work']);
+    expect(ids(result.ranked)).toEqual(['work', 'none', 'gone']);
+    expect(result.waiting).toEqual([]);
+    expect(result.otherAreas).toEqual([{ areaId: 'personal', count: 1, overdue: 0 }]);
+  });
+
+  it('lists a Waiting Task of a given Area, and drops one of another Area', () => {
+    const soon = { date: '2026-10-15', time: '09:00' };
+    const tasks = [
+      aTask({ id: 'in', areaId: 'work', availableFrom: soon }),
+      aTask({ id: 'out', areaId: 'personal', availableFrom: soon }),
+    ];
+    const result = inAreas(tasks, SATURDAY, ['work']);
+    expect(ids(result.waiting)).toEqual(['in']);
+    expect(result.otherAreas).toEqual([]);
+  });
+
+  it('puts every Task with a known Area out when currentAreaIds is empty', () => {
+    const soon = { date: '2026-10-15', time: '09:00' };
+    const tasks = [
+      aTask({ id: 'w', areaId: 'work', createdAt: 1 }),
+      aTask({ id: 'p', areaId: 'personal', createdAt: 2 }),
+      aTask({ id: 'wait', areaId: 'work', availableFrom: soon }),
+      aTask({ id: 'none', areaId: null, createdAt: 3 }),
+      aTask({ id: 'gone', areaId: 'gone', createdAt: 4 }),
+      aTask({ id: 'noneWait', areaId: null, availableFrom: soon }),
+    ];
+    const result = inAreas(tasks, SATURDAY, []);
+    expect(ids(result.ranked)).toEqual(['none', 'gone']);
+    expect(ids(result.waiting)).toEqual(['noneWait']);
+    expect(result.otherAreas).toEqual([
+      { areaId: 'personal', count: 1, overdue: 0 },
+      { areaId: 'work', count: 1, overdue: 0 },
+    ]);
+  });
+
+  it('tells an empty currentAreaIds from an omitted one', () => {
+    const w = aTask({ id: 'w', areaId: 'work' });
+    expect(ids(inAreas([w], MONDAY_10).ranked)).toEqual(['w']);
+    const empty = inAreas([w], MONDAY_10, []);
+    expect(empty.ranked).toEqual([]);
+    expect(empty.otherAreas).toEqual([{ areaId: 'work', count: 1, overdue: 0 }]);
+  });
+
+  it('does not convert now for the Area test when currentAreaIds is given', () => {
+    const w = aTask({ id: 'w', areaId: 'work' });
+    const bad = { timeZone: 'Mars/Olympus', urgencyWindowDays: 2 };
+    expect(ids(pick([w], [], areas, bad, SATURDAY, ['work']).ranked)).toEqual(['w']);
+    expect(() => pick([w], [], areas, bad, SATURDAY)).toThrow(
+      new RangeError('Invalid time zone: Mars/Olympus'),
+    );
+  });
+
+  it('orders the entries by Area name, then by id', () => {
+    const byName = [anArea({ id: 'z', name: 'Alpha' }), anArea({ id: 'a', name: 'Beta' })];
+    const tasks = [aTask({ id: '1', areaId: 'a' }), aTask({ id: '2', areaId: 'z' })];
+    expect(inAreas(tasks, SATURDAY, [], [], byName).otherAreas.map((o) => o.areaId)).toEqual([
+      'z',
+      'a',
+    ]);
+    const sameName = [anArea({ id: 'b', name: 'Same' }), anArea({ id: 'a', name: 'Same' })];
+    const tasks2 = [aTask({ id: '1', areaId: 'b' }), aTask({ id: '2', areaId: 'a' })];
+    expect(inAreas(tasks2, SATURDAY, [], [], sameName).otherAreas.map((o) => o.areaId)).toEqual([
+      'a',
+      'b',
+    ]);
+  });
+
+  it('leaves out an Area whose Tasks are all in the Current Area', () => {
+    const tasks = [aTask({ id: 'w', areaId: 'work' }), aTask({ id: 'p', areaId: 'personal' })];
+    const result = inAreas(tasks, SATURDAY, ['work', 'personal']);
+    expect(ids(result.ranked).sort()).toEqual(['p', 'w']);
+    expect(result.otherAreas).toEqual([]);
   });
 });

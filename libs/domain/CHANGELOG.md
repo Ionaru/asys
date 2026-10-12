@@ -4,6 +4,31 @@
 
 `RULES_VERSION` in `src/lib/rules-version.ts` names the rules a front-end derives its values with. Any change to a rule is at least a minor version (ADR 0003).
 
+## 0.5.0 (2026-10-12)
+
+The Current Area: the Areas whose Tasks Now ranks, a pick that overrides them, and a count of the Tasks the other Areas hold.
+
+### The Current Area
+
+- With no pick, the Current Area is every Area within its Active hours at that moment. With the seeded Areas in Amsterdam on a weekday, 07:59 gives Personal, 08:00 gives Work, 17:59 gives Work and 18:00 gives Personal. Overlapping Areas are all current, and at a moment inside no Area's hours none is.
+- A pick replaces that with one Area until its end, which is worked out when the pick is made: the next moment that day at which the picked Area comes into its Active hours, or the start of the next local day, whichever is earlier. An interval that starts where the one before it ends is not a new entry.
+- On a weekday, Personal picked at 07:30 or at 10:00 ends at 18:00, and Work picked at 06:00 ends at 08:00 and does not come back at 18:00. Work picked at 17:30, or on a Saturday, ends at midnight.
+- The start of the next local day follows the time zone: a pick on Sun 25 Oct in Amsterdam, a 25-hour day, ends at 00:00 CET on Mon 26 Oct.
+- On a day when the clocks change, an interval start is read as one wall-clock time: a start in the hour the clocks skip counts an hour later (02:30 on 29 Mar is 03:30), and a start in the hour they repeat counts at its first pass only.
+- A pick whose end has passed, or whose Area no longer exists, gives way to the Areas within Active hours.
+
+### The Picker
+
+- This replaces the rule of 0.1.0 under which a Task outside its Area's Active hours appeared in neither list and was not counted.
+- The Picker ranks and lists under Waiting the Tasks of the Current Area, and Tasks without an Area or with an Area it does not know, as before.
+- A Task that is Available but belongs to an Area outside the Current Area is counted under its Area, with how many of those are Overdue, such as Work 4 (1 Overdue). It is still neither ranked nor Waiting.
+- Inbox, Blocked and not-yet-Available Tasks of such an Area are neither listed nor counted. Areas with nothing counted are left out, and the counts are ordered by the Area's name, then its id, in code units.
+- Asked without a Current Area, the Picker uses each Area's Active hours at that moment, as before.
+
+### Seeded Areas
+
+- Personal is now seeded with Monday to Friday 00:00 to 08:00 and 18:00 to 24:00, and Saturday and Sunday all day, instead of every day all day: `Mon–Fri 00:00–08:00, 18:00–24:00 · Sat–Sun, all day`. Only Users created from now on get it.
+
 ## 0.4.0 (2026-10-09)
 
 The moment line of the Now screen, the summary of the Waiting section, and the fact of the reason line on its own.
