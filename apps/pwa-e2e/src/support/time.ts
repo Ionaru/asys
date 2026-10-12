@@ -43,6 +43,27 @@ export const localToday = (
   };
 };
 
+/** The instant at which E2E_ZONE shows the given `YYYY-MM-DD` date and `HH:MM`, handling the CEST/CET offset. */
+export const zonedDate = (date: string, time: string): Date => {
+  const [year, month, day] = date.split('-').map(Number);
+  const [hour, minute] = time.split(':').map(Number);
+  const wanted = Date.UTC(year, month - 1, day, hour, minute);
+  let guess = wanted;
+  // Two passes settle the offset, also when the first guess lands on the other side of a change.
+  for (let pass = 0; pass < 2; pass++) {
+    const parts = zoneParts(new Date(guess));
+    const shown = Date.UTC(
+      Number(parts['year']),
+      Number(parts['month']) - 1,
+      Number(parts['day']),
+      Number(parts['hour']),
+      Number(parts['minute']),
+    );
+    guess += wanted - shown;
+  }
+  return new Date(guess);
+};
+
 /** Adds whole days to a `YYYY-MM-DD` date. */
 export const addDays = (date: string, days: number): string => {
   const [year, month, day] = date.split('-').map(Number);

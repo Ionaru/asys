@@ -115,7 +115,7 @@ Decided by the maintainer on 2026-10-11. A line under the ranking reads, for exa
 
 ### 8. The initial bundle warning goes from 625 kB to 650 kB
 
-Decided by the maintainer on 2026-10-11. The last measure was 622.99 kB (commit `f476884`), so the pick and the palette blocks would cross the old warning. Piece 5 raises it in `apps/pwa/project.json` and records the size before and after. The new palette blocks drop their description comments where `@terrazzo/plugin-css` allows it.
+Decided by the maintainer on 2026-10-11. The last measure was 622.99 kB (commit `f476884`), so the pick and the palette blocks would cross the old warning. Piece 2 crossed it first, so piece 2 raises it in `apps/pwa/project.json`: the initial bundle went from 623.36 kB after piece 1 to 631.20 kB with the pick (measured on 2026-10-12). Piece 5 records the size after the palette blocks. The new palette blocks drop their description comments where `@terrazzo/plugin-css` allows it.
 
 ### 9. No ADR
 
@@ -139,10 +139,10 @@ Also in `CONTEXT.md`:
 | Piece | Delivers | Check |
 | --- | --- | --- |
 | 1. Current Area in the domain | `current-area.ts`, `pick()` taking the Current Area and returning `otherAreas`, the Personal seed, RULES_VERSION 0.5.0 | `nx test domain`, `nx test server` |
-| 2. The pick in Now | The pick store, `asys-area-pick` in Now's top row, the Other Areas line | `nx test pwa`, `current-area.spec.ts` |
+| 2. The pick in Now | The pick store, `asys-area-pick` in Now's top row, the Other Areas line, the budget | `nx test pwa`, `current-area.spec.ts` |
 | 3. Triage proposes the Current Area | The proposal in the Inbox's Triage draft | `nx test pwa`, `triage.spec.ts` |
 | 4. A palette per Area | `Area.palette` from the domain to the database and the Area editor, RULES_VERSION 0.6.0 | `nx test domain server pwa`, the migration checks |
-| 5. The look follows the Current Area | All palette blocks in CSS, `data-palette`, the `theme-color` metas, the budget | `nx test pwa`, `design-tokens:css`, e2e, the phone checks |
+| 5. The look follows the Current Area | All palette blocks in CSS, `data-palette`, the `theme-color` metas | `nx test pwa`, `design-tokens:css`, e2e, the phone checks |
 
 Each unit goes to an implementer and a test-writer working from the same contract. The planner reconciles their work and proves that the tests can fail.
 
@@ -198,21 +198,16 @@ Skills: `building-pwa-ui`, `writing-e2e-specs`. Rule: `angular-component-files`.
 - **`apps/pwa/src/app/ui/now-header/now-header.ts`**:
   - the top row wraps;
   - the moment is `flex: none`;
-  - the pick has `margin-inline-start: auto`;
-  - the More button's negative margin (lines 46-48) is checked;
+  - the More button's negative margin (lines 46-48) also reaches it inside a group;
   - the doc comment (lines 4-7) is updated.
-- **`apps/pwa/src/app/features/now/now.component.html:2-11`** projects `<asys-area-pick>` before the More link.
+- **`apps/pwa/src/app/features/now/now.component.html:2-11`** projects `<asys-area-pick>` and the More link in one group, `now__header-actions`, with `margin-inline-start: auto`. They wrap as one, so at 320px both drop under the moment rather than the More link alone (found in the piece 2 review).
 - **The Other Areas line** sits under the ranking, and also when the ranking is empty.
   - **Markup.** A `role="group"` labelled "Other Areas", with one button per Area. Each button's target is at least 44px, and its name is its visible text.
   - **Tapping.** It picks that Area, then moves focus to the pick control.
 - **The status line.** A pick sets the existing `role="status"` line (`now.component.html:12`) to "Work picked until midnight" or "Back to Automatic". The counts never sit in a live region.
-- **The Area editor's note** "Tasks in this Area never show in Now" (`features/areas/area-editor.component.html:66-68`) gains "unless you pick it in Now".
-- **Existing specs that fake `DataStore`** gain `currentArea`:
-  - `now.spec.ts:309`;
-  - `inbox.spec.ts:155`;
-  - `app.spec.ts:67`;
-  - `shell-layout.spec.ts:154,176`;
-  - `view-transitions.spec.ts:235`.
+- **The Area editor's note** "Tasks in this Area never show in Now" (`features/areas/area-editor.component.html:66-68`) becomes "Tasks in this Area never show in Now unless you pick it there."
+- **Existing specs that fake `DataStore`** gain `currentArea` where the code they render reads it: `now.spec.ts` and `app.routes.spec.ts`. `time-zone-sync.spec.ts` gives its real `DataStore` a fake `AreaPickStore`, because the store reads storage of its own. The fakes in `inbox.spec.ts` (piece 3), `app.spec.ts` (piece 5), `shell-layout.spec.ts` and `view-transitions.spec.ts` need it only once the code they render reads it.
+- **Budget.** The initial `maximumWarning` in `apps/pwa/project.json` becomes `650kb` (decision 8).
 - **New unit specs:**
   - the store: restore, a malformed value, expiry, the `storage` event with two instances over one `localStorage`, and sign-out;
   - `area-pick`: labels, the accessible name, and a change that emits;
@@ -283,7 +278,7 @@ Skills: `building-pwa-ui`, `writing-e2e-specs`.
   - **Its value.** It passes the palette of the single Current Area, or null.
   - **Cold start.** It skips while `state()` is null, so a cold start never overwrites the stored palette.
   - **Tests.** `app.spec` gains cases for it.
-- **Budget.** The initial `maximumWarning` in `apps/pwa/project.json` becomes `650kb` (decision 8).
+- **Budget.** Record the initial bundle size after the palette blocks against the 650 kB warning that piece 2 set (decision 8).
 - **Tests:**
   - `theme.spec`: the attribute and its removal, a fresh and a stale stored palette, the metas, and sign-out;
   - `pnpm exec nx run design-tokens:css`, then inspect for the Harbour blocks;

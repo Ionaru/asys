@@ -2,6 +2,7 @@
 import { TestBed } from '@angular/core/testing';
 
 import { AuthApi, AuthError, AuthResultTag, type AuthResult, type Me } from '../api/auth-api';
+import { AreaPickStore } from '../data/area-pick-store';
 import { ReportedZone } from '../platform/reported-zone';
 import { SESSION_CHECK_TIMEOUT_MS, Session, SessionState, SignOutReason } from './session';
 
@@ -32,6 +33,7 @@ describe('Session', () => {
   let get: ReturnType<typeof vi.fn<() => string | null>>;
   let set: ReturnType<typeof vi.fn<(zone: string) => void>>;
   let clear: ReturnType<typeof vi.fn<() => void>>;
+  let clearPick: ReturnType<typeof vi.fn<() => void>>;
   let session: Session;
 
   beforeEach(() => {
@@ -39,10 +41,12 @@ describe('Session', () => {
     get = vi.fn<() => string | null>();
     set = vi.fn<(zone: string) => void>();
     clear = vi.fn<() => void>();
+    clearPick = vi.fn<() => void>();
     TestBed.configureTestingModule({
       providers: [
         { provide: AuthApi, useValue: { me } },
         { provide: ReportedZone, useValue: { get, set, clear } },
+        { provide: AreaPickStore, useValue: { clear: clearPick } },
       ],
     });
     session = TestBed.inject(Session);
@@ -369,6 +373,14 @@ describe('Session', () => {
       expect(me).not.toHaveBeenCalled();
     });
 
+    it('keeps the Area pick on this device', async () => {
+      await session.signedIn(grace);
+      me.mockResolvedValue(ok(ada));
+      await session.signedIn();
+
+      expect(clearPick).not.toHaveBeenCalled();
+    });
+
     it('without a Me clears the reported zone and runs check, resolving when it settles', async () => {
       const pending = defer();
       me.mockReturnValue(pending.promise);
@@ -458,6 +470,18 @@ describe('Session', () => {
       expect(session.me()).toBeNull();
       expect(clear).toHaveBeenCalledOnce();
     });
+
+    it.each([SignOutReason.Chosen, SignOutReason.Revoked])(
+      'forgets the Area pick on this device once for %s',
+      async (reason) => {
+        await session.signedIn(ada);
+        clearPick.mockClear();
+
+        session.signedOut(reason);
+
+        expect(clearPick).toHaveBeenCalledOnce();
+      },
+    );
 
     it.each([SignOutReason.Chosen, SignOutReason.Revoked])('records %s', async (reason) => {
       await session.signedIn(ada);

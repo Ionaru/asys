@@ -405,13 +405,15 @@ describe('AreaEditor', () => {
     it('does not show the no-hours note when some day has hours', async () => {
       const { text } = await setup({ areaId: 'pm' });
 
-      expect(text()).not.toContain('Tasks in this Area never show in Now.');
+      expect(text()).not.toContain(
+        'Tasks in this Area never show in Now unless you pick it there.',
+      );
     });
 
     it('shows the no-hours note, not as an error, when no day has hours', async () => {
       const { text, saveButton, root } = await setup({ areaId: 'none' });
 
-      expect(text()).toContain('Tasks in this Area never show in Now.');
+      expect(text()).toContain('Tasks in this Area never show in Now unless you pick it there.');
       expect(must(saveButton()).disabled).toBe(true);
       expect(root().textContent).not.toContain('Hours overlap');
     });
@@ -432,7 +434,9 @@ describe('AreaEditor', () => {
 
       await addHours('Wednesday');
 
-      expect(text()).not.toContain('Tasks in this Area never show in Now.');
+      expect(text()).not.toContain(
+        'Tasks in this Area never show in Now unless you pick it there.',
+      );
     });
 
     it('Remove drops that row and the draft then differs from the stored hours', async () => {
@@ -883,7 +887,7 @@ describe('AreaEditor', () => {
       for (const legend of DAYS) {
         expect(rows(legend)).toEqual([]);
       }
-      expect(text()).toContain('Tasks in this Area never show in Now.');
+      expect(text()).toContain('Tasks in this Area never show in Now unless you pick it there.');
       expect(button('Create')).toBeDefined();
       expect(button('Save')).toBeUndefined();
     });

@@ -14,6 +14,7 @@ import { Clock } from '../platform/clock';
 import { DeviceStorage } from '../platform/device-storage';
 import { DeviceZone } from '../platform/device-zone';
 import { LAST_REPORTED_ZONE_KEY } from '../platform/reported-zone';
+import { AreaPickStore } from './area-pick-store';
 import { DataStore, POLL_INTERVAL_MS } from './data-store';
 import { TimeZoneSync } from './time-zone-sync';
 
@@ -161,6 +162,8 @@ describe('TimeZoneSync', () => {
         { provide: Clock, useValue: { now: signal(T0 as Instant) } },
         { provide: DeviceZone, useValue: { current } },
         { provide: DeviceStorage, useValue: { get, set, remove } },
+        // The pick store reads storage of its own; this spec is about TimeZoneSync's reads only.
+        { provide: AreaPickStore, useValue: { current: signal(null) } },
       ],
     });
     store = TestBed.inject(DataStore);
