@@ -11,6 +11,7 @@ import {
   WORK_ACTIVE_HOURS,
   type Area,
   type Command,
+  type CurrentArea,
   type DomainState,
   type ReviewItem,
   type Task,
@@ -130,12 +131,14 @@ const deferred = <T>() => {
 interface SetupOptions {
   readonly state?: DomainState | null;
   readonly status?: SyncStatus;
+  readonly currentArea?: CurrentArea | null;
 }
 
 const setup = async (options: SetupOptions = {}) => {
   const state = signal<DomainState | null>(options.state === undefined ? THREE : options.state);
   const status = signal<SyncStatus>(options.status ?? SyncStatus.Ready);
   const awaitingSync = signal<ReadonlySet<string>>(new Set());
+  const currentArea = signal<CurrentArea | null>(options.currentArea ?? null);
   const sends: ReturnType<typeof deferred<CommandOutcome>>[] = [];
   const send = vi.fn<(command: Command, key?: string) => Promise<CommandOutcome>>(() => {
     const d = deferred<CommandOutcome>();
@@ -152,7 +155,7 @@ const setup = async (options: SetupOptions = {}) => {
   TestBed.configureTestingModule({
     providers: [
       provideRouter([]),
-      { provide: DataStore, useValue: { state, status, awaitingSync, send, refresh } },
+      { provide: DataStore, useValue: { state, status, awaitingSync, currentArea, send, refresh } },
       { provide: Ids, useValue: { next } },
       { provide: ErrorHandler, useValue: { handleError } },
     ],
@@ -246,6 +249,7 @@ const setup = async (options: SetupOptions = {}) => {
     state,
     status,
     awaitingSync,
+    currentArea,
     send,
     sends,
     refresh,
@@ -1215,6 +1219,140 @@ describe('Inbox', () => {
       await finish(0, { _tag: CommandOutcomeTag.SignedOut });
 
       expect(statusLine().textContent?.trim()).toBe('');
+    });
+  });
+
+  describe('the Current Area proposal in Triage', () => {
+    const TWO_AREAS = [area('a1', 'Work'), area('a2', 'Personal')];
+
+    const WITH_AREAS = domainState([A, B], { areas: TWO_AREAS });
+
+    const TRIAGE_A: Command = {
+      _tag: CommandTag.TriageTask,
+      taskId: 'a',
+      important: true,
+      estimateMinutes: 25,
+      expect: { status: TaskStatus.Open },
+    };
+
+    const shownArea = (root: () => HTMLElement): string | undefined =>
+      root().querySelector('.asys-triage__area strong')?.textContent?.trim();
+
+    it('proposes the one automatic Current Area and sends it', async () => {
+      const { root, send, important, cardButton, click } = await setup({
+        state: WITH_AREAS,
+        currentArea: { areaIds: ['a1'], picked: false },
+      });
+
+      expect(shownArea(root)).toBe('Work');
+
+      await important(true);
+      await click(cardButton('Triage'));
+
+      expect(sent(send, 0)).toEqual({ ...TRIAGE_A, areaId: 'a1' });
+    });
+
+    it('proposes the one picked Current Area and sends it', async () => {
+      const { root, send, important, cardButton, click } = await setup({
+        state: WITH_AREAS,
+        currentArea: { areaIds: ['a2'], picked: true },
+      });
+
+      expect(shownArea(root)).toBe('Personal');
+
+      await important(true);
+      await click(cardButton('Triage'));
+
+      expect(sent(send, 0)).toEqual({ ...TRIAGE_A, areaId: 'a2' });
+    });
+
+    it.each([
+      ['two Areas current', { areaIds: ['a1', 'a2'], picked: false }],
+      ['no Area current', { areaIds: [], picked: false }],
+      ['no Current Area state', null],
+    ] satisfies [string, CurrentArea | null][])(
+      'proposes nothing with %s',
+      async (_name, currentArea) => {
+        const { root, send, important, cardButton, click } = await setup({
+          state: WITH_AREAS,
+          currentArea,
+        });
+
+        expect(shownArea(root)).toBe('No Area');
+
+        await important(true);
+        await click(cardButton('Triage'));
+
+        expect(Object.keys(sent(send, 0))).not.toContain('areaId');
+        expect(sent(send, 0)).toEqual(TRIAGE_A);
+      },
+    );
+
+    it('keeps the Area a Task already has over the proposal', async () => {
+      const { root, send, important, cardButton, click } = await setup({
+        state: domainState([{ ...A, areaId: 'a2' }, B], { areas: TWO_AREAS }),
+        currentArea: { areaIds: ['a1'], picked: false },
+      });
+
+      expect(shownArea(root)).toBe('Personal');
+
+      await important(true);
+      await click(cardButton('Triage'));
+
+      expect(Object.keys(sent(send, 0))).not.toContain('areaId');
+      expect(sent(send, 0)).toEqual(TRIAGE_A);
+    });
+
+    it('does not change the open card when the Current Area changes later', async () => {
+      const { root, currentArea, settle, send, important, cardButton, click } = await setup({
+        state: WITH_AREAS,
+        currentArea: { areaIds: ['a1'], picked: false },
+      });
+
+      currentArea.set({ areaIds: ['a2'], picked: true });
+      await settle();
+
+      expect(shownArea(root)).toBe('Work');
+
+      await important(true);
+      await click(cardButton('Triage'));
+
+      expect(sent(send, 0)).toEqual({ ...TRIAGE_A, areaId: 'a1' });
+    });
+
+    it('sends no Area when the person chooses No Area before Triage', async () => {
+      const { root, send, important, chooseArea, cardButton, click } = await setup({
+        state: WITH_AREAS,
+        currentArea: { areaIds: ['a1'], picked: false },
+      });
+
+      await important(true);
+      await chooseArea('');
+
+      expect(shownArea(root)).toBe('No Area');
+
+      await click(cardButton('Triage'));
+
+      expect(Object.keys(sent(send, 0))).not.toContain('areaId');
+      expect(sent(send, 0)).toEqual(TRIAGE_A);
+    });
+
+    it('reads the proposal anew for the next card', async () => {
+      const { root, currentArea, send, important, cardButton, click, finish } = await setup({
+        state: WITH_AREAS,
+        currentArea: { areaIds: ['a1'], picked: false },
+      });
+
+      await important(true);
+      await click(cardButton('Triage'));
+
+      expect(sent(send, 0)).toEqual({ ...TRIAGE_A, areaId: 'a1' });
+
+      currentArea.set({ areaIds: ['a2'], picked: true });
+      await finish(0, APPLIED, without(WITH_AREAS, 'a'));
+
+      expect(root().querySelector('.asys-triage__title')?.textContent?.trim()).toBe('Bravo');
+      expect(shownArea(root)).toBe('Personal');
     });
   });
 });

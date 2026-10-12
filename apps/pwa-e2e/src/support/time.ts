@@ -70,6 +70,20 @@ export const addDays = (date: string, days: number): string => {
   return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 };
 
+/** The ISO weekday (1 = Monday .. 7 = Sunday) of a `YYYY-MM-DD` date. */
+export const isoWeekdayOf = (date: string): number => {
+  const [year, month, day] = date.split('-').map(Number);
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  return weekday === 0 ? 7 : weekday;
+};
+
+/** The next date strictly after today whose ISO weekday satisfies the test. */
+export const nextDate = (matches: (isoWeekday: number) => boolean): string => {
+  let date = addDays(localToday().date, 1);
+  while (!matches(isoWeekdayOf(date))) date = addDays(date, 1);
+  return date;
+};
+
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
 const MONTH_NAMES = [

@@ -3,24 +3,11 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './support/fixtures.ts';
 import { areaId, seedTask } from './support/seed.ts';
-import { addDays, localToday, skipNearMidnight, zonedDate } from './support/time.ts';
+import { addDays, nextDate, skipNearMidnight, zonedDate } from './support/time.ts';
 
 const PERSONAL_TASK = 'Personal Current Area Task';
 
 const WORK_TASK = 'Work Current Area Task';
-
-const isoWeekdayOf = (date: string): number => {
-  const [year, month, day] = date.split('-').map(Number);
-  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
-  return weekday === 0 ? 7 : weekday;
-};
-
-/** The next date strictly after today whose ISO weekday satisfies the test. */
-const nextDate = (matches: (isoWeekday: number) => boolean): string => {
-  let date = addDays(localToday().date, 1);
-  while (!matches(isoWeekdayOf(date))) date = addDays(date, 1);
-  return date;
-};
 
 const seedBoth = async (page: Page): Promise<void> => {
   const personal = await areaId(page, 'Personal');
