@@ -92,8 +92,25 @@ describe('activeHoursSummary', () => {
     expect(activeHoursSummary(WORK_ACTIVE_HOURS)).toBe('Mon–Fri 08:00–18:00');
   });
 
+  it('summarises the personal hours', () => {
+    expect(activeHoursSummary(PERSONAL_ACTIVE_HOURS)).toBe(
+      'Mon–Fri 00:00–08:00, 18:00–24:00 · Sat–Sun, all day',
+    );
+  });
+
   it('summarises all-day, every-day hours', () => {
-    expect(activeHoursSummary(PERSONAL_ACTIVE_HOURS)).toBe('Every day, all day');
+    const allDay: Intervals = [[0, 1440]];
+    const everyDay = hours({
+      [IsoWeekday.Monday]: allDay,
+      [IsoWeekday.Tuesday]: allDay,
+      [IsoWeekday.Wednesday]: allDay,
+      [IsoWeekday.Thursday]: allDay,
+      [IsoWeekday.Friday]: allDay,
+      [IsoWeekday.Saturday]: allDay,
+      [IsoWeekday.Sunday]: allDay,
+    });
+
+    expect(activeHoursSummary(everyDay)).toBe('Every day, all day');
   });
 
   it('says so when there are no Active hours', () => {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
-import type { Area, ActiveHours } from '../area';
+import type { Area, ActiveHours, Palette } from '../area';
 import type { ReviewItem } from '../review';
 import type { Settings } from '../settings';
 import type { BlockerLink, Privacy, Task, TaskStatus } from '../task';
@@ -62,6 +62,7 @@ export enum RejectedReason {
   InvalidName = 'invalid_name',
   InvalidActiveHours = 'invalid_active_hours',
   InvalidPrivacy = 'invalid_privacy',
+  InvalidPalette = 'invalid_palette',
   InvalidTimeZone = 'invalid_time_zone',
   InvalidUrgencyWindow = 'invalid_urgency_window',
 }
@@ -161,12 +162,14 @@ export interface CreateArea {
   readonly name: string;
   readonly activeHours: ActiveHours;
   readonly defaultPrivacy: Privacy | null;
+  readonly palette?: Palette | null;
 }
 
 export interface AreaPatch {
   readonly name?: string;
   readonly activeHours?: ActiveHours;
   readonly defaultPrivacy?: Privacy | null;
+  readonly palette?: Palette | null;
 }
 
 export interface UpdateArea {

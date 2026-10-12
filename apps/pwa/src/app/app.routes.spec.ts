@@ -41,6 +41,7 @@ const setup = async () => {
           status: signal(SyncStatus.Loading),
           syncedAt: signal(null),
           now: signal(null),
+          currentArea: signal(null),
           inboxCount: signal(0),
           awaitingSync: signal(new Set()),
           send: vi.fn(),

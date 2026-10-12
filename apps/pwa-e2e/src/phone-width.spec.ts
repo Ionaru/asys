@@ -225,3 +225,44 @@ test('Nothing covers the Inbox Triage card footer or its open Drop confirmation'
   await expectClearOf(footer, [pill, nav]);
   await expectClearOf(confirm, [pill, nav]);
 });
+
+for (const width of [320, 375]) {
+  test.describe(`The Current Area control at ${width} wide`, () => {
+    test.use({ viewport: { width, height: 812 } });
+
+    test('The control and the More link fit beside the heading without sideways scroll', async ({
+      page,
+    }) => {
+      await seedTask(page, { title: 'Header width Task', important: false, estimateMinutes: 25 });
+      await page.goto('/now');
+      const control = page.getByRole('combobox', { name: 'Current Area' });
+      const more = page.getByRole('link', { name: 'More: Settings' });
+      await expect(control).toBeVisible();
+      await expect(more).toBeVisible();
+      await expect(page.getByText('Loading…', { exact: true })).toHaveCount(0);
+
+      // expectClearOf first waits for running animations, so the boxes below have settled.
+      await expectClearOf(page.getByRole('heading', { level: 1 }), [control, more]);
+
+      const widths = await page.evaluate(() => ({
+        scroll: document.documentElement.scrollWidth,
+        client: document.documentElement.clientWidth,
+      }));
+      expect(widths.scroll, 'documentElement scrollWidth').toBeLessThanOrEqual(widths.client);
+
+      const boxes = [];
+      for (const target of [control, more]) {
+        const box = await target.boundingBox();
+        if (box === null) throw new Error('target has no box');
+        expect(box.x, JSON.stringify(box)).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width, JSON.stringify(box)).toBeLessThanOrEqual(width);
+        boxes.push(box);
+      }
+
+      // The control and More wrap as one group, so they always share a line.
+      const [controlBox, moreBox] = boxes;
+      const middle = (box: { y: number; height: number }): number => box.y + box.height / 2;
+      expect(Math.abs(middle(controlBox) - middle(moreBox)), JSON.stringify(boxes)).toBeLessThan(4);
+    });
+  });
+}

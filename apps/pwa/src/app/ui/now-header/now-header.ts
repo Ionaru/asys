@@ -3,7 +3,8 @@ import { Component, ElementRef, input, viewChild, ViewEncapsulation } from '@ang
 
 /**
  * The top of Now: the moment, as a heading a screen reader announces as "Now, ...". Content is projected
- * after the moment, on the same row (the More button). Gaps arrive in slice 2.
+ * after the moment, on the same row (Now's group of the Current Area control and the More button). The row
+ * wraps when it does not fit, so that content drops under the moment. Gaps arrive in slice 2.
  */
 @Component({
   selector: 'asys-now-header',
@@ -29,6 +30,7 @@ import { Component, ElementRef, input, viewChild, ViewEncapsulation } from '@ang
 
     .asys-now-header__top {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
       gap: var(--space-2);
@@ -36,6 +38,7 @@ import { Component, ElementRef, input, viewChild, ViewEncapsulation } from '@ang
     }
 
     .asys-now-header__moment {
+      flex: none;
       margin: 0;
       color: var(--ink-muted);
       font-size: var(--font-size-reason);
@@ -43,7 +46,7 @@ import { Component, ElementRef, input, viewChild, ViewEncapsulation } from '@ang
       font-weight: 400;
     }
 
-    .asys-now-header__top > .asys-button--icon {
+    .asys-now-header__top .asys-button--icon:last-child {
       margin-inline-end: calc(var(--space-3) * -1);
     }
   `,

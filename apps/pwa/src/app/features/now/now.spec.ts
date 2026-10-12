@@ -11,6 +11,7 @@ import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import {
   CommandTag,
+  currentArea,
   IsoWeekday,
   pick,
   reasonFact,
@@ -20,6 +21,7 @@ import {
   waitingSummary,
   type ActiveHours,
   type Area,
+  type AreaPick,
   type Command,
   type DomainState,
   type Instant,
@@ -27,6 +29,7 @@ import {
 } from '@asys/domain';
 
 import { CommandOutcomeTag, type CommandOutcome } from '../../core/api/data-api';
+import { AreaPickStore } from '../../core/data/area-pick-store';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { DataStore, SyncStatus } from '../../core/data/data-store';
 import { DoneOrigin, DoneUndo, type DoneUndone, type PendingDone } from '../../core/data/done-undo';
@@ -148,6 +151,7 @@ const area = (id: string, name: string): Area => ({
   name,
   activeHours: ALL_DAY,
   defaultPrivacy: null,
+  palette: null,
   version: 1,
 });
 
@@ -223,6 +227,8 @@ interface SetupOptions {
   readonly undone?: DoneUndone | null;
   /** Whether Now gets the real `Motion` instead of the fake; `allowed` and `hold` then do nothing. */
   readonly realMotion?: boolean;
+  /** The Clock when Now is created; Sunday 4 October 2026, 10:00 in Amsterdam when absent. */
+  readonly now?: Instant;
 }
 
 const fakeAnimationEvent = (height = 56) => {
@@ -245,12 +251,25 @@ const setup = async (options: SetupOptions = {}) => {
   const state = signal<DomainState | null>(options.state === undefined ? FULL : options.state);
   const status = signal<SyncStatus>(options.status ?? SyncStatus.Ready);
   const awaitingSync = signal<ReadonlySet<string>>(new Set());
-  const clockNow = signal<Instant>(T0);
+  const clockNow = signal<Instant>(options.now ?? T0);
+  const pickSignal = signal<AreaPick | null>(null);
+  const currentAreaOf = computed(() => {
+    const s = state();
+
+    return s === null ? null : currentArea(s.areas, s.settings, clockNow(), pickSignal());
+  });
   const now = computed(() => {
     const s = state();
 
-    return s === null ? null : pick(s.tasks, s.links, s.areas, s.settings, clockNow());
+    return s === null
+      ? null
+      : pick(s.tasks, s.links, s.areas, s.settings, clockNow(), currentAreaOf()?.areaIds);
   });
+  const areaPickStore = {
+    current: pickSignal,
+    pick: vi.fn<(value: AreaPick) => void>((value) => pickSignal.set(value)),
+    clear: vi.fn<() => void>(() => pickSignal.set(null)),
+  };
   const sends: ReturnType<typeof deferred<CommandOutcome>>[] = [];
   const send = vi.fn<(command: Command, key?: string) => Promise<CommandOutcome>>(() => {
     const d = deferred<CommandOutcome>();
@@ -306,7 +325,11 @@ const setup = async (options: SetupOptions = {}) => {
   TestBed.configureTestingModule({
     providers: [
       provideRouter([]),
-      { provide: DataStore, useValue: { state, status, awaitingSync, now, send, refresh } },
+      {
+        provide: DataStore,
+        useValue: { state, status, awaitingSync, now, currentArea: currentAreaOf, send, refresh },
+      },
+      { provide: AreaPickStore, useValue: areaPickStore },
       { provide: DoneUndo, useValue: doneUndo },
       ...(options.realMotion === true
         ? []
@@ -431,6 +454,8 @@ const setup = async (options: SetupOptions = {}) => {
     status,
     awaitingSync,
     clockNow,
+    pickSignal,
+    areaPickStore,
     now: () => must(now()),
     send,
     sends,
@@ -619,11 +644,19 @@ describe('Now', () => {
       expect(text(heading())).toBe('Now, Sun 4 Oct · 08:00');
     });
 
-    it.each(STATES)(
+    // The Current Area control shows only with state; it and More follow the moment as one group.
+    const ACTIONS: [string, SetupOptions, readonly string[]][] = [
+      ['loaded', {}, ['asys-area-pick', 'a']],
+      ['loading', { state: null, status: SyncStatus.Loading }, ['a']],
+      ['failed', { state: null, status: SyncStatus.Failed }, ['a']],
+    ];
+
+    it.each(ACTIONS)(
       'has a More link to Settings after the heading in the %s state',
-      async (_, options) => {
+      async (_, options, tags) => {
         const { heading, moreLink, text } = await setup(options);
         const link = moreLink();
+        const actions = must(heading().nextElementSibling);
 
         expect(link.getAttribute('href')).toBe('/settings');
         expect(link.getAttribute('aria-label')).toBe('More: Settings');
@@ -631,8 +664,12 @@ describe('Now', () => {
         expect(link.classList.contains('asys-button--quiet')).toBe(true);
         expect(link.querySelector('svg[data-icon]')?.getAttribute('data-icon')).toBe('ellipsis');
         expect(text(link)).toBe('');
-        expect(heading().nextElementSibling).toBe(link);
-        expect(link.parentElement).toBe(heading().parentElement);
+        expect(actions.classList.contains('now__header-actions')).toBe(true);
+        expect(Array.from(actions.children).map((child) => child.tagName.toLowerCase())).toEqual(
+          tags,
+        );
+        expect(actions.lastElementChild).toBe(link);
+        expect(actions.parentElement).toBe(heading().parentElement);
       },
     );
   });
@@ -2691,6 +2728,398 @@ describe('Now', () => {
       expect(elements).toHaveLength(1);
       expect(elements[0]).toBe(must(waitingRows()[1]).querySelector('.asys-picker-row__title'));
       expect(elements[0]?.getAttribute('data-task-id')).toBe('report');
+    });
+  });
+
+  describe('the Current Area', () => {
+    // Saturday 10 October 2026, 14:00 in Amsterdam.
+    const SATURDAY = Date.parse('2026-10-10T12:00:00.000Z') as Instant;
+
+    // Monday 12 October 2026, 10:00 in Amsterdam.
+    const MONDAY = Date.parse('2026-10-12T08:00:00.000Z') as Instant;
+
+    // Sunday 00:00 in Amsterdam, where a pick made on Saturday ends.
+    const SATURDAY_MIDNIGHT = Date.parse('2026-10-10T22:00:00.000Z') as Instant;
+
+    const WEEKDAY_HOURS = (intervals: [number, number][]): ActiveHours => ({
+      [IsoWeekday.Monday]: intervals,
+      [IsoWeekday.Tuesday]: intervals,
+      [IsoWeekday.Wednesday]: intervals,
+      [IsoWeekday.Thursday]: intervals,
+      [IsoWeekday.Friday]: intervals,
+      [IsoWeekday.Saturday]: [],
+      [IsoWeekday.Sunday]: [],
+    });
+
+    // Work: Monday to Friday 08:00 to 18:00.
+    const WORK: Area = {
+      id: 'w',
+      name: 'Work',
+      activeHours: WEEKDAY_HOURS([[480, 1080]]),
+      defaultPrivacy: null,
+      palette: null,
+      version: 1,
+    };
+
+    // Personal: Monday to Friday 00:00 to 08:00 and 18:00 to 24:00, Saturday and Sunday all day.
+    const PERSONAL: Area = {
+      id: 'p',
+      name: 'Personal',
+      activeHours: {
+        ...WEEKDAY_HOURS([
+          [0, 480],
+          [1080, 1440],
+        ]),
+        [IsoWeekday.Saturday]: [[0, 1440]],
+        [IsoWeekday.Sunday]: [[0, 1440]],
+      },
+      defaultPrivacy: null,
+      palette: null,
+      version: 1,
+    };
+
+    const ERRANDS: Area = { ...WORK, id: 'e', name: 'Errands' };
+
+    const P = task({ id: 'p-task', title: 'Walk the dog', areaId: 'p', createdAt: 1 });
+
+    const W = task({ id: 'w-task', title: 'Write the plan', areaId: 'w', createdAt: 2 });
+
+    const stateOf = (tasks: readonly Task[], areas: readonly Area[] = [WORK, PERSONAL]) =>
+      domainState(tasks, { areas });
+
+    const view = async (options: SetupOptions) => {
+      const base = await setup(options);
+      const { root, text, settle } = base;
+      const control = (): HTMLElement | null => root().querySelector('asys-area-pick');
+      const select = (): HTMLSelectElement =>
+        must(root().querySelector<HTMLSelectElement>('select[aria-label="Current Area"]'));
+      const group = (): HTMLElement | null => root().querySelector('div.now__other-areas');
+      const buttons = (): HTMLButtonElement[] =>
+        Array.from(group()?.querySelectorAll<HTMLButtonElement>('button.now__other-area') ?? []);
+      const buttonTexts = (): string[] => buttons().map((b) => text(b));
+      const optionTexts = (): string[] => Array.from(select().options).map((o) => text(o));
+      const chipLabel = (): string =>
+        text(must(control()?.querySelector('.asys-area-pick__label')));
+      const chipState = (): string =>
+        text(must(control()?.querySelector('.asys-area-pick__state')));
+      const choose = async (value: string): Promise<void> => {
+        select().value = value;
+        select().dispatchEvent(new Event('change', { bubbles: true }));
+        await settle();
+      };
+      const tap = async (label: string): Promise<void> => {
+        const button = buttons().find((b) => text(b) === label);
+
+        must(button).click();
+        await settle();
+      };
+      const topText = (): string | null => {
+        const top = base.topPick();
+
+        return top === null ? null : text(base.topTitle());
+      };
+
+      return {
+        ...base,
+        control,
+        select,
+        group,
+        buttons,
+        buttonTexts,
+        optionTexts,
+        chipLabel,
+        chipState,
+        choose,
+        tap,
+        topText,
+      };
+    };
+
+    describe('on Saturday afternoon without a pick', () => {
+      it('ranks the Personal Task and shows the Work Task nowhere', async () => {
+        const { topText, text } = await view({ state: stateOf([P, W]), now: SATURDAY });
+
+        expect(topText()).toBe('Walk the dog');
+        expect(text()).not.toContain('Write the plan');
+      });
+
+      it('shows the control as Personal and Automatic, with Automatic: Personal first', async () => {
+        const { chipLabel, chipState, optionTexts, select, control } = await view({
+          state: stateOf([P, W]),
+          now: SATURDAY,
+        });
+
+        expect(chipLabel()).toBe('Personal');
+        expect(chipState()).toBe('Automatic');
+        expect(optionTexts()).toEqual(['Automatic: Personal', 'Personal', 'Work']);
+        expect(select().value).toBe('');
+        expect(select().selectedIndex).toBe(0);
+        expect(control()?.classList.contains('asys-area-pick--picked')).toBe(false);
+      });
+
+      it('puts the control in the header, before the More link', async () => {
+        const { nowHeader, control, moreLink } = await view({
+          state: stateOf([P, W]),
+          now: SATURDAY,
+        });
+
+        const actions = must(control()?.parentElement);
+
+        expect(actions.classList.contains('now__header-actions')).toBe(true);
+        expect(actions.parentElement).toBe(nowHeader().querySelector('.asys-now-header__top'));
+        expect(control()?.nextElementSibling).toBe(moreLink());
+      });
+
+      it('shows the Other Areas group with one Work button', async () => {
+        const { group, buttonTexts, text } = await view({
+          state: stateOf([P, W]),
+          now: SATURDAY,
+        });
+        const el = must(group());
+        const label = must(el.querySelector('.now__other-areas-label'));
+
+        expect(el.getAttribute('role')).toBe('group');
+        expect(el.getAttribute('aria-label')).toBe('Other Areas');
+        expect(label.getAttribute('aria-hidden')).toBe('true');
+        expect(text(label)).toBe('Other Areas:');
+        expect(buttonTexts()).toEqual(['Work 1']);
+        expect(el.firstElementChild).toBe(label);
+      });
+
+      it('makes each button a plain button whose name is its visible text', async () => {
+        const { buttons } = await view({ state: stateOf([P, W]), now: SATURDAY });
+        const [button] = buttons();
+
+        expect(button?.getAttribute('type')).toBe('button');
+        expect(button?.hasAttribute('aria-label')).toBe(false);
+      });
+
+      it('adds the Overdue count to the button when a counted Task is Overdue', async () => {
+        const overdue = task({
+          id: 'w-late',
+          title: 'Send the plan',
+          areaId: 'w',
+          due: { date: '2026-10-09' },
+        });
+        const { buttonTexts } = await view({ state: stateOf([P, overdue]), now: SATURDAY });
+
+        expect(buttonTexts()).toEqual(['Work 1 (1 Overdue)']);
+      });
+
+      it('orders the buttons by Area name', async () => {
+        const errand = task({ id: 'e-task', title: 'Post the parcel', areaId: 'e', createdAt: 3 });
+        const second = task({ id: 'w-two', title: 'Plan the week', areaId: 'w', createdAt: 4 });
+        const { buttonTexts } = await view({
+          state: stateOf([P, W, second, errand], [WORK, PERSONAL, ERRANDS]),
+          now: SATURDAY,
+        });
+
+        expect(buttonTexts()).toEqual(['Errands 1', 'Work 2']);
+      });
+
+      it('shows no group when no Task is counted in another Area', async () => {
+        const { group, root } = await view({ state: stateOf([P]), now: SATURDAY });
+
+        expect(group()).toBeNull();
+        expect(root().querySelector('.now__other-areas')).toBeNull();
+      });
+
+      it('shows the group even when nothing is ranked', async () => {
+        const { group, buttonTexts, topPick, text } = await view({
+          state: stateOf([W]),
+          now: SATURDAY,
+        });
+
+        expect(topPick()).toBeNull();
+        expect(text()).toContain('Nothing to do right now.');
+        expect(group()).not.toBeNull();
+        expect(buttonTexts()).toEqual(['Work 1']);
+      });
+
+      it('puts the group after the ranked list', async () => {
+        const second = task({ id: 'p-two', title: 'Water the herbs', areaId: 'p', createdAt: 3 });
+        const { rankedList, group } = await view({
+          state: stateOf([P, second, W]),
+          now: SATURDAY,
+        });
+
+        expect(
+          must(rankedList()).compareDocumentPosition(must(group())) &
+            Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+      });
+    });
+
+    describe('choosing an Area in the control', () => {
+      it('shows the status line, ranks the Work Task and flips the group', async () => {
+        const {
+          choose,
+          statusLine,
+          topText,
+          text,
+          buttonTexts,
+          chipLabel,
+          chipState,
+          areaPickStore,
+        } = await view({ state: stateOf([P, W]), now: SATURDAY });
+
+        await choose('w');
+
+        expect(text(statusLine())).toBe('Work picked until midnight');
+        expect(areaPickStore.pick).toHaveBeenCalledTimes(1);
+        expect(areaPickStore.pick).toHaveBeenCalledWith({
+          areaId: 'w',
+          endsAt: SATURDAY_MIDNIGHT,
+        });
+        expect(topText()).toBe('Write the plan');
+        expect(text()).not.toContain('Walk the dog');
+        expect(buttonTexts()).toEqual(['Personal 1']);
+        expect(chipLabel()).toBe('Work');
+        expect(chipState()).toBe('Picked');
+      });
+
+      it('selects the picked Area and keeps Automatic: Personal as the first option', async () => {
+        const { choose, select, optionTexts, control } = await view({
+          state: stateOf([P, W]),
+          now: SATURDAY,
+        });
+
+        await choose('w');
+
+        expect(select().value).toBe('w');
+        expect(optionTexts()).toEqual(['Automatic: Personal', 'Personal', 'Work']);
+        expect(control()?.classList.contains('asys-area-pick--picked')).toBe(true);
+      });
+
+      it('reads Picked when the pick was made elsewhere', async () => {
+        const { pickSignal, settle, chipLabel, chipState, topText } = await view({
+          state: stateOf([P, W]),
+          now: SATURDAY,
+        });
+
+        pickSignal.set({ areaId: 'w', endsAt: SATURDAY_MIDNIGHT });
+        await settle();
+
+        expect(chipLabel()).toBe('Work');
+        expect(chipState()).toBe('Picked');
+        expect(topText()).toBe('Write the plan');
+      });
+
+      it('goes back to Automatic, with its status line and the Saturday ranking', async () => {
+        const { choose, statusLine, topText, text, buttonTexts, chipState, areaPickStore } =
+          await view({ state: stateOf([P, W]), now: SATURDAY });
+
+        await choose('w');
+        await choose('');
+
+        expect(areaPickStore.clear).toHaveBeenCalledTimes(1);
+        expect(text(statusLine())).toBe('Back to Automatic');
+        expect(topText()).toBe('Walk the dog');
+        expect(buttonTexts()).toEqual(['Work 1']);
+        expect(chipState()).toBe('Automatic');
+      });
+
+      it('names the picked Area and its end by clock time on a weekday', async () => {
+        const { choose, statusLine, text, areaPickStore } = await view({
+          state: stateOf([P, W]),
+          now: MONDAY,
+        });
+
+        await choose('p');
+
+        expect(text(statusLine())).toBe('Personal picked until 18:00');
+        expect(areaPickStore.pick).toHaveBeenCalledWith({
+          areaId: 'p',
+          endsAt: Date.parse('2026-10-12T16:00:00.000Z'),
+        });
+      });
+    });
+
+    describe('tapping an Other Areas button', () => {
+      it('picks the Area as the control does and moves focus to the select', async () => {
+        const { tap, statusLine, topText, text, buttonTexts, chipLabel, chipState, select } =
+          await view({ state: stateOf([P, W]), now: SATURDAY });
+
+        await tap('Work 1');
+
+        expect(text(statusLine())).toBe('Work picked until midnight');
+        expect(topText()).toBe('Write the plan');
+        expect(buttonTexts()).toEqual(['Personal 1']);
+        expect(chipLabel()).toBe('Work');
+        expect(chipState()).toBe('Picked');
+        expect(document.activeElement).toBe(select());
+        expect(select().getAttribute('aria-label')).toBe('Current Area');
+      });
+
+      it('picks Personal until 18:00 on a weekday morning', async () => {
+        const { tap, statusLine, topText, text, select } = await view({
+          state: stateOf([P, W]),
+          now: MONDAY,
+        });
+
+        await tap('Personal 1');
+
+        expect(text(statusLine())).toBe('Personal picked until 18:00');
+        expect(topText()).toBe('Walk the dog');
+        expect(document.activeElement).toBe(select());
+      });
+    });
+
+    describe('on a weekday morning without a pick', () => {
+      it('ranks the Work Task and counts the Personal Task', async () => {
+        const { topText, text, buttonTexts, chipLabel, chipState, optionTexts } = await view({
+          state: stateOf([P, W]),
+          now: MONDAY,
+        });
+
+        expect(topText()).toBe('Write the plan');
+        expect(text()).not.toContain('Walk the dog');
+        expect(buttonTexts()).toEqual(['Personal 1']);
+        expect(chipLabel()).toBe('Work');
+        expect(chipState()).toBe('Automatic');
+        expect(optionTexts()[0]).toBe('Automatic: Work');
+      });
+
+      it('names the Automatic choice for the new Area at 18:00 when the Clock moves', async () => {
+        const { clockNow, settle, optionTexts, chipLabel, topText } = await view({
+          state: stateOf([P, W]),
+          now: Date.parse('2026-10-12T15:59:00.000Z') as Instant,
+        });
+
+        expect(optionTexts()[0]).toBe('Automatic: Work');
+
+        clockNow.set(Date.parse('2026-10-12T16:00:00.000Z') as Instant);
+        await settle();
+
+        expect(optionTexts()[0]).toBe('Automatic: Personal');
+        expect(chipLabel()).toBe('Personal');
+        expect(topText()).toBe('Walk the dog');
+      });
+    });
+
+    describe('around the control and the group', () => {
+      it('shows no control while there is no state', async () => {
+        const { control, group } = await view({ state: null, status: SyncStatus.Loading });
+
+        expect(control()).toBeNull();
+        expect(group()).toBeNull();
+      });
+
+      it('keeps the control and the group out of the status line and any live region', async () => {
+        const { statusLine, control, group, root } = await view({
+          state: stateOf([P, W]),
+          now: SATURDAY,
+        });
+
+        expect(statusLine().getAttribute('role')).toBe('status');
+        expect(statusLine().querySelector('asys-area-pick, .now__other-areas')).toBeNull();
+
+        for (const el of [control(), group()]) {
+          expect(must(el).closest('[role="status"], [aria-live]')).toBeNull();
+        }
+
+        expect(root().querySelectorAll('[role="status"]')).toHaveLength(1);
+      });
     });
   });
 });

@@ -6,6 +6,12 @@
 } @else if (areaId() === null || area() !== undefined) {
   <div class="area-editor__form">
     <asys-text-field label="Name" [value]="draft().name" (valueChange)="setName($event)" />
+    <asys-select-field
+      label="Palette"
+      [options]="paletteOptions"
+      [value]="draft().palette ?? ''"
+      (valueChange)="setPalette($event)"
+    />
     <p class="area-editor__hint">An end of 00:00 means the end of the day.</p>
     @for (day of dayViews(); track day.index) {
       <fieldset class="asys-fieldset-reset area-editor__day">
@@ -64,7 +70,9 @@
       </fieldset>
     }
     @if (noHours()) {
-      <p class="area-editor__note">Tasks in this Area never show in Now.</p>
+      <p class="area-editor__note">
+        Tasks in this Area never show in Now unless you pick it there.
+      </p>
     }
     <div class="asys-button-group">
       <button

@@ -26,6 +26,7 @@ import type {
   ActiveHours,
   ChangeEntity,
   ChangeOp,
+  Palette,
   Privacy,
   ReviewSubject,
   TaskKind,
@@ -60,6 +61,8 @@ export const taskStatus = pgEnum('task_status', [
 export const voice = pgEnum('voice', ['out_loud', 'closed_door']);
 
 export const privacy = pgEnum('privacy', ['visible', 'private', 'hidden']);
+
+export const palette = pgEnum('palette', ['evergreen', 'harbour', 'moss', 'graphite']);
 
 export const changeEntity = pgEnum('change_entity', [
   'task',
@@ -106,6 +109,7 @@ export const areas = pgTable.withRLS(
     name: text('name').notNull(),
     activeHours: jsonb('active_hours').$type<ActiveHours>().notNull(),
     defaultPrivacy: privacy('default_privacy').$type<Privacy>(),
+    palette: palette('palette').$type<Palette>(),
     version: integer('version').notNull(),
   },
   (t) => [

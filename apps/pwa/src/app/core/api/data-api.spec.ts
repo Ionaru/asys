@@ -42,6 +42,7 @@ const area = {
   name: 'Work',
   activeHours: { '1': [[540, 1020]], '2': [], '3': [], '4': [], '5': [], '6': [], '7': [] },
   defaultPrivacy: null,
+  palette: null,
   version: 1,
 };
 
@@ -109,6 +110,51 @@ describe('DataApi', () => {
           },
         },
       });
+    });
+
+    it('reads an Area without palette as null, for an older server', async () => {
+      const { palette: _palette, ...older } = area;
+      const result = api.snapshot();
+
+      http.expectOne('/v1/snapshot').flush({
+        seq: 1,
+        tasks: [],
+        blockers: [],
+        areas: [older],
+        reviewItems: [],
+        settings,
+      } as object | null);
+
+      expect(await result).toEqual({
+        _tag: HttpOutcomeTag.Ok,
+        value: {
+          seq: 1,
+          state: { tasks: [], links: [], areas: [area], reviewItems: [], settings },
+        },
+      });
+    });
+
+    it('keeps the palette of an Area that has one', async () => {
+      const result = api.snapshot();
+
+      http.expectOne('/v1/snapshot').flush({
+        seq: 1,
+        tasks: [],
+        blockers: [],
+        areas: [
+          { ...area, palette: 'moss' },
+          { ...area, id: 'a2', palette: null },
+        ],
+        reviewItems: [],
+        settings,
+      } as object | null);
+
+      const outcome = await result;
+
+      expect(outcome._tag).toBe(HttpOutcomeTag.Ok);
+      if (outcome._tag === HttpOutcomeTag.Ok) {
+        expect(outcome.value.state.areas.map((a) => a.palette)).toEqual(['moss', null]);
+      }
     });
 
     it('does not leak the blockers key into the state', async () => {
@@ -202,6 +248,37 @@ describe('DataApi', () => {
           op: ChangeOp.Remove,
         });
       }
+    });
+
+    it('reads the after of an Area entry without palette as null', async () => {
+      const { palette: _palette, ...older } = area;
+      const entries = [
+        { entity: 'area', op: 'put', id: 'a1', seq: 13, after: older },
+        { entity: 'area', op: 'put', id: 'a1', seq: 14, after: { ...area, palette: 'harbour' } },
+        { entity: 'task', op: 'put', id: 't1', seq: 15, after: task },
+      ];
+
+      const result = api.changes(12);
+
+      http.expectOne('/v1/changes?after=12').flush({ seq: 15, entries } as object | null);
+
+      expect(await result).toEqual({
+        _tag: HttpOutcomeTag.Ok,
+        value: {
+          seq: 15,
+          entries: [
+            { entity: 'area', op: 'put', id: 'a1', seq: 13, after: area },
+            {
+              entity: 'area',
+              op: 'put',
+              id: 'a1',
+              seq: 14,
+              after: { ...area, palette: 'harbour' },
+            },
+            { entity: 'task', op: 'put', id: 't1', seq: 15, after: task },
+          ],
+        },
+      });
     });
 
     it('sends after=0 for an empty cursor', async () => {

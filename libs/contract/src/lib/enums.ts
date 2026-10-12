@@ -2,6 +2,7 @@
 
 import {
   NotApplicableReason,
+  Palette,
   Privacy,
   RejectedReason,
   TaskKind,
@@ -22,6 +23,8 @@ export const TaskStatusSchema = Schema.Enum(TaskStatus).annotate({ identifier: '
 export const VoiceSchema = Schema.Enum(Voice).annotate({ identifier: 'Voice' });
 
 export const PrivacySchema = Schema.Enum(Privacy).annotate({ identifier: 'Privacy' });
+
+export const PaletteSchema = Schema.Enum(Palette).annotate({ identifier: 'Palette' });
 
 export const NotApplicableReasonSchema = Schema.Enum(NotApplicableReason).annotate({
   identifier: 'NotApplicableReason',

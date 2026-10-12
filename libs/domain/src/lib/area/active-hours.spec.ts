@@ -10,6 +10,7 @@ import {
   type ActiveHours,
 } from './active-hours';
 import { seedAreas, type Area } from './area';
+import { Palette } from './palette';
 import { Privacy } from '../task/task';
 
 const AMS = 'Europe/Amsterdam';
@@ -63,10 +64,18 @@ describe('seed Active hours', () => {
     expect(WORK_ACTIVE_HOURS[7]).toEqual([]);
   });
 
-  it('gives Personal the whole day on every weekday', () => {
-    for (const day of weekdays) {
-      expect(PERSONAL_ACTIVE_HOURS[day]).toEqual([[0, 1440]]);
+  it('gives Personal 00:00 to 08:00 and 18:00 to 24:00 on Monday to Friday', () => {
+    for (const day of [1, 2, 3, 4, 5] as const) {
+      expect(PERSONAL_ACTIVE_HOURS[day]).toEqual([
+        [0, 480],
+        [1080, 1440],
+      ]);
     }
+  });
+
+  it('gives Personal the whole day on Saturday and Sunday', () => {
+    expect(PERSONAL_ACTIVE_HOURS[6]).toEqual([[0, 1440]]);
+    expect(PERSONAL_ACTIVE_HOURS[7]).toEqual([[0, 1440]]);
   });
 });
 
@@ -78,6 +87,7 @@ describe('seedAreas', () => {
         name: 'Work',
         activeHours: WORK_ACTIVE_HOURS,
         defaultPrivacy: null,
+        palette: null,
         version: 1,
       },
       {
@@ -85,6 +95,7 @@ describe('seedAreas', () => {
         name: 'Personal',
         activeHours: PERSONAL_ACTIVE_HOURS,
         defaultPrivacy: Privacy.Hidden,
+        palette: Palette.Harbour,
         version: 1,
       },
     ]);

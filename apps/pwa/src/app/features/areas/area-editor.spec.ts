@@ -5,6 +5,7 @@ import { provideRouter, Router, type UrlTree } from '@angular/router';
 import {
   CommandTag,
   IsoWeekday,
+  Palette,
   PERSONAL_ACTIVE_HOURS,
   RejectedReason,
   WORK_ACTIVE_HOURS,
@@ -40,15 +41,21 @@ const EMPTY: ActiveHours = {
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-const area = (id: string, name: string, activeHours: ActiveHours): Area => ({
+const area = (
+  id: string,
+  name: string,
+  activeHours: ActiveHours,
+  palette: Palette | null = null,
+): Area => ({
   id,
   name,
   activeHours,
   defaultPrivacy: null,
+  palette,
   version: 1,
 });
 
-const PERSONAL = area('personal', 'Personal', PERSONAL_ACTIVE_HOURS);
+const PERSONAL = area('personal', 'Personal', PERSONAL_ACTIVE_HOURS, Palette.Harbour);
 
 const WORK = area('work', 'Work', WORK_ACTIVE_HOURS);
 
@@ -197,6 +204,22 @@ const setup = async (options: SetupOptions = {}) => {
         ),
       ).querySelector('input'),
     );
+  const paletteField = (): HTMLElement =>
+    must(
+      Array.from(root().querySelectorAll<HTMLElement>('asys-select-field')).find(
+        (f) => text(f.querySelector('label')) === 'Palette',
+      ),
+    );
+  const paletteSelect = (): HTMLSelectElement => must(paletteField().querySelector('select'));
+  const paletteOptions = (): { value: string; label: string }[] =>
+    Array.from(paletteSelect().options).map((o) => ({ value: o.value, label: text(o) }));
+  const choosePalette = async (value: string): Promise<void> => {
+    const el = paletteSelect();
+
+    el.value = value;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    await settle();
+  };
   const typeName = async (value: string): Promise<void> => {
     const el = nameInput();
 
@@ -260,6 +283,10 @@ const setup = async (options: SetupOptions = {}) => {
     setRow,
     addHours,
     nameInput,
+    paletteField,
+    paletteSelect,
+    paletteOptions,
+    choosePalette,
     typeName,
     finish,
     update,
@@ -354,7 +381,13 @@ describe('AreaEditor', () => {
     it('shows the hours as time-input rows, with an end of 1440 as 00:00', async () => {
       const { rows } = await setup({ areaId: 'personal' });
 
-      for (const legend of DAYS) {
+      for (const legend of DAYS.slice(0, 5)) {
+        expect(rows(legend)).toEqual([
+          ['00:00', '08:00'],
+          ['18:00', '00:00'],
+        ]);
+      }
+      for (const legend of DAYS.slice(5)) {
         expect(rows(legend)).toEqual([['00:00', '00:00']]);
       }
     });
@@ -399,13 +432,15 @@ describe('AreaEditor', () => {
     it('does not show the no-hours note when some day has hours', async () => {
       const { text } = await setup({ areaId: 'pm' });
 
-      expect(text()).not.toContain('Tasks in this Area never show in Now.');
+      expect(text()).not.toContain(
+        'Tasks in this Area never show in Now unless you pick it there.',
+      );
     });
 
     it('shows the no-hours note, not as an error, when no day has hours', async () => {
       const { text, saveButton, root } = await setup({ areaId: 'none' });
 
-      expect(text()).toContain('Tasks in this Area never show in Now.');
+      expect(text()).toContain('Tasks in this Area never show in Now unless you pick it there.');
       expect(must(saveButton()).disabled).toBe(true);
       expect(root().textContent).not.toContain('Hours overlap');
     });
@@ -426,7 +461,9 @@ describe('AreaEditor', () => {
 
       await addHours('Wednesday');
 
-      expect(text()).not.toContain('Tasks in this Area never show in Now.');
+      expect(text()).not.toContain(
+        'Tasks in this Area never show in Now unless you pick it there.',
+      );
     });
 
     it('Remove drops that row and the draft then differs from the stored hours', async () => {
@@ -618,6 +655,133 @@ describe('AreaEditor', () => {
       expect(text(day('Monday'))).toContain('Enter a time');
       expect(text(day('Monday'))).not.toContain('End after the start');
       expect(must(saveButton()).disabled).toBe(true);
+    });
+  });
+
+  describe('the Palette select', () => {
+    it('offers Default look first, then the four palettes, with the enum values', async () => {
+      const { paletteOptions } = await setup({ areaId: 'work' });
+
+      expect(paletteOptions()).toEqual([
+        { value: '', label: 'Default look (Evergreen)' },
+        { value: Palette.Evergreen, label: 'Evergreen' },
+        { value: Palette.Harbour, label: 'Harbour' },
+        { value: Palette.Moss, label: 'Moss' },
+        { value: Palette.Graphite, label: 'Graphite' },
+      ]);
+    });
+
+    it('sits after the Name field and before the weekday fieldsets, and is not a fieldset', async () => {
+      const { paletteField, nameInput, root } = await setup({ areaId: 'work' });
+      const firstDay = must(root().querySelector('fieldset'));
+
+      expect(paletteField().closest('fieldset')).toBeNull();
+      expect(
+        nameInput().compareDocumentPosition(paletteField()) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        paletteField().compareDocumentPosition(firstDay) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it('selects the Area palette', async () => {
+      const { paletteSelect } = await setup({ areaId: 'personal' });
+
+      expect(paletteSelect().value).toBe(Palette.Harbour);
+    });
+
+    it('selects Default look for an Area without a palette', async () => {
+      const { paletteSelect } = await setup({ areaId: 'work' });
+
+      expect(paletteSelect().value).toBe('');
+    });
+
+    it('enables Save when only the palette changed and sends just the palette', async () => {
+      const { choosePalette, saveButton, click, send } = await setup({ areaId: 'work' });
+
+      expect(must(saveButton()).disabled).toBe(true);
+
+      await choosePalette(Palette.Graphite);
+
+      expect(must(saveButton()).disabled).toBe(false);
+
+      await click(saveButton());
+
+      expect(sent(send, 0)).toStrictEqual({
+        _tag: CommandTag.UpdateArea,
+        areaId: 'work',
+        patch: { palette: Palette.Graphite },
+      });
+    });
+
+    it('sends null when Default look is chosen for an Area that has a palette', async () => {
+      const { choosePalette, click, saveButton, send } = await setup({ areaId: 'personal' });
+
+      await choosePalette('');
+      await click(saveButton());
+
+      expect(sent(send, 0)).toStrictEqual({
+        _tag: CommandTag.UpdateArea,
+        areaId: 'personal',
+        patch: { palette: null },
+      });
+    });
+
+    it('sends the palette together with a changed name', async () => {
+      const { choosePalette, typeName, click, saveButton, send } = await setup({ areaId: 'work' });
+
+      await typeName('Job');
+      await choosePalette(Palette.Moss);
+      await click(saveButton());
+
+      expect(sent(send, 0)).toStrictEqual({
+        _tag: CommandTag.UpdateArea,
+        areaId: 'work',
+        patch: { name: 'Job', palette: Palette.Moss },
+      });
+    });
+
+    it('does not send the palette when only the name changed', async () => {
+      const { typeName, click, saveButton, send } = await setup({ areaId: 'personal' });
+
+      await typeName('Home');
+      await click(saveButton());
+
+      expect(sent(send, 0)).toStrictEqual({
+        _tag: CommandTag.UpdateArea,
+        areaId: 'personal',
+        patch: { name: 'Home' },
+      });
+    });
+
+    it('disables Save again when the palette is chosen back', async () => {
+      const { choosePalette, saveButton } = await setup({ areaId: 'personal' });
+
+      await choosePalette(Palette.Moss);
+      await choosePalette(Palette.Harbour);
+
+      expect(must(saveButton()).disabled).toBe(true);
+    });
+
+    it('follows an outside palette change while the draft is untouched', async () => {
+      const { update, paletteSelect, saveButton } = await setup({ areaId: 'work' });
+
+      await update(
+        domainState([PERSONAL, { ...WORK, palette: Palette.Moss, version: 2 }, AFTERNOON, NONE]),
+      );
+
+      expect(paletteSelect().value).toBe(Palette.Moss);
+      expect(must(saveButton()).disabled).toBe(true);
+    });
+
+    it('keeps a palette the person chose when the name changes outside', async () => {
+      const { choosePalette, update, paletteSelect, saveButton } = await setup({ areaId: 'work' });
+
+      await choosePalette(Palette.Graphite);
+      await update(domainState([PERSONAL, { ...WORK, name: 'Job', version: 2 }, AFTERNOON, NONE]));
+
+      expect(paletteSelect().value).toBe(Palette.Graphite);
+      expect(must(saveButton()).disabled).toBe(false);
     });
   });
 
@@ -877,7 +1041,7 @@ describe('AreaEditor', () => {
       for (const legend of DAYS) {
         expect(rows(legend)).toEqual([]);
       }
-      expect(text()).toContain('Tasks in this Area never show in Now.');
+      expect(text()).toContain('Tasks in this Area never show in Now unless you pick it there.');
       expect(button('Create')).toBeDefined();
       expect(button('Save')).toBeUndefined();
     });
@@ -918,8 +1082,48 @@ describe('AreaEditor', () => {
           ],
         }),
         defaultPrivacy: null,
+        palette: null,
       });
       expect(sentKey(send, 0)).toBe('id-2');
+    });
+
+    it('starts on Default look', async () => {
+      const { paletteSelect } = await setup({ areaId: null });
+
+      expect(paletteSelect().value).toBe('');
+    });
+
+    it('sends CreateArea with the chosen palette', async () => {
+      const { typeName, choosePalette, click, saveButton, send } = await setup({ areaId: null });
+
+      await typeName('Errands');
+      await choosePalette(Palette.Moss);
+      await click(saveButton());
+
+      expect(sent(send, 0)).toMatchObject({
+        _tag: CommandTag.CreateArea,
+        name: 'Errands',
+        palette: 'moss',
+      });
+    });
+
+    it('retries after Failed and an edited palette with the same id but a new key', async () => {
+      const { typeName, choosePalette, click, saveButton, finish, send } = await setup({
+        areaId: null,
+      });
+
+      await typeName('Gym');
+      await click(saveButton());
+      await finish(0, FAILED);
+      await choosePalette(Palette.Harbour);
+      await click(saveButton());
+
+      expect(sent(send, 1)).toMatchObject({
+        _tag: CommandTag.CreateArea,
+        areaId: 'id-1',
+        palette: Palette.Harbour,
+      });
+      expect(sentKey(send, 1)).not.toBe(sentKey(send, 0));
     });
 
     it('can create an Area without hours', async () => {

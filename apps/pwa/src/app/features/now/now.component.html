@@ -1,13 +1,24 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
 <asys-now-header [moment]="moment()" [datetime]="momentDatetime()">
-  <a
-    asys-button
-    routerLink="/settings"
-    [variant]="Variants.Quiet"
-    [iconOnly]="true"
-    [icon]="Icons.Ellipsis"
-    aria-label="More: Settings"
-  ></a>
+  <div class="now__header-actions">
+    @if (areaControl(); as control) {
+      <asys-area-pick
+        [label]="control.label"
+        [pickedId]="control.pickedId"
+        [automaticLabel]="control.automaticLabel"
+        [areas]="control.areas"
+        (areaPicked)="pickArea($event)"
+      />
+    }
+    <a
+      asys-button
+      routerLink="/settings"
+      [variant]="Variants.Quiet"
+      [iconOnly]="true"
+      [icon]="Icons.Ellipsis"
+      aria-label="More: Settings"
+    ></a>
+  </div>
 </asys-now-header>
 <p class="asys-page__status now__status" role="status">{{ statusLine() }}</p>
 @if (dataStore.now(); as now) {
@@ -107,6 +118,16 @@
         </li>
       }
     </ul>
+  }
+  @if (otherAreas().length > 0) {
+    <div class="now__other-areas" role="group" aria-label="Other Areas">
+      <span class="now__other-areas-label" aria-hidden="true">Other Areas:</span>
+      @for (other of otherAreas(); track other.areaId) {
+        <button type="button" class="now__other-area" (click)="pickOtherArea(other.areaId)">
+          {{ other.text }}
+        </button>
+      }
+    </div>
   }
   @if (now.waiting.length > 0) {
     <asys-section-header

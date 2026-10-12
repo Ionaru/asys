@@ -4,6 +4,8 @@ import { HttpStatusCode } from '@angular/common/http';
 import { computed, inject, Service, signal, type Signal } from '@angular/core';
 import {
   applyChanges,
+  currentArea,
+  type CurrentArea,
   type Change,
   ChangeEntity,
   type Command,
@@ -25,6 +27,7 @@ import {
 import { HttpOutcomeTag, type HttpOutcome } from '../api/http-outcome';
 import { Clock } from '../platform/clock';
 import { Ids } from '../platform/ids';
+import { AreaPickStore } from './area-pick-store';
 import { commandSubject } from './command-subject';
 import { applyHolds, type Hold, isStillHeld } from './held-state';
 
@@ -84,6 +87,7 @@ export class DataStore {
   readonly #clock = inject(Clock);
   readonly #document = inject(DOCUMENT);
   readonly #ids = inject(Ids);
+  readonly #areaPickStore = inject(AreaPickStore);
 
   readonly #statusSignal = signal<SyncStatus>(SyncStatus.Idle);
   readonly #stateSignal = signal<DomainState | null>(null);
@@ -110,6 +114,19 @@ export class DataStore {
   /** The subjects (see commandSubject) whose command applied but whose follow-up request failed; empty once a later request succeeds. */
   readonly awaitingSync: Signal<ReadonlySet<string>> = this.#awaitingSyncSignal.asReadonly();
 
+  /** The Current Area now, from this device's pick and the Areas' Active hours; null without state. */
+  readonly currentArea: Signal<CurrentArea | null> = computed<CurrentArea | null>(() => {
+    const state = this.state();
+
+    if (state === null) {
+      return null;
+    }
+
+    const settings = { ...state.settings, timeZone: zoneOrUtc(state.settings.timeZone) };
+
+    return currentArea(state.areas, settings, this.#clock.now(), this.#areaPickStore.current());
+  });
+
   /** The ranked tasks for now; null without state. */
   readonly now = computed<PickResult | null>(() => {
     const state = this.state();
@@ -120,7 +137,14 @@ export class DataStore {
 
     const settings = { ...state.settings, timeZone: zoneOrUtc(state.settings.timeZone) };
 
-    return pick(state.tasks, state.links, state.areas, settings, this.#clock.now());
+    return pick(
+      state.tasks,
+      state.links,
+      state.areas,
+      settings,
+      this.#clock.now(),
+      this.currentArea()?.areaIds,
+    );
   });
 
   /** The number of items waiting in the Inbox; 0 without state. */

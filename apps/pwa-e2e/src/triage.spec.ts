@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: EUPL-1.2
 
 import { expect, test } from './support/fixtures.ts';
-import { captureTask } from './support/seed.ts';
+import { areaId, captureTask, snapshot } from './support/seed.ts';
+import { nextDate, zonedDate } from './support/time.ts';
 
 test('Triage defers, drops and triages Inbox Tasks while the badge counts down', async ({
   page,
@@ -10,6 +11,9 @@ test('Triage defers, drops and triages Inbox Tasks while the badge counts down',
   await captureTask(page, { title: 'Pay the invoice', captureText: rawText });
   await captureTask(page, { title: 'Book the dentist' });
   await captureTask(page, { title: 'Fix the bike' });
+  // On a weekday at 10:00 Work is the Current Area, so Triage proposes it.
+  const weekday = nextDate((isoWeekday) => isoWeekday <= 5);
+  await page.clock.install({ time: zonedDate(weekday, '10:00') });
   await page.reload();
 
   const nav = page.getByRole('navigation', { name: 'Primary' });
@@ -39,6 +43,8 @@ test('Triage defers, drops and triages Inbox Tasks while the badge counts down',
   await expect(title).toHaveText('Fix the bike');
   await expect(progress).toHaveText('2 of 3');
 
+  await expect(card.locator('.asys-triage__area strong')).toHaveText('Work');
+
   const triage = card.getByRole('button', { name: 'Triage', exact: true });
   await expect(triage).toBeDisabled();
   await card.getByRole('button', { name: 'Important', exact: true }).click();
@@ -47,6 +53,11 @@ test('Triage defers, drops and triages Inbox Tasks while the badge counts down',
   await triage.click();
   await expect(badge).toHaveText('1');
   await expect(title).toHaveText('Pay the invoice');
+  // The proposed Area reached the server, not only the card.
+  const work = await areaId(page, 'Work');
+  await expect
+    .poll(async () => (await snapshot(page)).tasks.find((task) => task.title === 'Fix the bike'))
+    .toMatchObject({ areaId: work });
   await expect(card.locator('.asys-triage__raw')).toHaveText(rawText);
 
   await page.reload();

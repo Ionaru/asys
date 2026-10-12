@@ -61,11 +61,26 @@ export const WORK_ACTIVE_HOURS: ActiveHours = {
 };
 
 export const PERSONAL_ACTIVE_HOURS: ActiveHours = {
-  [IsoWeekday.Monday]: [[0, 1440]],
-  [IsoWeekday.Tuesday]: [[0, 1440]],
-  [IsoWeekday.Wednesday]: [[0, 1440]],
-  [IsoWeekday.Thursday]: [[0, 1440]],
-  [IsoWeekday.Friday]: [[0, 1440]],
+  [IsoWeekday.Monday]: [
+    [0, 480],
+    [1080, 1440],
+  ],
+  [IsoWeekday.Tuesday]: [
+    [0, 480],
+    [1080, 1440],
+  ],
+  [IsoWeekday.Wednesday]: [
+    [0, 480],
+    [1080, 1440],
+  ],
+  [IsoWeekday.Thursday]: [
+    [0, 480],
+    [1080, 1440],
+  ],
+  [IsoWeekday.Friday]: [
+    [0, 480],
+    [1080, 1440],
+  ],
   [IsoWeekday.Saturday]: [[0, 1440]],
   [IsoWeekday.Sunday]: [[0, 1440]],
 };

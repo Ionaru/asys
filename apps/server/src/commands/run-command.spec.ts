@@ -12,6 +12,7 @@ import {
   ChangeOp,
   CommandTag,
   NotApplicableReason,
+  Palette,
   RejectedReason,
   TaskKind,
   TaskStatus,
@@ -704,6 +705,64 @@ layer(appDatabase())('runCommand, every command once', (it) => {
       assert.strictEqual(field(entry, 'id'), areaId);
       assert.strictEqual(snapshot.areas.length, 3);
       assert.isDefined(snapshot.areas.find((a) => a.id === areaId));
+    }),
+  );
+
+  it.effect('CreateArea with a palette stores it in the snapshot and the change log', () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(T);
+      const o = yield* newOwner();
+      const areaId = randomUUID();
+
+      const { result, entries, snapshot } = yield* runAndObserve(o, {
+        _tag: CommandTag.CreateArea,
+        idempotencyKey: randomUUID(),
+        areaId,
+        name: 'Garden',
+        activeHours: WORK_ACTIVE_HOURS,
+        defaultPrivacy: null,
+        palette: Palette.Moss,
+      });
+      yield* removeOwner(o);
+
+      assert.strictEqual(result._tag, TransitionResultTag.Applied);
+      const entry = onlyEntry(entries);
+      assert.strictEqual(field(field(entry, 'after'), 'palette'), 'moss');
+      assert.strictEqual(snapshot.areas.find((a) => a.id === areaId)?.palette, Palette.Moss);
+    }),
+  );
+
+  it.effect('UpdateArea sets a palette, then clears it again', () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(T);
+      const o = yield* newOwner();
+      const work = (yield* snapshotOf(o)).areas.find((a) => a.name === 'Work');
+      assert.isDefined(work);
+      if (work === undefined) return;
+      assert.strictEqual(work.palette, null);
+
+      const set = yield* runAndObserve(o, {
+        _tag: CommandTag.UpdateArea,
+        idempotencyKey: randomUUID(),
+        areaId: work.id,
+        patch: { palette: Palette.Graphite },
+      });
+      const cleared = yield* runAndObserve(o, {
+        _tag: CommandTag.UpdateArea,
+        idempotencyKey: randomUUID(),
+        areaId: work.id,
+        patch: { palette: null },
+      });
+      yield* removeOwner(o);
+
+      assert.strictEqual(
+        set.snapshot.areas.find((a) => a.id === work.id)?.palette,
+        Palette.Graphite,
+      );
+      assert.strictEqual(field(field(onlyEntry(set.entries), 'after'), 'palette'), 'graphite');
+      assert.strictEqual(cleared.snapshot.areas.find((a) => a.id === work.id)?.palette, null);
+      assert.strictEqual(field(field(onlyEntry(cleared.entries), 'after'), 'palette'), null);
+      assert.strictEqual(field(field(onlyEntry(cleared.entries), 'after'), 'version'), 3);
     }),
   );
 

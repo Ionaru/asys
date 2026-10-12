@@ -43,10 +43,45 @@ export const localToday = (
   };
 };
 
+/** The instant at which E2E_ZONE shows the given `YYYY-MM-DD` date and `HH:MM`, handling the CEST/CET offset. */
+export const zonedDate = (date: string, time: string): Date => {
+  const [year, month, day] = date.split('-').map(Number);
+  const [hour, minute] = time.split(':').map(Number);
+  const wanted = Date.UTC(year, month - 1, day, hour, minute);
+  let guess = wanted;
+  // Two passes settle the offset, also when the first guess lands on the other side of a change.
+  for (let pass = 0; pass < 2; pass++) {
+    const parts = zoneParts(new Date(guess));
+    const shown = Date.UTC(
+      Number(parts['year']),
+      Number(parts['month']) - 1,
+      Number(parts['day']),
+      Number(parts['hour']),
+      Number(parts['minute']),
+    );
+    guess += wanted - shown;
+  }
+  return new Date(guess);
+};
+
 /** Adds whole days to a `YYYY-MM-DD` date. */
 export const addDays = (date: string, days: number): string => {
   const [year, month, day] = date.split('-').map(Number);
   return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+};
+
+/** The ISO weekday (1 = Monday .. 7 = Sunday) of a `YYYY-MM-DD` date. */
+export const isoWeekdayOf = (date: string): number => {
+  const [year, month, day] = date.split('-').map(Number);
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  return weekday === 0 ? 7 : weekday;
+};
+
+/** The next date strictly after today whose ISO weekday satisfies the test. */
+export const nextDate = (matches: (isoWeekday: number) => boolean): string => {
+  let date = addDays(localToday().date, 1);
+  while (!matches(isoWeekdayOf(date))) date = addDays(date, 1);
+  return date;
 };
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;

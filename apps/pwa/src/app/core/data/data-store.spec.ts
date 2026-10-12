@@ -5,13 +5,21 @@ import {
   provideHttpClientTesting,
   type TestRequest,
 } from '@angular/common/http/testing';
-import { signal } from '@angular/core';
+import { signal, type WritableSignal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { CommandTag, type Command, type CompleteTask, type Instant } from '@asys/domain';
+import {
+  CommandTag,
+  seedAreas,
+  type AreaPick,
+  type Command,
+  type CompleteTask,
+  type Instant,
+} from '@asys/domain';
 
 import { CommandOutcomeTag, type CommandOutcome } from '../api/data-api';
 import { IGNORE_UNAUTHORIZED } from '../api/ignore-unauthorized';
 import { Clock } from '../platform/clock';
+import { AreaPickStore } from './area-pick-store';
 import { DataStore, POLL_INTERVAL_MS, SyncStatus } from './data-store';
 
 const T0 = Date.UTC(2026, 9, 3, 10, 0, 0);
@@ -140,6 +148,10 @@ const holdB: CompleteTask = { _tag: CommandTag.CompleteTask, taskId: 'B' };
 describe('DataStore', () => {
   let store: DataStore;
   let http: HttpTestingController;
+  let clockNow: WritableSignal<Instant>;
+  let storedPick: WritableSignal<AreaPick | null>;
+  let pickArea: ReturnType<typeof vi.fn<(value: AreaPick) => void>>;
+  let clearPick: ReturnType<typeof vi.fn<() => void>>;
 
   const noRequests = (): void => {
     http.expectNone(() => true);
@@ -153,11 +165,19 @@ describe('DataStore', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(T0);
+    clockNow = signal(T0 as Instant);
+    storedPick = signal<AreaPick | null>(null);
+    pickArea = vi.fn<(value: AreaPick) => void>();
+    clearPick = vi.fn<() => void>();
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: Clock, useValue: { now: signal(T0 as Instant) } },
+        { provide: Clock, useValue: { now: clockNow } },
+        {
+          provide: AreaPickStore,
+          useValue: { current: storedPick, pick: pickArea, clear: clearPick },
+        },
       ],
     });
     store = TestBed.inject(DataStore);
@@ -2131,6 +2151,125 @@ describe('DataStore', () => {
 
       expect(store.now()).not.toBeNull();
       expect(store.now()?.ranked.map((ranked) => ranked.task.id)).toEqual(['t2']);
+    });
+  });
+
+  describe('current Area', () => {
+    const MONDAY_10_00 = Date.parse('2026-10-12T08:00:00.000Z') as Instant;
+
+    const PICK_ENDS = Date.parse('2026-10-12T16:00:00.000Z') as Instant;
+
+    const areas = seedAreas({ workId: 'work', personalId: 'personal' });
+
+    const withTasks = {
+      areas,
+      tasks: [aTask('W', { areaId: 'work' }), aTask('P', { areaId: 'personal' })],
+    };
+
+    const rankedIds = (): readonly string[] =>
+      store.now()?.ranked.map((ranked) => ranked.task.id) ?? [];
+
+    it('is the automatic set on a weekday at 10:00, ranking Work and counting Personal', async () => {
+      clockNow.set(MONDAY_10_00);
+
+      await begin(12, withTasks);
+
+      expect(store.currentArea()).toEqual({ areaIds: ['work'], picked: false });
+      expect(rankedIds()).toEqual(['W']);
+      expect(store.now()?.otherAreas).toEqual([{ areaId: 'personal', count: 1, overdue: 0 }]);
+    });
+
+    it('is the stored pick, and the ranking flips', async () => {
+      clockNow.set(MONDAY_10_00);
+      storedPick.set({ areaId: 'personal', endsAt: PICK_ENDS });
+
+      await begin(12, withTasks);
+
+      expect(store.currentArea()).toEqual({ areaIds: ['personal'], picked: true });
+      expect(rankedIds()).toEqual(['P']);
+      expect(store.now()?.otherAreas).toEqual([{ areaId: 'work', count: 1, overdue: 0 }]);
+    });
+
+    it('follows a pick that arrives after the state', async () => {
+      clockNow.set(MONDAY_10_00);
+      await begin(12, withTasks);
+      expect(rankedIds()).toEqual(['W']);
+
+      storedPick.set({ areaId: 'personal', endsAt: PICK_ENDS });
+
+      expect(store.currentArea()).toEqual({ areaIds: ['personal'], picked: true });
+      expect(rankedIds()).toEqual(['P']);
+    });
+
+    it('is the automatic set again when the Clock reaches the end of the pick', async () => {
+      clockNow.set(MONDAY_10_00);
+      storedPick.set({ areaId: 'personal', endsAt: PICK_ENDS });
+      await begin(12, withTasks);
+
+      clockNow.set((PICK_ENDS - 1) as Instant);
+      expect(store.currentArea()).toEqual({ areaIds: ['personal'], picked: true });
+
+      clockNow.set(PICK_ENDS);
+
+      expect(store.currentArea()).toEqual({ areaIds: ['personal'], picked: false });
+      expect(rankedIds()).toEqual(['P']);
+      expect(store.now()?.otherAreas).toEqual([{ areaId: 'work', count: 1, overdue: 0 }]);
+    });
+
+    it('is the automatic Work set again at the end of a pick made before work hours', async () => {
+      const sevenLocal = Date.parse('2026-10-12T05:00:00.000Z') as Instant;
+      const eightLocal = Date.parse('2026-10-12T06:00:00.000Z') as Instant;
+      clockNow.set(sevenLocal);
+      storedPick.set({ areaId: 'work', endsAt: eightLocal });
+      await begin(12, withTasks);
+      expect(store.currentArea()).toEqual({ areaIds: ['work'], picked: true });
+
+      clockNow.set(eightLocal);
+
+      expect(store.currentArea()).toEqual({ areaIds: ['work'], picked: false });
+    });
+
+    it('is null with no state, and so is Now', () => {
+      storedPick.set({ areaId: 'personal', endsAt: PICK_ENDS });
+
+      expect(store.state()).toBeNull();
+      expect(store.currentArea()).toBeNull();
+      expect(store.now()).toBeNull();
+    });
+
+    it('is null again after stop', async () => {
+      await begin(12, withTasks);
+      expect(store.currentArea()).not.toBeNull();
+
+      store.stop();
+
+      expect(store.currentArea()).toBeNull();
+      expect(store.now()).toBeNull();
+    });
+
+    it('reads a time zone this browser does not know as UTC', async () => {
+      clockNow.set(Date.parse('2026-10-12T07:00:00.000Z') as Instant);
+
+      await begin(12, { ...withTasks, settings: settingsOf('Mars/Olympus') });
+
+      // 07:00 UTC is before Work starts; in Amsterdam it would be 09:00, inside Work.
+      expect(store.currentArea()).toEqual({ areaIds: ['personal'], picked: false });
+    });
+
+    it('never writes or clears the pick', async () => {
+      clockNow.set(MONDAY_10_00);
+      storedPick.set({ areaId: 'personal', endsAt: PICK_ENDS });
+      await begin(12, withTasks);
+      store.currentArea();
+      store.now();
+
+      clockNow.set(PICK_ENDS);
+      store.currentArea();
+      store.now();
+      store.stop();
+
+      expect(pickArea).not.toHaveBeenCalled();
+      expect(clearPick).not.toHaveBeenCalled();
     });
   });
 

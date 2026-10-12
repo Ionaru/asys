@@ -17,11 +17,13 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
+  automaticAreaIds,
   canLogProgress,
   formatMinutes,
   formatMoment,
   inboxTasks,
   isOverdue,
+  makeAreaPick,
   type RankedTask,
   reasonFact,
   type Task,
@@ -30,6 +32,7 @@ import {
 } from '@asys/domain';
 
 import { CommandOutcomeTag } from '../../core/api/data-api';
+import { AreaPickStore } from '../../core/data/area-pick-store';
 import { CommandAttempts } from '../../core/data/command-attempts';
 import { DataStore, SyncStatus, zoneOrUtc } from '../../core/data/data-store';
 import { DoneOrigin, DoneUndo } from '../../core/data/done-undo';
@@ -37,6 +40,7 @@ import { outcomeMessage } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
 import { Motion, MotionDuration, MotionEasing } from '../../core/platform/motion';
 import { TaskMorph } from '../../core/platform/task-morph';
+import { AreaPickControl } from '../../ui/area-pick/area-pick';
 import { Button, ButtonVariant } from '../../ui/button/button';
 import { IconName } from '../../ui/icon/icon';
 import { LoadState } from '../../ui/load-state/load-state';
@@ -51,6 +55,13 @@ import { SectionHeader } from '../../ui/section-header/section-header';
 import { SwipeActions } from '../../ui/swipe-actions/swipe-actions';
 import { SyncNote } from '../../ui/sync-note/sync-note';
 import { TopPick } from '../../ui/top-pick/top-pick';
+import { byAreaName } from '../areas/area-order';
+import {
+  areaNamesText,
+  BACK_TO_AUTOMATIC,
+  otherAreaText,
+  pickedStatusText,
+} from './current-area-text';
 import { collapseRow, expandRow } from './row-motion';
 
 /** Staggers the exit of a Done card after its check starts drawing. */
@@ -70,6 +81,7 @@ const RISE_KEYFRAMES: Keyframe[] = [
 @Component({
   selector: 'app-now',
   imports: [
+    AreaPickControl,
     Button,
     LoadState,
     LogProgressForm,
@@ -89,6 +101,8 @@ export class Now {
   protected readonly dataStore = inject(DataStore);
 
   readonly #clock = inject(Clock);
+
+  readonly #areaPickStore = inject(AreaPickStore);
 
   readonly #attempts = inject(CommandAttempts);
 
@@ -117,6 +131,8 @@ export class Now {
   protected readonly morphId = inject(TaskMorph).taskId;
 
   private readonly nowHeader = viewChild(NowHeader);
+
+  private readonly areaPickControl = viewChild(AreaPickControl);
 
   private readonly topPick = viewChild(TopPick);
 
@@ -220,6 +236,41 @@ export class Now {
     () => new Map((this.dataStore.state()?.areas ?? []).map((area) => [area.id, area.name])),
   );
 
+  /** What the header's Current Area control shows, or null while there is no state. */
+  protected readonly areaControl = computed(() => {
+    const state = this.dataStore.state();
+    const current = this.dataStore.currentArea();
+
+    if (state === null || current === null) {
+      return null;
+    }
+
+    const automatic = areaNamesText(
+      automaticAreaIds(state.areas, this.#timeZone(), this.#clock.now()),
+      state.areas,
+    );
+
+    return {
+      label: areaNamesText(current.areaIds, state.areas),
+      pickedId: current.picked ? (current.areaIds[0] ?? null) : null,
+      automaticLabel: `Automatic: ${automatic}`,
+      areas: state.areas.toSorted(byAreaName).map((area) => ({ id: area.id, name: area.name })),
+    };
+  });
+
+  /** The Other Areas line's buttons: each counted Area with its text; an Area of unknown name is skipped. */
+  protected readonly otherAreas = computed(() => {
+    const names = this.#areaNames();
+
+    return (this.dataStore.now()?.otherAreas ?? []).flatMap((other) => {
+      const name = names.get(other.areaId);
+
+      return name === undefined
+        ? []
+        : [{ areaId: other.areaId, text: otherAreaText(name, other.count, other.overdue) }];
+    });
+  });
+
   constructor() {
     effect(() => {
       const open = this.#openFormId() !== null;
@@ -249,6 +300,37 @@ export class Now {
         this.#riseRestored(undone.taskId);
       });
     });
+  }
+
+  /** Picks the Area for the rest of its stretch, or goes back to Automatic with null. */
+  protected pickArea(areaId: string | null): void {
+    const state = this.dataStore.state();
+
+    if (state === null) {
+      return;
+    }
+    if (areaId === null) {
+      this.#areaPickStore.clear();
+      this.statusLine.set(BACK_TO_AUTOMATIC);
+      return;
+    }
+
+    const now = this.#clock.now();
+    const zone = this.#timeZone();
+    const made = makeAreaPick(state.areas, { ...state.settings, timeZone: zone }, now, areaId);
+    const name = this.#areaNames().get(areaId);
+
+    if (made === null || name === undefined) {
+      return;
+    }
+    this.#areaPickStore.pick(made);
+    this.statusLine.set(pickedStatusText(name, made.endsAt, now, zone));
+  }
+
+  /** Picks the Area from the Other Areas line, then moves focus to the control after the next render. */
+  protected pickOtherArea(areaId: string): void {
+    this.pickArea(areaId);
+    afterNextRender(() => this.areaPickControl()?.focus(), { injector: this.#injector });
   }
 
   /** Collapses a leaving row; focus inside it moves to the top pick first, so it never falls to the body. */

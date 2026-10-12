@@ -23,6 +23,7 @@ import {
   isLocalTime,
   IsoWeekday,
   type MinuteInterval,
+  Palette,
   timeInputValue,
 } from '@asys/domain';
 
@@ -35,6 +36,7 @@ import { Ids } from '../../core/platform/ids';
 import { Button, ButtonSize, ButtonVariant } from '../../ui/button/button';
 import { FieldError } from '../../ui/field-error/field-error';
 import { LoadState } from '../../ui/load-state/load-state';
+import { type SelectOption, SelectField } from '../../ui/select-field/select-field';
 import { SyncNote } from '../../ui/sync-note/sync-note';
 import { TextField } from '../../ui/text-field/text-field';
 
@@ -47,6 +49,7 @@ interface TimeRow {
 /** The editable fields of an Area; `days` holds the rows of Monday to Sunday. */
 interface AreaDraft {
   readonly name: string;
+  readonly palette: Palette | null;
   readonly days: readonly (readonly TimeRow[])[];
 }
 
@@ -76,7 +79,16 @@ const NEW_ROW: TimeRow = { start: '09:00', end: '17:00' };
 
 const TIME_LENGTH = 5;
 
-const EMPTY_DRAFT: AreaDraft = { name: '', days: WEEKDAYS.map(() => []) };
+/** The Palette select's choices; the empty value is the default look (null). */
+const PALETTE_OPTIONS: readonly SelectOption[] = [
+  { value: '', label: 'Default look (Evergreen)' },
+  { value: Palette.Evergreen, label: 'Evergreen' },
+  { value: Palette.Harbour, label: 'Harbour' },
+  { value: Palette.Moss, label: 'Moss' },
+  { value: Palette.Graphite, label: 'Graphite' },
+];
+
+const EMPTY_DRAFT: AreaDraft = { name: '', palette: null, days: WEEKDAYS.map(() => []) };
 
 let nextId = 0;
 
@@ -92,6 +104,7 @@ const rowsOf = (intervals: readonly MinuteInterval[]): readonly TimeRow[] =>
 /** The draft of a stored Area, its hours sorted by start. */
 const draftOf = (area: Area): AreaDraft => ({
   name: area.name,
+  palette: area.palette,
   days: WEEKDAYS.map(({ weekday }) => rowsOf(area.activeHours[weekday])),
 });
 
@@ -174,9 +187,17 @@ const sameRows = (
 
 /** The fields of an Area draft that follow the store. */
 const AREA_DRAFT_FIELDS: DraftFields<AreaDraft> = {
-  keys: ['name', 'days'],
-  same: (key, a, b) =>
-    key === 'name' ? a.name.trim() === b.name.trim() : sameRows(a.days, b.days),
+  keys: ['name', 'palette', 'days'],
+  same: (key, a, b) => {
+    switch (key) {
+      case 'name':
+        return a.name.trim() === b.name.trim();
+      case 'palette':
+        return a.palette === b.palette;
+      case 'days':
+        return sameRows(a.days, b.days);
+    }
+  },
 };
 
 /** The fields of `draft` that differ from `baseline`, as an UpdateArea patch. */
@@ -189,14 +210,15 @@ const buildAreaPatch = (baseline: AreaDraft, draft: AreaDraft): AreaPatch => {
 
   return {
     ...(name === baseline.name ? {} : { name }),
+    ...(draft.palette === baseline.palette ? {} : { palette: draft.palette }),
     ...(hoursChanged ? { activeHours: hours } : {}),
   };
 };
 
-/** Edits an Area's name and its Active hours per weekday, or creates a new Area. */
+/** Edits an Area's name, palette and Active hours per weekday, or creates a new Area. */
 @Component({
   selector: 'asys-area-editor',
-  imports: [Button, FieldError, LoadState, RouterLink, SyncNote, TextField],
+  imports: [Button, FieldError, LoadState, RouterLink, SelectField, SyncNote, TextField],
   providers: [CommandAttempts],
   templateUrl: './area-editor.component.html',
   styleUrl: './area-editor.css',
@@ -226,6 +248,8 @@ export class AreaEditor {
   protected readonly Size = ButtonSize;
 
   protected readonly edges = EDGES;
+
+  protected readonly paletteOptions = PALETTE_OPTIONS;
 
   readonly #idPrefix = `asys-area-editor-${nextId++}`;
 
@@ -354,6 +378,15 @@ export class AreaEditor {
     this.draft.update((draft) => ({ ...draft, name }));
   }
 
+  protected setPalette(value: string): void {
+    const palette = Object.values<string>(Palette).find((candidate) => candidate === value);
+
+    this.draft.update((draft) => ({
+      ...draft,
+      palette: palette === undefined ? null : (palette as Palette),
+    }));
+  }
+
   protected setTime(day: number, row: number, edge: RowEdge, value: string): void {
     const time = value.slice(0, TIME_LENGTH);
 
@@ -406,7 +439,10 @@ export class AreaEditor {
     const name = draft.name.trim();
     const pending = this.#pendingCreate();
     const command: CreateArea =
-      pending !== null && pending.name === name && sameHours(pending.activeHours, activeHours)
+      pending !== null &&
+      pending.name === name &&
+      (pending.palette ?? null) === draft.palette &&
+      sameHours(pending.activeHours, activeHours)
         ? pending
         : {
             _tag: CommandTag.CreateArea,
@@ -414,6 +450,7 @@ export class AreaEditor {
             name,
             activeHours,
             defaultPrivacy: null,
+            palette: draft.palette,
           };
 
     this.#pendingCreate.set(command);

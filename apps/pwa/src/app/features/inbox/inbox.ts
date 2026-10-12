@@ -40,10 +40,14 @@ const NO_IDS: ReadonlySet<string> = new Set();
 
 const EMPTY_DRAFT: TriageDraft = { important: null, estimateMinutes: null, areaId: null };
 
-const draftOf = (task: Task | null): TriageDraft =>
+const draftOf = (task: Task | null, proposedAreaId: string | null): TriageDraft =>
   task === null
     ? EMPTY_DRAFT
-    : { important: task.important, estimateMinutes: task.estimateMinutes, areaId: task.areaId };
+    : {
+        important: task.important,
+        estimateMinutes: task.estimateMinutes,
+        areaId: task.areaId ?? proposedAreaId,
+      };
 
 const areaChoices = (state: DomainState): readonly AreaChoice[] =>
   state.areas.map((area) => ({ id: area.id, name: area.name })).sort(byAreaName);
@@ -133,12 +137,19 @@ export class Inbox {
     return [...this.#handledIds()].filter((id) => !inboxIds.has(id)).length;
   });
 
+  /** The single Current Area, which a card opens with when its Task has no Area. */
+  readonly #proposedAreaId = computed<string | null>(() => {
+    const current = this.dataStore.currentArea();
+
+    return current !== null && current.areaIds.length === 1 ? current.areaIds[0] : null;
+  });
+
   protected readonly draftState = linkedSignal<string | undefined, TriageDraft>({
     source: () => this.#card()?.id,
     computation: (id, previous) =>
       previous !== undefined && previous.source === id
         ? previous.value
-        : untracked(() => draftOf(this.#card())),
+        : untracked(() => draftOf(this.#card(), this.#proposedAreaId())),
   });
 
   protected readonly cardBusy = computed(() => {

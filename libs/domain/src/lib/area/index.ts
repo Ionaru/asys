@@ -2,4 +2,6 @@
 
 export * from './active-hours';
 export * from './area';
+export * from './current-area';
+export * from './palette';
 export * from './active-hours-text';

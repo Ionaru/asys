@@ -2,7 +2,7 @@
 import { Component, signal, type Provider } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router, withComponentInputBinding } from '@angular/router';
-import type { DomainState, Instant } from '@asys/domain';
+import { Palette, type DomainState, type Instant } from '@asys/domain';
 
 import { App } from './app';
 import { AuthApi, type Me } from './core/api/auth-api';
@@ -12,6 +12,7 @@ import { TimeZoneSync } from './core/data/time-zone-sync';
 import { AppUpdate } from './core/platform/app-update';
 import { DeviceZone } from './core/platform/device-zone';
 import { ReportedZone } from './core/platform/reported-zone';
+import { Theme, ThemeName } from './core/platform/theme';
 
 @Component({ template: '' })
 class Stub {}
@@ -23,12 +24,29 @@ const ADA: Me = { name: 'Ada', recoveryCodesLeft: 4 };
 const stateIn = (timeZone: string): DomainState =>
   ({ settings: { timeZone } }) as unknown as DomainState;
 
+const WORK = { id: 'w', name: 'Work', palette: null };
+
+const PERSONAL = { id: 'p', name: 'Personal', palette: Palette.Harbour };
+
+const stateWithAreas = (): DomainState =>
+  ({
+    settings: { timeZone: 'Europe/Amsterdam' },
+    areas: [WORK, PERSONAL],
+  }) as unknown as DomainState;
+
+interface PickedAreas {
+  areaIds: string[];
+  picked: boolean;
+}
+
 const setup = async (initial: SessionState, url = '/now', realSession = false) => {
   const sessionState = signal(initial);
   const signOutReason = signal<SignOutReason | null>(null);
   const check = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
   const status = signal(SyncStatus.Ready);
   const state = signal<DomainState | null>(null);
+  const currentArea = signal<PickedAreas | null>(null);
+  const setPalette = vi.fn<(palette: Palette | null) => void>();
   const syncedAt = signal<Instant | null>(null);
   const start = vi.fn<() => void>();
   const stop = vi.fn<() => void>();
@@ -70,6 +88,7 @@ const setup = async (initial: SessionState, url = '/now', realSession = false) =
           state,
           syncedAt,
           now: signal(null),
+          currentArea,
           inboxCount: signal(0),
           start,
           stop,
@@ -78,6 +97,10 @@ const setup = async (initial: SessionState, url = '/now', realSession = false) =
       },
       { provide: TimeZoneSync, useValue: { start: syncStart, stop: syncStop } },
       { provide: AppUpdate, useValue: { prompt, reload } },
+      {
+        provide: Theme,
+        useValue: { setPalette, clearPalette: vi.fn(), current: signal(ThemeName.Light) },
+      },
       { provide: DeviceZone, useValue: { current: () => 'Europe/Amsterdam' } },
     ],
   });
@@ -120,6 +143,8 @@ const setup = async (initial: SessionState, url = '/now', realSession = false) =
     check,
     status,
     state,
+    currentArea,
+    setPalette,
     syncedAt,
     start,
     stop,
@@ -578,6 +603,57 @@ describe('App', () => {
       await settle();
 
       expect(check).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('palette of the Current Area', () => {
+    it.each([
+      ['the Personal Area', ['p'], Palette.Harbour],
+      ['the Work Area', ['w'], null],
+      ['two Areas', ['p', 'w'], null],
+      ['no Area', [], null],
+      ['an id that is not among the Areas', ['x'], null],
+    ])('passes the palette for %s', async (_label, areaIds, expected) => {
+      const { state, currentArea, setPalette, settle } = await setup(SessionState.SignedIn);
+
+      state.set(stateWithAreas());
+      currentArea.set({ areaIds, picked: false });
+      await settle();
+
+      expect(setPalette).toHaveBeenCalledTimes(1);
+      expect(setPalette).toHaveBeenCalledWith(expected);
+    });
+
+    it('does nothing while the state is null', async () => {
+      const { currentArea, setPalette, settle } = await setup(SessionState.SignedIn);
+
+      currentArea.set({ areaIds: ['p'], picked: false });
+      await settle();
+
+      expect(setPalette).not.toHaveBeenCalled();
+    });
+
+    it('does nothing while the Current Area is null', async () => {
+      const { state, setPalette, settle } = await setup(SessionState.SignedIn);
+
+      state.set(stateWithAreas());
+      await settle();
+
+      expect(setPalette).not.toHaveBeenCalled();
+    });
+
+    it('passes the new palette when the Current Area changes', async () => {
+      const { state, currentArea, setPalette, settle } = await setup(SessionState.SignedIn);
+
+      state.set(stateWithAreas());
+      currentArea.set({ areaIds: ['w'], picked: false });
+      await settle();
+      currentArea.set({ areaIds: ['p'], picked: false });
+      await settle();
+
+      expect(setPalette).toHaveBeenCalledTimes(2);
+      expect(setPalette).toHaveBeenNthCalledWith(1, null);
+      expect(setPalette).toHaveBeenNthCalledWith(2, Palette.Harbour);
     });
   });
 });

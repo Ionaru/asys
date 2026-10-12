@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { randomUUID } from 'node:crypto';
 import {
+  Palette,
   Privacy,
   TaskKind,
   TaskStatus,
@@ -60,6 +61,7 @@ const area = (overrides: Partial<Area> = {}): Area => ({
   name: 'An area',
   activeHours: WORK_ACTIVE_HOURS,
   defaultPrivacy: null,
+  palette: null,
   version: 1,
   ...overrides,
 });
@@ -196,6 +198,21 @@ layer(appDatabase())('mappers against the database', (it) => {
       yield* removeOwner(owner);
       assert.deepStrictEqual(result, [input]);
       assert.isFalse('time' in (result[0].due ?? {}));
+    }),
+  );
+
+  it.effect('areas survive a round trip, with and without a palette', () =>
+    Effect.gen(function* () {
+      const owner = randomUUID();
+      const moss = area({ palette: Palette.Moss });
+      const evergreen = area({ name: 'Explicit', palette: Palette.Evergreen });
+      const none = area({ name: 'Default look', palette: null });
+      const result = yield* insertAndReadAreas(owner, [moss, evergreen, none]);
+
+      yield* removeOwner(owner);
+      assert.deepStrictEqual(result, byId([moss, evergreen, none]));
+      assert.strictEqual(result.find((a) => a.id === evergreen.id)?.palette, Palette.Evergreen);
+      assert.strictEqual(result.find((a) => a.id === none.id)?.palette, null);
     }),
   );
 

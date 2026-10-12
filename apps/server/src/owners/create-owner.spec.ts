@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { randomUUID } from 'node:crypto';
-import { PERSONAL_ACTIVE_HOURS, Privacy, WORK_ACTIVE_HOURS } from '@asys/domain';
+import { PERSONAL_ACTIVE_HOURS, Palette, Privacy, WORK_ACTIVE_HOURS } from '@asys/domain';
 import { assert, layer } from '@effect/vitest';
 import { Clock, Effect } from 'effect';
 import { TestClock } from 'effect/testing';
@@ -84,12 +84,20 @@ layer(appDatabase())('createOwner', (it) => {
           name: 'Personal',
           activeHours: PERSONAL_ACTIVE_HOURS,
           defaultPrivacy: Privacy.Hidden,
+          palette: Palette.Harbour,
           version: 1,
         },
       );
       assert.deepStrictEqual(
         { ...work, id: '' },
-        { id: '', name: 'Work', activeHours: WORK_ACTIVE_HOURS, defaultPrivacy: null, version: 1 },
+        {
+          id: '',
+          name: 'Work',
+          activeHours: WORK_ACTIVE_HOURS,
+          defaultPrivacy: null,
+          palette: null,
+          version: 1,
+        },
       );
       assert.match(personal.id, UUID_PATTERN);
       assert.match(work.id, UUID_PATTERN);

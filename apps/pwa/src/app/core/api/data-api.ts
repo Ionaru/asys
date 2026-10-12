@@ -2,7 +2,10 @@
 import { HttpContext, HttpErrorResponse, HttpStatusCode } from '@angular/common/http';
 import { inject, Service } from '@angular/core';
 import {
+  type Area,
   type Change,
+  ChangeEntity,
+  ChangeOp,
   type Command,
   type DomainState,
   NotApplicableReason,
@@ -66,6 +69,14 @@ export type CommandOutcome =
 export const isRetryable = (tag: CommandOutcomeTag): boolean =>
   tag === CommandOutcomeTag.Failed || tag === CommandOutcomeTag.KeyReused;
 
+/** Reads a palette an older server leaves out as null, so a cached new PWA survives a rollback. */
+const withPalette = (area: Area): Area => ({ ...area, palette: area.palette ?? null });
+
+const withAreaPalette = (entry: ChangeEntry): ChangeEntry =>
+  entry.entity === ChangeEntity.Area && entry.op === ChangeOp.Put
+    ? { ...entry, after: withPalette(entry.after) }
+    : entry;
+
 /** Reads the working-set data and submits commands. Never rejects, keeps no state. */
 @Service()
 export class DataApi {
@@ -87,7 +98,10 @@ export class DataApi {
     const { blockers, ...rest } = outcome.value;
     const { seq, ...state } = fromWire<WithSeq<DomainState>>({ ...rest, links: blockers });
 
-    return { _tag: HttpOutcomeTag.Ok, value: { seq, state } };
+    return {
+      _tag: HttpOutcomeTag.Ok,
+      value: { seq, state: { ...state, areas: state.areas.map(withPalette) } },
+    };
   }
 
   /** `GET /v1/changes?after=<after>`. */
@@ -102,7 +116,7 @@ export class DataApi {
       _tag: HttpOutcomeTag.Ok,
       value: {
         seq: outcome.value.seq,
-        entries: fromWire<ChangeEntry[]>(outcome.value.entries),
+        entries: fromWire<ChangeEntry[]>(outcome.value.entries).map(withAreaPalette),
       },
     };
   }

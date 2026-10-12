@@ -45,6 +45,7 @@ export const anArea = (overrides: Partial<Area> & { readonly id: string }): Area
     name: `Area ${overrides.id}`,
     activeHours: WORK_ACTIVE_HOURS,
     defaultPrivacy: null,
+    palette: null,
     version: 1,
     ...overrides,
   };
