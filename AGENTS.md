@@ -53,7 +53,7 @@ Traps when testing:
 
 - The server tests share the dev database `asys`, and Nx caches tests on file hashes alone. Always pass `--skip-nx-cache` to database tests, and stop `nx serve server` first, or its job worker claims the tests' due jobs.
 - `pwa:typecheck` runs plain `tsc` and does not check templates. `nx build pwa` and `nx test pwa` do.
-- `nx e2e pwa-e2e` (dev stack) and `nx run pwa-e2e:e2e-image` (image stack, started by hand from the `README.md` recipe) are the only supported e2e entry points. `e2e` recreates the `asys_e2e` database and rebuilds the files a running dev stack uses. To run it beside a dev stack, follow `README.md`. Both write to `dist/.playwright/apps/pwa-e2e`.
+- `nx e2e pwa-e2e` (dev stack) and `nx run pwa-e2e:e2e-image` (image stack, started by hand from the `README.md` recipe) are the only supported e2e entry points, plus `nx run pwa-e2e:shots` for screenshots. `e2e` and `shots` recreate the `asys_e2e` database and rebuild the files a running dev stack uses. To run either beside a dev stack, follow `README.md`. All three write to `dist/.playwright/apps/pwa-e2e`.
 - Only one process builds or tests in a checkout at a time.
 
 ## Enforced rules
@@ -129,6 +129,7 @@ The task recipes live in `.agents/skills/<name>/SKILL.md`, each linked from `.cl
 - `extending-the-server`: an HTTP endpoint, a job kind, a CLI command or a config variable.
 - `building-pwa-ui`: a UI component, a screen and route, wiring the generated client, palettes.
 - `writing-e2e-specs`: a Playwright spec in `apps/pwa-e2e`.
+- `taking-screenshots`: screenshots of PWA screens, and putting images on a pull request.
 - `adding-a-dependency`: a new package or an upgrade.
 - `planning-a-slice-piece`: planning, building and closing a piece of a slice plan.
 

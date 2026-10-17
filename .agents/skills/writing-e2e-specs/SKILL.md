@@ -15,7 +15,7 @@ description: Use when a change needs checking in a real browser (sign-up, passke
 
 Both suites must pass before a change is done.
 
-Each test signs up a fresh Owner with a WebAuthn virtual authenticator, so tests run in parallel and need no person at a passkey prompt. Browser checks of signed-in flows belong here, not in a manual click-through.
+Each test signs up a fresh Owner with a WebAuthn virtual authenticator, so tests run in parallel and need no person at a passkey prompt. Browser checks of signed-in flows belong here, not in a manual click-through. Screenshots come from a `*.shots.ts` file on the same stack instead: see `taking-screenshots`.
 
 ## Writing a spec
 
@@ -44,24 +44,25 @@ For the image stack, follow the README's "Against the image" recipe (never in th
 pnpm exec nx run pwa-e2e:e2e-image -- src/<topic>.spec.ts
 ```
 
-- `nx e2e pwa-e2e` and `nx run pwa-e2e:e2e-image` are the only supported entry points. The first one's `reset-db` dependency recreates `asys_e2e`, migrates it and copies the server bundle to `dist/pwa-e2e/server`; the second builds nothing and needs the image stack already running.
+- `nx e2e pwa-e2e` and `nx run pwa-e2e:e2e-image` are the only supported entry points for specs, and `nx run pwa-e2e:shots` for shots files. The first one's `reset-db` dependency recreates `asys_e2e`, migrates it and copies the server bundle to `dist/pwa-e2e/server`; the second builds nothing and needs the image stack already running.
 - The scripts refuse any database other than `asys_e2e`, and refuse to start while ports 3100 or 4300 are live.
 - **Beside a running dev stack**, follow the README's "End-to-end tests" section. Build once with the dev servers stopped, then run `reset-db` and `e2e` with `--exclude-task-dependencies`.
 - Reports and traces land in `dist/.playwright/apps/pwa-e2e`, for both targets, so each run replaces the other's.
 
 ## Common mistakes
 
-| Mistake                                                | Symptom                                                                                                          |
-| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| Seeding without `page.reload()`                        | The test waits for a poll and times out                                                                          |
-| Fixed calendar dates                                   | Fails on another day; use `localToday()`                                                                         |
-| Renamed sign-up UI strings                             | Every spec fails in the fixture (`fixtures.ts`)                                                                  |
-| Running Playwright directly                            | Stale `asys_e2e`, or the server bundle changes mid-run; use `nx e2e pwa-e2e` or `nx run pwa-e2e:e2e-image`       |
-| Expecting the service worker                           | Neither stack runs one: the dev stack serves none, and the image config blocks it                                |
-| Expecting a Done on the server at once                 | It is held for 5 s; use the clock recipe                                                                         |
-| Measuring a box mid-animation                          | The box is still moving; first wait for `document.getAnimations().length` to be 0 with `expect.poll`             |
-| Counting the keepalive POST                            | Playwright's request events miss a keepalive fetch sent while the page unloads; check the server with `snapshot` |
-| Swiping with `page.mouse`                              | Nothing moves: the swipe ignores mouse pointers                                                                  |
-| Using `page.touchscreen` for a drag                    | It only taps; use `support/touch.ts`                                                                             |
-| Dispatching `TouchEvent`s with `locator.dispatchEvent` | They are untrusted and produce no Pointer Events                                                                 |
-| Waiting for every animation while the Undo bar shows   | The Undo ring's fill runs for the whole 5 s window; leave it out of the count, as `swipe.spec.ts` does           |
+| Mistake                                                | Symptom                                                                                                                            |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Seeding without `page.reload()`                        | The test waits for a poll and times out                                                                                            |
+| Fixed calendar dates                                   | Fails on another day; use `localToday()`                                                                                           |
+| Renamed sign-up UI strings                             | Every spec fails in the fixture (`fixtures.ts`)                                                                                    |
+| Running Playwright directly                            | Stale `asys_e2e`, or the server bundle changes mid-run; use `nx e2e pwa-e2e`, `nx run pwa-e2e:e2e-image` or `nx run pwa-e2e:shots` |
+| Matching a field error exactly                         | Not found: its text starts with a visually hidden "Error: "; match a substring                                                     |
+| Expecting the service worker                           | Neither stack runs one: the dev stack serves none, and the image config blocks it                                                  |
+| Expecting a Done on the server at once                 | It is held for 5 s; use the clock recipe                                                                                           |
+| Measuring a box mid-animation                          | The box is still moving; first wait for `document.getAnimations().length` to be 0 with `expect.poll`                               |
+| Counting the keepalive POST                            | Playwright's request events miss a keepalive fetch sent while the page unloads; check the server with `snapshot`                   |
+| Swiping with `page.mouse`                              | Nothing moves: the swipe ignores mouse pointers                                                                                    |
+| Using `page.touchscreen` for a drag                    | It only taps; use `support/touch.ts`                                                                                               |
+| Dispatching `TouchEvent`s with `locator.dispatchEvent` | They are untrusted and produce no Pointer Events                                                                                   |
+| Waiting for every animation while the Undo bar shows   | The Undo ring's fill runs for the whole 5 s window; leave it out of the count, as `swipe.spec.ts` does                             |
