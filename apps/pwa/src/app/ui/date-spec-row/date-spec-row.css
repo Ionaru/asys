@@ -1,0 +1,57 @@
+/* SPDX-License-Identifier: EUPL-1.2 */
+.asys-date-row {
+  display: flex;
+  align-items: stretch;
+}
+
+.asys-date-row__open {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+}
+
+.asys-date-row__time {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-width: var(--tap-target-large);
+  margin: 0;
+  padding: 0 var(--space-4) 0 var(--space-3);
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: var(--font-size-time);
+  line-height: var(--line-height-time);
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+}
+
+.asys-date-row__time::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: var(--space-3);
+  bottom: var(--space-3);
+  border-left: 1px solid var(--line);
+}
+
+.asys-date-row__time--set {
+  color: var(--ink);
+}
+
+.asys-date-row__time:active {
+  background: var(--signal-soft);
+  color: var(--on-signal-soft);
+}
+
+.asys-date-row__time:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+[data-theme='drive'] .asys-date-row__time {
+  min-height: var(--tap-target-drive);
+}

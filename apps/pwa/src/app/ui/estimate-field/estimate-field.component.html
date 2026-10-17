@@ -1,33 +1,75 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
-<fieldset class="asys-fieldset-reset asys-estimate">
-  <legend class="asys-estimate__legend">{{ legend() }}</legend>
-  <div class="asys-estimate__chips">
-    @for (chip of chips; track chip.minutes) {
+@if (layout() === Layout.Ruler) {
+  <div class="asys-estimate asys-estimate--ruler" role="group" [attr.aria-labelledby]="legendId">
+    <div class="asys-estimate__head">
+      <span class="asys-estimate__legend" [id]="legendId">{{ legend() }}</span>
       <button
-        #chipButton
+        asys-button
         type="button"
-        class="asys-num asys-estimate__chip asys-estimate__chip--num"
+        class="asys-estimate__other-toggle"
+        [variant]="Variant.Quiet"
+        [size]="Size.Small"
         [disabled]="disabled()"
-        [attr.aria-pressed]="value() === chip.minutes ? 'true' : 'false'"
+        [attr.aria-pressed]="otherShown() ? 'true' : 'false'"
+        (click)="openOther()"
+      >
+        Other
+      </button>
+    </div>
+    <div class="asys-estimate__ruler">
+      @for (chip of chips; track chip.minutes) {
+        <button
+          #chipButton
+          type="button"
+          class="asys-estimate__cell"
+          [attr.aria-label]="chip.label"
+          [disabled]="disabled()"
+          [attr.aria-pressed]="value() === chip.minutes ? 'true' : 'false'"
+          [attr.aria-describedby]="messageId()"
+          (click)="pick(chip.minutes)"
+          (blur)="touch.emit()"
+        >
+          <span class="asys-num asys-estimate__num">{{ chip.amount }}</span>
+          <span class="asys-estimate__unit">{{ chip.unit }}</span>
+        </button>
+      }
+    </div>
+    <ng-container *ngTemplateOutlet="extras" />
+  </div>
+} @else {
+  <fieldset class="asys-fieldset-reset asys-estimate">
+    <legend class="asys-estimate__legend">{{ legend() }}</legend>
+    <div class="asys-estimate__chips">
+      @for (chip of chips; track chip.minutes) {
+        <button
+          #chipButton
+          type="button"
+          class="asys-num asys-estimate__chip asys-estimate__chip--num"
+          [disabled]="disabled()"
+          [attr.aria-pressed]="value() === chip.minutes ? 'true' : 'false'"
+          [attr.aria-describedby]="messageId()"
+          (click)="pick(chip.minutes)"
+          (blur)="touch.emit()"
+        >
+          {{ chip.label }}
+        </button>
+      }
+      <button
+        type="button"
+        class="asys-estimate__chip"
+        [disabled]="disabled()"
+        [attr.aria-pressed]="otherShown() ? 'true' : 'false'"
         [attr.aria-describedby]="messageId()"
-        (click)="pick(chip.minutes)"
+        (click)="openOther()"
         (blur)="touch.emit()"
       >
-        {{ chip.label }}
+        Other
       </button>
-    }
-    <button
-      type="button"
-      class="asys-estimate__chip"
-      [disabled]="disabled()"
-      [attr.aria-pressed]="otherShown() ? 'true' : 'false'"
-      [attr.aria-describedby]="messageId()"
-      (click)="openOther()"
-      (blur)="touch.emit()"
-    >
-      Other
-    </button>
-  </div>
+    </div>
+    <ng-container *ngTemplateOutlet="extras" />
+  </fieldset>
+}
+<ng-template #extras>
   @if (otherShown()) {
     <div class="asys-field asys-estimate__other" [class.asys-field--error]="showError()">
       <label class="asys-field__label" [for]="otherId">Minutes</label>
@@ -41,7 +83,10 @@
         [disabled]="disabled()"
         [attr.aria-invalid]="showError() ? 'true' : null"
         [attr.aria-describedby]="messageId()"
-        (input)="typeOther(otherInput.value)"
+        (input)="
+          layout() === Layout.Ruler ? keepTyped(otherInput.value) : typeOther(otherInput.value)
+        "
+        (change)="layout() === Layout.Ruler && typeOther(otherInput.value)"
         (blur)="touch.emit()"
       />
     </div>
@@ -51,4 +96,4 @@
   } @else if (hint()) {
     <p class="asys-field__hint" [id]="messageParagraphId">{{ hint() }}</p>
   }
-</fieldset>
+</ng-template>
