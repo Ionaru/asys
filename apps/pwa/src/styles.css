@@ -26,6 +26,12 @@ body {
   min-height: 100dvh;
 }
 
+/* The Task editor's sticky bar and footer cover the page edges, so a focused control scrolls clear of them (WCAG 2.4.11). The editor publishes their heights on the root element. */
+.task-editor-open {
+  scroll-padding-block: var(--task-editor-bar-height, 0px)
+    calc(var(--task-editor-footer-height, 0px) + env(safe-area-inset-bottom));
+}
+
 /* Base layer, ported from the design system. */
 .asys-root,
 .asys-root * {

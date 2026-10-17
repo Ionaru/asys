@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: EUPL-1.2
-import { Location, NgTemplateOutlet } from '@angular/common';
+import { DOCUMENT, Location, NgTemplateOutlet } from '@angular/common';
 import {
   afterNextRender,
   Component,
@@ -18,38 +18,31 @@ import {
 import { disabled, form, FormField, validate } from '@angular/forms/signals';
 import { Router, RouterLink } from '@angular/router';
 import {
-  type AddBlocker,
-  blockerCandidates,
-  blocks,
+  BlockedReasonTag,
   canLogProgress,
-  type Command,
   CommandTag,
   type DomainState,
-  dueInstant,
-  effectiveDue,
-  formatClock,
-  isBlocked,
-  isInInbox,
-  isOverdue,
-  latestStart,
+  explainTask,
   type Task,
+  TaskExplanationTag,
   TaskStatus,
+  toLocalDateTime,
 } from '@asys/domain';
 
 import { CommandOutcomeTag } from '../../core/api/data-api';
 import { CommandAttempts } from '../../core/data/command-attempts';
 import { DataStore, SyncStatus, zoneOrUtc } from '../../core/data/data-store';
 import { DoneOrigin, DoneUndo } from '../../core/data/done-undo';
-import { followStore, settleSaved } from '../../core/data/draft-follow';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
-import { Ids } from '../../core/platform/ids';
 import { TaskMorph } from '../../core/platform/task-morph';
 import { activationOf } from '../../ui/activation/activation';
 import { Button, ButtonSize, ButtonVariant } from '../../ui/button/button';
-import { DateSpecField } from '../../ui/date-spec-field/date-spec-field';
-import { EstimateField } from '../../ui/estimate-field/estimate-field';
-import { IconName } from '../../ui/icon/icon';
+import { ChoiceRow } from '../../ui/choice-row/choice-row';
+import { DateSpecRow } from '../../ui/date-spec-row/date-spec-row';
+import { EstimateField, EstimateLayout } from '../../ui/estimate-field/estimate-field';
+import { FieldError } from '../../ui/field-error/field-error';
+import { Icon, IconName } from '../../ui/icon/icon';
 import { InlineConfirm } from '../../ui/inline-confirm/inline-confirm';
 import { LoadState } from '../../ui/load-state/load-state';
 import {
@@ -57,24 +50,19 @@ import {
   LogProgressForm,
   logProgressCommand,
 } from '../../ui/log-progress-form/log-progress-form';
+import { QuadrantChip } from '../../ui/quadrant-chip/quadrant-chip';
 import { Segmented } from '../../ui/segmented/segmented';
 import { areaSelectOptions } from '../../ui/select-field/area-options';
-import { SelectField } from '../../ui/select-field/select-field';
+import { Sheet } from '../../ui/sheet/sheet';
 import { StatusBadge, StatusBadgeStatus } from '../../ui/status-badge/status-badge';
 import { SyncNote } from '../../ui/sync-note/sync-note';
-import { TextField } from '../../ui/text-field/text-field';
 import { byAreaName } from '../areas/area-order';
-import { buildTaskPatch, draftOf, TASK_DRAFT_FIELDS, type TaskDraft } from './task-patch';
+import { SaveState, TaskDraftSaver } from './task-draft-saver';
+import { TaskBlockers } from './task-blockers';
+import { previewTask } from './task-preview';
+import { buildTaskPatch, savableDraft } from './task-patch';
 
-const EMPTY_DRAFT: TaskDraft = {
-  title: '',
-  notes: '',
-  areaId: '',
-  important: null,
-  estimateMinutes: null,
-  availableFrom: null,
-  due: null,
-};
+let nextId = 0;
 
 /** The stored Task and the state it was read from, as the editor renders them. */
 interface EditorView {
@@ -82,26 +70,33 @@ interface EditorView {
   readonly task: Task;
 }
 
-/** Edits every field of one Task, shows its derived state, and runs its actions and blocker links. */
+/**
+ * Edits one Task on a full-screen card and saves every change as it is made. It renders the draft that
+ * TaskDraftSaver keeps, previews the Task's reason line from it, and runs Done, Log progress and Drop.
+ */
 @Component({
   selector: 'asys-task-editor',
   imports: [
     Button,
-    DateSpecField,
+    ChoiceRow,
+    DateSpecRow,
     EstimateField,
+    FieldError,
     FormField,
+    Icon,
     InlineConfirm,
     LoadState,
     LogProgressForm,
     NgTemplateOutlet,
+    QuadrantChip,
     RouterLink,
     Segmented,
-    SelectField,
+    Sheet,
     StatusBadge,
     SyncNote,
-    TextField,
+    TaskBlockers,
   ],
-  providers: [CommandAttempts],
+  providers: [CommandAttempts, TaskDraftSaver],
   templateUrl: './task-editor.component.html',
   styleUrl: './task-editor.css',
 })
@@ -110,9 +105,9 @@ export class TaskEditor {
 
   protected readonly dataStore = inject(DataStore);
 
-  readonly #clock = inject(Clock);
+  protected readonly saver = inject(TaskDraftSaver);
 
-  readonly #ids = inject(Ids);
+  readonly #clock = inject(Clock);
 
   readonly #taskMorph = inject(TaskMorph);
 
@@ -125,6 +120,8 @@ export class TaskEditor {
   readonly #location = inject(Location);
 
   readonly #injector = inject(Injector);
+
+  readonly #document = inject(DOCUMENT);
 
   readonly #destroyRef = inject(DestroyRef);
 
@@ -140,19 +137,36 @@ export class TaskEditor {
 
   protected readonly TaskStatuses = TaskStatus;
 
+  protected readonly Tags = TaskExplanationTag;
+
+  protected readonly Saves = SaveState;
+
+  protected readonly Layout = EstimateLayout;
+
+  protected readonly titleErrorId = `task-editor-${nextId++}-title-error`;
+
   private readonly headingElement = viewChild<ElementRef<HTMLElement>>('heading');
 
-  private readonly logButton = viewChild('logButton', { read: ElementRef<HTMLElement> });
+  private readonly notesField = viewChild<ElementRef<HTMLTextAreaElement>>('notesField');
 
   private readonly dropButton = viewChild('dropButton', { read: ElementRef<HTMLElement> });
 
-  private readonly addBlockerButton = viewChild('addBlockerButton', {
-    read: ElementRef<HTMLElement>,
-  });
+  private readonly moreButton = viewChild('moreButton', { read: ElementRef<HTMLElement> });
 
-  protected readonly statusLine = signal('');
+  private readonly logButton = viewChild('logButton', { read: ElementRef<HTMLElement> });
 
-  protected readonly blockerMessage = signal('');
+  private readonly bar = viewChild<ElementRef<HTMLElement>>('bar');
+
+  private readonly footer = viewChild<ElementRef<HTMLElement>>('footer');
+
+  /** Action messages; a message of the saver wins over it in the status text. */
+  readonly #statusLine = signal('');
+
+  /** The message of a failed Log progress, shown inside its sheet. */
+  protected readonly logMessage = signal('');
+
+  /** The message of a failed Drop, shown inside the More sheet. */
+  protected readonly dropMessage = signal('');
 
   /**
    * Set before a Done or Drop leaves. A Done holds the Task and leaves at once, so it stays true; a Drop
@@ -160,20 +174,17 @@ export class TaskEditor {
    */
   protected readonly leaving = signal(false);
 
-  /** The AddBlocker commands still being tried, by blocker id, so a retry reuses its linkId. */
-  readonly #addCommands = new Map<string, AddBlocker>();
+  /** Whether a Log progress or Drop send is running. */
+  readonly #acting = signal(false);
 
   protected readonly logOpen = signal(false);
 
+  protected readonly moreOpen = signal(false);
+
   protected readonly confirmingDrop = signal(false);
 
-  protected readonly pickerOpen = signal(false);
-
-  protected readonly filter = signal('');
-
-  readonly #task = computed<Task | undefined>(() =>
-    this.dataStore.state()?.tasks.find((task) => task.id === this.taskId()),
-  );
+  /** Set when "Add notes" was pressed, so empty Notes stay shown. */
+  readonly #notesRequested = signal(false);
 
   /** The stored Task to render; while leaving, the last one rendered stays. */
   protected readonly view = linkedSignal<
@@ -182,7 +193,7 @@ export class TaskEditor {
   >({
     source: () => ({
       state: this.dataStore.state(),
-      task: this.#task(),
+      task: this.saver.task(),
       leaving: this.leaving(),
     }),
     computation: (source, previous) => {
@@ -195,125 +206,109 @@ export class TaskEditor {
   });
 
   protected readonly headingText = linkedSignal<Task | undefined, string>({
-    source: () => this.#task(),
+    source: () => this.saver.task(),
     computation: (task, previous) => task?.title ?? previous?.value ?? 'Task',
   });
 
   /** Whether the running view transition morphs this Task's title. */
   protected readonly morph = computed(() => this.#taskMorph.taskId() === this.taskId());
 
-  readonly #baseline = signal<TaskDraft | null>(null);
+  /** The raw draft, typed text included, differs from the stored Task. */
+  protected readonly dirty = computed(() => {
+    const baseline = this.saver.baseline();
 
-  readonly #model = signal<TaskDraft>(EMPTY_DRAFT);
-
-  /** The stored status when the baseline was first set. */
-  #expectedStatus: TaskStatus = TaskStatus.Open;
-
-  readonly #patch = computed(() => {
-    const baseline = this.#baseline();
-
-    return baseline === null ? {} : buildTaskPatch(baseline, this.#model());
+    return (
+      baseline !== null && Object.keys(buildTaskPatch(baseline, this.saver.model())).length > 0
+    );
   });
 
-  protected readonly dirty = computed(() => Object.keys(this.#patch()).length > 0);
-
-  /** The Task is missing and the form is dirty: the form stays visible but cannot change. */
-  readonly #readOnly = computed(
-    () => this.view() === null && this.dataStore.state() !== null && this.dirty(),
+  /** The form cannot change: the Task is missing and the form is dirty, the Task is Stopped, or it is leaving. */
+  protected readonly readOnly = computed(
+    () =>
+      (this.view() === null && this.dataStore.state() !== null && this.dirty()) ||
+      this.saver.state() === SaveState.Stopped ||
+      this.leaving(),
   );
 
-  protected readonly editForm = form(this.#model, (path) => {
+  protected readonly editForm = form(this.saver.model, (path) => {
     validate(path.title, ({ value }) =>
       value().trim() === '' ? { kind: 'required', message: 'Needs a title' } : undefined,
     );
-    disabled(path, { when: () => this.#readOnly() });
-  });
-
-  protected readonly needsTitle = computed(() => this.#model().title.trim() === '');
-
-  protected readonly needsEstimate = computed(() => {
-    const baseline = this.#baseline();
-
-    return (
-      baseline !== null &&
-      baseline.estimateMinutes !== null &&
-      this.#model().estimateMinutes === null
+    validate(path.estimateMinutes, () =>
+      this.saver.needsEstimate() ? { kind: 'required', message: 'Needs an Estimate' } : undefined,
     );
+    validate(path.important, () =>
+      this.saver.needsImportance()
+        ? { kind: 'required', message: 'Needs an Importance' }
+        : undefined,
+    );
+    disabled(path, { when: () => this.readOnly() });
   });
 
-  protected readonly needsImportance = computed(() => {
-    const baseline = this.#baseline();
-
-    return baseline !== null && baseline.important !== null && this.#model().important === null;
-  });
-
-  /**
-   * Whether Save, Done, Drop, Log progress and Add blocker are unavailable right now: the Task is
-   * leaving, or a send for it is in flight or waits for the server.
-   */
-  protected readonly actionsBusy = computed(
-    () => this.leaving() || this.#attempts.busy(this.taskId()),
+  /** Whether Done, and the blockers, are unavailable: leaving, awaiting the server, or read-only. */
+  protected readonly doneBlocked = computed(
+    () => this.leaving() || this.dataStore.awaitingSync().has(this.taskId()) || this.readOnly(),
   );
 
-  protected readonly canSave = computed(
-    () =>
-      this.#baseline() !== null &&
-      !this.#readOnly() &&
-      this.dirty() &&
-      !this.needsTitle() &&
-      !this.needsEstimate() &&
-      !this.needsImportance() &&
-      !this.actionsBusy(),
+  /** Whether Log progress and Drop are unavailable: Done's blocks, or one of them is running. */
+  protected readonly actionBlocked = computed(() => this.doneBlocked() || this.#acting());
+
+  protected readonly blockersBusy = computed(() => this.doneBlocked());
+
+  protected readonly statusText = computed(() => this.saver.message() || this.#statusLine());
+
+  readonly #timeZone = computed(() => zoneOrUtc(this.dataStore.state()?.settings.timeZone));
+
+  protected readonly today = computed(
+    () => toLocalDateTime(this.#clock.now(), this.#timeZone()).date,
   );
 
   protected readonly areaOptions = computed(() =>
     areaSelectOptions([...(this.dataStore.state()?.areas ?? [])].sort(byAreaName)),
   );
 
-  readonly #timeZone = computed(() => zoneOrUtc(this.view()?.state.settings.timeZone));
+  /** The reason line, previewed from the draft: only committed text, and never a cleared Estimate or Importance. */
+  protected readonly explanation = computed(() => {
+    const view = this.view();
+    const baseline = this.saver.baseline();
+
+    if (view === null || baseline === null) {
+      return null;
+    }
+
+    const zone = zoneOrUtc(view.state.settings.timeZone);
+    const preview = previewTask(
+      view.task,
+      savableDraft(baseline, this.saver.model(), this.saver.committed()),
+    );
+    const tasks = view.state.tasks.map((task) => (task.id === preview.id ? preview : task));
+
+    return explainTask(
+      preview,
+      tasks,
+      view.state.links,
+      { ...view.state.settings, timeZone: zone },
+      this.#clock.now(),
+    );
+  });
 
   protected readonly overdue = computed(() => {
-    const view = this.view();
+    const explanation = this.explanation();
 
-    return view !== null && isOverdue(view.task, this.#clock.now(), this.#timeZone());
+    return (
+      (explanation?._tag === TaskExplanationTag.Available ||
+        explanation?._tag === TaskExplanationTag.Waiting) &&
+      explanation.reason.overdue
+    );
   });
 
   protected readonly blocked = computed(() => {
-    const view = this.view();
+    const explanation = this.explanation();
 
-    return view !== null && isBlocked(view.task, view.state.tasks, view.state.links);
-  });
-
-  protected readonly inInbox = computed(() => {
-    const view = this.view();
-
-    return view !== null && isInInbox(view.task);
-  });
-
-  /** Latest start and Effective due, when the Effective due differs from the Task's own Due. */
-  protected readonly deadlines = computed(() => {
-    const view = this.view();
-
-    if (view === null) {
-      return null;
-    }
-
-    const { task, state } = view;
-    const zone = this.#timeZone();
-    const effective = effectiveDue(task, state.tasks, state.links, zone);
-    const own = task.due === null ? null : dueInstant(task.due, zone);
-
-    if (effective === null || effective === own) {
-      return null;
-    }
-
-    const now = this.#clock.now();
-    const start = latestStart(task, state.tasks, state.links, zone);
-
-    return {
-      latestStart: start === null ? null : formatClock(start, now, zone),
-      effectiveDue: formatClock(effective, now, zone),
-    };
+    return (
+      explanation?._tag === TaskExplanationTag.Waiting &&
+      explanation.reasons.some((reason) => reason._tag === BlockedReasonTag.BlockedBy)
+    );
   });
 
   protected readonly capturedText = computed(() => {
@@ -330,109 +325,100 @@ export class TaskEditor {
 
   protected readonly canLogProgress = computed(() => canLogProgress(this.view()?.task));
 
-  protected readonly blockedBy = computed(() => {
-    const view = this.view();
+  /** The stored Estimate while Log progress can be used, else null. */
+  protected readonly logEstimate = computed(() => {
+    const task = this.view()?.task;
 
-    if (view === null) {
-      return [];
-    }
-
-    return view.state.links
-      .filter((link) => link.taskId === view.task.id)
-      .map((link) => ({
-        linkId: link.id,
-        title:
-          view.state.tasks.find((task) => task.id === link.blockerId)?.title ??
-          'A Task that is no longer open',
-      }));
+    return this.canLogProgress() ? (task?.estimateMinutes ?? null) : null;
   });
 
-  protected readonly blocksTasks = computed<readonly Task[]>(() => {
-    const view = this.view();
-
-    return view === null ? [] : blocks(view.task, view.state.tasks, view.state.links);
-  });
-
-  protected readonly candidates = computed<readonly Task[]>(() => {
-    const view = this.view();
-
-    if (view === null) {
-      return [];
-    }
-
-    const needle = this.filter().toLowerCase();
-
-    return blockerCandidates(view.task, view.state.tasks, view.state.links).filter((task) =>
-      task.title.toLowerCase().includes(needle),
-    );
-  });
+  protected readonly notesShown = computed(
+    () =>
+      this.#notesRequested() ||
+      (this.saver.baseline()?.notes ?? '') !== '' ||
+      this.saver.model().notes !== '',
+  );
 
   constructor() {
+    this.saver.connect(() => this.taskId());
+
+    // A save in flight ends the Log progress confirmation, so a later save message is the one shown.
     effect(() => {
-      const task = this.#task();
-
-      untracked(() => this.#follow(task));
-    });
-  }
-
-  /** Whether this link's Remove is pending or waits for the server. */
-  protected removeBusy(linkId: string): boolean {
-    return this.leaving() || this.#attempts.busy(linkId);
-  }
-
-  protected async save(): Promise<void> {
-    const baseline = this.#baseline();
-
-    if (baseline === null || !this.canSave()) {
-      return;
-    }
-
-    this.#clearMessages();
-
-    const sent = this.#model();
-    const command: Command = {
-      _tag: CommandTag.EditTask,
-      taskId: this.taskId(),
-      patch: buildTaskPatch(baseline, sent),
-      expect: { status: this.#expectedStatus },
-    };
-    const outcome = await this.#attempts.send(command);
-
-    if (this.#destroyRef.destroyed) {
-      return;
-    }
-
-    if (outcome._tag !== CommandOutcomeTag.Applied) {
-      this.statusLine.set(outcomeMessage(outcome) ?? '');
-      return;
-    }
-
-    const task = this.#task();
-
-    if (task !== undefined) {
-      const stored = draftOf(task);
-
-      this.#baseline.set(stored);
-
-      if (!this.dataStore.awaitingSync().has(task.id)) {
-        this.#model.set(settleSaved(TASK_DRAFT_FIELDS, sent, this.#model(), stored));
+      if (this.saver.state() === SaveState.Saving) {
+        untracked(() => this.#statusLine.set(''));
       }
-    }
+    });
 
-    this.statusLine.set('Saved.');
+    this.#measureChrome();
   }
 
-  /** Holds the Task through DoneUndo and leaves at once; the send happens when its Undo window ends. */
-  protected done(event: MouseEvent): void {
-    const task = this.#task();
+  /** A person closed the Log progress or More sheet: focus returns to its opener, or the heading. */
+  protected sheetClosed(open: boolean, sheet: 'log' | 'more'): void {
+    if (!open) {
+      this.#focusAfterRender(
+        () => (sheet === 'log' ? this.logButton() : this.moreButton())?.nativeElement,
+      );
+    }
+  }
 
-    if (this.actionsBusy() || task === undefined) {
+  protected titleInput(event: Event): void {
+    const field = event.target as HTMLTextAreaElement;
+    const title = field.value.replace(/\r\n|\n/g, ' ');
+
+    if (title !== field.value) {
+      field.value = title;
+    }
+
+    this.saver.model.update((draft) => ({ ...draft, title }));
+  }
+
+  protected titleBeforeInput(event: InputEvent): void {
+    if (event.inputType === 'insertLineBreak' || event.inputType === 'insertParagraph') {
+      event.preventDefault();
+      this.saver.commit();
+    }
+  }
+
+  protected titleKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Enter' && !event.isComposing) {
+      event.preventDefault();
+      this.saver.commit();
+    }
+  }
+
+  protected notesInput(event: Event): void {
+    const notes = (event.target as HTMLTextAreaElement).value;
+
+    this.saver.model.update((draft) => ({ ...draft, notes }));
+  }
+
+  protected addNotes(): void {
+    this.#notesRequested.set(true);
+    this.#focusAfterRender(() => this.notesField()?.nativeElement);
+  }
+
+  protected openMore(): void {
+    this.confirmingDrop.set(false);
+    this.dropMessage.set('');
+    this.moreOpen.set(true);
+  }
+
+  protected back(): void {
+    this.#leave();
+  }
+
+  /** Saves the draft, holds the Task through DoneUndo and leaves at once; the send waits for its Undo window. */
+  protected done(event: MouseEvent): void {
+    const task = this.saver.task();
+
+    if (this.doneBlocked() || task === undefined) {
       return;
     }
 
-    this.#clearMessages();
+    this.#statusLine.set('');
+    this.saver.flush();
     this.leaving.set(true);
-    this.#doneUndo.complete(task, DoneOrigin.Button);
+    this.#doneUndo.complete(task, DoneOrigin.Button, this.saver.idle());
 
     if (activationOf(event).keyboard) {
       this.#doneUndo.requestFocus();
@@ -441,14 +427,53 @@ export class TaskEditor {
     this.#leave();
   }
 
-  /** Sends a Drop; Applied leaves the editor, anything else stays with its message. */
-  protected async drop(): Promise<void> {
-    if (this.actionsBusy()) {
+  protected async logProgress(minutes: number): Promise<void> {
+    if (this.actionBlocked()) {
       return;
     }
 
+    this.#acting.set(true);
     this.#clearMessages();
+
+    await this.saver.idle();
+
+    if (this.#destroyRef.destroyed) {
+      return;
+    }
+
+    const outcome = await this.#attempts.send(logProgressCommand(this.taskId(), minutes));
+
+    if (this.#destroyRef.destroyed) {
+      return;
+    }
+
+    if (outcome._tag === CommandOutcomeTag.Applied) {
+      this.#statusLine.set(estimateNowText(minutes));
+      this.logOpen.set(false);
+      this.#focusAfterRender(() => this.logButton()?.nativeElement);
+    } else {
+      this.logMessage.set(outcomeMessage(outcome) ?? '');
+    }
+
+    this.#acting.set(false);
+  }
+
+  /** Sends a Drop; Applied leaves the editor, anything else stays with its message in the More sheet. */
+  protected async drop(): Promise<void> {
+    if (this.actionBlocked()) {
+      return;
+    }
+
+    this.#acting.set(true);
     this.leaving.set(true);
+    this.#clearMessages();
+    this.saver.halt();
+
+    await this.saver.idle();
+
+    if (this.#destroyRef.destroyed) {
+      return;
+    }
 
     const outcome = await this.#attempts.send({
       _tag: CommandTag.DropTask,
@@ -461,12 +486,15 @@ export class TaskEditor {
     }
 
     if (outcome._tag === CommandOutcomeTag.Applied) {
+      this.moreOpen.set(false);
       this.#leave();
       return;
     }
 
     this.leaving.set(false);
-    this.statusLine.set(outcomeMessage(outcome) ?? '');
+    this.#acting.set(false);
+    this.saver.resume();
+    this.dropMessage.set(outcomeMessage(outcome) ?? '');
   }
 
   protected cancelDrop(): void {
@@ -474,112 +502,57 @@ export class TaskEditor {
     this.#focusAfterRender(() => this.dropButton()?.nativeElement);
   }
 
-  protected async logProgress(minutes: number): Promise<void> {
-    if (this.actionsBusy()) {
+  /**
+   * While the editor exists, publishes the heights of its sticky bar and footer on the root element,
+   * so `scroll-padding-block` keeps a focused control clear of them. Needs ResizeObserver.
+   */
+  #measureChrome(): void {
+    if (typeof ResizeObserver !== 'function') {
       return;
     }
 
-    this.#clearMessages();
+    const root = this.#document.documentElement;
 
-    const outcome = await this.#attempts.send(logProgressCommand(this.taskId(), minutes));
+    root.classList.add('task-editor-open');
 
-    if (this.#destroyRef.destroyed) {
-      return;
-    }
+    effect((onCleanup) => {
+      const element = this.bar()?.nativeElement;
 
-    if (outcome._tag !== CommandOutcomeTag.Applied) {
-      this.statusLine.set(outcomeMessage(outcome) ?? '');
-      return;
-    }
+      if (element) {
+        onCleanup(this.#observeBlockSize(element, '--task-editor-bar-height'));
+      }
+    });
 
-    this.statusLine.set(estimateNowText(minutes));
-    this.logOpen.set(false);
-    this.#focusAfterRender(() => this.logButton()?.nativeElement);
+    effect((onCleanup) => {
+      const element = this.footer()?.nativeElement;
+
+      if (element) {
+        onCleanup(this.#observeBlockSize(element, '--task-editor-footer-height'));
+      } else {
+        root.style.setProperty('--task-editor-footer-height', '0px');
+      }
+    });
+
+    this.#destroyRef.onDestroy(() => {
+      root.classList.remove('task-editor-open');
+      root.style.removeProperty('--task-editor-bar-height');
+      root.style.removeProperty('--task-editor-footer-height');
+    });
   }
 
-  protected cancelLogProgress(): void {
-    this.logOpen.set(false);
-    this.#focusAfterRender(() => this.logButton()?.nativeElement);
-  }
+  /** Writes the border-box block size of `element` to the property `name` on the root element, as it changes. */
+  #observeBlockSize(element: HTMLElement, name: string): () => void {
+    const observer = new ResizeObserver((entries) => {
+      const size = entries[0]?.borderBoxSize[0]?.blockSize;
 
-  protected async removeBlocker(linkId: string): Promise<void> {
-    if (this.removeBusy(linkId)) {
-      return;
-    }
+      if (size !== undefined) {
+        this.#document.documentElement.style.setProperty(name, `${size}px`);
+      }
+    });
 
-    this.#clearMessages();
+    observer.observe(element);
 
-    const outcome = await this.#attempts.send({ _tag: CommandTag.RemoveBlocker, linkId });
-
-    if (this.#destroyRef.destroyed) {
-      return;
-    }
-
-    if (outcome._tag === CommandOutcomeTag.Applied) {
-      this.#focusAfterRender(() => this.addBlockerButton()?.nativeElement);
-    } else {
-      this.statusLine.set(outcomeMessage(outcome) ?? '');
-    }
-  }
-
-  protected async addBlocker(blockerId: string): Promise<void> {
-    if (this.actionsBusy()) {
-      return;
-    }
-
-    this.#clearMessages();
-
-    const command: AddBlocker = this.#addCommands.get(blockerId) ?? {
-      _tag: CommandTag.AddBlocker,
-      linkId: this.#ids.next(),
-      taskId: this.taskId(),
-      blockerId,
-    };
-
-    this.#addCommands.set(blockerId, command);
-
-    const outcome = await this.#attempts.send(command);
-
-    if (this.#destroyRef.destroyed) {
-      return;
-    }
-
-    if (outcome._tag !== CommandOutcomeTag.Failed) {
-      this.#addCommands.delete(blockerId);
-    }
-
-    if (outcome._tag === CommandOutcomeTag.Applied) {
-      this.closePicker();
-    } else {
-      this.blockerMessage.set(outcomeMessage(outcome) ?? '');
-    }
-  }
-
-  protected closePicker(): void {
-    this.pickerOpen.set(false);
-    this.#focusAfterRender(() => this.addBlockerButton()?.nativeElement);
-  }
-
-  /** Sets the baseline when the Task first appears, then follows the store field by field. */
-  #follow(task: Task | undefined): void {
-    if (task === undefined) {
-      return;
-    }
-
-    const stored = draftOf(task);
-    const baseline = this.#baseline();
-
-    if (baseline === null) {
-      this.#expectedStatus = task.status;
-      this.#baseline.set(stored);
-      this.#model.set(stored);
-      return;
-    }
-
-    const next = followStore(TASK_DRAFT_FIELDS, baseline, this.#model(), stored);
-
-    this.#baseline.set(next.baseline);
-    this.#model.set(next.draft);
+    return () => observer.disconnect();
   }
 
   #leave(): void {
@@ -591,8 +564,9 @@ export class TaskEditor {
   }
 
   #clearMessages(): void {
-    this.statusLine.set('');
-    this.blockerMessage.set('');
+    this.#statusLine.set('');
+    this.logMessage.set('');
+    this.dropMessage.set('');
   }
 
   /** After the next render, focuses the element, or the heading when it is gone. */

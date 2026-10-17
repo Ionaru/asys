@@ -1116,4 +1116,125 @@ describe('DoneUndo', () => {
       expect(release).not.toHaveBeenCalled();
     });
   });
+
+  describe('waiting for the flushed edit', () => {
+    /** A promise the test settles by hand, standing for the editor's `saver.idle()`. */
+    const gate = () => {
+      let resolve!: () => void;
+      let reject!: (reason: unknown) => void;
+      const promise = new Promise<void>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+
+      return { promise, resolve, reject };
+    };
+
+    it('sends the held Done only after `after` has settled, once its window has ended', async () => {
+      const after = gate();
+
+      doneUndo.complete(A, DoneOrigin.Button, after.promise);
+      await advance(UNDO_WINDOW_MS);
+
+      expect(send).not.toHaveBeenCalled();
+      expect(doneUndo.pending()).toBeNull();
+
+      after.resolve();
+      await advance(0);
+
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(send.mock.calls[0]?.[0]).toStrictEqual(completeCommand('a'));
+      expect(send.mock.calls[0]?.[1]).toBe('key-1');
+      expect(runCommand).not.toHaveBeenCalled();
+    });
+
+    it('sends at the end of the window without waiting when `after` has already settled', async () => {
+      doneUndo.complete(A, DoneOrigin.Button, Promise.resolve());
+      await advance(UNDO_WINDOW_MS);
+
+      expect(send).toHaveBeenCalledTimes(1);
+    });
+
+    it('treats a rejected `after` as settled and sends anyway', async () => {
+      const after = gate();
+
+      doneUndo.complete(A, DoneOrigin.Button, after.promise);
+      await advance(UNDO_WINDOW_MS);
+
+      expect(send).not.toHaveBeenCalled();
+
+      after.reject(new Error('the edit failed'));
+      await advance(0);
+
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(send.mock.calls[0]?.[0]).toStrictEqual(completeCommand('a'));
+    });
+
+    it('does not wait for `after` when the page is hidden', async () => {
+      const after = gate();
+
+      doneUndo.complete(A, DoneOrigin.Button, after.promise);
+      setVisibility('hidden');
+      document.dispatchEvent(new Event('visibilitychange'));
+
+      expect(runCommand).toHaveBeenCalledTimes(1);
+      expect(runCommand.mock.calls[0]?.[0]).toStrictEqual(completeCommand('a'));
+      expect(runCommand.mock.calls[0]?.[2]).toStrictEqual({ keepalive: true });
+      expect(send).not.toHaveBeenCalled();
+    });
+
+    it('does not wait for `after` on pagehide', () => {
+      const after = gate();
+
+      doneUndo.complete(A, DoneOrigin.Button, after.promise);
+      window.dispatchEvent(new Event('pagehide'));
+
+      expect(runCommand).toHaveBeenCalledTimes(1);
+      expect(send).not.toHaveBeenCalled();
+    });
+
+    it('sends nothing for an Undo while `after` is pending, even once it settles', async () => {
+      const after = gate();
+
+      doneUndo.complete(A, DoneOrigin.Button, after.promise);
+      await advance(1_000);
+      doneUndo.undo();
+      after.resolve();
+      await advance(UNDO_WINDOW_MS);
+
+      expect(send).not.toHaveBeenCalled();
+      expect(runCommand).not.toHaveBeenCalled();
+      expect(release).toHaveBeenCalledWith('key-1');
+    });
+
+    it('sends the earlier Done at once for a second Done, and it still awaits its own `after`', async () => {
+      const afterA = gate();
+
+      doneUndo.complete(A, DoneOrigin.Button, afterA.promise);
+      await advance(1_000);
+      doneUndo.complete(B, DoneOrigin.Button);
+      await advance(0);
+
+      expect(send).not.toHaveBeenCalled();
+      expect(doneUndo.pending()?.taskId).toBe('b');
+
+      afterA.resolve();
+      await advance(0);
+
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(send.mock.calls[0]?.[0]).toStrictEqual(completeCommand('a'));
+      expect(send.mock.calls[0]?.[1]).toBe('key-1');
+    });
+
+    it("does not make a later Done wait for the earlier one's `after`", async () => {
+      const afterA = gate();
+
+      doneUndo.complete(A, DoneOrigin.Button, afterA.promise);
+      doneUndo.complete(B, DoneOrigin.Button);
+      await advance(UNDO_WINDOW_MS);
+
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(send.mock.calls[0]?.[0]).toStrictEqual(completeCommand('b'));
+    });
+  });
 });

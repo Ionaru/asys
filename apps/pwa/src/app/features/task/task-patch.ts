@@ -56,3 +56,47 @@ export const buildTaskPatch = (baseline: TaskDraft, draft: TaskDraft): TaskPatch
     ...(sameSpec(draft.due, baseline.due) ? {} : { due: draft.due }),
   };
 };
+
+/** Title and Notes as the person last committed them (on change, Enter or a flush). */
+export interface CommittedText {
+  readonly title: string;
+  readonly notes: string;
+}
+
+/** The committed text of a draft. */
+export const committedOf = (draft: TaskDraft): CommittedText => ({
+  title: draft.title,
+  notes: draft.notes,
+});
+
+/** The committed text compared field by field, for followStore and settleSaved. */
+export const COMMITTED_FIELDS: DraftFields<CommittedText> = {
+  keys: ['title', 'notes'],
+  same: (key, a, b) => a[key] === b[key],
+};
+
+/** The draft as it would be saved: committed text instead of typed text, and no field the editor never sends. */
+export const savableDraft = (
+  baseline: TaskDraft,
+  draft: TaskDraft,
+  committed: CommittedText,
+): TaskDraft => ({
+  title: committed.title.trim() === '' ? baseline.title : committed.title,
+  notes: committed.notes,
+  areaId: draft.areaId,
+  important:
+    draft.important === null && baseline.important !== null ? baseline.important : draft.important,
+  estimateMinutes:
+    draft.estimateMinutes === null && baseline.estimateMinutes !== null
+      ? baseline.estimateMinutes
+      : draft.estimateMinutes,
+  availableFrom: draft.availableFrom,
+  due: draft.due,
+});
+
+/** The EditTask patch an autosave sends: buildTaskPatch(baseline, savableDraft(baseline, draft, committed)). */
+export const buildSavePatch = (
+  baseline: TaskDraft,
+  draft: TaskDraft,
+  committed: CommittedText,
+): TaskPatch => buildTaskPatch(baseline, savableDraft(baseline, draft, committed));

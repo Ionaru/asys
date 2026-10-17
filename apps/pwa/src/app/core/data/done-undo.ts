@@ -58,6 +58,8 @@ interface Held {
   readonly command: CompleteTask;
   readonly key: string;
   readonly origin: DoneOrigin;
+  /** Work this Done waits for before a normal send, such as an edit still being saved. */
+  readonly after: Promise<void> | undefined;
 }
 
 /**
@@ -134,8 +136,11 @@ export class DoneUndo {
     });
   }
 
-  /** Hides the Task at once and opens its Undo window; an earlier Done is sent without waiting. */
-  complete(task: Task, origin: DoneOrigin): void {
+  /**
+   * Hides the Task at once and opens its Undo window; an earlier Done is sent without waiting. A normal
+   * send first awaits `after` (a rejection counts as settled); a send with `keepalive` does not wait.
+   */
+  complete(task: Task, origin: DoneOrigin, after?: Promise<void>): void {
     if (this.#held?.task.id === task.id) {
       return;
     }
@@ -156,7 +161,7 @@ export class DoneUndo {
     const key = this.#attempts.keyFor(command);
 
     this.#dataStore.hold(command, key);
-    this.#held = { task, command, key, origin };
+    this.#held = { task, command, key, origin, after };
     this.#remaining = UNDO_WINDOW_MS;
     this.#pendingSignal.set({
       taskId: task.id,
@@ -320,6 +325,10 @@ export class DoneUndo {
 
   #dispatch(held: Held, keepalive: boolean): Promise<void> {
     const run = async (): Promise<void> => {
+      if (!keepalive && held.after !== undefined) {
+        await held.after.catch(() => undefined);
+      }
+
       const outcome = keepalive
         ? await this.#dataApi.runCommand(held.command, held.key, { keepalive: true })
         : await this.#dataStore.send(held.command, held.key);
