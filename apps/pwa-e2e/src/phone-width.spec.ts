@@ -88,11 +88,12 @@ test('No sideways scroll on the Task screens at phone width', async ({ page }) =
     ['/today', heading('Today')],
     ['/inbox', page.locator('article.asys-triage .asys-triage__title')],
     ['/capture', heading('Capture')],
-    [`/tasks/${urlTaskId}`, heading(TRIAGED_URL_TITLE)],
+    [`/tasks/${urlTaskId}`, page.getByRole('textbox', { name: 'Title' })],
   ];
   for (const [path, ready] of screens) {
     await expectNoSidewaysScroll(page, path, ready);
     if (path === '/inbox') await expect(ready).toHaveText(URL_TITLE);
+    if (path.startsWith('/tasks/')) await expect(ready).toHaveValue(TRIAGED_URL_TITLE);
   }
 });
 
@@ -112,11 +113,7 @@ test('No sideways scroll on Settings, Areas and the account at phone width', asy
 });
 
 test('The bottom nav centres its destinations when Capture is not shown', async ({ page }) => {
-  const taskId = await seedTask(page, {
-    title: 'Centred nav Task',
-    important: false,
-    estimateMinutes: 25,
-  });
+  await seedTask(page, { title: 'Centred nav Task', important: false, estimateMinutes: 25 });
   await page.reload();
   const nav = page.getByRole('navigation', { name: 'Primary' });
   const capture = page.getByRole('button', { name: 'Capture' });
@@ -140,12 +137,49 @@ test('The bottom nav centres its destinations when Capture is not shown', async 
   expect(tab.start, JSON.stringify(tab)).toBeCloseTo(0, 0);
   expect(tab.end, JSON.stringify(tab)).toBeCloseTo(0, 0);
 
-  await page.goto(`/tasks/${taskId}`);
-  await expect(page.getByRole('heading', { level: 1, name: 'Centred nav Task' })).toBeVisible();
+  // Settings has the nav but no Capture.
+  await page.goto('/settings');
+  await expect(page.getByLabel('Time zone')).toBeVisible();
+  await expect(nav).toBeVisible();
   await expect(capture).toHaveCount(0);
-  const editor = await gaps();
-  expect(editor.start, JSON.stringify(editor)).toBeGreaterThan(1);
-  expect(Math.abs(editor.start - editor.end), JSON.stringify(editor)).toBeLessThan(1);
+  const settings = await gaps();
+  expect(settings.start, JSON.stringify(settings)).toBeGreaterThan(1);
+  expect(Math.abs(settings.start - settings.end), JSON.stringify(settings)).toBeLessThan(1);
+});
+
+test('The Task editor has no nav, its footer clears the card and nothing scrolls sideways', async ({
+  page,
+}) => {
+  const taskId = await seedTask(page, {
+    title: 'Editor phone Task',
+    important: false,
+    estimateMinutes: 25,
+    captureText: 'Some notes captured with the Task',
+  });
+  await page.goto(`/tasks/${taskId}`);
+  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('Editor phone Task');
+  await expect(page.getByRole('navigation', { name: 'Primary' })).toHaveCount(0);
+
+  const done = page.getByRole('button', { name: 'Done', exact: true });
+  await expect(done).toBeVisible();
+
+  await scrollToBottom(page);
+  const card = page.locator('section.task-editor__card');
+  await expectClearOf(done, [card]);
+  const cardBox = await card.boundingBox();
+  const doneBox = await done.boundingBox();
+  if (cardBox === null || doneBox === null) throw new Error('no box');
+  expect(doneBox.y, JSON.stringify({ cardBox, doneBox })).toBeGreaterThanOrEqual(
+    cardBox.y + cardBox.height,
+  );
+
+  const widths = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth,
+    client: document.documentElement.clientWidth,
+    bodyScroll: document.body.scrollWidth,
+  }));
+  expect(widths.scroll, 'documentElement scrollWidth').toBeLessThanOrEqual(widths.client);
+  expect(widths.bodyScroll, 'body scrollWidth').toBeLessThanOrEqual(widths.client);
 });
 
 test('Nothing covers the last Now row, with the pill or the open quick add', async ({ page }) => {

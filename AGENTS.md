@@ -9,7 +9,7 @@ ASYS (Assisting System) is a personal task manager that answers "what should I d
 - `CONTEXT.md` is the domain language. Use its terms exactly and capitalised (Task, Estimate, Available from, Due, Picker, Now, Inbox, Review item, Area, Voice) in code, tests, UI copy and docs. Never use the words on its _Avoid_ lines, such as "to-do", "event", "deadline" or "project".
 - `docs/adr/` holds the decisions that bind the code. Read the ADR before changing what it governs.
 - `docs/mvp-plan.md` says what each slice and stage holds. `docs/scenarios.md` holds the acceptance examples, mirrored one-to-one by `libs/domain/src/scenarios/s<N>.spec.ts`.
-- `docs/slice-1-plan.md` records how slice 1 was built: its decisions, known limits and dated "Facts checked" notes. Its "Pulled ahead before slice 2" section holds what the motion, Undo, swipe and Current Area work left open, phone checks included. Counts and versions in it are historical, so check the code.
+- `docs/slice-1-plan.md` records how slice 1 was built: its decisions, known limits and dated "Facts checked" notes. Its "Pulled ahead before slice 2" section holds what the motion, Undo, swipe, Current Area and Task editor work left open, phone checks included. Counts and versions in it are historical, so check the code.
 - `README.md` covers running the stack, the end-to-end tests, CI and the deploy runbook.
 
 ## Projects
@@ -32,7 +32,7 @@ Use Node 24 and pnpm 11. `package.json` has no scripts, so everything runs throu
 
 - **Database:** `docker compose up -d --wait`, then `pnpm exec drizzle-kit migrate --config apps/server/drizzle.config.ts`. The root `.env` holds the passwords and `DATABASE_URL_OWNER` / `DATABASE_URL_APP` (see `README.md`).
 - **Dev stack:** start `pnpm exec nx serve pwa` before `pnpm exec nx serve server`, because generating the PWA's API client rebuilds the server bundle. Open `http://localhost:4200` exactly. On `127.0.0.1`, the Origin guard answers 403 and passkeys fail.
-- **One project:** `pnpm exec nx <target> <project>`, for example `pnpm exec nx test domain` or `pnpm exec nx typecheck pwa`. **One spec:** `pnpm exec nx test domain -- src/lib/picker/picker.spec.ts`.
+- **One project:** `pnpm exec nx <target> <project>`, for example `pnpm exec nx test domain` or `pnpm exec nx typecheck pwa`. **One spec:** `pnpm exec nx test domain -- src/lib/picker/picker.spec.ts`; the PWA's unit-test builder takes `--include` instead: `pnpm exec nx test pwa --include=apps/pwa/src/app/ui/sheet/sheet.spec.ts`.
 - **JSON from Nx:** `pnpm exec` prints "Already up to date" first, so for JSON run `node_modules/.bin/nx show project <name> --json`.
 
 CI (`.github/workflows/cd.yaml`) runs each check below as its own job. Run the ones your change touches before you call it done:
