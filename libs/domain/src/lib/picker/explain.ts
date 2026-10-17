@@ -10,7 +10,7 @@ import {
   type Task,
 } from '../task';
 import { addCalendarDays, toLocalDateTime, type Instant } from '../time';
-import type { ExclusionReason, Reason } from './picker';
+import type { ExclusionReason, Reason } from './reason-types';
 import { exclusionReasons, reasonOf } from './reasons';
 import { reasonTextOn } from './reason-text';
 import { waitingTextOn } from './waiting-text';

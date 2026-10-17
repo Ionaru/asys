@@ -10,33 +10,21 @@ import {
   deadlineIndex,
   Quadrant,
   TaskStatus,
-  type BlockedBy,
   type BlockerLink,
   type Task,
 } from '../task';
 import { addCalendarDays, toLocalDateTime, type Instant } from '../time';
 import { exclusionReasons, reasonOf } from './reasons';
 import { reasonTextOn } from './reason-text';
+import type { ExclusionReason, Reason } from './reason-types';
 import { waitingTextOn } from './waiting-text';
 
-export enum ExclusionReasonTag {
-  NotYetAvailable = 'NotYetAvailable',
-}
-
-export interface NotYetAvailable {
-  readonly _tag: ExclusionReasonTag.NotYetAvailable;
-  readonly from: Instant;
-}
-
-/** Why an Open, triaged Task is not ranked. An open union: Slice 2 adds Voice and Gap reasons, so consumers must handle tags they do not know. */
-export type ExclusionReason = NotYetAvailable | BlockedBy;
-
-export interface Reason {
-  readonly overdue: boolean;
-  readonly quadrant: Quadrant;
-  readonly urgent: boolean;
-  readonly latestStart: Instant | null;
-}
+export {
+  ExclusionReasonTag,
+  type ExclusionReason,
+  type NotYetAvailable,
+  type Reason,
+} from './reason-types';
 
 export interface RankedTask {
   readonly task: Task;

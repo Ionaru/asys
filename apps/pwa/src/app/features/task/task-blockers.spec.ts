@@ -253,12 +253,68 @@ describe('TaskBlockers', () => {
       expect(text(header())).toContain('Waits for no other Task. No Task waits for this one.');
     });
 
-    it('summarises the blockers by title and a missing one as no longer open', async () => {
-      const { header, text } = await setup({ state: LINKED });
+    it('leaves a missing blocker out of the summary but keeps it in the sheet', async () => {
+      const { header, text, openSheet, removes } = await setup({
+        state: domainState([CALL], { links: [link('l1', 't1', 'gone')] }),
+      });
 
-      expect(text(header())).toContain(
-        'Waits for Water form and A Task that is no longer open. No Task waits for this one.',
+      expect(text(header())).toContain('Waits for no other Task. No Task waits for this one.');
+
+      await openSheet();
+
+      expect(removes()).toHaveLength(1);
+      expect(text(removes()[0]?.closest('.task-blockers__row') ?? null)).toContain(
+        'A Task that is no longer open',
       );
+    });
+
+    it('names the open blocker and leaves the missing one out of the summary', async () => {
+      const { header, text, openSheet, removes } = await setup({
+        state: domainState([CALL, task({ id: 't6', title: 'Order card' })], {
+          links: [link('l1', 't1', 't6'), link('l2', 't1', 'gone')],
+        }),
+      });
+
+      expect(text(header())).toContain('Waits for Order card. No Task waits for this one.');
+
+      await openSheet();
+
+      expect(removes()).toHaveLength(2);
+    });
+
+    it('summarises open blockers by title', async () => {
+      const { header, text } = await setup({
+        state: domainState(
+          [CALL, task({ id: 't6', title: 'Bravo' }), task({ id: 't7', title: 'Charlie' })],
+          { links: [link('l1', 't1', 't6'), link('l2', 't1', 't7')] },
+        ),
+      });
+
+      expect(text(header())).toContain('Waits for Bravo and Charlie. No Task waits for this one.');
+    });
+
+    it('keeps the link order and skips a missing blocker between open ones', async () => {
+      const { header, text } = await setup({
+        state: domainState(
+          [CALL, task({ id: 't7', title: 'Echo' }), task({ id: 't6', title: 'Delta' })],
+          {
+            links: [link('l1', 't1', 't6'), link('l2', 't1', 'gone'), link('l3', 't1', 't7')],
+          },
+        ),
+      });
+
+      expect(text(header())).toContain('Waits for Delta and Echo. No Task waits for this one.');
+    });
+
+    it('counts a Delegated blocker and not a Done one that is still in the state', async () => {
+      const { header, text } = await setup({
+        state: domainState(
+          [CALL, task({ id: 't6', title: 'Hand over', status: TaskStatus.Delegated }), OLD],
+          { links: [link('l1', 't1', 't4'), link('l2', 't1', 't6')] },
+        ),
+      });
+
+      expect(text(header())).toContain('Waits for Hand over. No Task waits for this one.');
     });
 
     it('summarises one blocker and the Tasks that wait for this one', async () => {

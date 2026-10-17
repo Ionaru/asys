@@ -90,7 +90,11 @@
   }
 }
 
-<asys-sheet heading="Log progress" [(open)]="logOpen" (openChange)="sheetClosed($event, 'log')">
+<asys-sheet
+  heading="Log progress"
+  [(open)]="logOpen"
+  (openChange)="sheetClosed($event, Sheets.Log)"
+>
   <ng-template>
     <p class="task-editor__message" role="status">{{ logMessage() }}</p>
     @if (logEstimate(); as estimate) {
@@ -103,7 +107,7 @@
     }
   </ng-template>
 </asys-sheet>
-<asys-sheet heading="More" [(open)]="moreOpen" (openChange)="sheetClosed($event, 'more')">
+<asys-sheet heading="More" [(open)]="moreOpen" (openChange)="sheetClosed($event, Sheets.More)">
   <ng-template>
     @if (confirmingDrop()) {
       <asys-inline-confirm
@@ -217,20 +221,29 @@
     @if (explanation(); as e) {
       @if (e._tag === Tags.Inbox) {
         <div class="task-editor__reason">
+          <ng-container [ngTemplateOutlet]="badges" />
           <p class="task-editor__reason-text">In the Inbox until Triage</p>
         </div>
       } @else if (e._tag === Tags.Available || e._tag === Tags.Waiting) {
         <div class="task-editor__reason">
           <asys-quadrant-chip [quadrant]="e.reason.quadrant" [strong]="true" />
-          @if (overdue()) {
-            <asys-status-badge [status]="Badge.Overdue" />
-          }
-          @if (blocked()) {
-            <asys-status-badge [status]="Badge.Blocked" />
-          }
+          <ng-container [ngTemplateOutlet]="badges" />
           <span class="task-editor__reason-text">{{ e.reasonText }}</span>
+        </div>
+      } @else if (overdue() || blocked()) {
+        <div class="task-editor__reason">
+          <ng-container [ngTemplateOutlet]="badges" />
         </div>
       }
     }
   </section>
+</ng-template>
+
+<ng-template #badges>
+  @if (overdue()) {
+    <asys-status-badge [status]="Badge.Overdue" />
+  }
+  @if (blocked()) {
+    <asys-status-badge [status]="Badge.Blocked" />
+  }
 </ng-template>

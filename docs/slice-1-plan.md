@@ -211,7 +211,7 @@ This is `libs/domain/src/lib/`: MPL-2.0, with no import beyond `temporal-polyfil
 time/        local-date.ts (LocalDate, LocalTime, DateSpec, parse and validate), zoned.ts (startOfDay, availableFromInstant, dueInstant, addCalendarDays; Temporal only here)
 area/        active-hours.ts (ActiveHours: per ISO weekday, a list of [startMinute, endMinute) intervals; isWithinActiveHours(area, instant, tz); the Work and Personal seeds)
 task/        task.ts (types), inbox.ts, blocked.ts (BlockedReason union), available.ts, deadlines.ts (isOverdue, effectiveDue, latestStart), priority.ts (isUrgent, quadrant)
-picker/      picker.ts (pick returns { ranked, waiting }; Reason; an open ExclusionReason union), reason-text.ts
+picker/      picker.ts (pick returns { ranked, waiting }), reason-types.ts (Reason; an open ExclusionReason union; re-exported by picker.ts since 2026-10-17), reason-text.ts
 commands/    command.ts (TransitionResult: applied{changes}, notApplicable{reason} or rejected{reason}; Change: {entity, op: 'put' or 'remove', after}), task-, blocker-, area-, settings- and review-commands.ts
 rules-version.ts   RULES_VERSION (0.1.0 in piece 1), with libs/domain/CHANGELOG.md
 ```
@@ -906,7 +906,7 @@ Their plans were removed once built: the first three on 2026-10-11, the Current 
 - Correcting a mis-tapped Due date counts one Due move.
 - A Title typed, but not yet committed, while another device renames the Task can send the other device's title back once; the server takes it as a no-op.
 - An edit made while a save comes back Rejected or Failed is sent with the next change or Try again, not on its own.
-- A Done waits for the editor's last save before it sends, except when the app is hidden or closed during the Undo window: then both go out at once with keepalive, the Done can land first, and the edit becomes a Review item.
+- A Done waits for the editor's last save before it sends, except when the app is hidden or closed before that Done has gone out, during the Undo window or while it still waits for the save: then the Done goes out at once with keepalive beside the edit's own send, it can land first, and the edit becomes a Review item.
 - While the Undo bar shows on the editor, a focused control can sit under it: the scroll padding counts only the editor's own bar and footer.
 
 **Open checks on the phone.** These need the installed PWA on an Android phone. Record each outcome here in a docs-only commit.

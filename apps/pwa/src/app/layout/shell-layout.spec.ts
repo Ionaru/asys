@@ -31,6 +31,8 @@ interface NowItem {
   readonly id: string;
   readonly leaving?: boolean;
   readonly linked?: boolean;
+  /** Carries data-task-id (the morph hook) but not data-focus-title: never a focus target. */
+  readonly unmarked?: boolean;
 }
 
 /** What `NowStub` renders after its h1; a case sets it and `afterEach` resets it. */
@@ -42,14 +44,18 @@ const nowItems = signal<readonly NowItem[]>([]);
     @for (item of items(); track item.id) {
       @if (item.leaving) {
         <div data-leaving>
-          <span tabindex="-1" [attr.data-task-id]="item.id">{{ item.id }}</span>
+          <span tabindex="-1" data-focus-title [attr.data-task-id]="item.id">{{ item.id }}</span>
         </div>
       } @else if (item.linked) {
         <a [attr.href]="'/tasks/' + item.id"
-          ><span tabindex="-1" [attr.data-task-id]="item.id">{{ item.id }}</span></a
+          ><span tabindex="-1" data-focus-title [attr.data-task-id]="item.id">{{
+            item.id
+          }}</span></a
         >
-      } @else {
+      } @else if (item.unmarked) {
         <span tabindex="-1" [attr.data-task-id]="item.id">{{ item.id }}</span>
+      } @else {
+        <span tabindex="-1" data-focus-title [attr.data-task-id]="item.id">{{ item.id }}</span>
       }
     }
   `,
@@ -1628,6 +1634,7 @@ describe('ShellLayout', () => {
 
       outside.tabIndex = -1;
       outside.dataset['taskId'] = 'x';
+      outside.dataset['focusTitle'] = '';
       must(root().querySelector('nav[aria-label="Primary"]')).appendChild(outside);
 
       doneUndo.pending.set(PENDING);
@@ -1635,6 +1642,41 @@ describe('ShellLayout', () => {
       await pressEscapeInBar();
 
       expect(document.activeElement).not.toBe(outside);
+      expect(document.activeElement).toBe(root().querySelector('main h1'));
+    });
+
+    it('never focuses an element with data-task-id but no data-focus-title on Escape', async () => {
+      const { doneUndo, root, pressEscapeInBar, settle } = await setup();
+
+      nowItems.set([{ id: 'a', unmarked: true }]);
+      doneUndo.pending.set(PENDING);
+      await settle();
+      await pressEscapeInBar();
+
+      expect(document.activeElement).not.toBe(root().querySelector('main [data-task-id="a"]'));
+      expect(document.activeElement).toBe(root().querySelector('main h1'));
+    });
+
+    it('skips an unmarked element for the first marked title on Escape', async () => {
+      const { doneUndo, root, pressEscapeInBar, settle } = await setup();
+
+      nowItems.set([{ id: 'a', unmarked: true }, { id: 'b' }]);
+      doneUndo.pending.set(PENDING);
+      await settle();
+      await pressEscapeInBar();
+
+      expect(document.activeElement).toBe(root().querySelector('main [data-task-id="b"]'));
+    });
+
+    it('never focuses an unmarked element of the restored Task after an Undo', async () => {
+      const { doneUndo, root, settle } = await setup();
+
+      nowItems.set([{ id: 'b', unmarked: true }]);
+      await settle();
+      doneUndo.undone.set({ taskId: 'b', seq: 1 });
+      await settle();
+
+      expect(document.activeElement).not.toBe(root().querySelector('main [data-task-id="b"]'));
       expect(document.activeElement).toBe(root().querySelector('main h1'));
     });
 

@@ -215,6 +215,8 @@ interface SetupOptions {
   readonly taskId?: string;
   /** The Clock's now; defaults to 10:00 in Amsterdam on 2026-10-04. */
   readonly now?: Instant;
+  /** Replaces the Clock's now signal, for tests that count its reads. */
+  readonly readNow?: () => Instant;
   /** Navigate twice before the editor acts, so the router has a previous navigation. */
   readonly withHistory?: boolean;
 }
@@ -267,7 +269,7 @@ const stubs = (options: SetupOptions) => {
       { provide: DataStore, useValue: { state, status, awaitingSync, send, refresh } },
       { provide: DataApi, useValue: { runCommand } },
       { provide: DoneUndo, useValue: doneUndo },
-      { provide: Clock, useValue: { now: signal(options.now ?? T0) } },
+      { provide: Clock, useValue: { now: options.readNow ?? signal(options.now ?? T0) } },
       { provide: Ids, useValue: { next } },
       { provide: ErrorHandler, useValue: { handleError } },
     ],
@@ -1026,6 +1028,82 @@ describe('TaskEditor', () => {
       expect(sent(send, 0)).toEqual(editTask('t1', { title: expected }));
     });
 
+    describe('the caret', () => {
+      const typeWithCaret = async (
+        el: HTMLTextAreaElement,
+        value: string,
+        caret: number,
+        settle: () => Promise<void>,
+      ): Promise<void> => {
+        el.value = value;
+        el.setSelectionRange(caret, caret);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        await settle();
+      };
+
+      it.each([
+        ['ab\ncd', 3, 'ab cd', 3],
+        ['Callx\ny\nz Marit', 9, 'Callx y z Marit', 9],
+      ])(
+        'turns %j with the caret at %i into %j with the caret at %i',
+        async (value, caret, expected, expectedCaret) => {
+          const { titleField, settle } = await setup();
+
+          await typeWithCaret(titleField(), value, caret, settle);
+
+          expect(titleField().value).toBe(expected);
+          expect(titleField().selectionStart).toBe(expectedCaret);
+          expect(titleField().selectionEnd).toBe(expectedCaret);
+        },
+      );
+
+      it('keeps the caret in place straight after the input event', async () => {
+        const { titleField } = await setup();
+        const el = titleField();
+
+        el.value = 'ab\ncd';
+        el.setSelectionRange(3, 3);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+
+        expect(el.value).toBe('ab cd');
+        expect(el.selectionStart).toBe(3);
+        expect(el.selectionEnd).toBe(3);
+      });
+
+      it('commits the replaced Title', async () => {
+        const { send, titleField, settle, changeOn } = await setup();
+
+        await typeWithCaret(titleField(), 'Call\nMarit back', 5, settle);
+        await changeOn(titleField());
+
+        expect(sent(send, 0)).toEqual(editTask('t1', { title: 'Call Marit back' }));
+      });
+
+      it('does not write the value back when there is no newline', async () => {
+        const { titleField, settle } = await setup();
+        const el = titleField();
+        const real = must(Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value'));
+        const writes: string[] = [];
+
+        el.value = 'Call Marit';
+        el.setSelectionRange(4, 4);
+        Object.defineProperty(el, 'value', {
+          configurable: true,
+          get: () => real.get?.call(el) as string,
+          set: (v: string) => {
+            writes.push(v);
+            real.set?.call(el, v);
+          },
+        });
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        await settle();
+
+        expect(writes).toEqual([]);
+        expect(el.selectionStart).toBe(4);
+        expect(el.value).toBe('Call Marit');
+      });
+    });
+
     it('marks a blank Title as needing one, and still saves the other fields', async () => {
       const { send, root, typeTitle, changeOn, titleField, press, importanceButton } =
         await setup();
@@ -1266,12 +1344,88 @@ describe('TaskEditor', () => {
       expect(badges()).toEqual([]);
     });
 
-    it('shows no reason line for a Task that is not Open', async () => {
+    it('shows no reason line for a Delegated Task with no Due and no blockers', async () => {
       const { reason } = await setup({
-        state: domainState([{ ...CALL, status: TaskStatus.Delegated }]),
+        state: domainState([{ ...CALL, due: null, status: TaskStatus.Delegated }]),
       });
 
       expect(reason()).toBeNull();
+    });
+
+    it('badges an Overdue Inbox Task and keeps the Inbox text', async () => {
+      const { reason, badges, reasonText, chip } = await setup({
+        state: domainState([
+          { ...CALL, important: null, estimateMinutes: 15, due: { date: '2026-10-03' } },
+        ]),
+      });
+
+      expect(reason()).not.toBeNull();
+      expect(document.querySelectorAll('.task-editor__reason')).toHaveLength(1);
+      expect(badges()).toEqual(['Overdue']);
+      expect(reasonText()).toBe('In the Inbox until Triage');
+      expect(chip()).toBeNull();
+    });
+
+    it('badges a blocked Inbox Task and keeps the Inbox text', async () => {
+      const { badges, reasonText } = await setup({
+        state: domainState([{ ...CALL, important: null, due: null }, WATER], {
+          links: [link('l1', 't1', 't2')],
+        }),
+      });
+
+      expect(badges()).toEqual(['Blocked']);
+      expect(reasonText()).toBe('In the Inbox until Triage');
+    });
+
+    it('badges an Overdue Delegated Task with the badge alone', async () => {
+      const { reason, badges, reasonText } = await setup({
+        state: domainState([
+          { ...CALL, status: TaskStatus.Delegated, due: { date: '2026-10-03' } },
+        ]),
+      });
+
+      expect(reason()).not.toBeNull();
+      expect(badges()).toEqual(['Overdue']);
+      expect(reason()?.querySelector('.task-editor__reason-text')).toBeNull();
+      expect(reasonText()).toBe('');
+    });
+
+    it('badges an Overdue Available Task with the chip and its reason text', async () => {
+      const { chip, badges, reasonText } = await setup({
+        state: domainState([{ ...CALL, due: { date: '2026-10-03' } }]),
+      });
+
+      expect(chip()).not.toBeNull();
+      expect(badges()).toEqual(['Overdue']);
+      expect(reasonText()).not.toBe('');
+    });
+
+    it('badges a Waiting Task that an open Task blocks', async () => {
+      const { badges } = await setup({
+        state: domainState([{ ...CALL, availableFrom: { date: '2026-10-09' } }, WATER], {
+          links: [link('l1', 't1', 't2')],
+        }),
+      });
+
+      expect(badges()).toContain('Blocked');
+    });
+
+    it('drops the Overdue badge of an Inbox Task once its Due is removed, before the save lands', async () => {
+      const { press, rowButton, dialog, badges, sends } = await setup({
+        state: domainState([{ ...CALL, important: null, due: { date: '2026-10-03' } }]),
+      });
+
+      expect(badges()).toEqual(['Overdue']);
+
+      await press(rowButton('Due'));
+      await press(
+        Array.from(dialog('Due').querySelectorAll<HTMLButtonElement>('button')).find(
+          (b) => (b.textContent ?? '').trim() === 'Remove Due',
+        ),
+      );
+
+      expect(sends).toHaveLength(1);
+      expect(badges()).toEqual([]);
     });
 
     it('follows the draft before the save lands', async () => {
@@ -1503,6 +1657,88 @@ describe('TaskEditor', () => {
       expect(
         must(footerButton('Log progress')).querySelector('svg[data-icon="bar-progress-half"]'),
       ).not.toBeNull();
+    });
+
+    describe('the Title the Undo bar names', () => {
+      it('is the Title being saved, trimmed, after a rename', async () => {
+        const { doneUndo, footerButton, typeTitle, press } = await setup();
+
+        await typeTitle('  Call Marit back ');
+        await press(footerButton('Done'));
+
+        expect(doneUndo.complete).toHaveBeenCalledTimes(1);
+
+        const [held, origin] = must(doneUndo.complete.mock.calls[0]);
+
+        expect(held).toEqual({ ...CALL, title: 'Call Marit back' });
+        expect(origin).toBe(DoneOrigin.Button);
+      });
+
+      it('is the stored Title when the typed one is blank', async () => {
+        const { doneUndo, footerButton, typeTitle, press } = await setup();
+
+        await typeTitle('   ');
+        await press(footerButton('Done'));
+
+        expect(doneUndo.complete).toHaveBeenCalledTimes(1);
+        expect(must(doneUndo.complete.mock.calls[0])[0]).toEqual(CALL);
+      });
+
+      it('is the stored Task unchanged when nothing was edited', async () => {
+        const { doneUndo, footerButton, press } = await setup();
+
+        await press(footerButton('Done'));
+
+        expect(doneUndo.complete).toHaveBeenCalledTimes(1);
+        expect(must(doneUndo.complete.mock.calls[0])[0]).toEqual(CALL);
+        expect(must(doneUndo.complete.mock.calls[0])[0].title).toBe('Call Marit');
+      });
+    });
+  });
+
+  describe('leaving at most once', () => {
+    it('Back twice goes back once when the router has a previous navigation', async () => {
+      const { backButton, press, navigate, back } = await setup({ withHistory: true });
+
+      await press(backButton());
+      await press(backButton());
+
+      expect(back).toHaveBeenCalledTimes(1);
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it('Back after Done goes back once', async () => {
+      const { backButton, footerButton, press, back } = await setup({ withHistory: true });
+
+      await press(footerButton('Done'));
+      await press(backButton());
+
+      expect(back).toHaveBeenCalledTimes(1);
+    });
+
+    it('Back twice without history navigates to Now once', async () => {
+      const { backButton, press, navigate, back } = await setup();
+
+      await press(backButton());
+      await press(backButton());
+
+      expect(navigate).toHaveBeenCalledExactlyOnceWith('/now', { replaceUrl: true });
+      expect(back).not.toHaveBeenCalled();
+    });
+
+    it('lets a second Back navigate again when the first navigation was refused', async () => {
+      const { backButton, press, navigate } = await setup();
+
+      navigate.mockResolvedValueOnce(false);
+
+      await press(backButton());
+
+      expect(navigate).toHaveBeenCalledTimes(1);
+
+      await press(backButton());
+
+      expect(navigate).toHaveBeenCalledTimes(2);
+      expect(navigate).toHaveBeenLastCalledWith('/now', { replaceUrl: true });
     });
   });
 
@@ -1982,6 +2218,61 @@ describe('TaskEditor', () => {
       expect(handleError).not.toHaveBeenCalled();
     });
   });
+
+  describe('reason line recomputation', () => {
+    const counted = () => {
+      const nowSignal = signal(T0);
+      const now = vi.fn(() => nowSignal());
+
+      return { now, readNow: now as () => Instant };
+    };
+
+    it('does not read the Clock while the Title is typed but not committed', async () => {
+      const { now, readNow } = counted();
+      const { titleField, settle } = await setup({ readNow });
+      const el = titleField();
+
+      await settle();
+      now.mockClear();
+      for (const value of ['Call', 'Call Ma', 'Call Marit']) {
+        el.value = value;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      await settle();
+
+      expect(now).not.toHaveBeenCalled();
+    });
+
+    it('does not read the Clock while the Notes are typed but not committed', async () => {
+      const { now, readNow } = counted();
+      const { press, addNotes, notesField, settle } = await setup({ readNow });
+
+      await press(addNotes());
+      await settle();
+      const el = must(notesField());
+
+      now.mockClear();
+      for (const value of ['a', 'a no', 'a note']) {
+        el.value = value;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      await settle();
+
+      expect(now).not.toHaveBeenCalled();
+    });
+
+    it('reads the Clock once a changed Title is committed', async () => {
+      const { now, readNow } = counted();
+      const { titleField, settle, typeInto, changeOn } = await setup({ readNow });
+
+      await settle();
+      now.mockClear();
+      await typeInto(titleField(), 'Call Marit back');
+      await changeOn(titleField());
+
+      expect(now).toHaveBeenCalled();
+    });
+  });
 });
 
 describe('TaskEditor page insets', () => {
@@ -2128,6 +2419,55 @@ describe('TaskEditor page insets', () => {
     const { card } = await setup();
 
     expect(card()).not.toBeNull();
+    expect(property(BAR_PROPERTY)).toBe('');
+    expect(property(FOOTER_PROPERTY)).toBe('');
+  });
+
+  it('keeps the page marked when one editor replaces another, and clears it after the last', async () => {
+    installObserver();
+
+    const s = stubs({});
+
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter(
+          [
+            { path: 'tasks/:taskId', component: TaskEditorRoute },
+            { path: 'now', component: Stub },
+          ],
+          withComponentInputBinding(),
+        ),
+        ...s.providers,
+      ],
+    });
+
+    const harness = await RouterTestingHarness.create();
+    const flush = async (): Promise<void> => {
+      for (let round = 0; round < 3; round++) {
+        await wait();
+        await harness.fixture.whenStable();
+        harness.detectChanges();
+        await harness.fixture.whenStable();
+      }
+    };
+    const root = document.documentElement;
+
+    await harness.navigateByUrl('/tasks/t1');
+    await flush();
+
+    expect(root.classList.contains('task-editor-open')).toBe(true);
+
+    await harness.navigateByUrl('/tasks/t2');
+    await flush();
+
+    expect(root.classList.contains('task-editor-open')).toBe(true);
+    expect(property(BAR_PROPERTY)).toBe(`${BAR_HEIGHT}px`);
+    expect(property(FOOTER_PROPERTY)).toBe(`${FOOTER_HEIGHT}px`);
+
+    await harness.navigateByUrl('/now');
+    await flush();
+
+    expect(root.classList.contains('task-editor-open')).toBe(false);
     expect(property(BAR_PROPERTY)).toBe('');
     expect(property(FOOTER_PROPERTY)).toBe('');
   });

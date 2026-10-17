@@ -9,7 +9,7 @@ import {
   type TimeZone,
 } from '../time';
 import { formatClockOn } from '../time/display';
-import type { Reason } from './picker';
+import type { Reason } from './reason-types';
 
 const factOn = (task: Task, reason: Reason, today: () => LocalDate, timeZone: TimeZone): string => {
   if (reason.overdue && task.due !== null) {

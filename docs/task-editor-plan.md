@@ -79,7 +79,7 @@ These are slice 1's agreements, in short:
     - **The textarea.** It carries `task-editor__title`, `data-task-id`, `data-morph`, `aria-label="Title"`, `enterkeyhint="done"` and `field-sizing: content`.
     - **Enter and newlines.** Enter and a line-break `beforeinput` commit without a newline, except while composing. Newlines typed or pasted become spaces.
     - **The heading.** A visually hidden `h1` (`task-editor__heading`, the stored title, no `data-task-id`) is the page heading and the focus fallback.
-    - **The shell.** `ShellLayout.#focusTitle` skips form controls.
+    - **The shell.** `ShellLayout.#focusTitle` focuses only an element marked `data-focus-title`, which Now's titles carry beside `data-task-id`; the textarea carries none. (The first build skipped form controls by tag name; the review of 2026-10-17 replaced that with the marker.)
 15. **Icons.** `ChevronLeft` (Back) and `Clock` (the time button) join `IconName`. The design mirrors chevron-right and draws its own clock.
 16. **`--scrim`.** It is a token of its own group in `libs/design-tokens/src/themes/*.tokens.json`: light `#1a1d20` at 40%, dark `#000000` at 60%, Voice only `#000000` at 70%.
     - **Wiring.** `'scrim.*'` joins `SCHEME_TOKENS` in `terrazzo.config.mts`, and `scrim` joins `ThemeFile` in `scripts/palettes.mts` with a cross-theme presence check. The 9 palette files are regenerated.
@@ -180,7 +180,7 @@ These are slice 1's agreements, in short:
 - **Failed sends that applied.** A Failed send whose request did apply on the server can be overwritten by the next poll's baseline. This is true today with Save.
 - **Due moves.** Correcting a mis-tapped Due date counts one Due move.
 - **Unverified.** It is not known whether a tap on `::backdrop` closes a `closedby="any"` dialog on Android; the phone check decides. The e2e suite runs Chromium only.
-- **A Done and the page going away.** A Done waits for the editor's last save before it sends, except when the app is hidden or closed during the Undo window. Then both go out at once with keepalive, the Done can land first, and the edit becomes a Review item.
+- **A Done and the page going away.** A Done waits for the editor's last save before it sends, except when the app is hidden or closed before that Done has gone out, during the Undo window or while it still waits for the save. Then the Done goes out at once with keepalive beside the edit's own send, it can land first, and the edit becomes a Review item.
 - **The Undo bar and focus.** While the Undo bar shows on the editor, a focused control can sit under it, because the scroll padding counts only the editor's own bar and footer.
 - **A remote rename while typing.** A Title being typed while another device renames the Task can send the other device's title back once. The server takes it as a no-op.
 
@@ -248,3 +248,16 @@ Built on 2026-10-16 in the order of the pieces. Each unit with behaviour had an 
   - `ChoiceRow`'s styles and `Sheet`'s template went back inline, per the 100-line rule.
   - `TaskBlockers` members that only the class reads became ES private.
 - **Tests.** The remaining test gaps were closed.
+
+**Second review (2026-10-17).**
+- **How it ran.** A code review of pull request #30 reported 14 findings: seven correctness, and seven on efficiency, simplification, reuse, conventions and altitude. Each was fixed as a unit with an implementer and, where the behaviour could be pinned, a test-writer, then judged against its contract by an Opus pass. Each new test was seen to fail with its fix reverted or broken by hand.
+- **Done and the page going away.** A Done that already left its Undo window but still waits for the editor's save is sent at once with keepalive when the page is hidden or closed, or when `DoneUndo` is destroyed. Before, nothing sent it, and a kill lost it. Its waiting run does the keepalive send itself, so `flush()` resolves exactly when that send has been handled.
+- **The editor.**
+  - The editors publishing their chrome are counted, so going from one editor to another (`@for` builds the new one before it destroys the old) keeps `.task-editor-open`.
+  - Back and Done leave at most once; a second Back no longer goes back two entries.
+  - The Undo bar names the Title being saved, not the stored one.
+  - The Overdue and Blocked badges come from `isOverdue` and `isBlocked` on the previewed Task again, so an Inbox Task and a Delegated Task show them too.
+  - A newline typed or pasted into the Title becomes a space without moving the caret. A textarea's value holds only LF, so no CR case exists.
+  - The reason line's preview reads a draft memoised field by field, so typing in the Title or Notes no longer rebuilds `explainTask`.
+- **The Blocked by summary** names only blockers that are still Open or Delegated; a link to a closed Task stays in the sheet with Remove.
+- **Cleanups.** `observeBlockSize` (`core/platform`) replaces the two copies in the shell and the editor; `routeMotion` walks the route once; the picker's reason types moved to `picker/reason-types.ts`, ending two runtime import cycles; `EditorSheet` replaces a string-literal union; the dead Title validator went; the badge pair is one template.

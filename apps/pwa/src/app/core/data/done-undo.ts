@@ -97,6 +97,12 @@ export class DoneUndo {
 
   readonly #inflight = new Set<Promise<void>>();
 
+  /**
+   * Dones taken for a normal send that still wait for `after`, each with the function that wakes its run: with
+   * the keepalive send a hide started, or with null after a destroy, which sends and releases it itself.
+   */
+  readonly #waiting = new Map<Held, (keepaliveSend: Promise<CommandOutcome> | null) => void>();
+
   #held: Held | null = null;
 
   #timer: ReturnType<typeof setTimeout> | null = null;
@@ -132,6 +138,13 @@ export class DoneUndo {
       if (held !== null) {
         void this.#dataApi.runCommand(held.command, held.key, { keepalive: true });
         this.#dataStore.release(held.key);
+      }
+
+      for (const [waiting, wake] of this.#waiting) {
+        this.#waiting.delete(waiting);
+        void this.#dataApi.runCommand(waiting.command, waiting.key, { keepalive: true });
+        this.#dataStore.release(waiting.key);
+        wake(null);
       }
     });
   }
@@ -267,11 +280,26 @@ export class DoneUndo {
 
   /** Sends the pending Done now, if there is one; with `keepalive`, the request outlives the page. */
   #sendHeld(keepalive: boolean): void {
+    if (keepalive) {
+      this.#sendWaiting();
+    }
+
     const held = this.#take();
 
     if (held !== null) {
       void this.#dispatch(held, keepalive);
       this.#clearPausesWhenIdle();
+    }
+  }
+
+  /**
+   * Sends every Done that waits for `after` at once with keepalive, and hands the send to its own run, which
+   * handles the outcome instead of sending normally; a flush that holds that run waits for exactly this send.
+   */
+  #sendWaiting(): void {
+    for (const [waiting, wake] of this.#waiting) {
+      this.#waiting.delete(waiting);
+      wake(this.#dataApi.runCommand(waiting.command, waiting.key, { keepalive: true }));
     }
   }
 
@@ -325,13 +353,33 @@ export class DoneUndo {
 
   #dispatch(held: Held, keepalive: boolean): Promise<void> {
     const run = async (): Promise<void> => {
+      let started: Promise<CommandOutcome> | null = null;
+
       if (!keepalive && held.after !== undefined) {
-        await held.after.catch(() => undefined);
+        // Wrapped, so a started send does not settle the race before its outcome arrives.
+        const woken = new Promise<{ readonly send: Promise<CommandOutcome> | null }>((resolve) => {
+          this.#waiting.set(held, (send) => {
+            resolve({ send });
+          });
+        });
+        const afterSettled = held.after.catch(() => undefined).then(() => null);
+        const wake = await Promise.race([afterSettled, woken]);
+
+        if (wake === null) {
+          this.#waiting.delete(held);
+        } else if (wake.send === null) {
+          // A destroy sent it with keepalive and released it.
+          return;
+        } else {
+          // A hide sent it with keepalive.
+          started = wake.send;
+        }
       }
 
-      const outcome = keepalive
-        ? await this.#dataApi.runCommand(held.command, held.key, { keepalive: true })
-        : await this.#dataStore.send(held.command, held.key);
+      const outcome = await (started ??
+        (keepalive
+          ? this.#dataApi.runCommand(held.command, held.key, { keepalive: true })
+          : this.#dataStore.send(held.command, held.key)));
 
       this.#attempts.settle(held.command, outcome);
       this.#handle(held, outcome);

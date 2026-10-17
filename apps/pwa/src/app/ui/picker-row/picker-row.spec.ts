@@ -281,11 +281,16 @@ describe('PickerRow task hooks', () => {
     expect(withAttribute('data-task-id')[0]).toBe(title());
     expect(withAttribute('data-morph')).toHaveLength(1);
     expect(withAttribute('data-morph')[0]).toBe(title());
+    expect(title().hasAttribute('data-focus-title')).toBe(true);
+    expect(title().getAttribute('data-focus-title')).toBe('');
+    expect(withAttribute('data-focus-title')).toHaveLength(1);
+    expect(withAttribute('data-focus-title')[0]).toBe(title());
 
     expect(row().tagName).toBe('A');
     expect(row().getAttribute('href')).toBe('/tasks/42');
     expect(row().hasAttribute('data-task-id')).toBe(false);
     expect(row().hasAttribute('data-morph')).toBe(false);
+    expect(row().hasAttribute('data-focus-title')).toBe(false);
     expect(classesBefore).toContain('asys-picker-row');
     expect(Array.from(row().classList)).toEqual(classesBefore);
   });
@@ -295,6 +300,7 @@ describe('PickerRow task hooks', () => {
 
     expect(title().hasAttribute('data-task-id')).toBe(false);
     expect(title().hasAttribute('data-morph')).toBe(false);
+    expect(title().hasAttribute('data-focus-title')).toBe(false);
 
     host.taskId.set('42');
     host.morph.set(true);
@@ -306,6 +312,7 @@ describe('PickerRow task hooks', () => {
 
     expect(title().hasAttribute('data-task-id')).toBe(false);
     expect(title().hasAttribute('data-morph')).toBe(false);
+    expect(title().hasAttribute('data-focus-title')).toBe(false);
   });
 
   it('has neither attribute while neither input is bound', async () => {
@@ -315,5 +322,7 @@ describe('PickerRow task hooks', () => {
     expect(q('.asys-picker-row__title')?.hasAttribute('data-morph')).toBe(false);
     expect(q('[data-task-id]')).toBeNull();
     expect(q('[data-morph]')).toBeNull();
+    expect(q('.asys-picker-row__title')?.hasAttribute('data-focus-title')).toBe(false);
+    expect(q('[data-focus-title]')).toBeNull();
   });
 });

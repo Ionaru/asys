@@ -11,7 +11,15 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { type AddBlocker, blockerCandidates, blocks, CommandTag, type Task } from '@asys/domain';
+import {
+  type AddBlocker,
+  BlockedReasonTag,
+  blockedReasons,
+  blockerCandidates,
+  blocks,
+  CommandTag,
+  type Task,
+} from '@asys/domain';
 
 import { CommandOutcomeTag } from '../../core/api/data-api';
 import { CommandAttempts } from '../../core/data/command-attempts';
@@ -114,11 +122,29 @@ export class TaskBlockers {
     );
   });
 
+  /** The titles of the blockers the domain counts: those still Open or Delegated, in link order. */
+  readonly #waitsFor = computed<readonly string[]>(() => {
+    const state = this.#dataStore.state();
+    const task = this.#task();
+
+    if (state === null || task === undefined) {
+      return [];
+    }
+
+    // The blockers the domain counts (blockedReasons), named in link order.
+    const counted = new Set(
+      blockedReasons(task, state.tasks, state.links).flatMap((reason) =>
+        reason._tag === BlockedReasonTag.BlockedBy ? reason.taskIds : [],
+      ),
+    );
+
+    return state.links
+      .filter((link) => link.taskId === task.id && counted.has(link.blockerId))
+      .flatMap((link) => state.tasks.find((other) => other.id === link.blockerId)?.title ?? []);
+  });
+
   protected readonly summary = computed(() =>
-    blockerSummary(
-      this.blockedBy().map((row) => row.title),
-      this.blocksTasks().length,
-    ),
+    blockerSummary(this.#waitsFor(), this.blocksTasks().length),
   );
 
   /** Whether the candidates are unavailable: the editor is busy or an add from here is in flight. */

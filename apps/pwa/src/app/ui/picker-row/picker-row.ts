@@ -30,6 +30,7 @@ export enum PickerRowVariant {
       <span
         class="asys-picker-row__title"
         [attr.data-task-id]="taskId()"
+        [attr.data-focus-title]="taskId() === null ? null : ''"
         [attr.data-morph]="morph() ? '' : null"
         ><ng-content
       /></span>

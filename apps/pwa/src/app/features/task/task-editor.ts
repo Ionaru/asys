@@ -18,11 +18,12 @@ import {
 import { disabled, form, FormField, validate } from '@angular/forms/signals';
 import { Router, RouterLink } from '@angular/router';
 import {
-  BlockedReasonTag,
   canLogProgress,
   CommandTag,
   type DomainState,
   explainTask,
+  isBlocked,
+  isOverdue,
   type Task,
   TaskExplanationTag,
   TaskStatus,
@@ -35,6 +36,7 @@ import { DataStore, SyncStatus, zoneOrUtc } from '../../core/data/data-store';
 import { DoneOrigin, DoneUndo } from '../../core/data/done-undo';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
+import { observeBlockSize } from '../../core/platform/observe-block-size';
 import { TaskMorph } from '../../core/platform/task-morph';
 import { activationOf } from '../../ui/activation/activation';
 import { Button, ButtonSize, ButtonVariant } from '../../ui/button/button';
@@ -60,9 +62,18 @@ import { byAreaName } from '../areas/area-order';
 import { SaveState, TaskDraftSaver } from './task-draft-saver';
 import { TaskBlockers } from './task-blockers';
 import { previewTask } from './task-preview';
-import { buildTaskPatch, savableDraft } from './task-patch';
+import { buildTaskPatch, savableDraft, TASK_DRAFT_FIELDS } from './task-patch';
 
 let nextId = 0;
+
+/** How many live editors have published their chrome on the root element; the last one out removes it. */
+let chromeEditors = 0;
+
+/** The sheets whose closing returns focus to their opener. */
+enum EditorSheet {
+  Log = 'log',
+  More = 'more',
+}
 
 /** The stored Task and the state it was read from, as the editor renders them. */
 interface EditorView {
@@ -125,6 +136,9 @@ export class TaskEditor {
 
   readonly #destroyRef = inject(DestroyRef);
 
+  /** Set once this editor has started leaving, so Back and Done navigate at most once. */
+  #left = false;
+
   protected readonly Status = SyncStatus;
 
   protected readonly Variant = ButtonVariant;
@@ -142,6 +156,8 @@ export class TaskEditor {
   protected readonly Saves = SaveState;
 
   protected readonly Layout = EstimateLayout;
+
+  protected readonly Sheets = EditorSheet;
 
   protected readonly titleErrorId = `task-editor-${nextId++}-title-error`;
 
@@ -231,9 +247,6 @@ export class TaskEditor {
   );
 
   protected readonly editForm = form(this.saver.model, (path) => {
-    validate(path.title, ({ value }) =>
-      value().trim() === '' ? { kind: 'required', message: 'Needs a title' } : undefined,
-    );
     validate(path.estimateMinutes, () =>
       this.saver.needsEstimate() ? { kind: 'required', message: 'Needs an Estimate' } : undefined,
     );
@@ -267,48 +280,68 @@ export class TaskEditor {
     areaSelectOptions([...(this.dataStore.state()?.areas ?? [])].sort(byAreaName)),
   );
 
-  /** The reason line, previewed from the draft: only committed text, and never a cleared Estimate or Importance. */
-  protected readonly explanation = computed(() => {
-    const view = this.view();
-    const baseline = this.saver.baseline();
+  /** The draft as it would save; typed, uncommitted text leaves it equal, so the reason line is not rebuilt per keystroke. */
+  readonly #savable = computed(
+    () => {
+      const baseline = this.saver.baseline();
 
-    if (view === null || baseline === null) {
+      return baseline === null
+        ? null
+        : savableDraft(baseline, this.saver.model(), this.saver.committed());
+    },
+    {
+      equal: (a, b) =>
+        a === null || b === null
+          ? a === b
+          : TASK_DRAFT_FIELDS.keys.every((key) => TASK_DRAFT_FIELDS.same(key, a, b)),
+    },
+  );
+
+  /** The Task as the draft would save it, the list with it in place of the stored Task, and the zone. */
+  readonly #preview = computed(() => {
+    const view = this.view();
+    const savable = this.#savable();
+
+    if (view === null || savable === null) {
       return null;
     }
 
     const zone = zoneOrUtc(view.state.settings.timeZone);
-    const preview = previewTask(
-      view.task,
-      savableDraft(baseline, this.saver.model(), this.saver.committed()),
-    );
+    const preview = previewTask(view.task, savable);
     const tasks = view.state.tasks.map((task) => (task.id === preview.id ? preview : task));
+
+    return { state: view.state, preview, tasks, zone };
+  });
+
+  /** The reason line, previewed from the draft: only committed text, and never a cleared Estimate or Importance. */
+  protected readonly explanation = computed(() => {
+    const draft = this.#preview();
+
+    if (draft === null) {
+      return null;
+    }
+
+    const { state, preview, tasks, zone } = draft;
 
     return explainTask(
       preview,
       tasks,
-      view.state.links,
-      { ...view.state.settings, timeZone: zone },
+      state.links,
+      { ...state.settings, timeZone: zone },
       this.#clock.now(),
     );
   });
 
   protected readonly overdue = computed(() => {
-    const explanation = this.explanation();
+    const draft = this.#preview();
 
-    return (
-      (explanation?._tag === TaskExplanationTag.Available ||
-        explanation?._tag === TaskExplanationTag.Waiting) &&
-      explanation.reason.overdue
-    );
+    return draft !== null && isOverdue(draft.preview, this.#clock.now(), draft.zone);
   });
 
   protected readonly blocked = computed(() => {
-    const explanation = this.explanation();
+    const draft = this.#preview();
 
-    return (
-      explanation?._tag === TaskExplanationTag.Waiting &&
-      explanation.reasons.some((reason) => reason._tag === BlockedReasonTag.BlockedBy)
-    );
+    return draft !== null && isBlocked(draft.preview, draft.tasks, draft.state.links);
   });
 
   protected readonly capturedText = computed(() => {
@@ -353,20 +386,24 @@ export class TaskEditor {
   }
 
   /** A person closed the Log progress or More sheet: focus returns to its opener, or the heading. */
-  protected sheetClosed(open: boolean, sheet: 'log' | 'more'): void {
+  protected sheetClosed(open: boolean, sheet: EditorSheet): void {
     if (!open) {
       this.#focusAfterRender(
-        () => (sheet === 'log' ? this.logButton() : this.moreButton())?.nativeElement,
+        () => (sheet === EditorSheet.Log ? this.logButton() : this.moreButton())?.nativeElement,
       );
     }
   }
 
   protected titleInput(event: Event): void {
     const field = event.target as HTMLTextAreaElement;
-    const title = field.value.replace(/\r\n|\n/g, ' ');
+    // A textarea's value holds its line breaks as LF only, so each becomes one space and the selection keeps its offsets.
+    const title = field.value.replaceAll('\n', ' ');
 
     if (title !== field.value) {
+      const { selectionStart, selectionEnd } = field;
+
       field.value = title;
+      field.setSelectionRange(selectionStart, selectionEnd);
     }
 
     this.saver.model.update((draft) => ({ ...draft, title }));
@@ -418,7 +455,10 @@ export class TaskEditor {
     this.#statusLine.set('');
     this.saver.flush();
     this.leaving.set(true);
-    this.#doneUndo.complete(task, DoneOrigin.Button, this.saver.idle());
+
+    const title = this.#savable()?.title.trim() ?? task.title;
+
+    this.#doneUndo.complete({ ...task, title }, DoneOrigin.Button, this.saver.idle());
 
     if (activationOf(event).keyboard) {
       this.#doneUndo.requestFocus();
@@ -513,13 +553,18 @@ export class TaskEditor {
 
     const root = this.#document.documentElement;
 
+    chromeEditors++;
     root.classList.add('task-editor-open');
 
     effect((onCleanup) => {
       const element = this.bar()?.nativeElement;
 
       if (element) {
-        onCleanup(this.#observeBlockSize(element, '--task-editor-bar-height'));
+        onCleanup(
+          observeBlockSize(element, (size) =>
+            root.style.setProperty('--task-editor-bar-height', `${size}px`),
+          ),
+        );
       }
     });
 
@@ -527,39 +572,48 @@ export class TaskEditor {
       const element = this.footer()?.nativeElement;
 
       if (element) {
-        onCleanup(this.#observeBlockSize(element, '--task-editor-footer-height'));
+        onCleanup(
+          observeBlockSize(element, (size) =>
+            root.style.setProperty('--task-editor-footer-height', `${size}px`),
+          ),
+        );
       } else {
         root.style.setProperty('--task-editor-footer-height', '0px');
       }
     });
 
     this.#destroyRef.onDestroy(() => {
+      chromeEditors--;
+
+      if (chromeEditors > 0) {
+        return;
+      }
+
       root.classList.remove('task-editor-open');
       root.style.removeProperty('--task-editor-bar-height');
       root.style.removeProperty('--task-editor-footer-height');
     });
   }
 
-  /** Writes the border-box block size of `element` to the property `name` on the root element, as it changes. */
-  #observeBlockSize(element: HTMLElement, name: string): () => void {
-    const observer = new ResizeObserver((entries) => {
-      const size = entries[0]?.borderBoxSize[0]?.blockSize;
-
-      if (size !== undefined) {
-        this.#document.documentElement.style.setProperty(name, `${size}px`);
-      }
-    });
-
-    observer.observe(element);
-
-    return () => observer.disconnect();
-  }
-
+  /**
+   * Leaves at most once. A navigateByUrl to Now that resolves false lets a later call try again; a
+   * Location.back() gives no result, so after it the editor never tries again.
+   */
   #leave(): void {
+    if (this.#left) {
+      return;
+    }
+
+    this.#left = true;
+
     if ((this.#router.lastSuccessfulNavigation()?.previousNavigation ?? null) !== null) {
       this.#location.back();
     } else {
-      void this.#router.navigateByUrl('/now', { replaceUrl: true });
+      void this.#router.navigateByUrl('/now', { replaceUrl: true }).then((navigated) => {
+        if (!navigated) {
+          this.#left = false;
+        }
+      });
     }
   }
 

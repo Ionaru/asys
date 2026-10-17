@@ -3,7 +3,7 @@
 import { blockedReasons, isOverdue, quadrant, type BlockerLink, type Task } from '../task';
 import { isUrgentBy } from '../task/priority';
 import { availableFromInstant, type Instant, type TimeZone } from '../time';
-import { ExclusionReasonTag, type ExclusionReason, type Reason } from './picker';
+import { ExclusionReasonTag, type ExclusionReason, type Reason } from './reason-types';
 
 /** The Reason of an Available Task: the one computation pick and explainTask share. `urgencyCutoff` returns the end of the Urgency window and is called only when `start` is set. */
 export const reasonOf = (
