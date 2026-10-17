@@ -1,7 +1,10 @@
 {
   "$schema": "../../node_modules/oxlint/configuration_schema.json",
   "extends": ["../../.oxlintrc.json"],
-  "plugins": ["vitest"],
+  "plugins": ["vitest", "import"],
+  "rules": {
+    "import/no-cycle": "error"
+  },
   "overrides": [
     {
       "files": ["src/scenarios/**/*.spec.ts"],
