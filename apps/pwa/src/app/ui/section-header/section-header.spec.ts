@@ -3,7 +3,7 @@ import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { IconName } from '../icon/icon';
-import { SectionHeader } from './section-header';
+import { SectionHeader, SectionHeaderAction } from './section-header';
 
 @Component({
   imports: [SectionHeader],
@@ -292,5 +292,107 @@ describe('SectionHeader body ids', () => {
     expect(bodies[0]?.id).not.toBe(bodies[1]?.id);
     expect(buttons[0]?.getAttribute('aria-controls')).toBe(bodies[0]?.id);
     expect(buttons[1]?.getAttribute('aria-controls')).toBe(bodies[1]?.id);
+  });
+});
+
+@Component({
+  imports: [SectionHeader],
+  template: `
+    <asys-section-header
+      [icon]="icon"
+      [title]="'Due'"
+      [action]="action"
+      [trailingIcon]="trailingIcon"
+      [(expanded)]="expanded"
+      (expandedChange)="emitted.push($event)"
+      (activate)="activations.set(activations() + 1)"
+    >
+      <p class="projected">Call the dentist</p>
+    </asys-section-header>
+  `,
+})
+class OpenHost {
+  readonly icon = IconName.Clock;
+
+  readonly action = SectionHeaderAction.Open;
+
+  readonly trailingIcon = IconName.ChevronRight;
+
+  readonly expanded = signal(false);
+
+  readonly emitted: boolean[] = [];
+
+  readonly activations = signal(0);
+}
+
+describe('SectionHeader Open action', () => {
+  const setupOpen = async () => {
+    const fixture = TestBed.createComponent(OpenHost);
+    await fixture.whenStable();
+
+    const root = (): HTMLElement => fixture.nativeElement;
+    const button = (): HTMLButtonElement =>
+      root().querySelector(
+        'section.asys-section > button.asys-section-header',
+      ) as HTMLButtonElement;
+
+    return { fixture, host: fixture.componentInstance, root, button };
+  };
+
+  it('opens a dialog without claiming to expand anything', async () => {
+    const { button } = await setupOpen();
+
+    expect(button().getAttribute('aria-haspopup')).toBe('dialog');
+    expect(button().hasAttribute('aria-expanded')).toBe(false);
+    expect(button().hasAttribute('aria-controls')).toBe(false);
+  });
+
+  it('emits activate on a click and leaves expanded false', async () => {
+    const { fixture, host, button } = await setupOpen();
+
+    button().dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    await fixture.whenStable();
+
+    expect(host.activations()).toBe(1);
+    expect(host.expanded()).toBe(false);
+    expect(host.emitted).toEqual([]);
+    expect(button().hasAttribute('aria-expanded')).toBe(false);
+  });
+
+  it('renders no body and no projected content', async () => {
+    const { fixture, host, root, button } = await setupOpen();
+
+    expect(root().querySelector('.asys-section__body')).toBeNull();
+    expect(root().querySelector('.projected')).toBeNull();
+
+    button().click();
+    await fixture.whenStable();
+
+    expect(host.expanded()).toBe(false);
+    expect(root().querySelector('.asys-section__body')).toBeNull();
+    expect(root().querySelector('.projected')).toBeNull();
+  });
+
+  it('draws the trailing icon input at the end of the button', async () => {
+    const { button } = await setupOpen();
+    const last = button().lastElementChild as HTMLElement;
+
+    expect(last.tagName).toBe('ASYS-ICON');
+    expect(last.querySelector('svg[data-icon]')?.getAttribute('data-icon')).toBe('chevron-right');
+    expect(button().querySelector('svg[data-icon="chevron-down"]')).toBeNull();
+  });
+
+  it('keeps the Expand behaviour and chevron-down by default', async () => {
+    const fixture = TestBed.createComponent(Host);
+    await fixture.whenStable();
+
+    const button = fixture.nativeElement.querySelector(
+      'section.asys-section > button.asys-section-header',
+    ) as HTMLButtonElement;
+
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(button.hasAttribute('aria-haspopup')).toBe(false);
+    expect(button.querySelector('svg[data-icon="chevron-down"]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.projected')).not.toBeNull();
   });
 });

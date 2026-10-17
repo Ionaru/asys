@@ -401,10 +401,40 @@ describe('editTask due move counter', () => {
     expect(after.due).toEqual({ date: '2026-10-19' });
   });
 
-  it('counts adding a time to a date-only Due', () => {
+  it('does not count adding a time to a date-only Due', () => {
     const dateOnly = aTask({ id: 't1', due: { date: '2026-10-19' } });
     const after = taskAfter(edit(dateOnly, { due: { date: '2026-10-19', time: '12:00' } }));
-    expect(after.dueMoveCount).toBe(1);
+    expect(after.dueMoveCount).toBe(0);
+    expect(after.due).toEqual({ date: '2026-10-19', time: '12:00' });
+  });
+
+  it('does not count removing the time from a Due', () => {
+    const after = taskAfter(edit(due, { due: { date: '2026-10-19' } }));
+    expect(after.dueMoveCount).toBe(0);
+    expect(after.due).toEqual({ date: '2026-10-19' });
+    expect(after.version).toBe(2);
+  });
+
+  it('does not count changing only the time of a Due', () => {
+    const after = taskAfter(edit(due, { due: { date: '2026-10-19', time: '09:00' } }));
+    expect(after.dueMoveCount).toBe(0);
+    expect(after.due).toEqual({ date: '2026-10-19', time: '09:00' });
+    expect(after.version).toBe(2);
+  });
+
+  it('counts a changed date of a date-only Due', () => {
+    const dateOnly = aTask({ id: 't1', due: { date: '2026-10-19' } });
+    expect(taskAfter(edit(dateOnly, { due: { date: '2026-10-20' } })).dueMoveCount).toBe(1);
+  });
+
+  it('counts a date change on top of a stored count of 2', () => {
+    const moved = aTask({
+      id: 't1',
+      due: { date: '2026-10-19', time: '17:00' },
+      dueMoveCount: 2,
+    });
+    const after = taskAfter(edit(moved, { due: { date: '2026-10-20', time: '09:00' } }));
+    expect(after.dueMoveCount).toBe(3);
   });
 
   it('adds to an existing counter', () => {

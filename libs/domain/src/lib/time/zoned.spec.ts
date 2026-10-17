@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MPL-2.0
 
 import { describe, expect, it } from 'vitest';
-import { formatLocalDate } from './local-date';
+import { formatLocalDate, IsoWeekday } from './local-date';
 import {
   addCalendarDays,
+  addDays,
   availableFromInstant,
   dueInstant,
+  isoWeekdayOf,
   isValidTimeZone,
   localMinuteInstant,
   startOfDay,
@@ -322,5 +324,55 @@ describe('localMinuteInstant', () => {
     expect(() => localMinuteInstant('2026-10-12', 480, 'Mars/Olympus')).toThrow(
       new RangeError('Invalid time zone: Mars/Olympus'),
     );
+  });
+});
+
+describe('addDays', () => {
+  it.each([
+    ['2026-10-16', 1, '2026-10-17'],
+    ['2026-10-31', 1, '2026-11-01'],
+    ['2026-12-31', 1, '2027-01-01'],
+    ['2028-02-28', 1, '2028-02-29'],
+    ['2026-10-16', -16, '2026-09-30'],
+    ['2026-10-16', 0, '2026-10-16'],
+    ['2026-10-24', 1, '2026-10-25'],
+  ])('adds %s + %i days = %s', (date, days, expected) => {
+    expect(addDays(date, days)).toBe(expected);
+  });
+
+  it.each(['2026-02-30', 'x'])('rejects the invalid date %j', (date) => {
+    expect(() => addDays(date, 1)).toThrow(RangeError);
+  });
+
+  it.each([1.5, Number.NaN, Number.POSITIVE_INFINITY])('rejects the days count %d', (days) => {
+    expect(() => addDays('2026-10-16', days)).toThrow(RangeError);
+  });
+
+  it('is undone by adding the opposite count', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: at('2020-01-01T00:00:00.000Z'), max: at('2030-12-31T00:00:00.000Z') }),
+        fc.integer({ min: -400, max: 400 }),
+        (instant, days) => {
+          const date = toLocalDateTime(instant, 'UTC').date;
+          expect(addDays(addDays(date, days), -days)).toBe(date);
+        },
+      ),
+      { numRuns: 200 },
+    );
+  });
+});
+
+describe('isoWeekdayOf', () => {
+  it.each([
+    ['2026-10-12', IsoWeekday.Monday],
+    ['2026-10-16', IsoWeekday.Friday],
+    ['2026-10-18', IsoWeekday.Sunday],
+  ])('gives %s the weekday %i', (date, expected) => {
+    expect(isoWeekdayOf(date)).toBe(expected);
+  });
+
+  it.each(['2026-02-30', 'x'])('rejects the invalid date %j', (date) => {
+    expect(() => isoWeekdayOf(date)).toThrow(RangeError);
   });
 });

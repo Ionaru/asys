@@ -25,6 +25,7 @@ asys-section-header {
   border-radius: var(--radius-lg);
   text-align: left;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
   transition: background-color var(--duration-quick) var(--ease-out);
 }
 

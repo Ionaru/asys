@@ -10,6 +10,7 @@ import { Motion } from './motion';
 import { TaskMorph } from './task-morph';
 import {
   TransitionKind,
+  leafRoute,
   onViewTransitionCreated,
   routeMotion,
   transitionKind,
@@ -373,6 +374,47 @@ describe('routeMotion', () => {
       tab: null,
       taskId: null,
     });
+  });
+});
+
+describe('leafRoute', () => {
+  afterEach(() => {
+    TestBed.resetTestingModule();
+  });
+
+  it('returns the root itself before any navigation, as it has no child', async () => {
+    const { router } = await setup();
+    const root = router.routerState.snapshot.root;
+
+    expect(root.firstChild).toBeNull();
+    expect(leafRoute(root)).toBe(root);
+  });
+
+  it('returns the deepest first child of a root snapshot', async () => {
+    const { snapshot } = await setup();
+    const root = await snapshot('/tasks/abc');
+    const frame = root.firstChild;
+    const leaf = frame?.firstChild;
+
+    expect(frame).not.toBeNull();
+    expect(leaf?.firstChild).toBeNull();
+    expect(leaf?.params['taskId']).toBe('abc');
+    expect(leafRoute(root)).toBe(leaf);
+  });
+
+  it('returns a leaf directly under the root when the route has no parent frame', async () => {
+    const { snapshot } = await setup();
+    const root = await snapshot('/signin');
+
+    expect(leafRoute(root)).toBe(root.firstChild);
+    expect(leafRoute(root).firstChild).toBeNull();
+  });
+
+  it('returns the leaf itself when given a leaf', async () => {
+    const { snapshot } = await setup();
+    const leaf = leafRoute(await snapshot('/now'));
+
+    expect(leafRoute(leaf)).toBe(leaf);
   });
 });
 

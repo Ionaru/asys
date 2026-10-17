@@ -2,7 +2,14 @@
 
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import { formatClock, formatDateSpec, formatDay, formatMinutes, formatMoment } from './display';
+import {
+  formatClock,
+  formatDateSpec,
+  formatDate,
+  formatDay,
+  formatMinutes,
+  formatMoment,
+} from './display';
 import { toLocalDateTime } from './zoned';
 
 const AMS = 'Europe/Amsterdam';
@@ -323,5 +330,37 @@ describe('formatMoment', () => {
       }),
       { numRuns: 500 },
     );
+  });
+});
+
+describe('formatDate', () => {
+  it.each([
+    ['2026-10-15', '2026-10-13', 'Thu 15 Oct'],
+    ['2026-10-13', '2026-10-13', 'Tue 13 Oct'],
+    ['2026-10-14', '2026-10-13', 'Wed 14 Oct'],
+    ['2027-01-04', '2026-12-30', 'Mon 4 Jan 2027'],
+    ['2026-12-30', '2027-01-04', 'Wed 30 Dec 2026'],
+  ])('formats %s with today %s as %j', (date, today, expected) => {
+    expect(formatDate(date, today)).toBe(expected);
+  });
+
+  it('rejects an invalid date', () => {
+    expect(() => formatDate('2026-02-30', '2026-10-13')).toThrow(RangeError);
+  });
+
+  it('rejects an invalid today', () => {
+    expect(() => formatDate('2026-10-13', 'x')).toThrow(RangeError);
+  });
+});
+
+describe('formatDay built on formatDate', () => {
+  it.each([
+    ['2026-10-13', 'today'],
+    ['2026-10-14', 'tomorrow'],
+    ['2026-10-12', 'yesterday'],
+    ['2026-10-15', formatDate('2026-10-15', '2026-10-13')],
+    ['2027-01-04', 'Mon 4 Jan 2027'],
+  ])('formats %s with today 2026-10-13 as %j', (date, expected) => {
+    expect(formatDay(date, '2026-10-13')).toBe(expected);
   });
 });

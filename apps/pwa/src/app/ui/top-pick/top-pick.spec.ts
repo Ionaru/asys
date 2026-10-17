@@ -710,22 +710,28 @@ describe('TopPick task hooks', () => {
     expect(titleText().getAttribute('data-task-id')).toBe('abc');
     expect(all('[data-task-id]')).toHaveLength(1);
     expect(all('[data-task-id]')[0]).toBe(titleText());
+    expect(titleText().getAttribute('data-focus-title')).toBe('');
+    expect(all('[data-focus-title]')).toHaveLength(1);
+    expect(all('[data-focus-title]')[0]).toBe(titleText());
   });
 
   it('has no data-task-id on the title text when taskId is null, also after it was cleared', async () => {
     const { fixture, host, titleText } = await setup();
 
     expect(titleText().hasAttribute('data-task-id')).toBe(false);
+    expect(titleText().hasAttribute('data-focus-title')).toBe(false);
 
     host.taskId.set('abc');
     await fixture.whenStable();
 
     expect(titleText().getAttribute('data-task-id')).toBe('abc');
+    expect(titleText().getAttribute('data-focus-title')).toBe('');
 
     host.taskId.set(null);
     await fixture.whenStable();
 
     expect(titleText().hasAttribute('data-task-id')).toBe(false);
+    expect(titleText().hasAttribute('data-focus-title')).toBe(false);
   });
 
   it('has data-morph on the title text while morph is true and drops it when morph is false', async () => {
@@ -757,6 +763,7 @@ describe('TopPick task hooks', () => {
 
     expect(link().hasAttribute('data-task-id')).toBe(false);
     expect(link().hasAttribute('data-morph')).toBe(false);
+    expect(link().hasAttribute('data-focus-title')).toBe(false);
   });
 
   it('has neither attribute while neither input is bound', async () => {
@@ -766,5 +773,6 @@ describe('TopPick task hooks', () => {
     expect(q('.asys-top-pick__title-text')?.hasAttribute('data-morph')).toBe(false);
     expect(q('[data-task-id]')).toBeNull();
     expect(q('[data-morph]')).toBeNull();
+    expect(q('[data-focus-title]')).toBeNull();
   });
 });

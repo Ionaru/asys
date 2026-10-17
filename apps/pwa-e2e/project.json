@@ -27,6 +27,15 @@
         "cwd": "{workspaceRoot}"
       }
     },
+    "shots": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["reset-db", "server:build", "pwa:api-client", "design-tokens:css"],
+      "options": {
+        "command": "playwright test -c apps/pwa-e2e/playwright.shots.config.mts",
+        "cwd": "{workspaceRoot}"
+      }
+    },
     "typecheck": {
       "executor": "nx:run-commands",
       "cache": true,

@@ -3,7 +3,7 @@ import { Component, signal, viewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { form, FormField, validate, type ValidationError } from '@angular/forms/signals';
 
-import { EstimateField } from './estimate-field';
+import { EstimateField, EstimateLayout } from './estimate-field';
 
 const RANGE_ERROR = 'Error: Use whole minutes from 1 to 100000.';
 
@@ -599,6 +599,288 @@ describe('EstimateField', () => {
       host.f.estimate().focusBoundControl();
 
       expect(document.activeElement).toBe(chips()[0]);
+    });
+  });
+});
+
+@Component({
+  imports: [EstimateField],
+  template: `
+    <asys-estimate-field
+      [layout]="layout"
+      [value]="value()"
+      (valueChange)="value.set($event)"
+      [hint]="hint()"
+      [errors]="errors()"
+      [touched]="touched()"
+      [disabled]="disabled()"
+      (touch)="touches.set(touches() + 1)"
+    />
+  `,
+})
+class RulerHost {
+  readonly layout = EstimateLayout.Ruler;
+
+  readonly field = viewChild.required(EstimateField);
+
+  readonly value = signal<number | null>(null);
+
+  readonly hint = signal<string | undefined>(undefined);
+
+  readonly errors = signal<readonly ValidationError.WithOptionalFieldTree[]>([]);
+
+  readonly touched = signal(false);
+
+  readonly disabled = signal(false);
+
+  readonly touches = signal(0);
+}
+
+const setupRuler = async () => {
+  const fixture = TestBed.createComponent(RulerHost);
+  await fixture.whenStable();
+
+  const host = fixture.componentInstance;
+  const root = (): HTMLElement => fixture.nativeElement;
+  const group = (): HTMLElement =>
+    root().querySelector('[role="group"].asys-estimate') as HTMLElement;
+  const legend = (): HTMLElement | null => root().querySelector('.asys-estimate__legend');
+  const cells = (): HTMLButtonElement[] =>
+    Array.from(root().querySelectorAll<HTMLButtonElement>('button.asys-estimate__cell'));
+  const toggle = (): HTMLButtonElement =>
+    root().querySelector('button.asys-estimate__other-toggle') as HTMLButtonElement;
+  const otherInput = (): HTMLInputElement | null =>
+    root().querySelector<HTMLInputElement>('input.asys-field__input');
+  const error = (): HTMLElement | null => root().querySelector('p.asys-field__error');
+  const typeEvent = async (text: string, event: 'input' | 'change') => {
+    const input = otherInput() as HTMLInputElement;
+
+    input.value = text;
+    input.dispatchEvent(new Event(event, { bubbles: true }));
+    await fixture.whenStable();
+  };
+
+  return { fixture, host, root, group, legend, cells, toggle, otherInput, error, typeEvent };
+};
+
+describe('EstimateField Ruler layout', () => {
+  it('is a group named by its legend, not a fieldset or a chip row', async () => {
+    const { root, group, legend } = await setupRuler();
+
+    expect(group().classList.contains('asys-estimate--ruler')).toBe(true);
+    expect(root().querySelector('fieldset')).toBeNull();
+    expect(root().querySelector('button.asys-estimate__chip')).toBeNull();
+    expect(legend()?.textContent?.trim()).toBe('Estimate');
+    expect(legend()?.id).not.toBe('');
+    expect(group().getAttribute('aria-labelledby')).toBe(legend()?.id);
+  });
+
+  it('renders six cells with the number and the unit, and the whole text as the label', async () => {
+    const { cells } = await setupRuler();
+
+    expect(cells().every((b) => b.getAttribute('type') === 'button')).toBe(true);
+    expect(
+      cells().map((b) => [
+        b.querySelector('.asys-estimate__num')?.textContent?.trim(),
+        b.querySelector('.asys-estimate__unit')?.textContent?.trim(),
+        b.getAttribute('aria-label'),
+      ]),
+    ).toEqual([
+      ['5', 'min', '5 min'],
+      ['15', 'min', '15 min'],
+      ['25', 'min', '25 min'],
+      ['45', 'min', '45 min'],
+      ['1', 'h', '1 h'],
+      ['2', 'h', '2 h'],
+    ]);
+  });
+
+  it('sets the minutes of each cell when clicked', async () => {
+    const { fixture, host, cells } = await setupRuler();
+
+    for (const [index, minutes] of [5, 15, 25, 45, 60, 120].entries()) {
+      cells()[index].click();
+      await fixture.whenStable();
+
+      expect(host.value()).toBe(minutes);
+    }
+  });
+
+  it('presses exactly the cell equal to the value', async () => {
+    const { fixture, host, cells } = await setupRuler();
+
+    host.value.set(45);
+    await fixture.whenStable();
+
+    expect(cells().map((b) => b.getAttribute('aria-pressed'))).toEqual([
+      'false',
+      'false',
+      'false',
+      'true',
+      'false',
+      'false',
+    ]);
+  });
+
+  it('disables the cells when the control is disabled', async () => {
+    const { fixture, host, cells } = await setupRuler();
+
+    host.disabled.set(true);
+    await fixture.whenStable();
+
+    expect(cells().every((b) => b.disabled)).toBe(true);
+  });
+
+  it('emits touch when a cell blurs', async () => {
+    const { fixture, host, cells } = await setupRuler();
+
+    document.body.appendChild(fixture.nativeElement);
+    cells()[0].focus();
+    cells()[0].blur();
+    await fixture.whenStable();
+
+    expect(host.touches()).toBe(1);
+  });
+
+  it('focuses the first cell from focus()', async () => {
+    const { fixture, host, cells } = await setupRuler();
+
+    document.body.appendChild(fixture.nativeElement);
+    host.field().focus();
+
+    expect(document.activeElement).toBe(cells()[0]);
+  });
+
+  it('wires the error paragraph to every cell', async () => {
+    const { fixture, host, root, cells } = await setupRuler();
+
+    host.errors.set([{ kind: 'x', message: 'Pick an estimate' }]);
+    host.touched.set(true);
+    await fixture.whenStable();
+
+    const message = root().querySelector('p[asys-field-error]') as HTMLElement;
+
+    expect(message).not.toBeNull();
+    expect(message.id).not.toBe('');
+    expect(cells().length).toBe(6);
+    expect(cells().every((b) => b.getAttribute('aria-describedby') === message.id)).toBe(true);
+  });
+
+  it('wires the hint to every cell', async () => {
+    const { fixture, host, root, cells } = await setupRuler();
+
+    host.hint.set('How long it takes');
+    await fixture.whenStable();
+
+    const hint = root().querySelector('.asys-field__hint') as HTMLElement;
+
+    expect(hint).not.toBeNull();
+    expect(hint.id).not.toBe('');
+    expect(cells().every((b) => b.getAttribute('aria-describedby') === hint.id)).toBe(true);
+  });
+
+  describe('Other', () => {
+    it('is a quiet toggle labelled Other that opens the minutes input', async () => {
+      const { fixture, toggle, otherInput } = await setupRuler();
+
+      expect(toggle().textContent?.trim()).toBe('Other');
+      expect(toggle().getAttribute('type')).toBe('button');
+      expect(toggle().getAttribute('aria-pressed')).toBe('false');
+      expect(otherInput()).toBeNull();
+
+      toggle().click();
+      await fixture.whenStable();
+
+      expect(otherInput()).not.toBeNull();
+      expect(Array.from(otherInput()?.labels ?? []).map((l) => l.textContent?.trim())).toEqual([
+        'Minutes',
+      ]);
+      expect(toggle().getAttribute('aria-pressed')).toBe('true');
+    });
+
+    it('opens with the stored custom value', async () => {
+      const { fixture, host, toggle, otherInput, cells } = await setupRuler();
+
+      host.value.set(42);
+      await fixture.whenStable();
+
+      expect(toggle().getAttribute('aria-pressed')).toBe('true');
+      expect(otherInput()?.value).toBe('42');
+      expect(cells().every((b) => b.getAttribute('aria-pressed') === 'false')).toBe(true);
+    });
+
+    it('does not commit typed digits on input', async () => {
+      const { fixture, host, toggle, typeEvent } = await setupRuler();
+
+      host.value.set(25);
+      await fixture.whenStable();
+      toggle().click();
+      await fixture.whenStable();
+      await typeEvent('4', 'input');
+      await typeEvent('42', 'input');
+
+      expect(host.value()).toBe(25);
+    });
+
+    it('commits the typed minutes once on change', async () => {
+      const { fixture, host, toggle, typeEvent, error } = await setupRuler();
+      const seen: (number | null)[] = [];
+
+      toggle().click();
+      await fixture.whenStable();
+      host.value.set(null);
+      await typeEvent('4', 'input');
+      await typeEvent('42', 'input');
+
+      expect(host.value()).toBeNull();
+
+      await typeEvent('42', 'change');
+      seen.push(host.value());
+
+      expect(seen).toEqual([42]);
+      expect(error()).toBeNull();
+    });
+
+    it('shows no error while typing invalid text, and the error on change', async () => {
+      const { fixture, host, toggle, typeEvent, error } = await setupRuler();
+
+      toggle().click();
+      await fixture.whenStable();
+      await typeEvent('abc', 'input');
+
+      expect(error()).toBeNull();
+
+      await typeEvent('abc', 'change');
+
+      expect(host.value()).toBeNull();
+      expect(error()?.textContent?.replace(/\s+/g, ' ').trim()).toBe(RANGE_ERROR);
+    });
+
+    it('sets null without an error when emptied on change', async () => {
+      const { fixture, host, toggle, typeEvent, error } = await setupRuler();
+
+      toggle().click();
+      await fixture.whenStable();
+      await typeEvent('40', 'change');
+
+      expect(host.value()).toBe(40);
+
+      await typeEvent('', 'change');
+
+      expect(host.value()).toBeNull();
+      expect(error()).toBeNull();
+    });
+
+    it('closes the input when a cell is clicked', async () => {
+      const { fixture, host, cells, otherInput } = await setupRuler();
+
+      host.value.set(20);
+      await fixture.whenStable();
+      cells()[1].click();
+      await fixture.whenStable();
+
+      expect(host.value()).toBe(15);
+      expect(otherInput()).toBeNull();
     });
   });
 });

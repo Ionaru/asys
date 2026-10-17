@@ -1,49 +1,65 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
-<h1
-  #heading
-  class="asys-page__title task-editor__title"
-  tabindex="-1"
-  [attr.data-task-id]="taskId()"
-  [attr.data-morph]="morph() ? '' : null"
->
+<header #bar class="task-editor__bar">
+  <button
+    asys-button
+    type="button"
+    class="task-editor__back"
+    aria-label="Back"
+    [variant]="Variant.Quiet"
+    [iconOnly]="true"
+    [icon]="Icons.ChevronLeft"
+    (click)="back()"
+  ></button>
+  <span class="task-editor__saved" role="status">
+    @if (saver.saved()) {
+      <asys-icon [name]="Icons.Check" />
+      Saved
+    }
+  </span>
+  @if (view()?.task?.status === TaskStatuses.Open && !readOnly()) {
+    <button
+      #moreButton
+      asys-button
+      type="button"
+      aria-label="More actions"
+      [variant]="Variant.Quiet"
+      [iconOnly]="true"
+      [icon]="Icons.Ellipsis"
+      (click)="openMore()"
+    ></button>
+  }
+</header>
+<h1 #heading class="asys-visually-hidden task-editor__heading" tabindex="-1">
   {{ headingText() }}
 </h1>
-<p class="asys-page__status task-editor__status" role="status">{{ statusLine() }}</p>
+<p class="asys-page__status task-editor__status" role="status">{{ statusText() }}</p>
+@if (saver.state() === Saves.Failed) {
+  <button
+    asys-button
+    type="button"
+    class="task-editor__retry"
+    [variant]="Variant.Quiet"
+    [size]="Size.Small"
+    (click)="saver.retry()"
+  >
+    Try again
+  </button>
+}
 @if (view(); as v) {
-  @if (overdue() || blocked()) {
-    <p class="task-editor__badges">
-      @if (overdue()) {
-        <asys-status-badge [status]="Badge.Overdue" />
-      }
-      @if (blocked()) {
-        <asys-status-badge [status]="Badge.Blocked" />
-      }
-    </p>
+  @if (dataStore.awaitingSync().has(taskId())) {
+    <p asys-sync-note class="task-editor__sync"></p>
   }
-  @if (inInbox()) {
-    <p class="task-editor__line">In the Inbox until Triage</p>
-  }
-  @if (deadlines(); as d) {
-    @if (d.latestStart !== null) {
-      <p class="task-editor__line">Latest start {{ d.latestStart }}</p>
-    }
-    <p class="task-editor__line">Effective due {{ d.effectiveDue }}</p>
-  }
-  @if (capturedText(); as text) {
-    <section class="task-editor__captured">
-      <h2 class="task-editor__subtitle">Captured text</h2>
-      <p class="task-editor__captured-text">{{ text }}</p>
-    </section>
-  }
-  <ng-container [ngTemplateOutlet]="draftForm" />
+  <ng-container [ngTemplateOutlet]="card" />
+  <asys-task-blockers [taskId]="taskId()" [busy]="blockersBusy()" />
   @if (v.task.status === TaskStatuses.Open) {
-    <div class="asys-button-group task-editor__actions">
+    <footer #footer class="task-editor__actions">
       <button
         asys-button
         type="button"
-        [variant]="Variant.Secondary"
+        [variant]="Variant.Primary"
+        [size]="Size.Large"
         [icon]="Icons.Check"
-        [disabled]="actionsBusy()"
+        [disabled]="doneBlocked()"
         (click)="done($event)"
       >
         Done
@@ -54,166 +70,181 @@
           asys-button
           type="button"
           [variant]="Variant.Secondary"
+          [size]="Size.Large"
           [icon]="Icons.BarProgressHalf"
-          [disabled]="actionsBusy()"
+          [disabled]="actionBlocked()"
           (click)="logOpen.set(true)"
         >
           Log progress
         </button>
       }
-      <button
-        #dropButton
-        asys-button
-        type="button"
-        [variant]="Variant.Quiet"
-        [disabled]="actionsBusy()"
-        (click)="confirmingDrop.set(true)"
-      >
-        Drop
-      </button>
-    </div>
-    @if (logOpen() && canLogProgress() && v.task.estimateMinutes !== null) {
-      <asys-log-progress-form
-        [estimateMinutes]="v.task.estimateMinutes"
-        [busy]="actionsBusy()"
-        (save)="logProgress($event)"
-        (cancel)="cancelLogProgress()"
-      />
-    }
-    @if (confirmingDrop()) {
-      <asys-inline-confirm
-        [message]="'Drop “' + v.task.title + '”? This cannot be undone.'"
-        confirmLabel="Drop"
-        [busy]="actionsBusy()"
-        (confirm)="drop()"
-        (cancel)="cancelDrop()"
-      />
-    }
+    </footer>
   }
-  @if (dataStore.awaitingSync().has(taskId())) {
-    <p asys-sync-note class="task-editor__sync"></p>
-  }
-  <section class="task-editor__section">
-    <h2 class="task-editor__subtitle">Blocked by</h2>
-    @if (blockedBy().length > 0) {
-      <ul class="task-editor__list">
-        @for (row of blockedBy(); track row.linkId) {
-          <li class="task-editor__row">
-            <span class="task-editor__row-title">{{ row.title }}</span>
-            <button
-              asys-button
-              type="button"
-              [variant]="Variant.Quiet"
-              [size]="Size.Small"
-              [disabled]="removeBusy(row.linkId)"
-              (click)="removeBlocker(row.linkId)"
-            >
-              Remove
-            </button>
-          </li>
-        }
-      </ul>
-    } @else {
-      <p class="task-editor__text">Waits for no other Task.</p>
-    }
-    <button
-      #addBlockerButton
-      asys-button
-      type="button"
-      [variant]="Variant.Secondary"
-      [disabled]="actionsBusy()"
-      (click)="pickerOpen.set(true)"
-    >
-      Add a blocker
-    </button>
-    <p class="task-editor__blocker-message" role="status">{{ blockerMessage() }}</p>
-    @if (pickerOpen()) {
-      <div class="task-editor__picker">
-        <asys-text-field label="Find a Task" [(value)]="filter" />
-        @if (candidates().length > 0) {
-          <ul class="task-editor__list">
-            @for (candidate of candidates(); track candidate.id) {
-              <li>
-                <button
-                  asys-button
-                  type="button"
-                  [variant]="Variant.Quiet"
-                  [disabled]="actionsBusy()"
-                  (click)="addBlocker(candidate.id)"
-                >
-                  {{ candidate.title }}
-                </button>
-              </li>
-            }
-          </ul>
-        } @else {
-          <p class="task-editor__text">No Task matches.</p>
-        }
-        <button asys-button type="button" [variant]="Variant.Quiet" (click)="closePicker()">
-          Close
-        </button>
-      </div>
-    }
-  </section>
-  <section class="task-editor__section">
-    <h2 class="task-editor__subtitle">Blocks</h2>
-    @if (blocksTasks().length > 0) {
-      <ul class="task-editor__list">
-        @for (dependant of blocksTasks(); track dependant.id) {
-          <li>
-            <a class="task-editor__blocks-link" [routerLink]="['/tasks', dependant.id]">{{
-              dependant.title
-            }}</a>
-          </li>
-        }
-      </ul>
-    } @else {
-      <p class="task-editor__text">No Task waits for this one.</p>
-    }
-  </section>
 } @else if (dataStore.state() === null) {
   <asys-load-state [failed]="dataStore.status() === Status.Failed" (retry)="dataStore.refresh()" />
 } @else if (!leaving()) {
   <p class="task-editor__missing">This Task is no longer open.</p>
   <p class="task-editor__text"><a class="task-editor__link" routerLink="/now">Go to Now</a></p>
   @if (dirty()) {
-    <ng-container [ngTemplateOutlet]="draftForm" />
+    <ng-container [ngTemplateOutlet]="card" />
   }
 }
 
-<ng-template #draftForm>
-  <div class="task-editor__form">
-    <asys-text-field [formField]="editForm.title" label="Title" />
-    <asys-text-field [formField]="editForm.notes" label="Notes" [multiline]="true" />
-    <asys-select-field [formField]="editForm.areaId" label="Area" [options]="areaOptions()" />
+<asys-sheet
+  heading="Log progress"
+  [(open)]="logOpen"
+  (openChange)="sheetClosed($event, Sheets.Log)"
+>
+  <ng-template>
+    <p class="task-editor__message" role="status">{{ logMessage() }}</p>
+    @if (logEstimate(); as estimate) {
+      <asys-log-progress-form
+        [estimateMinutes]="estimate"
+        [busy]="actionBlocked()"
+        (save)="logProgress($event)"
+        (cancel)="logOpen.set(false)"
+      />
+    }
+  </ng-template>
+</asys-sheet>
+<asys-sheet heading="More" [(open)]="moreOpen" (openChange)="sheetClosed($event, Sheets.More)">
+  <ng-template>
+    @if (confirmingDrop()) {
+      <asys-inline-confirm
+        [message]="'Drop “' + (view()?.task?.title ?? headingText()) + '”? This cannot be undone.'"
+        confirmLabel="Drop"
+        [busy]="actionBlocked()"
+        (confirm)="drop()"
+        (cancel)="cancelDrop()"
+      />
+    } @else {
+      <button
+        #dropButton
+        asys-button
+        type="button"
+        [variant]="Variant.Danger"
+        [block]="true"
+        [icon]="Icons.Xmark"
+        (click)="confirmingDrop.set(true)"
+      >
+        Drop
+      </button>
+    }
+    <p class="task-editor__message" role="status">{{ dropMessage() }}</p>
+  </ng-template>
+</asys-sheet>
+
+<ng-template #card>
+  <section class="task-editor__card" aria-label="Task">
+    <textarea
+      class="task-editor__title"
+      rows="1"
+      aria-label="Title"
+      placeholder="Title"
+      enterkeyhint="done"
+      [attr.data-task-id]="taskId()"
+      [attr.data-morph]="morph() ? '' : null"
+      [value]="saver.model().title"
+      [disabled]="readOnly()"
+      [attr.aria-invalid]="saver.needsTitle() ? 'true' : null"
+      [attr.aria-describedby]="saver.needsTitle() ? titleErrorId : null"
+      (input)="titleInput($event)"
+      (beforeinput)="titleBeforeInput($any($event))"
+      (keydown)="titleKeydown($event)"
+      (change)="saver.commit()"
+    ></textarea>
+    @if (saver.needsTitle()) {
+      <p asys-field-error [id]="titleErrorId">Needs a title</p>
+    }
+    @if (notesShown()) {
+      <textarea
+        #notesField
+        class="asys-field__input task-editor__notes"
+        aria-label="Notes"
+        placeholder="Add notes"
+        rows="1"
+        [value]="saver.model().notes"
+        [disabled]="readOnly()"
+        (input)="notesInput($event)"
+        (change)="saver.commit()"
+      ></textarea>
+    } @else {
+      <button
+        asys-button
+        type="button"
+        class="task-editor__add-notes"
+        [variant]="Variant.Quiet"
+        [size]="Size.Small"
+        [icon]="Icons.Plus"
+        [disabled]="readOnly()"
+        (click)="addNotes()"
+      >
+        Add notes
+      </button>
+    }
+    @if (capturedText(); as text) {
+      <p class="task-editor__captured">
+        <span class="task-editor__captured-label">Captured text</span>
+        <span class="task-editor__captured-text">{{ text }}</span>
+      </p>
+    }
     <asys-segmented
       [formField]="editForm.important"
       legend="Importance"
       trueLabel="Important"
       falseLabel="Not important"
     />
-    <asys-estimate-field [formField]="editForm.estimateMinutes" />
-    <asys-date-spec-field [formField]="editForm.availableFrom" legend="Available from" />
-    <asys-date-spec-field [formField]="editForm.due" legend="Due" />
-    <div class="asys-button-group">
-      <button
-        asys-button
-        type="button"
-        [variant]="Variant.Primary"
-        [disabled]="!canSave()"
-        (click)="save()"
-      >
-        Save
-      </button>
-      @if (needsTitle()) {
-        <p class="task-editor__reason">Needs a title</p>
-      }
-      @if (needsEstimate()) {
-        <p class="task-editor__reason">Needs an Estimate</p>
-      }
-      @if (needsImportance()) {
-        <p class="task-editor__reason">Needs an Importance</p>
-      }
+    <asys-estimate-field [formField]="editForm.estimateMinutes" [layout]="Layout.Ruler" />
+    <div class="task-editor__rows">
+      <asys-choice-row
+        [formField]="editForm.areaId"
+        label="Area"
+        [options]="areaOptions()"
+        [icon]="Icons.Folder"
+      />
+      <asys-date-spec-row
+        [formField]="editForm.availableFrom"
+        label="Available from"
+        noneLabel="Any time"
+        removeLabel="Remove Available from"
+        timePrefix="Available from"
+        [today]="today()"
+      />
+      <asys-date-spec-row
+        [formField]="editForm.due"
+        label="Due"
+        noneLabel="None"
+        removeLabel="Remove Due"
+        timePrefix="Due at"
+        [today]="today()"
+      />
     </div>
-  </div>
+    @if (explanation(); as e) {
+      @if (e._tag === Tags.Inbox) {
+        <div class="task-editor__reason">
+          <ng-container [ngTemplateOutlet]="badges" />
+          <p class="task-editor__reason-text">In the Inbox until Triage</p>
+        </div>
+      } @else if (e._tag === Tags.Available || e._tag === Tags.Waiting) {
+        <div class="task-editor__reason">
+          <asys-quadrant-chip [quadrant]="e.reason.quadrant" [strong]="true" />
+          <ng-container [ngTemplateOutlet]="badges" />
+          <span class="task-editor__reason-text">{{ e.reasonText }}</span>
+        </div>
+      } @else if (overdue() || blocked()) {
+        <div class="task-editor__reason">
+          <ng-container [ngTemplateOutlet]="badges" />
+        </div>
+      }
+    }
+  </section>
+</ng-template>
+
+<ng-template #badges>
+  @if (overdue()) {
+    <asys-status-badge [status]="Badge.Overdue" />
+  }
+  @if (blocked()) {
+    <asys-status-badge [status]="Badge.Blocked" />
+  }
 </ng-template>

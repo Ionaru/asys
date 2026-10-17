@@ -99,9 +99,11 @@ test('A failed capture stays as a row until Try again sends it', async ({ page }
 });
 
 test('The Inbox badge pops when a capture lands, not when the page loads', async ({ page }) => {
-  // Records, one frame after each Inbox badge is inserted, how many animations it runs.
+  // Records, one frame after each Inbox badge is inserted, how many animations it runs. A badge is recorded once,
+  // also when it arrives inside a nav that is inserted with it.
   await page.addInitScript(() => {
     const seen: number[] = [];
+    const recordedBadges = new WeakSet<Element>();
     (window as unknown as { badgeAnimations: number[] }).badgeAnimations = seen;
     new MutationObserver((records) => {
       for (const record of records) {
@@ -113,6 +115,10 @@ test('The Inbox badge pops when a capture lands, not when the page loads', async
             ? [node]
             : Array.from(node.querySelectorAll('.asys-bottomnav__badge'));
           for (const badge of badges) {
+            if (recordedBadges.has(badge)) {
+              continue;
+            }
+            recordedBadges.add(badge);
             requestAnimationFrame(() => seen.push(badge.getAnimations().length));
           }
         }

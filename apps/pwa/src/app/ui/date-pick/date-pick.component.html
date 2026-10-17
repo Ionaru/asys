@@ -1,0 +1,61 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
+<div class="asys-date-pick__chips" role="group" aria-label="Quick dates">
+  @for (chip of chips(); track $index) {
+    <button
+      type="button"
+      class="asys-date-pick__chip"
+      [attr.aria-pressed]="value() === chip.date ? 'true' : 'false'"
+      (click)="choose(chip.date)"
+    >
+      {{ chip.label }}
+    </button>
+  }
+</div>
+<div class="asys-date-pick__calendar" role="group" [attr.aria-label]="calendarLabel()">
+  @for (name of weekdays; track name) {
+    <span class="asys-date-pick__dow" aria-hidden="true">{{ name }}</span>
+  }
+  @for (day of days(); track day.date) {
+    <button
+      type="button"
+      class="asys-num asys-date-pick__day"
+      [class.asys-date-pick__day--today]="day.isToday"
+      [attr.aria-label]="day.label"
+      [attr.aria-pressed]="value() === day.date ? 'true' : 'false'"
+      [attr.aria-current]="day.isToday ? 'date' : null"
+      [disabled]="day.past"
+      (click)="choose(day.date)"
+    >
+      {{ day.number }}
+    </button>
+  }
+</div>
+<div class="asys-field asys-date-pick__other">
+  <label class="asys-field__label" [for]="otherId">Other date</label>
+  <input
+    #otherInput
+    class="asys-field__input"
+    type="date"
+    [id]="otherId"
+    [attr.min]="today()"
+    [value]="value() ?? ''"
+    [attr.aria-invalid]="pastTyped() ? 'true' : null"
+    [attr.aria-describedby]="pastTyped() ? errorId : null"
+    (change)="typeDate(otherInput.value)"
+  />
+  @if (pastTyped()) {
+    <p asys-field-error [id]="errorId">Pick today or a later date.</p>
+  }
+</div>
+@if (value() !== null) {
+  <button
+    asys-button
+    type="button"
+    class="asys-date-pick__remove"
+    [variant]="Variant.Secondary"
+    [block]="true"
+    (click)="remove.emit()"
+  >
+    {{ removeLabel() }}
+  </button>
+}

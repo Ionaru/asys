@@ -31,6 +31,8 @@ interface NowItem {
   readonly id: string;
   readonly leaving?: boolean;
   readonly linked?: boolean;
+  /** Carries data-task-id (the morph hook) but not data-focus-title: never a focus target. */
+  readonly unmarked?: boolean;
 }
 
 /** What `NowStub` renders after its h1; a case sets it and `afterEach` resets it. */
@@ -42,14 +44,18 @@ const nowItems = signal<readonly NowItem[]>([]);
     @for (item of items(); track item.id) {
       @if (item.leaving) {
         <div data-leaving>
-          <span tabindex="-1" [attr.data-task-id]="item.id">{{ item.id }}</span>
+          <span tabindex="-1" data-focus-title [attr.data-task-id]="item.id">{{ item.id }}</span>
         </div>
       } @else if (item.linked) {
         <a [attr.href]="'/tasks/' + item.id"
-          ><span tabindex="-1" [attr.data-task-id]="item.id">{{ item.id }}</span></a
+          ><span tabindex="-1" data-focus-title [attr.data-task-id]="item.id">{{
+            item.id
+          }}</span></a
         >
-      } @else {
+      } @else if (item.unmarked) {
         <span tabindex="-1" [attr.data-task-id]="item.id">{{ item.id }}</span>
+      } @else {
+        <span tabindex="-1" data-focus-title [attr.data-task-id]="item.id">{{ item.id }}</span>
       }
     }
   `,
@@ -57,6 +63,15 @@ const nowItems = signal<readonly NowItem[]>([]);
 class NowStub {
   protected readonly items = nowItems;
 }
+
+/** The Task editor's page: a Title textarea carrying the Task id, then a visually hidden h1. */
+@Component({
+  template: `
+    <textarea data-task-id="t1"></textarea>
+    <h1 tabindex="-1">Task</h1>
+  `,
+})
+class EditorStub {}
 
 const PENDING: PendingDone = {
   taskId: 'a',
@@ -166,7 +181,7 @@ const setup = async (url = '/now', { motion }: SetupOptions = {}) => {
               { path: 'now', component: NowStub },
               { path: 'today', component: Stub },
               { path: 'inbox', component: Stub },
-              { path: 'tasks/:taskId', component: Stub },
+              { path: 'tasks/:taskId', component: EditorStub, data: { hideNav: true } },
               { path: 'settings', component: Stub },
             ],
           },
@@ -501,7 +516,7 @@ describe('ShellLayout', () => {
       },
     );
 
-    it.each(['/tasks/x', '/settings'])(
+    it.each(['/settings'])(
       'shows neither Capture nor the bar on %s, and leaves the nav with its links',
       async (url) => {
         const { captures, nav, bar } = await setup(url);
@@ -512,6 +527,40 @@ describe('ShellLayout', () => {
         expect(nav()?.querySelector('button')).toBeNull();
       },
     );
+
+    it('hides the bottom nav, Capture and the bar on the Task editor', async () => {
+      const { root, captures, nav, bar, shellHost } = await setup('/tasks/x');
+
+      expect(root().querySelector('asys-bottom-nav')).toBeNull();
+      expect(nav()).toBeNull();
+      expect(captures()).toHaveLength(0);
+      expect(bar()).toBeNull();
+      expect(shellHost()?.classList.contains('shell--bare')).toBe(true);
+    });
+
+    it('brings the nav back with its links and Capture when leaving the Task editor for Now, and takes it away again', async () => {
+      const { root, captures, nav, shellHost, go } = await setup('/tasks/x');
+
+      await go('/now');
+
+      expect(root().querySelector('asys-bottom-nav')).not.toBeNull();
+      expect(nav()?.querySelectorAll('a')).toHaveLength(3);
+      expect(captures()).toHaveLength(1);
+      expect(shellHost()?.classList.contains('shell--bare')).toBe(false);
+
+      await go('/tasks/x');
+
+      expect(root().querySelector('asys-bottom-nav')).toBeNull();
+      expect(captures()).toHaveLength(0);
+      expect(shellHost()?.classList.contains('shell--bare')).toBe(true);
+    });
+
+    it.each(['/now', '/settings'])('does not mark the shell bare on %s', async (url) => {
+      const { root, shellHost } = await setup(url);
+
+      expect(root().querySelector('asys-bottom-nav')).not.toBeNull();
+      expect(shellHost()?.classList.contains('shell--bare')).toBe(false);
+    });
 
     it('ignores the query when deciding the path', async () => {
       const { capture } = await setup('/now?x=1');
@@ -1525,6 +1574,27 @@ describe('ShellLayout', () => {
       expect(document.activeElement).toBe(root().querySelector('main [data-task-id="b"]'));
     });
 
+    it('focuses the h1, not the Title textarea, on Escape in the Task editor', async () => {
+      const { doneUndo, root, pressEscapeInBar, settle } = await setup('/tasks/x');
+
+      doneUndo.pending.set(PENDING);
+      await settle();
+      await pressEscapeInBar();
+
+      expect(document.activeElement).toBe(root().querySelector('main h1'));
+      expect(document.activeElement).not.toBe(root().querySelector('main textarea'));
+    });
+
+    it('focuses the h1, not the Title textarea, after an Undo of that Task in the Task editor', async () => {
+      const { doneUndo, root, settle } = await setup('/tasks/x');
+
+      doneUndo.undone.set({ taskId: 't1', seq: 1 });
+      await settle();
+
+      expect(document.activeElement).toBe(root().querySelector('main h1'));
+      expect(document.activeElement).not.toBe(root().querySelector('main textarea'));
+    });
+
     it('skips a leaving title on Escape, even though its own element has no data-leaving', async () => {
       const { doneUndo, root, pressEscapeInBar, settle } = await setup();
 
@@ -1564,6 +1634,7 @@ describe('ShellLayout', () => {
 
       outside.tabIndex = -1;
       outside.dataset['taskId'] = 'x';
+      outside.dataset['focusTitle'] = '';
       must(root().querySelector('nav[aria-label="Primary"]')).appendChild(outside);
 
       doneUndo.pending.set(PENDING);
@@ -1571,6 +1642,41 @@ describe('ShellLayout', () => {
       await pressEscapeInBar();
 
       expect(document.activeElement).not.toBe(outside);
+      expect(document.activeElement).toBe(root().querySelector('main h1'));
+    });
+
+    it('never focuses an element with data-task-id but no data-focus-title on Escape', async () => {
+      const { doneUndo, root, pressEscapeInBar, settle } = await setup();
+
+      nowItems.set([{ id: 'a', unmarked: true }]);
+      doneUndo.pending.set(PENDING);
+      await settle();
+      await pressEscapeInBar();
+
+      expect(document.activeElement).not.toBe(root().querySelector('main [data-task-id="a"]'));
+      expect(document.activeElement).toBe(root().querySelector('main h1'));
+    });
+
+    it('skips an unmarked element for the first marked title on Escape', async () => {
+      const { doneUndo, root, pressEscapeInBar, settle } = await setup();
+
+      nowItems.set([{ id: 'a', unmarked: true }, { id: 'b' }]);
+      doneUndo.pending.set(PENDING);
+      await settle();
+      await pressEscapeInBar();
+
+      expect(document.activeElement).toBe(root().querySelector('main [data-task-id="b"]'));
+    });
+
+    it('never focuses an unmarked element of the restored Task after an Undo', async () => {
+      const { doneUndo, root, settle } = await setup();
+
+      nowItems.set([{ id: 'b', unmarked: true }]);
+      await settle();
+      doneUndo.undone.set({ taskId: 'b', seq: 1 });
+      await settle();
+
+      expect(document.activeElement).not.toBe(root().querySelector('main [data-task-id="b"]'));
       expect(document.activeElement).toBe(root().querySelector('main h1'));
     });
 

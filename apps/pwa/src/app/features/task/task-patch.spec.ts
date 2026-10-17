@@ -1,7 +1,16 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { TaskKind, TaskStatus, type Task } from '@asys/domain';
 
-import { buildTaskPatch, draftOf, type TaskDraft } from './task-patch';
+import {
+  buildSavePatch,
+  buildTaskPatch,
+  COMMITTED_FIELDS,
+  committedOf,
+  draftOf,
+  savableDraft,
+  type CommittedText,
+  type TaskDraft,
+} from './task-patch';
 
 const BASELINE: TaskDraft = {
   title: 'Call Marit',
@@ -145,5 +154,116 @@ describe('buildTaskPatch', () => {
 
   it('has no keys for unchanged fields', () => {
     expect(Object.keys(buildTaskPatch(BASELINE, { ...BASELINE, notes: 'x' }))).toEqual(['notes']);
+  });
+});
+
+describe('committedOf', () => {
+  it('takes the title and Notes of the draft', () => {
+    expect(committedOf({ ...BASELINE, title: 'Buy milk', notes: 'Oat' })).toEqual({
+      title: 'Buy milk',
+      notes: 'Oat',
+    });
+  });
+});
+
+describe('COMMITTED_FIELDS', () => {
+  const a: CommittedText = { title: 'A', notes: 'n' };
+
+  it('names the title and notes', () => {
+    expect([...COMMITTED_FIELDS.keys]).toEqual(['title', 'notes']);
+  });
+
+  it('compares field by field', () => {
+    expect(COMMITTED_FIELDS.same('title', a, { ...a })).toBe(true);
+    expect(COMMITTED_FIELDS.same('title', a, { ...a, title: 'B' })).toBe(false);
+    expect(COMMITTED_FIELDS.same('notes', a, { ...a, title: 'B' })).toBe(true);
+    expect(COMMITTED_FIELDS.same('notes', a, { ...a, notes: 'm' })).toBe(false);
+  });
+});
+
+describe('buildSavePatch and savableDraft', () => {
+  const MILK: TaskDraft = {
+    title: 'Buy milk',
+    notes: '',
+    areaId: 'a1',
+    important: true,
+    estimateMinutes: 30,
+    availableFrom: null,
+    due: null,
+  };
+  const COMMITTED: CommittedText = { title: 'Buy milk', notes: '' };
+
+  it('does not send a typed title that is not committed', () => {
+    expect(buildSavePatch(MILK, { ...MILK, title: 'Buy oat milk' }, COMMITTED)).toEqual({});
+    expect(savableDraft(MILK, { ...MILK, title: 'Buy oat milk' }, COMMITTED).title).toBe(
+      'Buy milk',
+    );
+  });
+
+  it('sends the committed title trimmed', () => {
+    expect(buildSavePatch(MILK, MILK, { title: 'Buy oat milk ', notes: '' })).toEqual({
+      title: 'Buy oat milk',
+    });
+  });
+
+  it('never sends a blank committed title, but sends the rest', () => {
+    const patch = buildSavePatch(MILK, { ...MILK, important: false }, { title: '   ', notes: '' });
+
+    expect(patch).toEqual({ important: false });
+    expect('title' in patch).toBe(false);
+    expect(savableDraft(MILK, MILK, { title: '   ', notes: '' }).title).toBe('Buy milk');
+  });
+
+  it('does not send a cleared Estimate, but sends a changed one', () => {
+    expect(buildSavePatch(MILK, { ...MILK, estimateMinutes: null }, COMMITTED)).toEqual({});
+    expect(buildSavePatch(MILK, { ...MILK, estimateMinutes: 15 }, COMMITTED)).toEqual({
+      estimateMinutes: 15,
+    });
+  });
+
+  it('does not send a cleared Importance', () => {
+    expect(buildSavePatch(MILK, { ...MILK, important: null }, COMMITTED)).toEqual({});
+  });
+
+  it('sends the first Importance and Estimate of an Inbox Task', () => {
+    const inbox = { ...MILK, important: null, estimateMinutes: null };
+
+    expect(
+      buildSavePatch(inbox, { ...inbox, important: true, estimateMinutes: 15 }, COMMITTED),
+    ).toEqual({
+      important: true,
+      estimateMinutes: 15,
+    });
+  });
+
+  it('sends No Area as null', () => {
+    expect(buildSavePatch(MILK, { ...MILK, areaId: '' }, COMMITTED)).toEqual({ areaId: null });
+  });
+
+  it('sends a changed Due, and nothing for a date equal by value', () => {
+    expect(
+      buildSavePatch(MILK, { ...MILK, due: { date: '2026-10-20', time: '17:00' } }, COMMITTED),
+    ).toEqual({ due: { date: '2026-10-20', time: '17:00' } });
+
+    const withFrom = { ...MILK, availableFrom: { date: '2026-10-06' } };
+
+    expect(
+      buildSavePatch(withFrom, { ...withFrom, availableFrom: { date: '2026-10-06' } }, COMMITTED),
+    ).toEqual({});
+  });
+
+  it('sends committed Notes', () => {
+    expect(buildSavePatch(MILK, MILK, { title: 'Buy milk', notes: 'Call first' })).toEqual({
+      notes: 'Call first',
+    });
+  });
+
+  it('is the patch of the savable draft', () => {
+    const draft = { ...MILK, estimateMinutes: null, areaId: '' };
+    const committed = { title: 'Milk', notes: 'x' };
+
+    expect(buildSavePatch(MILK, draft, committed)).toEqual(
+      buildTaskPatch(MILK, savableDraft(MILK, draft, committed)),
+    );
   });
 });

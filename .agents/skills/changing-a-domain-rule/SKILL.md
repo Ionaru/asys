@@ -8,7 +8,7 @@ description: Use when changing how ASYS derives a value (Available, Blocked, Ove
 
 ## Overview
 
-`libs/domain` is the only home of the rules. The server and the PWA call the rules; they never re-implement them. A front-end derives values with the rules named by `RULES_VERSION`, so ADR 0003 makes any rule change at least a minor version, with a changelog entry. No test ties the version to the changelog, so you are the check.
+`libs/domain` is the only home of the rules. The server and the PWA call the rules; they never re-implement them. A front-end derives values with the rules named by `RULES_VERSION`, so ADR 0003 makes any rule change at least a minor version, with a changelog entry. No test ties the version to the changelog, so you are the check. A move of types or functions between files, or another refactor that leaves every output the same, is not a rule change: it needs no `RULES_VERSION` bump and no changelog section.
 
 ## Steps
 

@@ -237,15 +237,21 @@ test('opens the top pick with Push and moves its title, then goes back with Pop'
 
   let before = await recordCount(page);
   await topPick.locator('a.asys-top-pick__link').click();
-  await expect(page.locator('h1.task-editor__title')).toBeVisible();
+  await expect(page.locator('textarea.task-editor__title')).toBeVisible();
   const push = await lastSettled(page, before);
 
   expect(push.kind).toBe('push');
+  expect(push.settled).toBe(true);
+  expect(push.skipped).toBe(false);
+  // The editor has no bottom nav, so the nav's groups exist on the old side only.
+  expect(namesOf(push.oldNames)).toEqual(expect.arrayContaining(['shell-nav', 'nav-mark']));
+  expect(namesOf(push.newNames)).not.toContain('shell-nav');
+  expect(namesOf(push.newNames)).not.toContain('nav-mark');
   expect(withName(push.oldNames, 'task-title')).toEqual([
     { name: 'task-title', tag: 'span', classes: 'asys-top-pick__title-text' },
   ]);
   expect(withName(push.newNames, 'task-title')).toEqual([
-    { name: 'task-title', tag: 'h1', classes: 'asys-page__title task-editor__title' },
+    { name: 'task-title', tag: 'textarea', classes: 'task-editor__title' },
   ]);
 
   before = await recordCount(page);
@@ -254,8 +260,14 @@ test('opens the top pick with Push and moves its title, then goes back with Pop'
   const pop = await lastSettled(page, before);
 
   expect(pop.kind).toBe('pop');
+  expect(pop.settled).toBe(true);
+  expect(pop.skipped).toBe(false);
+  // The nav's groups exist on the new side only.
+  expect(namesOf(pop.oldNames)).not.toContain('shell-nav');
+  expect(namesOf(pop.oldNames)).not.toContain('nav-mark');
+  expect(namesOf(pop.newNames)).toEqual(expect.arrayContaining(['shell-nav', 'nav-mark']));
   expect(withName(pop.oldNames, 'task-title')).toEqual([
-    { name: 'task-title', tag: 'h1', classes: 'asys-page__title task-editor__title' },
+    { name: 'task-title', tag: 'textarea', classes: 'task-editor__title' },
   ]);
   expect(withName(pop.newNames, 'task-title')).toEqual([
     { name: 'task-title', tag: 'span', classes: 'asys-top-pick__title-text' },
@@ -272,7 +284,7 @@ test("moves a ranked row's title into the editor", async ({ page }) => {
 
   const before = await recordCount(page);
   await row.click();
-  await expect(page.locator('h1.task-editor__title')).toBeVisible();
+  await expect(page.locator('textarea.task-editor__title')).toBeVisible();
   const push = await lastSettled(page, before);
 
   expect(push.kind).toBe('push');
@@ -280,7 +292,7 @@ test("moves a ranked row's title into the editor", async ({ page }) => {
     { name: 'task-title', tag: 'span', classes: 'asys-picker-row__title' },
   ]);
   expect(withName(push.newNames, 'task-title')).toEqual([
-    { name: 'task-title', tag: 'h1', classes: 'asys-page__title task-editor__title' },
+    { name: 'task-title', tag: 'textarea', classes: 'task-editor__title' },
   ]);
 });
 
@@ -291,7 +303,7 @@ test("goes back from the editor's Done without a morph", async ({ page }) => {
   const topPick = page.locator('article.asys-top-pick');
   let before = await recordCount(page);
   await topPick.locator('a.asys-top-pick__link').click();
-  await expect(page.locator('h1.task-editor__title')).toBeVisible();
+  await expect(page.locator('textarea.task-editor__title')).toBeVisible();
   await lastSettled(page, before);
 
   before = await recordCount(page);
@@ -310,7 +322,7 @@ test("captures the Undo bar on the editor's Done Pop", async ({ page }) => {
 
   let before = await recordCount(page);
   await page.locator('article.asys-top-pick a.asys-top-pick__link').click();
-  await expect(page.locator('h1.task-editor__title')).toBeVisible();
+  await expect(page.locator('textarea.task-editor__title')).toBeVisible();
   await lastSettled(page, before);
 
   before = await recordCount(page);

@@ -52,7 +52,7 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/task/task-editor-route').then((m) => m.TaskEditorRoute),
         title: 'Task · ASYS',
-        data: { level: 1 },
+        data: { level: 1, hideNav: true },
       },
       {
         path: 'settings',

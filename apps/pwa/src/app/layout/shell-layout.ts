@@ -21,8 +21,10 @@ import { CommandAttempts } from '../core/data/command-attempts';
 import { DataStore } from '../core/data/data-store';
 import { DoneUndo, PauseReason, UNDO_WINDOW_MS } from '../core/data/done-undo';
 import { Motion } from '../core/platform/motion';
+import { observeBlockSize } from '../core/platform/observe-block-size';
 import { TAB_PATHS } from '../core/platform/tabs';
 import { pathOf } from '../core/platform/url-path';
+import { leafRoute } from '../core/platform/view-transitions';
 import type { Activation } from '../ui/activation/activation';
 import { BottomNav } from '../ui/bottom-nav/bottom-nav';
 import { CaptureButton } from '../ui/capture-button/capture-button';
@@ -36,6 +38,7 @@ import { leaveMarked } from './shell-motion';
   selector: 'app-shell-layout',
   imports: [RouterOutlet, BottomNav, CaptureButton, QuickAdd, UndoBar],
   providers: [CommandAttempts, CaptureQueue, DoneUndo],
+  host: { '[class.shell--bare]': 'navHidden()' },
   templateUrl: './shell-layout.component.html',
   styleUrl: './shell-layout.css',
 })
@@ -82,6 +85,15 @@ export class ShellLayout {
     return TAB_PATHS.includes(
       pathOf(this.#router.serializeUrl(navigation.finalUrl ?? navigation.extractedUrl)),
     );
+  });
+
+  /** Whether the routed screen hides the bottom nav (route data `hideNav`), as of the last successful navigation. */
+  protected readonly navHidden = computed(() => {
+    if (this.#router.lastSuccessfulNavigation() === null) {
+      return false;
+    }
+
+    return leafRoute(this.#router.routerState.snapshot.root).data['hideNav'] === true;
   });
 
   protected readonly open = linkedSignal<boolean, boolean>({
@@ -174,7 +186,9 @@ export class ShellLayout {
         return;
       }
 
-      const stop = this.#observeBlockSize(element, '--shell-undo-height');
+      const stop = observeBlockSize(element, (size) =>
+        this.#host.nativeElement.style.setProperty('--shell-undo-height', `${size}px`),
+      );
 
       onCleanup(() => {
         stop();
@@ -191,7 +205,9 @@ export class ShellLayout {
         return;
       }
 
-      const stop = this.#observeBlockSize(element, '--shell-nav-height');
+      const stop = observeBlockSize(element, (size) =>
+        this.#host.nativeElement.style.setProperty('--shell-nav-height', `${size}px`),
+      );
 
       onCleanup(() => {
         stop();
@@ -249,24 +265,6 @@ export class ShellLayout {
   }
 
   /**
-   * Writes the border-box block size of `element` to the custom property `name` on the shell host, as
-   * it changes. Returns the function that stops observing.
-   */
-  #observeBlockSize(element: HTMLElement, name: string): () => void {
-    const observer = new ResizeObserver((entries) => {
-      const size = entries[0]?.borderBoxSize[0]?.blockSize;
-
-      if (size !== undefined) {
-        this.#host.nativeElement.style.setProperty(name, `${size}px`);
-      }
-    });
-
-    observer.observe(element);
-
-    return () => observer.disconnect();
-  }
-
-  /**
    * Runs after a layout change that happened while focus was in the bar. Focus still in the bar stays.
    * Otherwise the Focus pause ends, and when focus was lost (not moved elsewhere) and the change was
    * not a pointer action, it goes to the bar's first button, or to the page as Escape does.
@@ -307,7 +305,8 @@ export class ShellLayout {
       return;
     }
 
-    const title = Array.from(main.querySelectorAll<HTMLElement>('[data-task-id]')).find(
+    // Only a title marked data-focus-title is a focus target: data-task-id alone is the morph hook, and the editor's Title textarea carries it.
+    const title = Array.from(main.querySelectorAll<HTMLElement>('[data-focus-title]')).find(
       (element) =>
         (taskId === null || element.dataset['taskId'] === taskId) &&
         element.closest('[data-leaving]') === null,

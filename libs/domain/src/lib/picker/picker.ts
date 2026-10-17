@@ -4,41 +4,27 @@ import { isWithinActiveHours, type Area } from '../area';
 import { compareCodeUnits } from '../compare';
 import type { Settings } from '../settings';
 import {
-  blockedReasons,
   isAvailable,
   isInInbox,
   isOverdue,
   deadlineIndex,
   Quadrant,
   TaskStatus,
-  quadrant,
-  type BlockedBy,
   type BlockerLink,
   type Task,
 } from '../task';
-import { isUrgentBy } from '../task/priority';
-import { addCalendarDays, availableFromInstant, toLocalDateTime, type Instant } from '../time';
+import { addCalendarDays, toLocalDateTime, type Instant } from '../time';
+import { exclusionReasons, reasonOf } from './reasons';
 import { reasonTextOn } from './reason-text';
+import type { ExclusionReason, Reason } from './reason-types';
 import { waitingTextOn } from './waiting-text';
 
-export enum ExclusionReasonTag {
-  NotYetAvailable = 'NotYetAvailable',
-}
-
-export interface NotYetAvailable {
-  readonly _tag: ExclusionReasonTag.NotYetAvailable;
-  readonly from: Instant;
-}
-
-/** Why an Open, triaged Task is not ranked. An open union: Slice 2 adds Voice and Gap reasons, so consumers must handle tags they do not know. */
-export type ExclusionReason = NotYetAvailable | BlockedBy;
-
-export interface Reason {
-  readonly overdue: boolean;
-  readonly quadrant: Quadrant;
-  readonly urgent: boolean;
-  readonly latestStart: Instant | null;
-}
+export {
+  ExclusionReasonTag,
+  type ExclusionReason,
+  type NotYetAvailable,
+  type Reason,
+} from './reason-types';
 
 export interface RankedTask {
   readonly task: Task;
@@ -150,23 +136,11 @@ export const pick = (
         counts.set(outside.id, entry);
         continue;
       }
-      const start = deadlines.latestStart(task);
-      const urgent = isUrgentBy(start, urgencyCutoff);
-      const reason: Reason = {
-        overdue: isOverdue(task, now, tz),
-        quadrant: quadrant(task.important === true, urgent),
-        urgent,
-        latestStart: start,
-      };
+      const reason = reasonOf(task, deadlines.latestStart(task), now, tz, urgencyCutoff);
       ranked.push({ task, reason, reasonText: reasonTextOn(task, reason, today, tz) });
     } else if (task.status === TaskStatus.Open && !isInInbox(task)) {
       if (outsideArea(task) !== undefined) continue;
-      const reasons: ExclusionReason[] = [];
-      if (task.availableFrom !== null) {
-        const from = availableFromInstant(task.availableFrom, tz);
-        if (now < from) reasons.push({ _tag: ExclusionReasonTag.NotYetAvailable, from });
-      }
-      reasons.push(...blockedReasons(task, tasks, links));
+      const reasons = exclusionReasons(task, tasks, links, now, tz);
       waiting.push({ task, reasons, reasonText: waitingTextOn(task, reasons, tasks, today, tz) });
     }
   }

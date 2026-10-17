@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: EUPL-1.2
-import { Component, input, model, ViewEncapsulation } from '@angular/core';
+import { Component, computed, input, model, output, ViewEncapsulation } from '@angular/core';
 
 import { Icon, IconName } from '../icon/icon';
+
+/** What a click on the header does: expand its body, or ask the parent to open something (a sheet). */
+export enum SectionHeaderAction {
+  Expand = 'expand',
+  Open = 'open',
+}
 
 let nextId = 0;
 
@@ -19,9 +25,10 @@ let nextId = 0;
       <button
         class="asys-section-header"
         type="button"
-        [attr.aria-expanded]="expanded() ? 'true' : 'false'"
-        [attr.aria-controls]="bodyId"
-        (click)="expanded.set(!expanded())"
+        [attr.aria-expanded]="isOpen() ? null : expanded() ? 'true' : 'false'"
+        [attr.aria-controls]="isOpen() ? null : bodyId"
+        [attr.aria-haspopup]="isOpen() ? 'dialog' : null"
+        (click)="click()"
       >
         <asys-icon class="asys-section-header__icon" [name]="icon()" />
         <span class="asys-section-header__text">
@@ -35,18 +42,18 @@ let nextId = 0;
             <span class="asys-section-header__summary">{{ text }}</span>
           }
         </span>
-        <asys-icon class="asys-section-header__chevron" [name]="ChevronDown" />
+        <asys-icon class="asys-section-header__chevron" [name]="trailingIcon()" />
       </button>
-      <div class="asys-section__body" [id]="bodyId" [hidden]="!expanded()">
-        <ng-content />
-      </div>
+      @if (!isOpen()) {
+        <div class="asys-section__body" [id]="bodyId" [hidden]="!expanded()">
+          <ng-content />
+        </div>
+      }
     </section>
   `,
   styleUrl: './section-header.css',
 })
 export class SectionHeader {
-  protected readonly ChevronDown = IconName.ChevronDown;
-
   protected readonly bodyId = `asys-section-body-${nextId++}`;
 
   /** The Icon that marks the section, such as the hourglass for Waiting. */
@@ -60,4 +67,19 @@ export class SectionHeader {
   readonly summary = input<string | null>(null);
 
   readonly expanded = model<boolean>(false);
+
+  /** Expand toggles the body; Open emits `activate` and renders no body. */
+  readonly action = input<SectionHeaderAction>(SectionHeaderAction.Expand);
+
+  /** The Icon at the end of the header. Only an Expand header's chevron turns. */
+  readonly trailingIcon = input<IconName>(IconName.ChevronDown);
+
+  readonly activate = output<void>();
+
+  protected readonly isOpen = computed(() => this.action() === SectionHeaderAction.Open);
+
+  protected click(): void {
+    if (this.isOpen()) this.activate.emit();
+    else this.expanded.set(!this.expanded());
+  }
 }

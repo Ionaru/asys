@@ -1,0 +1,81 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
+<asys-section-header
+  [action]="SectionHeaderAction.Open"
+  [icon]="Icons.Ban"
+  [trailingIcon]="Icons.Plus"
+  [title]="'Blocked by'"
+  [summary]="summary()"
+  (activate)="open.set(true)"
+/>
+<asys-sheet heading="Blocked by" [(open)]="open">
+  <ng-template>
+    <div class="task-blockers__body">
+      <h3 class="task-blockers__subtitle">Waits for</h3>
+      @if (blockedBy().length > 0) {
+        <ul class="task-blockers__list">
+          @for (row of blockedBy(); track row.linkId) {
+            <li class="task-blockers__row">
+              <span class="task-blockers__title">{{ row.title }}</span>
+              <button
+                asys-button
+                type="button"
+                class="task-blockers__remove"
+                [variant]="Variant.Quiet"
+                [size]="Size.Small"
+                [disabled]="removeBusy(row.linkId)"
+                (click)="removeBlocker(row.linkId)"
+              >
+                Remove
+              </button>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="task-blockers__text">Waits for no other Task.</p>
+      }
+      <asys-text-field
+        label="Find a Task"
+        hint="This Task waits until the one you pick is Done."
+        [(value)]="filter"
+      />
+      @if (candidates().length > 0) {
+        <ul class="task-blockers__list">
+          @for (candidate of candidates(); track candidate.id) {
+            <li>
+              <button
+                asys-button
+                type="button"
+                class="task-blockers__candidate"
+                [variant]="Variant.Quiet"
+                [disabled]="addBusy()"
+                (click)="addBlocker(candidate.id)"
+              >
+                {{ candidate.title }}
+              </button>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="task-blockers__text">No Task matches.</p>
+      }
+      <p class="task-blockers__message" role="status">{{ blockerMessage() }}</p>
+      <h3 class="task-blockers__subtitle">Blocks</h3>
+      @if (blocksTasks().length > 0) {
+        <ul class="task-blockers__list">
+          @for (dependant of blocksTasks(); track dependant.id) {
+            <li>
+              <a
+                class="task-blockers__link"
+                [routerLink]="['/tasks', dependant.id]"
+                (click)="open.set(false)"
+                >{{ dependant.title }}</a
+              >
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="task-blockers__text">No Task waits for this one.</p>
+      }
+    </div>
+  </ng-template>
+</asys-sheet>

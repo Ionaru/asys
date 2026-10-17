@@ -136,3 +136,14 @@ export const toLocalDateTime = (instant: Instant, timeZone: TimeZone): LocalDate
     minuteOfDay: zoned.hour * 60 + zoned.minute,
   };
 };
+
+/** A calendar date some days from another, with no zone: addDays('2026-10-31', 1) is '2026-11-01'. */
+export const addDays = (date: LocalDate, days: number): LocalDate => {
+  if (!Number.isInteger(days)) throw new RangeError(`Invalid number of days: ${days}`);
+  return plainDate(date).add({ days }).toString();
+};
+
+/** The ISO weekday of a calendar date: '2026-10-12' is IsoWeekday.Monday. */
+export const isoWeekdayOf = (date: LocalDate): IsoWeekday => {
+  return plainDate(date).dayOfWeek as IsoWeekday;
+};

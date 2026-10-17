@@ -63,6 +63,7 @@ interface ThemeFile {
   $description: string;
   color: Record<string, unknown>;
   shadow: unknown;
+  scrim: Record<string, unknown>;
 }
 
 // The curated palettes. Adding one: add its inputs here, run the script, review it in all three themes.
@@ -451,6 +452,29 @@ for (const mode of MODES) {
       );
     if (!matches) problems.push(`${file}: ${name} components do not match its hex ${String(hex)}`);
   }
+}
+
+// The scrim is an alpha colour, so it is checked apart from the opaque colours above.
+for (const mode of MODES) {
+  const file = `themes/${mode}${TOKENS_SUFFIX}`;
+  const value = (
+    themes[mode].scrim?.['scrim'] as
+      | { $value?: Partial<ColorValue> & { alpha?: unknown } }
+      | undefined
+  )?.$value;
+  const hex = value?.hex;
+  const alpha = value?.alpha;
+  const valid =
+    value?.colorSpace === 'srgb' &&
+    typeof hex === 'string' &&
+    /^#[0-9a-f]{6}$/.test(hex) &&
+    typeof alpha === 'number' &&
+    alpha >= 0 &&
+    alpha <= 1;
+  if (!valid)
+    problems.push(
+      `${file}: scrim.scrim is not an srgb colour with a 6-digit hex and an alpha from 0 to 1`,
+    );
 }
 
 // Stop here: the colours below are read from themes that passed these checks.

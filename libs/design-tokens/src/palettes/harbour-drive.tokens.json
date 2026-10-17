@@ -205,5 +205,17 @@
         }
       }
     }
+  },
+  "scrim": {
+    "$type": "color",
+    "scrim": {
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [0, 0, 0],
+        "alpha": 0.7,
+        "hex": "#000000"
+      },
+      "$description": "The backdrop behind a bottom sheet; dims the page so the sheet reads as modal."
+    }
   }
 }

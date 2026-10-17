@@ -1,0 +1,84 @@
+/* SPDX-License-Identifier: EUPL-1.2 */
+.task-blockers__subtitle {
+  margin: 0;
+  font-size: var(--font-size-label);
+  line-height: var(--line-height-label);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.task-blockers__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.task-blockers__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.task-blockers__title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * The buttons' text lines up with the column, and their tap targets reach into the sheet's padding up to its
+ * edge. Remove's enlarged hit area stops at that edge, so the sheet never scrolls sideways, and the focus ring
+ * is drawn inside them, where the scrolling sheet body cannot clip it.
+ */
+.task-blockers__remove {
+  margin-inline-end: calc(var(--space-4) * -1);
+}
+
+.task-blockers__remove::after {
+  inset-inline-end: 0;
+}
+
+.task-blockers__candidate {
+  justify-content: flex-start;
+  margin-inline: calc(var(--space-4) * -1);
+  text-align: start;
+}
+
+.task-blockers__remove:focus-visible,
+.task-blockers__candidate:focus-visible {
+  outline-offset: -2px;
+}
+
+.task-blockers__text,
+.task-blockers__message {
+  margin: 0;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+}
+
+.task-blockers__message {
+  color: var(--ink-muted);
+  font-size: var(--font-size-reason);
+  line-height: var(--line-height-reason);
+}
+
+/* An empty status stays in place as the live region and takes no room, not even the body's gap. */
+.task-blockers__message:empty {
+  margin: 0 0 calc(var(--space-3) * -1);
+}
+
+.task-blockers__link {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap-target);
+}
+
+[data-theme='drive'] .task-blockers__link {
+  min-height: var(--tap-target-drive);
+}
+
+.task-blockers__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}

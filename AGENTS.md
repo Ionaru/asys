@@ -9,7 +9,7 @@ ASYS (Assisting System) is a personal task manager that answers "what should I d
 - `CONTEXT.md` is the domain language. Use its terms exactly and capitalised (Task, Estimate, Available from, Due, Picker, Now, Inbox, Review item, Area, Voice) in code, tests, UI copy and docs. Never use the words on its _Avoid_ lines, such as "to-do", "event", "deadline" or "project".
 - `docs/adr/` holds the decisions that bind the code. Read the ADR before changing what it governs.
 - `docs/mvp-plan.md` says what each slice and stage holds. `docs/scenarios.md` holds the acceptance examples, mirrored one-to-one by `libs/domain/src/scenarios/s<N>.spec.ts`.
-- `docs/slice-1-plan.md` records how slice 1 was built: its decisions, known limits and dated "Facts checked" notes. Its "Pulled ahead before slice 2" section holds what the motion, Undo, swipe and Current Area work left open, phone checks included. Counts and versions in it are historical, so check the code.
+- `docs/slice-1-plan.md` records how slice 1 was built: its decisions, known limits and dated "Facts checked" notes. Its "Pulled ahead before slice 2" section holds what the motion, Undo, swipe, Current Area and Task editor work left open, phone checks included. Counts and versions in it are historical, so check the code.
 - `README.md` covers running the stack, the end-to-end tests, CI and the deploy runbook.
 
 ## Projects
@@ -32,7 +32,7 @@ Use Node 24 and pnpm 11. `package.json` has no scripts, so everything runs throu
 
 - **Database:** `docker compose up -d --wait`, then `pnpm exec drizzle-kit migrate --config apps/server/drizzle.config.ts`. The root `.env` holds the passwords and `DATABASE_URL_OWNER` / `DATABASE_URL_APP` (see `README.md`).
 - **Dev stack:** start `pnpm exec nx serve pwa` before `pnpm exec nx serve server`, because generating the PWA's API client rebuilds the server bundle. Open `http://localhost:4200` exactly. On `127.0.0.1`, the Origin guard answers 403 and passkeys fail.
-- **One project:** `pnpm exec nx <target> <project>`, for example `pnpm exec nx test domain` or `pnpm exec nx typecheck pwa`. **One spec:** `pnpm exec nx test domain -- src/lib/picker/picker.spec.ts`.
+- **One project:** `pnpm exec nx <target> <project>`, for example `pnpm exec nx test domain` or `pnpm exec nx typecheck pwa`. **One spec:** `pnpm exec nx test domain -- src/lib/picker/picker.spec.ts`; the PWA's unit-test builder takes `--include` instead: `pnpm exec nx test pwa --include=apps/pwa/src/app/ui/sheet/sheet.spec.ts`.
 - **JSON from Nx:** `pnpm exec` prints "Already up to date" first, so for JSON run `node_modules/.bin/nx show project <name> --json`.
 
 CI (`.github/workflows/cd.yaml`) runs each check below as its own job. Run the ones your change touches before you call it done:
@@ -53,7 +53,7 @@ Traps when testing:
 
 - The server tests share the dev database `asys`, and Nx caches tests on file hashes alone. Always pass `--skip-nx-cache` to database tests, and stop `nx serve server` first, or its job worker claims the tests' due jobs.
 - `pwa:typecheck` runs plain `tsc` and does not check templates. `nx build pwa` and `nx test pwa` do.
-- `nx e2e pwa-e2e` (dev stack) and `nx run pwa-e2e:e2e-image` (image stack, started by hand from the `README.md` recipe) are the only supported e2e entry points. `e2e` recreates the `asys_e2e` database and rebuilds the files a running dev stack uses. To run it beside a dev stack, follow `README.md`. Both write to `dist/.playwright/apps/pwa-e2e`.
+- `nx e2e pwa-e2e` (dev stack) and `nx run pwa-e2e:e2e-image` (image stack, started by hand from the `README.md` recipe) are the only supported e2e entry points, plus `nx run pwa-e2e:shots` for screenshots. `e2e` and `shots` recreate the `asys_e2e` database and rebuild the files a running dev stack uses. To run either beside a dev stack, follow `README.md`. All three write to `dist/.playwright/apps/pwa-e2e`.
 - Only one process builds or tests in a checkout at a time.
 
 ## Enforced rules
@@ -129,6 +129,7 @@ The task recipes live in `.agents/skills/<name>/SKILL.md`, each linked from `.cl
 - `extending-the-server`: an HTTP endpoint, a job kind, a CLI command or a config variable.
 - `building-pwa-ui`: a UI component, a screen and route, wiring the generated client, palettes.
 - `writing-e2e-specs`: a Playwright spec in `apps/pwa-e2e`.
+- `taking-screenshots`: screenshots of PWA screens, and putting images on a pull request.
 - `adding-a-dependency`: a new package or an upgrade.
 - `planning-a-slice-piece`: planning, building and closing a piece of a slice plan.
 

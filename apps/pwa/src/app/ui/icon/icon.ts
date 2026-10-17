@@ -9,9 +9,11 @@ import {
   faCalendarDay,
   faCheck,
   faChevronDown,
+  faChevronLeft,
   faChevronRight,
   faCircleExclamation,
   faCircleQuestion,
+  faClock,
   faCloudArrowUp,
   faEllipsis,
   faFolder,
@@ -54,6 +56,8 @@ export enum IconName {
   User = 'user',
   Forward = 'forward',
   CloudArrowUp = 'cloud-arrow-up',
+  ChevronLeft = 'chevron-left',
+  Clock = 'clock',
 }
 
 /** Classic Regular, the design system's one style. */
@@ -79,6 +83,8 @@ export const REGULAR_ICONS: Readonly<Record<IconName, IconDefinition>> = {
   [IconName.User]: faUser,
   [IconName.Forward]: faForward,
   [IconName.CloudArrowUp]: faCloudArrowUp,
+  [IconName.ChevronLeft]: faChevronLeft,
+  [IconName.Clock]: faClock,
 };
 
 /** Classic Solid, only for the current tab in the bottom navigation. */

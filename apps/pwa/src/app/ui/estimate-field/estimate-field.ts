@@ -12,11 +12,19 @@ import {
   viewChild,
   ViewEncapsulation,
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import type { FormValueControl } from '@angular/forms/signals';
 import { formatMinutes } from '@asys/domain';
 
+import { Button, ButtonSize, ButtonVariant } from '../button/button';
 import { FieldControl } from '../field-control/field-control';
 import { FieldError } from '../field-error/field-error';
+
+/** How the Estimate choices are drawn: wrapping chips, or a single ruler under a head with the Other button. */
+export enum EstimateLayout {
+  Chips = 'chips',
+  Ruler = 'ruler',
+}
 
 let nextId = 0;
 
@@ -29,7 +37,7 @@ const OTHER_ERROR = 'Use whole minutes from 1 to 100000.';
 /** Estimate chips plus an Other input, usable as a Signal Forms custom control. */
 @Component({
   selector: 'asys-estimate-field',
-  imports: [FieldError],
+  imports: [Button, FieldError, NgTemplateOutlet],
   encapsulation: ViewEncapsulation.None,
   templateUrl: './estimate-field.component.html',
   styleUrl: './estimate-field.css',
@@ -39,10 +47,21 @@ export class EstimateField extends FieldControl implements FormValueControl<numb
 
   readonly legend = input<string>('Estimate');
 
-  protected readonly chips = CHIP_MINUTES.map((minutes) => ({
-    minutes,
-    label: formatMinutes(minutes),
-  }));
+  readonly layout = input<EstimateLayout>(EstimateLayout.Chips);
+
+  protected readonly Layout = EstimateLayout;
+
+  protected readonly Variant = ButtonVariant;
+
+  protected readonly Size = ButtonSize;
+
+  protected readonly chips = CHIP_MINUTES.map((minutes) => {
+    const label = formatMinutes(minutes);
+    const [amount = label, unit = ''] = label.split(' ');
+    return { minutes, label, amount, unit };
+  });
+
+  protected readonly legendId = `asys-estimate-${nextId}-legend`;
 
   protected readonly otherId = `asys-estimate-${nextId}-other`;
 
@@ -92,6 +111,12 @@ export class EstimateField extends FieldControl implements FormValueControl<numb
     afterNextRender(() => this.otherInput()?.nativeElement.focus(), { injector: this.#injector });
   }
 
+  /** The Ruler layout keeps what is typed and commits it on `change`. */
+  protected keepTyped(raw: string): void {
+    this.#otherOpen.set(true);
+    this.#typed.set(raw);
+  }
+
   protected typeOther(raw: string): void {
     const text = raw.trim();
     this.#otherOpen.set(true);
@@ -111,7 +136,7 @@ export class EstimateField extends FieldControl implements FormValueControl<numb
     }
   }
 
-  /** Focuses the first chip, called by Signal Forms' `focusBoundControl()`. */
+  /** Focuses the first chip or ruler cell, called by Signal Forms' `focusBoundControl()`. */
   focus(options?: FocusOptions): void {
     this.chipButtons()?.nativeElement.focus(options);
   }

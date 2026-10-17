@@ -26,6 +26,12 @@ body {
   min-height: 100dvh;
 }
 
+/* The Task editor's sticky bar and footer cover the page edges, so a focused control scrolls clear of them (WCAG 2.4.11). The editor publishes their heights on the root element. */
+.task-editor-open {
+  scroll-padding-block: var(--task-editor-bar-height, 0px)
+    calc(var(--task-editor-footer-height, 0px) + env(safe-area-inset-bottom));
+}
+
 /* Base layer, ported from the design system. */
 .asys-root,
 .asys-root * {
@@ -219,6 +225,65 @@ textarea.asys-field__input,
   padding: 0;
   border: 0;
   min-width: 0;
+}
+
+/* The row of a bottom-sheet control: a label, its value and a chevron. Used by asys-date-spec-row and asys-choice-row. */
+.asys-row {
+  appearance: none;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--tap-target-large);
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  transition: background var(--duration-quick) var(--ease-out);
+}
+
+.asys-row:active {
+  background: var(--signal-soft);
+}
+
+.asys-row:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.asys-row__label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.asys-row__value {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--ink-muted);
+  font-size: var(--font-size-reason);
+  text-align: right;
+}
+
+.asys-row__value--set {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.asys-row__chevron {
+  color: var(--ink-muted);
+  font-size: 0.875em;
+}
+
+[data-theme='drive'] .asys-row {
+  min-height: var(--tap-target-drive);
 }
 
 /* Motion used by animate.enter and animate.leave. */
@@ -558,7 +623,8 @@ textarea.asys-field__input,
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
-  *::after {
+  *::after,
+  *::backdrop {
     animation: none !important;
     transition: none !important;
   }
@@ -572,7 +638,8 @@ textarea.asys-field__input,
 
 [data-theme='drive'] *,
 [data-theme='drive'] *::before,
-[data-theme='drive'] *::after {
+[data-theme='drive'] *::after,
+[data-theme='drive'] *::backdrop {
   animation: none !important;
   transition: none !important;
 }

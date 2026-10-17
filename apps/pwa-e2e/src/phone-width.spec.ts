@@ -3,6 +3,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './support/fixtures.ts';
 import { areaId, captureTask, seedTask } from './support/seed.ts';
+import { addDays, localToday } from './support/time.ts';
 
 test.use({ viewport: { width: 375, height: 812 } });
 
@@ -88,11 +89,12 @@ test('No sideways scroll on the Task screens at phone width', async ({ page }) =
     ['/today', heading('Today')],
     ['/inbox', page.locator('article.asys-triage .asys-triage__title')],
     ['/capture', heading('Capture')],
-    [`/tasks/${urlTaskId}`, heading(TRIAGED_URL_TITLE)],
+    [`/tasks/${urlTaskId}`, page.getByRole('textbox', { name: 'Title' })],
   ];
   for (const [path, ready] of screens) {
     await expectNoSidewaysScroll(page, path, ready);
     if (path === '/inbox') await expect(ready).toHaveText(URL_TITLE);
+    if (path.startsWith('/tasks/')) await expect(ready).toHaveValue(TRIAGED_URL_TITLE);
   }
 });
 
@@ -112,11 +114,7 @@ test('No sideways scroll on Settings, Areas and the account at phone width', asy
 });
 
 test('The bottom nav centres its destinations when Capture is not shown', async ({ page }) => {
-  const taskId = await seedTask(page, {
-    title: 'Centred nav Task',
-    important: false,
-    estimateMinutes: 25,
-  });
+  await seedTask(page, { title: 'Centred nav Task', important: false, estimateMinutes: 25 });
   await page.reload();
   const nav = page.getByRole('navigation', { name: 'Primary' });
   const capture = page.getByRole('button', { name: 'Capture' });
@@ -140,12 +138,250 @@ test('The bottom nav centres its destinations when Capture is not shown', async 
   expect(tab.start, JSON.stringify(tab)).toBeCloseTo(0, 0);
   expect(tab.end, JSON.stringify(tab)).toBeCloseTo(0, 0);
 
-  await page.goto(`/tasks/${taskId}`);
-  await expect(page.getByRole('heading', { level: 1, name: 'Centred nav Task' })).toBeVisible();
+  // Settings has the nav but no Capture.
+  await page.goto('/settings');
+  await expect(page.getByLabel('Time zone')).toBeVisible();
+  await expect(nav).toBeVisible();
   await expect(capture).toHaveCount(0);
-  const editor = await gaps();
-  expect(editor.start, JSON.stringify(editor)).toBeGreaterThan(1);
-  expect(Math.abs(editor.start - editor.end), JSON.stringify(editor)).toBeLessThan(1);
+  const settings = await gaps();
+  expect(settings.start, JSON.stringify(settings)).toBeGreaterThan(1);
+  expect(Math.abs(settings.start - settings.end), JSON.stringify(settings)).toBeLessThan(1);
+});
+
+test('The Task editor has no nav, its footer clears the card and nothing scrolls sideways', async ({
+  page,
+}) => {
+  const taskId = await seedTask(page, {
+    title: 'Editor phone Task',
+    important: false,
+    estimateMinutes: 25,
+    captureText: 'Some notes captured with the Task',
+  });
+  await page.goto(`/tasks/${taskId}`);
+  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('Editor phone Task');
+  await expect(page.getByRole('navigation', { name: 'Primary' })).toHaveCount(0);
+
+  const done = page.getByRole('button', { name: 'Done', exact: true });
+  await expect(done).toBeVisible();
+
+  await scrollToBottom(page);
+  const card = page.locator('section.task-editor__card');
+  await expectClearOf(done, [card]);
+  const cardBox = await card.boundingBox();
+  const doneBox = await done.boundingBox();
+  if (cardBox === null || doneBox === null) throw new Error('no box');
+  expect(doneBox.y, JSON.stringify({ cardBox, doneBox })).toBeGreaterThanOrEqual(
+    cardBox.y + cardBox.height,
+  );
+
+  const widths = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth,
+    client: document.documentElement.clientWidth,
+    bodyScroll: document.body.scrollWidth,
+  }));
+  expect(widths.scroll, 'documentElement scrollWidth').toBeLessThanOrEqual(widths.client);
+  expect(widths.bodyScroll, 'body scrollWidth').toBeLessThanOrEqual(widths.client);
+});
+
+interface Edges {
+  readonly left: number;
+  readonly right: number;
+}
+
+// Where an element's text and icons start and end: what a person sees of a button, without its padding.
+const inkEdges = (target: Locator): Promise<Edges> =>
+  target.evaluate((el) => {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const rects = [
+      ...Array.from(range.getClientRects()).filter((rect) => rect.width > 0),
+      ...Array.from(el.querySelectorAll('svg'), (svg) => svg.getBoundingClientRect()),
+    ];
+    return {
+      left: Math.min(...rects.map((rect) => rect.left)),
+      right: Math.max(...rects.map((rect) => rect.right)),
+    };
+  });
+
+const contentEdges = (target: Locator): Promise<Edges> =>
+  target.evaluate((el) => {
+    const box = el.getBoundingClientRect();
+    const style = getComputedStyle(el);
+    return {
+      left: box.left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft),
+      right: box.right - parseFloat(style.borderRightWidth) - parseFloat(style.paddingRight),
+    };
+  });
+
+// A quiet button's ink sits inside its 1px transparent border, so it lines up within that pixel, give or take
+// sub-pixel rounding. Its padding stays on both sides, so the tap target is as wide as before.
+const expectInkAt = async (button: Locator, side: keyof Edges, edge: number): Promise<void> => {
+  const ink = await inkEdges(button);
+  const box = await button.boundingBox();
+  if (box === null) throw new Error('button has no box');
+  const detail = JSON.stringify({ ink, edge, box });
+  expect(Math.abs(ink[side] - edge), detail).toBeLessThanOrEqual(1.5);
+  expect(box.width - (ink.right - ink.left), detail).toBeGreaterThanOrEqual(32);
+};
+
+// How much room an empty status takes: none means its neighbours sit as they would without it.
+const roomTakenBy = (status: Locator): Promise<number> =>
+  status.evaluate((el) => {
+    const parent = el.parentElement;
+    if (parent === null) throw new Error('status has no parent');
+    const style = getComputedStyle(parent);
+    const box = parent.getBoundingClientRect();
+    const previous = el.previousElementSibling;
+    const next = el.nextElementSibling;
+    const start =
+      previous === null
+        ? box.top + parseFloat(style.borderTopWidth) + parseFloat(style.paddingTop)
+        : previous.getBoundingClientRect().bottom +
+          parseFloat(getComputedStyle(previous).marginBottom);
+    const end =
+      next === null
+        ? box.bottom - parseFloat(style.borderBottomWidth) - parseFloat(style.paddingBottom)
+        : next.getBoundingClientRect().top - parseFloat(getComputedStyle(next).marginTop);
+    const gap = previous !== null && next !== null ? parseFloat(style.rowGap) || 0 : 0;
+    return end - start - gap;
+  });
+
+const expectEmptyStatusTakesNoRoom = async (status: Locator): Promise<void> => {
+  await expect(status).toBeAttached();
+  await expect(status).toHaveText('');
+  expect(await roomTakenBy(status)).toBeCloseTo(0, 1);
+};
+
+test('The Task editor card lines up its Captured text, quiet buttons and rows', async ({
+  page,
+}) => {
+  const taskId = await captureTask(page, {
+    title: 'Card layout Task',
+    captureText: 'card layout, captured\nover two lines',
+  });
+  await page.goto(`/tasks/${taskId}`);
+  const title = page.getByRole('textbox', { name: 'Title' });
+  await expect(title).toHaveValue('Card layout Task');
+  const card = page.locator('section.task-editor__card');
+  const content = await contentEdges(card);
+
+  // The Captured text keeps its line breaks, and its first line starts under the label with no space before it.
+  const captured = card.locator('.task-editor__captured');
+  const indent = await captured.evaluate((p) => {
+    const label = p.querySelector('.task-editor__captured-label');
+    if (label === null) throw new Error('no label');
+    const walker = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+      const at = label.contains(node) ? -1 : (node.textContent ?? '').search(/\S/);
+      if (at < 0) continue;
+      const glyph = document.createRange();
+      glyph.setStart(node, at);
+      glyph.setEnd(node, at + 1);
+      return glyph.getBoundingClientRect().left - label.getBoundingClientRect().left;
+    }
+    throw new Error('no Captured text');
+  });
+  expect(indent).toBeCloseTo(0, 1);
+
+  await expectInkAt(card.getByRole('button', { name: 'Add notes' }), 'left', content.left);
+  await expectInkAt(card.getByRole('button', { name: 'Other' }), 'right', content.right);
+
+  // The line above the reason meets the last row, as the line above the first row meets the first.
+  const reason = card.locator('.task-editor__reason');
+  await expect(reason).toHaveText('In the Inbox until Triage');
+  const lastRow = await card.locator('.task-editor__rows > :last-child').boundingBox();
+  const reasonBox = await reason.boundingBox();
+  if (lastRow === null || reasonBox === null) throw new Error('no box');
+  expect(reasonBox.y, JSON.stringify({ lastRow, reasonBox })).toBeCloseTo(
+    lastRow.y + lastRow.height,
+    1,
+  );
+
+  // A blank Title shows its placeholder and the field-error line under it.
+  await expect(title).toHaveCSS('box-shadow', 'none');
+  await title.fill('');
+  await title.blur();
+  await expect(card.getByText('Needs a title')).toBeVisible();
+  await expect(title).toHaveAttribute('placeholder', 'Title');
+  await expect(title).toHaveAttribute('aria-invalid', 'true');
+  await expect(title).toHaveCSS('box-shadow', /inset/);
+});
+
+test('The Task editor sheets give an empty status no room and line up the Blocked by buttons', async ({
+  page,
+}) => {
+  const taskId = await seedTask(page, {
+    title: 'Sheet layout Task',
+    important: false,
+    estimateMinutes: 30,
+    due: { date: addDays(localToday().date, 2), time: '12:00' },
+  });
+  await seedTask(page, { title: 'Sheet layout blocker', important: false, estimateMinutes: 5 });
+  const longTitle = 'A Task with a title long enough to wrap onto a second line of the sheet';
+  await seedTask(page, { title: longTitle, important: false, estimateMinutes: 5 });
+  await page.goto(`/tasks/${taskId}`);
+  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('Sheet layout Task');
+
+  // Rows that show their own pressed state draw no tap highlight on top of it.
+  for (const name of [/^Area/, /^Due (?!at )/, /^Due at 12:00/, /^Blocked by/]) {
+    await expect(page.getByRole('button', { name })).toHaveCSS(
+      '-webkit-tap-highlight-color',
+      'rgba(0, 0, 0, 0)',
+    );
+  }
+
+  await page.getByRole('button', { name: 'Log progress', exact: true }).click();
+  const log = page.getByRole('dialog', { name: 'Log progress', exact: true });
+  await expect(log.getByLabel('Time still needed')).toBeFocused();
+  await expectEmptyStatusTakesNoRoom(log.locator('p.task-editor__message[role="status"]'));
+  await page.keyboard.press('Escape');
+  await expect(log).toBeHidden();
+
+  await page.getByRole('button', { name: 'More actions' }).click();
+  const more = page.getByRole('dialog', { name: 'More', exact: true });
+  await expect(more.getByRole('button', { name: 'Drop', exact: true })).toBeVisible();
+  await expectEmptyStatusTakesNoRoom(more.locator('p.task-editor__message[role="status"]'));
+  await page.keyboard.press('Escape');
+  await expect(more).toBeHidden();
+
+  await page.getByRole('button', { name: /^Blocked by/ }).click();
+  const blockers = page.getByRole('dialog', { name: 'Blocked by', exact: true });
+  await blockers.getByRole('button', { name: 'Sheet layout blocker', exact: true }).click();
+  const remove = blockers.getByRole('button', { name: 'Remove', exact: true });
+  await expect(remove).toBeVisible();
+  await expectEmptyStatusTakesNoRoom(blockers.locator('p.task-blockers__message[role="status"]'));
+
+  const column = await contentEdges(blockers.locator('.task-blockers__body'));
+  await expectInkAt(remove, 'right', column.right);
+  const candidate = blockers.getByRole('button', { name: longTitle, exact: true });
+  await expectInkAt(candidate, 'left', column.left);
+  // Each line of a wrapped title starts at the column's edge.
+  const lineStarts = await candidate.evaluate((button) => {
+    const range = document.createRange();
+    range.selectNodeContents(button);
+    return Array.from(range.getClientRects())
+      .filter((rect) => rect.width > 0)
+      .map((rect) => rect.left);
+  });
+  expect(lineStarts.length).toBeGreaterThan(1);
+  for (const left of lineStarts) expect(Math.abs(left - column.left)).toBeLessThanOrEqual(1.5);
+
+  const widths = await blockers
+    .locator('.asys-sheet__body')
+    .evaluate((body) => ({ scroll: body.scrollWidth, client: body.clientWidth }));
+  expect(widths.scroll, 'sheet body scrollWidth').toBeLessThanOrEqual(widths.client);
+
+  // The buttons reach the sheet body's edge, which clips, so keyboard focus draws their ring inside them.
+  const find = blockers.getByRole('textbox', { name: 'Find a Task' });
+  const focused = blockers.locator(':focus-visible');
+  await find.focus();
+  await page.keyboard.press('Tab');
+  await expect(focused).toHaveText(longTitle);
+  await expect(focused).toHaveCSS('outline-offset', '-2px');
+  await find.focus();
+  await page.keyboard.press('Shift+Tab');
+  await expect(focused).toHaveText('Remove');
+  await expect(focused).toHaveCSS('outline-offset', '-2px');
 });
 
 test('Nothing covers the last Now row, with the pill or the open quick add', async ({ page }) => {

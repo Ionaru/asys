@@ -41,3 +41,12 @@
   /* The safe area under the bar is painted, not padded, so the measured height is the bar's alone. */
   box-shadow: 0 env(safe-area-inset-bottom) 0 0 var(--surface);
 }
+
+:host(.shell--bare) {
+  --shell-nav-height: 0px;
+}
+
+:host(.shell--bare) .shell__page {
+  padding-block-start: 0;
+  padding-bottom: calc(var(--shell-undo-height) + env(safe-area-inset-bottom));
+}

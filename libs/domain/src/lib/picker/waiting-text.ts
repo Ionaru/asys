@@ -11,7 +11,8 @@ import {
   type TimeZone,
 } from '../time';
 import { formatClockOn } from '../time/display';
-import { ExclusionReasonTag, type ExclusionReason, type WaitingTask } from './picker';
+import { ExclusionReasonTag, type ExclusionReason } from './reason-types';
+import type { WaitingTask } from './picker';
 
 const blockedText = (taskIds: readonly string[], tasks: readonly Task[]): string | null => {
   const ids = new Set(taskIds);
