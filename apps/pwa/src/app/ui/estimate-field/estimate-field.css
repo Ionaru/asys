@@ -67,6 +67,11 @@
   margin: 0;
 }
 
+/* Other's text lines up with the ruler's end, and the tap target reaches into the padding beyond it. */
+.asys-estimate__other-toggle {
+  margin-inline-end: calc(var(--space-4) * -1);
+}
+
 .asys-estimate__ruler {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));

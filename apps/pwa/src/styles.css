@@ -242,6 +242,7 @@ textarea.asys-field__input,
   color: var(--ink);
   text-align: left;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
   font-family: var(--font-sans);
   font-size: var(--font-size-body);
   line-height: var(--line-height-body);

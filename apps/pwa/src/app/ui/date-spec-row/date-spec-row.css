@@ -26,6 +26,7 @@
   line-height: var(--line-height-time);
   font-weight: 600;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
   position: relative;
 }
 

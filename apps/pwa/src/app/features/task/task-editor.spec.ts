@@ -768,7 +768,11 @@ describe('TaskEditor', () => {
       expect(captured.querySelector('.task-editor__captured-label')?.textContent?.trim()).toBe(
         'Captured text',
       );
-      expect(captured.textContent).toContain('call marit about\nthe lease');
+      // The text keeps its line breaks (pre-wrap), so any whitespace around it would show as an indent.
+      expect(captured.textContent).toBe('Captured textcall marit about\nthe lease');
+      expect(must(captured.querySelector('.task-editor__captured-text')).textContent).toBe(
+        'call marit about\nthe lease',
+      );
     });
 
     it.each([
@@ -1114,6 +1118,7 @@ describe('TaskEditor', () => {
       const error = must(root().querySelector('p[asys-field-error]'));
 
       expect(error.textContent).toContain('Needs a title');
+      expect(titleField().getAttribute('placeholder')).toBe('Title');
       expect(titleField().getAttribute('aria-invalid')).toBe('true');
       expect(titleField().getAttribute('aria-describedby')).toBe(error.id);
       expect(send).not.toHaveBeenCalled();

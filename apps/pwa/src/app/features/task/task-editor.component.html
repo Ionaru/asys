@@ -140,6 +140,7 @@
       class="task-editor__title"
       rows="1"
       aria-label="Title"
+      placeholder="Title"
       enterkeyhint="done"
       [attr.data-task-id]="taskId()"
       [attr.data-morph]="morph() ? '' : null"
@@ -184,7 +185,7 @@
     @if (capturedText(); as text) {
       <p class="task-editor__captured">
         <span class="task-editor__captured-label">Captured text</span>
-        {{ text }}
+        <span class="task-editor__captured-text">{{ text }}</span>
       </p>
     }
     <asys-segmented

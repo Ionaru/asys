@@ -36,8 +36,9 @@
   margin: 0 0 calc(var(--space-4) * -1);
 }
 
+/* An empty status stays in place as the live region and takes no room, not even the sheet body's gap. */
 .task-editor__message:empty {
-  margin: 0;
+  margin: 0 0 calc(var(--space-4) * -1);
 }
 
 .task-editor__retry {
@@ -76,12 +77,24 @@
   overflow-wrap: anywhere;
 }
 
+.task-editor__title::placeholder {
+  color: var(--ink-muted);
+  opacity: 1;
+}
+
+/* The Title has no border, so a blank one is marked by the field-error colour and width as a line under it. */
+.task-editor__title[aria-invalid='true'] {
+  box-shadow: inset 0 -2px 0 var(--danger);
+}
+
 [data-theme='drive'] .task-editor__title {
   min-height: var(--tap-target-drive);
 }
 
+/* The icon lines up with the card's content edge, and the tap target reaches into the padding. */
 .task-editor__add-notes {
   align-self: flex-start;
+  margin-inline-start: calc(var(--space-4) * -1);
 }
 
 .task-editor__notes {
@@ -98,6 +111,9 @@
   color: var(--ink-muted);
   font-size: var(--font-size-reason);
   line-height: var(--line-height-reason);
+}
+
+.task-editor__captured-text {
   white-space: pre-wrap;
 }
 
@@ -128,6 +144,11 @@
   color: var(--ink-muted);
   font-size: var(--font-size-reason);
   line-height: var(--line-height-reason);
+}
+
+/* The reason's line meets the last row, as the line above the first row meets it. */
+.task-editor__rows + .task-editor__reason {
+  margin-top: calc(var(--space-4) * -1);
 }
 
 .task-editor__reason-text {
