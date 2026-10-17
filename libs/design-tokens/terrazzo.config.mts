@@ -30,7 +30,7 @@ enum Theme {
 const EXTENSION_KEY = 'io.github.ionaru.asys';
 
 // The tokens that differ between schemes. Every other token is the same in all of them, so only the light block carries it.
-const SCHEME_TOKENS = ['color.*', 'shadow.*'];
+const SCHEME_TOKENS = ['color.*', 'shadow.*', 'scrim.*'];
 
 // A token that DTCG cannot express as none (a shadow) says so in its extension.
 const isNone = (extensions: Record<string, unknown> | undefined): boolean => {

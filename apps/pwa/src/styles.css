@@ -558,7 +558,8 @@ textarea.asys-field__input,
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
-  *::after {
+  *::after,
+  *::backdrop {
     animation: none !important;
     transition: none !important;
   }
@@ -572,7 +573,8 @@ textarea.asys-field__input,
 
 [data-theme='drive'] *,
 [data-theme='drive'] *::before,
-[data-theme='drive'] *::after {
+[data-theme='drive'] *::after,
+[data-theme='drive'] *::backdrop {
   animation: none !important;
   transition: none !important;
 }

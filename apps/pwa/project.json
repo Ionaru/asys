@@ -157,7 +157,8 @@
         "buildTarget": "pwa:build:development",
         "runner": "vitest",
         "watch": false,
-        "tsConfig": "apps/pwa/tsconfig.spec.json"
+        "tsConfig": "apps/pwa/tsconfig.spec.json",
+        "setupFiles": ["apps/pwa/src/test-setup.ts"]
       }
     }
   },

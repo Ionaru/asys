@@ -23,6 +23,7 @@ import { DoneUndo, PauseReason, UNDO_WINDOW_MS } from '../core/data/done-undo';
 import { Motion } from '../core/platform/motion';
 import { TAB_PATHS } from '../core/platform/tabs';
 import { pathOf } from '../core/platform/url-path';
+import { leafRoute } from '../core/platform/view-transitions';
 import type { Activation } from '../ui/activation/activation';
 import { BottomNav } from '../ui/bottom-nav/bottom-nav';
 import { CaptureButton } from '../ui/capture-button/capture-button';
@@ -36,6 +37,7 @@ import { leaveMarked } from './shell-motion';
   selector: 'app-shell-layout',
   imports: [RouterOutlet, BottomNav, CaptureButton, QuickAdd, UndoBar],
   providers: [CommandAttempts, CaptureQueue, DoneUndo],
+  host: { '[class.shell--bare]': 'navHidden()' },
   templateUrl: './shell-layout.component.html',
   styleUrl: './shell-layout.css',
 })
@@ -82,6 +84,15 @@ export class ShellLayout {
     return TAB_PATHS.includes(
       pathOf(this.#router.serializeUrl(navigation.finalUrl ?? navigation.extractedUrl)),
     );
+  });
+
+  /** Whether the routed screen hides the bottom nav (route data `hideNav`), as of the last successful navigation. */
+  protected readonly navHidden = computed(() => {
+    if (this.#router.lastSuccessfulNavigation() === null) {
+      return false;
+    }
+
+    return leafRoute(this.#router.routerState.snapshot.root).data['hideNav'] === true;
   });
 
   protected readonly open = linkedSignal<boolean, boolean>({
@@ -307,9 +318,11 @@ export class ShellLayout {
       return;
     }
 
+    // A form control carrying the id (the editor's Title textarea) is never a title to focus: that would raise the keyboard.
     const title = Array.from(main.querySelectorAll<HTMLElement>('[data-task-id]')).find(
       (element) =>
         (taskId === null || element.dataset['taskId'] === taskId) &&
+        !['INPUT', 'TEXTAREA', 'SELECT'].includes(element.tagName) &&
         element.closest('[data-leaving]') === null,
     );
 

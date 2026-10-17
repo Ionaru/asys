@@ -41,17 +41,19 @@
     (close)="close()"
   />
 }
-<asys-bottom-nav
-  class="shell__nav"
-  [inboxCount]="dataStore.state() === null ? null : dataStore.inboxCount()"
->
-  @if (onCapturePath()) {
-    <button
-      asys-capture-button
-      #pill
-      [count]="captureQueue.failed().length"
-      [attr.aria-expanded]="open() ? 'true' : 'false'"
-      (click)="toggleQuickAdd()"
-    ></button>
-  }
-</asys-bottom-nav>
+@if (!navHidden()) {
+  <asys-bottom-nav
+    class="shell__nav"
+    [inboxCount]="dataStore.state() === null ? null : dataStore.inboxCount()"
+  >
+    @if (onCapturePath()) {
+      <button
+        asys-capture-button
+        #pill
+        [count]="captureQueue.failed().length"
+        [attr.aria-expanded]="open() ? 'true' : 'false'"
+        (click)="toggleQuickAdd()"
+      ></button>
+    }
+  </asys-bottom-nav>
+}

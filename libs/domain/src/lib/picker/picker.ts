@@ -4,20 +4,18 @@ import { isWithinActiveHours, type Area } from '../area';
 import { compareCodeUnits } from '../compare';
 import type { Settings } from '../settings';
 import {
-  blockedReasons,
   isAvailable,
   isInInbox,
   isOverdue,
   deadlineIndex,
   Quadrant,
   TaskStatus,
-  quadrant,
   type BlockedBy,
   type BlockerLink,
   type Task,
 } from '../task';
-import { isUrgentBy } from '../task/priority';
-import { addCalendarDays, availableFromInstant, toLocalDateTime, type Instant } from '../time';
+import { addCalendarDays, toLocalDateTime, type Instant } from '../time';
+import { exclusionReasons, reasonOf } from './reasons';
 import { reasonTextOn } from './reason-text';
 import { waitingTextOn } from './waiting-text';
 
@@ -150,23 +148,11 @@ export const pick = (
         counts.set(outside.id, entry);
         continue;
       }
-      const start = deadlines.latestStart(task);
-      const urgent = isUrgentBy(start, urgencyCutoff);
-      const reason: Reason = {
-        overdue: isOverdue(task, now, tz),
-        quadrant: quadrant(task.important === true, urgent),
-        urgent,
-        latestStart: start,
-      };
+      const reason = reasonOf(task, deadlines.latestStart(task), now, tz, urgencyCutoff);
       ranked.push({ task, reason, reasonText: reasonTextOn(task, reason, today, tz) });
     } else if (task.status === TaskStatus.Open && !isInInbox(task)) {
       if (outsideArea(task) !== undefined) continue;
-      const reasons: ExclusionReason[] = [];
-      if (task.availableFrom !== null) {
-        const from = availableFromInstant(task.availableFrom, tz);
-        if (now < from) reasons.push({ _tag: ExclusionReasonTag.NotYetAvailable, from });
-      }
-      reasons.push(...blockedReasons(task, tasks, links));
+      const reasons = exclusionReasons(task, tasks, links, now, tz);
       waiting.push({ task, reasons, reasonText: waitingTextOn(task, reasons, tasks, today, tz) });
     }
   }

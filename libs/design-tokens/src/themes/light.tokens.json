@@ -200,5 +200,17 @@
       },
       "$description": "Bottom sheets and the quick-add bar only; everything else is separated by line, not shadow."
     }
+  },
+  "scrim": {
+    "$type": "color",
+    "scrim": {
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [0.102, 0.1137, 0.1255],
+        "alpha": 0.4,
+        "hex": "#1a1d20"
+      },
+      "$description": "The backdrop behind a bottom sheet; dims the page so the sheet reads as modal."
+    }
   }
 }

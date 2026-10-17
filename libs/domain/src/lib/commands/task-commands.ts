@@ -192,7 +192,8 @@ export const editTask = (
   }
   if (present(patch, 'due')) {
     const due = patch.due as DateSpec | null;
-    const moved = task.due !== null && !(due !== null && sameDateSpec(task.due, due));
+    // Only a change of the Due's date, or clearing it, is a move; a time added, changed or removed on the same date is not.
+    const moved = task.due !== null && (due === null || due.date !== task.due.date);
     next = { ...next, due, dueMoveCount: task.dueMoveCount + (moved ? 1 : 0) };
   }
   if (present(patch, 'estimateMinutes')) {

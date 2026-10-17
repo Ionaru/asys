@@ -4,6 +4,30 @@
 
 `RULES_VERSION` in `src/lib/rules-version.ts` names the rules a front-end derives its values with. Any change to a rule is at least a minor version (ADR 0003).
 
+## 0.7.0 (2026-10-16)
+
+A Task's own explanation, a calendar's date arithmetic, and a Due move that ignores the time.
+
+### Due moves
+
+- The counter of Due moves counts a change of an existing Due's date, or clearing it. Adding, changing or removing the time on the same date does not count. From a Due of Mon 19 Oct 17:00, Tue 20 Oct 17:00 counts one move and clearing the Due counts one, while Mon 19 Oct (the time removed) and Mon 19 Oct 09:00 count none.
+- This replaces 0.1.0's rule that the counter "counts every change to an existing Due, including clearing it". A first Due still counts none, and setting the same Due still changes nothing.
+- A Due set by taps, a date and then a time, now counts no move: the second tap changes only the time.
+
+### Explaining one Task
+
+- `explainTask(task, tasks, links, settings, now)` explains one Task the way Now would, with four outcomes: Available (the Reason, such as the Quadrant and Latest start, and its text), Waiting (the Reason, the exclusion reasons and their text), Inbox, and Not open (Done, Dropped, Delegated or Skipped).
+- An Available Task's text is the one Now shows, such as `Latest start 14:30 · important`, `Due yesterday 17:00` or `No Due`. A Waiting Task's text is the one Now shows in Waiting, such as `Available from Tue 6 Oct · Blocked by Order card`.
+- It ignores Areas and the Current Area, so a Task outside the Current Area is explained like any other.
+- It reads the Task's own fields from the Task passed in, never from `tasks`, so an unsaved copy can be explained against the saved working set.
+- It matches the Picker: for every Task the Picker ranks, or lists as Waiting, the explanation holds the same Reason, exclusion reasons and text.
+
+### Dates
+
+- `addDays(date, days)` adds whole calendar days to a local date with no zone: `2026-10-31` plus 1 is `2026-11-01`, `2028-02-28` plus 1 is `2028-02-29`, and `2026-10-16` minus 16 is `2026-09-30`. It throws a RangeError for an invalid date or a `days` that is not an integer.
+- `isoWeekdayOf(date)` gives the ISO weekday of a local date: `2026-10-12` is Monday, `2026-10-16` is Friday and `2026-10-18` is Sunday.
+- `formatDate(date, today)` gives the weekday, day and month, never a relative word: `Thu 15 Oct`, and `Mon 4 Jan 2027` when the year differs from today's. `formatDay` keeps every output and uses it for dates that are not today, tomorrow or yesterday.
+
 ## 0.6.0 (2026-10-12)
 
 A palette per Area.

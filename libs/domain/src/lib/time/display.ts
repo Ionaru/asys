@@ -23,7 +23,15 @@ const plainDate = (date: LocalDate): Temporal.PlainDate => {
 
 const pad2 = (value: number): string => String(value).padStart(2, '0');
 
-/** A local date relative to today: 'today', 'tomorrow', 'yesterday', else 'Sat 3 Oct' (with the year when it differs from today's). */
+/** A local date as the weekday, day and month, such as 'Thu 15 Oct', with the year when it differs from today's. Never a relative word. */
+export const formatDate = (date: LocalDate, today: LocalDate): string => {
+  const target = plainDate(date);
+  const base = plainDate(today);
+  const text = `${WEEKDAYS[target.dayOfWeek - 1]} ${target.day} ${MONTHS[target.month - 1]}`;
+  return target.year === base.year ? text : `${text} ${target.year}`;
+};
+
+/** A local date relative to today: 'today', 'tomorrow', 'yesterday', else formatDate's text such as 'Sat 3 Oct'. */
 export const formatDay = (date: LocalDate, today: LocalDate): string => {
   const target = plainDate(date);
   const base = plainDate(today);
@@ -31,8 +39,7 @@ export const formatDay = (date: LocalDate, today: LocalDate): string => {
   if (diff === 0) return 'today';
   if (diff === 1) return 'tomorrow';
   if (diff === -1) return 'yesterday';
-  const text = `${WEEKDAYS[target.dayOfWeek - 1]} ${target.day} ${MONTHS[target.month - 1]}`;
-  return target.year === base.year ? text : `${text} ${target.year}`;
+  return formatDate(date, today);
 };
 
 /** A DateSpec relative to today: formatDay of its date, then ' HH:MM' when it has a time. */

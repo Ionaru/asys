@@ -30,15 +30,28 @@ export interface RouteMotion {
 
 const NOW_PATH = '/now';
 
-/** The path, navigation level, tab index and Task id of a root snapshot, read along its first children. */
-export const routeMotion = (snapshot: ActivatedRouteSnapshot): RouteMotion => {
-  const segments: string[] = snapshot.url.map((segment) => segment.path);
+/** The deepest descendant of a snapshot along its first children (the snapshot itself when it has none). */
+export const leafRoute = (snapshot: ActivatedRouteSnapshot): ActivatedRouteSnapshot => {
   let leaf = snapshot;
 
   while (leaf.firstChild !== null) {
     leaf = leaf.firstChild;
-    segments.push(...leaf.url.map((segment) => segment.path));
   }
+
+  return leaf;
+};
+
+/** The path, navigation level, tab index and Task id of a root snapshot, read along its first children. */
+export const routeMotion = (snapshot: ActivatedRouteSnapshot): RouteMotion => {
+  const segments: string[] = snapshot.url.map((segment) => segment.path);
+  let node = snapshot;
+
+  while (node.firstChild !== null) {
+    node = node.firstChild;
+    segments.push(...node.url.map((segment) => segment.path));
+  }
+
+  const leaf = leafRoute(snapshot);
 
   const path = `/${segments.join('/')}`;
   const level: unknown = leaf.data['level'];

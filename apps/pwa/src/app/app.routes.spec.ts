@@ -2,7 +2,13 @@
 import { signal, type Type } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { By, Title } from '@angular/platform-browser';
-import { Router, provideRouter, withComponentInputBinding } from '@angular/router';
+import {
+  Router,
+  provideRouter,
+  withComponentInputBinding,
+  type Route,
+  type Routes,
+} from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import type { Instant } from '@asys/domain';
 
@@ -131,6 +137,24 @@ describe('routes', () => {
         path: url,
         level,
       });
+    });
+  });
+
+  describe('hideNav', () => {
+    const collect = (list: Routes): Route[] =>
+      list.flatMap((route) => [route, ...collect(route.children ?? [])]);
+
+    it('is set on tasks/:taskId, at level 1', () => {
+      const task = collect(routes).find((route) => route.path === 'tasks/:taskId');
+
+      expect(task?.data?.['hideNav']).toBe(true);
+      expect(task?.data?.['level']).toBe(1);
+    });
+
+    it('is set on no other route', () => {
+      const hiding = collect(routes).filter((route) => route.data?.['hideNav'] !== undefined);
+
+      expect(hiding.map((route) => route.path)).toEqual(['tasks/:taskId']);
     });
   });
 
