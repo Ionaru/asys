@@ -12,11 +12,11 @@ import { RouterLink } from '@angular/router';
 import { Quadrant } from '@asys/domain';
 
 import { type Activation, activationOf } from '../activation/activation';
-import { Button, ButtonSize, ButtonVariant } from '../button/button';
+import { Button, ButtonSize, ButtonVariant } from '../../components/atoms/button/button';
 import { Fact } from '../fact/fact';
-import { Icon, IconName } from '../icon/icon';
-import { QuadrantChip } from '../quadrant-chip/quadrant-chip';
-import { StatusBadge, StatusBadgeStatus } from '../status-badge/status-badge';
+import { Icon, IconName } from '../../components/atoms/icon/icon';
+import { QuadrantChip } from '../../components/atoms/quadrant-chip/quadrant-chip';
+import { StatusBadge, StatusBadgeStatus } from '../../components/atoms/status-badge/status-badge';
 
 /**
  * The card for the Task Now recommends: its title (a link that opens the Task), the reason, its facts and

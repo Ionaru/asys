@@ -2,7 +2,7 @@
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
-import { InputBox } from '../input-box/input-box';
+import { InputBox } from './input-box';
 import { breaksLine, flattenLines, SingleLine, submitImplicitly } from './single-line';
 
 const enter = (init: KeyboardEventInit = {}): KeyboardEvent =>

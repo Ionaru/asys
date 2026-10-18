@@ -11,7 +11,7 @@ A component's template and styles start inline in its `.ts` file and move to fil
 - **When:** you create or change a component whose `.ts` file has 100 lines or more, counted as `wc -l` counts them on the formatted file. Spec files and `.ts` files without a `@Component` are exempt. Do not split a component you are not otherwise changing.
 - **Which first:** move whichever of the `template` and `styles` literals has more lines, measured from its `template:` or `styles:` line to its closing backtick line. That one saves the most. On a tie, move the template.
 - **Then:** if the file still has 100 lines or more, move the other literal too, and stop. A file that is still long after both moves is long because of its class, and this rule asks nothing more of it.
-- **Exceptions:** a literal that fits on its key line, such as `template: '<ng-content />'`, stays inline, because moving it saves nothing. A moved template or stylesheet stays moved if the component later shrinks below 100 lines.
+- **Exceptions:** an atom (`components/atoms/`) keeps its template inline whatever its length, and `scripts/check-architecture.mts` fails on an HTML file in an atom's folder. A literal that fits on its key line, such as `template: '<ng-content />'`, stays inline, because moving it saves nothing. A moved template or stylesheet stays moved if the component later shrinks below 100 lines.
 
 ## Moving a literal
 

@@ -11,9 +11,9 @@ import {
   ViewEncapsulation,
 } from '@angular/core';
 
-import { Button, ButtonSize, ButtonVariant } from '../button/button';
+import { Button, ButtonSize, ButtonVariant } from '../../components/atoms/button/button';
 import { CaptureField } from '../capture-field/capture-field';
-import { Icon, IconName } from '../icon/icon';
+import { Icon, IconName } from '../../components/atoms/icon/icon';
 
 /** A capture that was not sent, shown above the input. */
 export interface QuickAddFailure {

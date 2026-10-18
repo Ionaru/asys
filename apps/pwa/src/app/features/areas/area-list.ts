@@ -4,7 +4,7 @@ import { RouterLink } from '@angular/router';
 import { activeHoursSummary } from '@asys/domain';
 
 import { DataStore, SyncStatus } from '../../core/data/data-store';
-import { Button, ButtonVariant } from '../../ui/button/button';
+import { Button, ButtonVariant } from '../../components/atoms/button/button';
 import { LoadState } from '../../ui/load-state/load-state';
 import { byAreaName } from './area-order';
 

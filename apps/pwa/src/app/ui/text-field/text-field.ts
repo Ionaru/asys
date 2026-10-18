@@ -3,17 +3,17 @@ import { Component, ElementRef, input, model, viewChild, ViewEncapsulation } fro
 import type { FormValueControl } from '@angular/forms/signals';
 
 import { FieldControl } from '../field-control/field-control';
-import { FieldError } from '../field-error/field-error';
-import { Input } from '../input/input';
-import { InputBox } from '../input-box/input-box';
-import { Label } from '../label/label';
-import { SingleLine } from '../single-line/single-line';
+import { FieldError } from '../../components/atoms/field-error/field-error';
+import { Input } from '../../components/atoms/input/input';
+import { InputBox } from '../../components/atoms/input/input-box';
+import { Label } from '../../components/atoms/label/label';
+import { SingleLine } from '../../components/atoms/input/single-line';
 
 let nextId = 0;
 
 /**
  * A single or multi line text field, usable as a Signal Forms custom control. A single line one is a one-row textarea
- * (see `ui/single-line`), unless `autofill` asks for a text input.
+ * (see `components/atoms/input/single-line`), unless `autofill` asks for a text input.
  */
 @Component({
   selector: 'asys-text-field',

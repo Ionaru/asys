@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { Component, input, ViewEncapsulation } from '@angular/core';
 
-import { Icon, IconName } from '../icon/icon';
+import { Icon, IconName } from '../../components/atoms/icon/icon';
 
 /**
  * An icon that says what a value means, then the value. Display only. The label is what screen readers

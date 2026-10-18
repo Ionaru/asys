@@ -12,7 +12,7 @@ import { AppUpdate } from './core/platform/app-update';
 import { DeviceZone } from './core/platform/device-zone';
 import { Theme } from './core/platform/theme';
 import { pathOf } from './core/platform/url-path';
-import { Button, ButtonSize, ButtonVariant } from './ui/button/button';
+import { Button, ButtonSize, ButtonVariant } from './components/atoms/button/button';
 
 /** The root: update prompt, connection banners, the data store's and time zone sync's lifecycle, the sign-out redirect, and the Current Area's palette. */
 @Component({

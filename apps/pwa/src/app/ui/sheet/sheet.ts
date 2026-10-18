@@ -12,8 +12,8 @@ import {
   ViewEncapsulation,
 } from '@angular/core';
 
-import { Button, ButtonVariant } from '../button/button';
-import { IconName } from '../icon/icon';
+import { Button, ButtonVariant } from '../../components/atoms/button/button';
+import { IconName } from '../../components/atoms/icon/icon';
 
 let nextId = 0;
 

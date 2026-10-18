@@ -2,9 +2,9 @@
 import { Component, input, output, ViewEncapsulation } from '@angular/core';
 import { isLocalTime, type LocalTime } from '@asys/domain';
 
-import { Button, ButtonVariant } from '../button/button';
-import { Input } from '../input/input';
-import { Label } from '../label/label';
+import { Button, ButtonVariant } from '../../components/atoms/button/button';
+import { Input } from '../../components/atoms/input/input';
+import { Label } from '../../components/atoms/label/label';
 
 let nextId = 0;
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { Component, computed, input, model, output, ViewEncapsulation } from '@angular/core';
 
-import { Icon, IconName } from '../icon/icon';
+import { Icon, IconName } from '../../components/atoms/icon/icon';
 
 /** What a click on the header does: expand its body, or ask the parent to open something (a sheet). */
 export enum SectionHeaderAction {

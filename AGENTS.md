@@ -39,7 +39,7 @@ CI (`.github/workflows/cd.yaml`) runs each check below as its own job. Run the o
 
 | Check       | Command                                                                                                                  |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------ |
-| lint        | `pnpm exec nx run-many -t lint`                                                                                          |
+| lint        | `pnpm exec nx run-many -t lint`, then `node scripts/check-architecture.mts`                                              |
 | typecheck   | `pnpm exec nx run-many -t typecheck`, then `pnpm exec tsc -p scripts/tsconfig.json`                                      |
 | build       | `pnpm exec nx run-many -t build`, then `pnpm exec nx run server:openapi`                                                 |
 | test        | `pnpm exec nx run-many -t test --skip-nx-cache` (database up and migrated)                                               |
@@ -65,6 +65,7 @@ These fail lint, a test or a CI check when broken.
   - contract may add `effect` and `@ionaru/effect-passkeys/api`. Never Drizzle, `@effect/sql-pg`, Node platform packages or Angular.
   - The PWA never imports `@asys/contract`, `effect` or `@ionaru/effect-passkeys/api` at runtime (type-only imports are fine). `@ionaru/effect-passkeys/server` and `/testing` are banned outright, and `/client` is the one passkeys entry it may use. It reaches the generated client (`apps/pwa/src/generated`) only from `app/core/api`.
   - Two `no-restricted-imports` overrides in the root `.oxlintrc.json` cover `apps/pwa/**` and `apps/pwa/src/app/core/api/**`. They share their passkeys and contract patterns but differ on the generated client. Because oxlint override options replace rather than merge, change a shared pattern in both, and keep each block's own generated-client pattern.
+- **Atomic Design levels** (`scripts/check-architecture.mts`): a component under `apps/pwa/src/app/components/` imports only its own level or below, and a page under `pages/` renders exactly one template, as `components/README.md` says.
 - **Row-level security** (`apps/server/src/db/rls-tables.spec.ts`): every table has `owner_id`, `ENABLE` and `FORCE ROW LEVEL SECURITY`, and the one policy from `ownerPolicy()`. The server connects as `asys_app`. Lookups before an owner is known go only through `SECURITY DEFINER` functions owned by `asys_lookup` (ADR 0007). Use the `adding-an-owned-table` skill.
 - **Contract lockstep** (`libs/contract/src/lib/*.test-d.ts`): a schema's `Type` equals the plain domain type. PWA screens are kept in line by `apps/pwa/src/app/core/api/wire.ts` (`SHAPES`) and exhaustive `switch`es.
 - **Licences** (`scripts/check-spdx.mts`, `reuse lint`, `scripts/check-licenses.mts`):

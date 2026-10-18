@@ -1,0 +1,45 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
+
+# Atomic Design refactor plan
+
+The PWA's presentational components move from `apps/pwa/src/app/ui/` into the Atomic Design levels under `apps/pwa/src/app/components/` (atoms, molecules, organisms, templates), and the routed screens move from `features/` into `apps/pwa/src/app/pages/`. The rules are in `apps/pwa/src/app/components/README.md`; the level of each component comes from the design system's level table (https://claude.ai/artifact/Qr1Coh3jiqRdS18W9id71v, README, Atomic design).
+
+## Decisions
+
+- **Layout.** A component lives at `components/<level>/<name>/<name>.ts`, with its spec, `.component.html` and `.css` beside it. A template is `components/templates/<screen>-template/`, a page `pages/<screen>/`, and a screen's pure helpers and route wrapper move into its page folder.
+- **Names stay in the move PRs.** Folders, selectors and host classes keep their current names, so git records each move as a rename and no e2e selector or `styles.css` rule changes. The design-system renames (QuadrantChip to QuadrantLabel, PickerRow to TaskRow, NowHeader to ScreenHeader, and so on) come later, each in its own PR.
+- **One atom, several files.** The Input atom is `input.ts`, `input-box.ts` and `single-line.ts` in `atoms/input/`, because together they are the design system's Input. That removes the one place where an atom imported another.
+- **Icon inside an atom.** The README says atoms import no other atom. The design system allows an Icon inside a Button as part of its label, and lists StatusBadge, which has an icon, as an atom. So an atom may hold the Icon atom, and nothing else from another atom folder.
+- **Support code.** Helpers that several levels share (`activation.ts`, `field-control.ts`) go to `components/support/`, which every level may import and which imports nothing from `components/`. Helpers that one component owns stay beside it (`area-options.ts`, `day-label.ts`, `swipe-decision.ts`).
+- **Focus methods and projection.** Public `focus…()` methods that move focus inside a component, and projected content, are allowed beside inputs and outputs. Replacing them would change behaviour across the specs.
+- **Swipe.** `swipe-actions` keeps its `core/platform` seams (`Motion`, `Haptics`, `theme`), as the only component that may import `core` at runtime.
+- **Enforcement.** `scripts/check-architecture.mts` checks every import under `components/` and `pages/` against the level rules, and runs in the `lint` CI job. A script was chosen over oxlint overrides, because overrides replace rather than merge, so the PWA's shared import bans would be copied once per level.
+- **The shell stays outside.** `layout/` (the shell with the router outlet) and `app.ts` are not a template with inputs and outputs only. They are looked at once the screens are done.
+
+## Pull requests
+
+Each lands on `main` with every check green and no visual change unless it says so.
+
+1. **Atoms.** Icon, Button, CaptureButton, Input (with InputBox and SingleLine), Label, StatusBadge, QuadrantChip, SyncNote and FieldError, plus the level check, the README and the skill.
+2. **Molecules and support.** Fact, InlineConfirm, LoadState, AreaPick, CaptureField, TextField, Segmented, SelectField, PickerRow, ReviewItem and UndoBar; `activation` and `field-control` into `support/`.
+3. **Organisms.** BottomNav, QuickAdd, LogProgressForm, NowHeader, SectionHeader, Sheet, TimePick, DatePick, EstimateField, ChoiceRow, DateSpecRow, TopPick, TriageCard and SwipeActions; `ui/` is deleted. ChoiceRow, DateSpecRow and SectionHeader go in as organisms although the design system names molecules for them, because they hold a Sheet; the later splits make the molecules real.
+4. **Pages and templates for Today, Recovered and the Areas list**, the lowest risk, to set the pattern.
+5. **Sign-in, Sign-up and Recover**, sharing one template.
+6. **Capture and Settings.**
+7. **Account.**
+8. **Inbox.**
+9. **Area editor.**
+10. **Now.**
+11. **Task editor.** `features/` is deleted.
+
+## Later, out of scope for the moves
+
+- The design-system renames, which change selectors, classes, e2e specs and `styles.css`.
+- Folding CaptureButton into Button `--capture`.
+- The splits: SectionHeader into SectionHeader and CollapsibleSection, DateRow and ChoiceRow into FieldRow with a Sheet and OptionList, and the Calendar molecule.
+- New atoms and molecules: Count, Segment, Countdown, Text, Link, ButtonGroup, NavItem, GapSummary.
+
+## Open questions
+
+- Several screens have no template in the design system (Recovered, the Areas list and editor, the auth screens, Capture, Settings, Account). Before PR 4: add templates for them to the design system, or share one simple screen template.
+- SyncNote may be the design system's SaveStatus. It moves as SyncNote until that is settled.

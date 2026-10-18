@@ -10,10 +10,10 @@ import { DataStore, SyncStatus } from '../../core/data/data-store';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { TimeZoneSync } from '../../core/data/time-zone-sync';
 import { DeviceZone } from '../../core/platform/device-zone';
-import { Button, ButtonVariant } from '../../ui/button/button';
+import { Button, ButtonVariant } from '../../components/atoms/button/button';
 import { LoadState } from '../../ui/load-state/load-state';
 import { type SelectOption, SelectField } from '../../ui/select-field/select-field';
-import { SyncNote } from '../../ui/sync-note/sync-note';
+import { SyncNote } from '../../components/atoms/sync-note/sync-note';
 
 const MAX_URGENCY_DAYS = 14;
 

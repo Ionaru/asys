@@ -2,7 +2,7 @@
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-import { Button, ButtonVariant } from '../../ui/button/button';
+import { Button, ButtonVariant } from '../../components/atoms/button/button';
 
 /** Shown after a recovery code sign-in, nudging the Owner to replace lost passkeys. */
 @Component({

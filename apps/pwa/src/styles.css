@@ -106,7 +106,7 @@ body {
   letter-spacing: 0.01em;
 }
 
-/* The field chrome, on an input itself or on the box around a one-line field's textarea (ui/input-box). */
+/* The field chrome, on an input itself or on the box around a one-line field's textarea (components/atoms/input/input-box). */
 .asys-input,
 .asys-input-box {
   min-width: 0;
@@ -164,7 +164,7 @@ textarea.asys-input {
   letter-spacing: -0.005em;
 }
 
-/* A one-line field is a one-row textarea (ui/single-line). A textarea scrolls its text into its own padding, so the
+/* A one-line field is a one-row textarea (components/atoms/input/single-line). A textarea scrolls its text into its own padding, so the
    field's border and inline padding go on a box around it, and the focus ring with them. The block padding stays on
    the textarea, so a press anywhere but the box's sides lands on the text and places the caret. */
 .asys-input-box {

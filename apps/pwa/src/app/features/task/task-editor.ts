@@ -39,13 +39,13 @@ import { Clock } from '../../core/platform/clock';
 import { observeBlockSize } from '../../core/platform/observe-block-size';
 import { TaskMorph } from '../../core/platform/task-morph';
 import { activationOf } from '../../ui/activation/activation';
-import { Button, ButtonSize, ButtonVariant } from '../../ui/button/button';
+import { Button, ButtonSize, ButtonVariant } from '../../components/atoms/button/button';
 import { ChoiceRow } from '../../ui/choice-row/choice-row';
 import { DateSpecRow } from '../../ui/date-spec-row/date-spec-row';
 import { EstimateField, EstimateLayout } from '../../ui/estimate-field/estimate-field';
-import { FieldError } from '../../ui/field-error/field-error';
-import { Icon, IconName } from '../../ui/icon/icon';
-import { Input, InputVariant } from '../../ui/input/input';
+import { FieldError } from '../../components/atoms/field-error/field-error';
+import { Icon, IconName } from '../../components/atoms/icon/icon';
+import { Input, InputVariant } from '../../components/atoms/input/input';
 import { InlineConfirm } from '../../ui/inline-confirm/inline-confirm';
 import { LoadState } from '../../ui/load-state/load-state';
 import {
@@ -53,13 +53,13 @@ import {
   LogProgressForm,
   logProgressCommand,
 } from '../../ui/log-progress-form/log-progress-form';
-import { QuadrantChip } from '../../ui/quadrant-chip/quadrant-chip';
+import { QuadrantChip } from '../../components/atoms/quadrant-chip/quadrant-chip';
 import { Segmented } from '../../ui/segmented/segmented';
 import { areaSelectOptions } from '../../ui/select-field/area-options';
 import { Sheet } from '../../ui/sheet/sheet';
-import { SingleLine } from '../../ui/single-line/single-line';
-import { StatusBadge, StatusBadgeStatus } from '../../ui/status-badge/status-badge';
-import { SyncNote } from '../../ui/sync-note/sync-note';
+import { SingleLine } from '../../components/atoms/input/single-line';
+import { StatusBadge, StatusBadgeStatus } from '../../components/atoms/status-badge/status-badge';
+import { SyncNote } from '../../components/atoms/sync-note/sync-note';
 import { byAreaName } from '../areas/area-order';
 import { SaveState, TaskDraftSaver } from './task-draft-saver';
 import { TaskBlockers } from './task-blockers';

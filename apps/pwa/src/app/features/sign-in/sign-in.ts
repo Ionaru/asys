@@ -8,8 +8,8 @@ import { PasskeyCeremony } from '../../core/api/passkey-ceremony';
 import { safeReturnUrl } from '../../core/auth/safe-return-url';
 import { Session } from '../../core/auth/session';
 import { GENERIC_MESSAGE } from '../../core/data/outcome-message';
-import { Button, ButtonVariant } from '../../ui/button/button';
-import { IconName } from '../../ui/icon/icon';
+import { Button, ButtonVariant } from '../../components/atoms/button/button';
+import { IconName } from '../../components/atoms/icon/icon';
 import { ceremonyOptions } from '../auth/ceremony-options';
 import { MISCONFIGURED_MESSAGE, TRY_AGAIN_MESSAGE } from '../auth/passkey-messages';
 

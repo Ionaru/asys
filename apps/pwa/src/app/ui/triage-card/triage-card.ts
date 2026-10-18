@@ -14,7 +14,7 @@ import {
   ViewEncapsulation,
 } from '@angular/core';
 
-import { Button, ButtonSize, ButtonVariant } from '../button/button';
+import { Button, ButtonSize, ButtonVariant } from '../../components/atoms/button/button';
 import { EstimateField } from '../estimate-field/estimate-field';
 import { InlineConfirm } from '../inline-confirm/inline-confirm';
 import { Segmented } from '../segmented/segmented';

@@ -17,7 +17,7 @@ import {
 import { Haptics } from '../../core/platform/haptics';
 import { Motion, MotionDuration, MotionEasing } from '../../core/platform/motion';
 import { ThemeName } from '../../core/platform/theme';
-import { Icon, IconName } from '../icon/icon';
+import { Icon, IconName } from '../../components/atoms/icon/icon';
 import {
   CLICK_SUPPRESS_MS,
   RUBBER_BAND_FACTOR,

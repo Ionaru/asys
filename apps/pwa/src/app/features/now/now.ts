@@ -41,8 +41,8 @@ import { Clock } from '../../core/platform/clock';
 import { Motion, MotionDuration, MotionEasing } from '../../core/platform/motion';
 import { TaskMorph } from '../../core/platform/task-morph';
 import { AreaPickControl } from '../../ui/area-pick/area-pick';
-import { Button, ButtonVariant } from '../../ui/button/button';
-import { IconName } from '../../ui/icon/icon';
+import { Button, ButtonVariant } from '../../components/atoms/button/button';
+import { IconName } from '../../components/atoms/icon/icon';
 import { LoadState } from '../../ui/load-state/load-state';
 import {
   estimateNowText,
@@ -53,7 +53,7 @@ import { NowHeader } from '../../ui/now-header/now-header';
 import { PickerRow, PickerRowVariant } from '../../ui/picker-row/picker-row';
 import { SectionHeader } from '../../ui/section-header/section-header';
 import { SwipeActions } from '../../ui/swipe-actions/swipe-actions';
-import { SyncNote } from '../../ui/sync-note/sync-note';
+import { SyncNote } from '../../components/atoms/sync-note/sync-note';
 import { TopPick } from '../../ui/top-pick/top-pick';
 import { byAreaName } from '../areas/area-order';
 import {
