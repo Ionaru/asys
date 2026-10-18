@@ -38,7 +38,7 @@ import { outcomeMessage } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
 import { observeBlockSize } from '../../core/platform/observe-block-size';
 import { TaskMorph } from '../../core/platform/task-morph';
-import { activationOf } from '../../ui/activation/activation';
+import { activationOf } from '../../components/support/activation';
 import { Button, ButtonSize, ButtonVariant } from '../../components/atoms/button/button';
 import { ChoiceRow } from '../../ui/choice-row/choice-row';
 import { DateSpecRow } from '../../ui/date-spec-row/date-spec-row';
@@ -46,16 +46,16 @@ import { EstimateField, EstimateLayout } from '../../ui/estimate-field/estimate-
 import { FieldError } from '../../components/atoms/field-error/field-error';
 import { Icon, IconName } from '../../components/atoms/icon/icon';
 import { Input, InputVariant } from '../../components/atoms/input/input';
-import { InlineConfirm } from '../../ui/inline-confirm/inline-confirm';
-import { LoadState } from '../../ui/load-state/load-state';
+import { InlineConfirm } from '../../components/molecules/inline-confirm/inline-confirm';
+import { LoadState } from '../../components/molecules/load-state/load-state';
 import {
   estimateNowText,
   LogProgressForm,
   logProgressCommand,
 } from '../../ui/log-progress-form/log-progress-form';
 import { QuadrantChip } from '../../components/atoms/quadrant-chip/quadrant-chip';
-import { Segmented } from '../../ui/segmented/segmented';
-import { areaSelectOptions } from '../../ui/select-field/area-options';
+import { Segmented } from '../../components/molecules/segmented/segmented';
+import { areaSelectOptions } from '../../components/molecules/select-field/area-options';
 import { Sheet } from '../../ui/sheet/sheet';
 import { SingleLine } from '../../components/atoms/input/single-line';
 import { StatusBadge, StatusBadgeStatus } from '../../components/atoms/status-badge/status-badge';

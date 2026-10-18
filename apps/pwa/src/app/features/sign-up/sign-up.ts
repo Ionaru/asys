@@ -25,7 +25,7 @@ import { GENERIC_MESSAGE } from '../../core/data/outcome-message';
 import { DeviceZone } from '../../core/platform/device-zone';
 import { Button, ButtonVariant } from '../../components/atoms/button/button';
 import { IconName } from '../../components/atoms/icon/icon';
-import { TextField } from '../../ui/text-field/text-field';
+import { TextField } from '../../components/molecules/text-field/text-field';
 import { ceremonyOptions } from '../auth/ceremony-options';
 import { nameError } from '../auth/name-rule';
 import { MISCONFIGURED_MESSAGE, TRY_AGAIN_MESSAGE } from '../auth/passkey-messages';

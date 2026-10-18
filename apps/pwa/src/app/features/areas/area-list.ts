@@ -5,7 +5,7 @@ import { activeHoursSummary } from '@asys/domain';
 
 import { DataStore, SyncStatus } from '../../core/data/data-store';
 import { Button, ButtonVariant } from '../../components/atoms/button/button';
-import { LoadState } from '../../ui/load-state/load-state';
+import { LoadState } from '../../components/molecules/load-state/load-state';
 import { byAreaName } from './area-order';
 
 /** Lists the Areas by name, each with its Active hours, and links to a new Area. */

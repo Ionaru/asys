@@ -37,10 +37,13 @@ import { Button, ButtonSize, ButtonVariant } from '../../components/atoms/button
 import { FieldError } from '../../components/atoms/field-error/field-error';
 import { Input } from '../../components/atoms/input/input';
 import { Label } from '../../components/atoms/label/label';
-import { LoadState } from '../../ui/load-state/load-state';
-import { type SelectOption, SelectField } from '../../ui/select-field/select-field';
+import { LoadState } from '../../components/molecules/load-state/load-state';
+import {
+  type SelectOption,
+  SelectField,
+} from '../../components/molecules/select-field/select-field';
 import { SyncNote } from '../../components/atoms/sync-note/sync-note';
-import { TextField } from '../../ui/text-field/text-field';
+import { TextField } from '../../components/molecules/text-field/text-field';
 
 /** One row of Active hours as the time inputs hold it. */
 interface TimeRow {

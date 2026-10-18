@@ -2,7 +2,7 @@
 import { Component, signal, viewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
-import type { Activation } from '../activation/activation';
+import type { Activation } from '../../support/activation';
 import { UndoBar, UndoBarVariant } from './undo-bar';
 
 @Component({

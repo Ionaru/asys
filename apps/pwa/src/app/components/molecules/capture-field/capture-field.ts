@@ -9,9 +9,9 @@ import {
   ViewEncapsulation,
 } from '@angular/core';
 
-import { Button, ButtonVariant } from '../../components/atoms/button/button';
-import { InputBox } from '../../components/atoms/input/input-box';
-import { SingleLine } from '../../components/atoms/input/single-line';
+import { Button, ButtonVariant } from '../../atoms/button/button';
+import { InputBox } from '../../atoms/input/input-box';
+import { SingleLine } from '../../atoms/input/single-line';
 
 let nextId = 0;
 

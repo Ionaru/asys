@@ -17,7 +17,7 @@ import type { FormValueControl } from '@angular/forms/signals';
 import { formatMinutes } from '@asys/domain';
 
 import { Button, ButtonSize, ButtonVariant } from '../../components/atoms/button/button';
-import { FieldControl } from '../field-control/field-control';
+import { FieldControl } from '../../components/support/field-control';
 import { FieldError } from '../../components/atoms/field-error/field-error';
 import { InputBox } from '../../components/atoms/input/input-box';
 import { Label } from '../../components/atoms/label/label';
