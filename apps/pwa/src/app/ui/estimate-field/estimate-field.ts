@@ -19,6 +19,7 @@ import { formatMinutes } from '@asys/domain';
 import { Button, ButtonSize, ButtonVariant } from '../button/button';
 import { FieldControl } from '../field-control/field-control';
 import { FieldError } from '../field-error/field-error';
+import { breaksLine, flattenLines, pressBox, submitImplicitly } from '../single-line/single-line';
 
 /** How the Estimate choices are drawn: wrapping chips, or a single ruler under a head with the Other button. */
 export enum EstimateLayout {
@@ -67,11 +68,15 @@ export class EstimateField extends FieldControl implements FormValueControl<numb
 
   protected override readonly messageParagraphId = `asys-estimate-${nextId++}-message`;
 
+  protected readonly flattenLines = flattenLines;
+
+  protected readonly pressBox = pressBox;
+
   readonly #injector = inject(Injector);
 
   private readonly chipButtons = viewChild<ElementRef<HTMLButtonElement>>('chipButton');
 
-  private readonly otherInput = viewChild<ElementRef<HTMLInputElement>>('otherInput');
+  private readonly otherInput = viewChild<ElementRef<HTMLTextAreaElement>>('otherInput');
 
   readonly #otherOpen = signal(false);
 
@@ -134,6 +139,23 @@ export class EstimateField extends FieldControl implements FormValueControl<numb
       this.#localError.set(true);
       this.value.set(null);
     }
+  }
+
+  /** Enter in Other commits what is typed, as the `change` that a text input fires on Enter did, and submits. */
+  protected otherEnter(event: Event): void {
+    if (!breaksLine(event)) {
+      return;
+    }
+
+    const field = event.target as HTMLTextAreaElement;
+
+    event.preventDefault();
+
+    if (this.layout() === EstimateLayout.Ruler) {
+      this.typeOther(field.value);
+    }
+
+    submitImplicitly(field);
   }
 
   /** Focuses the first chip or ruler cell, called by Signal Forms' `focusBoundControl()`. */

@@ -14,6 +14,7 @@ import {
 
 import { Button, ButtonSize, ButtonVariant } from '../button/button';
 import { Icon, IconName } from '../icon/icon';
+import { enterAsInput, flattenLines, pressBox } from '../single-line/single-line';
 
 /** A capture that was not sent, shown above the input. */
 export interface QuickAddFailure {
@@ -25,11 +26,7 @@ export interface QuickAddFailure {
 
 let nextId = 0;
 
-/**
- * The quick-add bar that captures a Task into the Inbox. Its field is a one-row textarea, not a text input: Chrome on
- * Android shows its passwords, cards and addresses bar above the keyboard on every text input, whatever its
- * autocomplete, and never on a textarea. So the field keeps to one line itself, and Enter submits as in a text input.
- */
+/** The quick-add bar that captures a Task into the Inbox. Its field is a one-row textarea (see `ui/single-line`). */
 @Component({
   selector: 'asys-quick-add',
   imports: [Button, Icon],
@@ -49,6 +46,12 @@ export class QuickAdd {
   protected readonly Icons = IconName;
 
   protected readonly inputId = `asys-quickadd-${nextId++}-input`;
+
+  protected readonly enterAsInput = enterAsInput;
+
+  protected readonly flattenLines = flattenLines;
+
+  protected readonly pressBox = pressBox;
 
   readonly value = model<string>('');
 
@@ -84,44 +87,6 @@ export class QuickAdd {
   protected discardFailure(id: string): void {
     this.focus();
     this.discard.emit(id);
-  }
-
-  /** A press on the pill around the field keeps focus in the field, as a press on a text input's edge does. */
-  protected fieldMousedown(event: MouseEvent): void {
-    if (event.target === event.currentTarget) {
-      event.preventDefault();
-      this.focus();
-    }
-  }
-
-  protected fieldInput(event: Event): void {
-    const field = event.target as HTMLTextAreaElement;
-    // A textarea's value holds its line breaks as LF only, so each becomes one space and the selection keeps its offsets.
-    const text = field.value.replaceAll('\n', ' ');
-
-    if (text !== field.value) {
-      const { selectionStart, selectionEnd } = field;
-
-      field.value = text;
-      field.setSelectionRange(selectionStart, selectionEnd);
-    }
-
-    this.value.set(text);
-  }
-
-  /** A phone keyboard's Enter often arrives as a line break with no Enter keydown before it. */
-  protected fieldBeforeInput(event: InputEvent): void {
-    if (event.inputType === 'insertLineBreak' || event.inputType === 'insertParagraph') {
-      event.preventDefault();
-      (event.target as HTMLTextAreaElement).form?.requestSubmit();
-    }
-  }
-
-  protected fieldKeydown(event: KeyboardEvent): void {
-    if (event.key === 'Enter' && !event.isComposing) {
-      event.preventDefault();
-      (event.target as HTMLTextAreaElement).form?.requestSubmit();
-    }
   }
 
   protected submit(event: Event): void {

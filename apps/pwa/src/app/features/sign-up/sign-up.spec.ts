@@ -241,6 +241,14 @@ describe('SignUp', () => {
       expect(registerOptions).not.toHaveBeenCalled();
     });
 
+    it('keeps the Name a text input that names its autofill, so the browser can fill it', async () => {
+      const { nameInput } = await setup();
+
+      expect(nameInput().tagName).toBe('INPUT');
+      expect(nameInput().type).toBe('text');
+      expect(nameInput().getAttribute('autocomplete')).toBe('name');
+    });
+
     it('when already signed in shows the AlreadySignedIn step and sends nothing', async () => {
       sessionState = SessionState.SignedIn;
       const { root, h1s } = await setup();

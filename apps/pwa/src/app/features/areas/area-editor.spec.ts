@@ -196,13 +196,13 @@ const setup = async (options: SetupOptions = {}) => {
   const addHours = async (legend: string): Promise<void> => {
     await click(buttonIn(day(legend), 'Add hours'));
   };
-  const nameInput = (): HTMLInputElement =>
+  const nameInput = (): HTMLTextAreaElement =>
     must(
       must(
         Array.from(root().querySelectorAll<HTMLElement>('asys-text-field')).find(
           (f) => text(f.querySelector('label')) === 'Name',
         ),
-      ).querySelector('input'),
+      ).querySelector('textarea'),
     );
   const paletteField = (): HTMLElement =>
     must(

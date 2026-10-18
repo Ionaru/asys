@@ -69,8 +69,8 @@ const finders = (root: () => HTMLElement) => {
   const numberChips = (): HTMLButtonElement[] =>
     chips().filter((b) => b.classList.contains('asys-estimate__chip--num'));
   const other = (): HTMLButtonElement => chips()[6];
-  const otherInput = (): HTMLInputElement | null =>
-    root().querySelector<HTMLInputElement>('input.asys-field__input');
+  const otherInput = (): HTMLTextAreaElement | null =>
+    root().querySelector<HTMLTextAreaElement>('textarea.asys-field__line');
   const error = (): HTMLElement | null => root().querySelector('p.asys-field__error');
   const pressedMinutes = (): string[] =>
     numberChips()
@@ -87,7 +87,7 @@ const setup = async () => {
   const host = fixture.componentInstance;
   const root = (): HTMLElement => fixture.nativeElement;
   const type = async (text: string) => {
-    const input = finders(root).otherInput() as HTMLInputElement;
+    const input = finders(root).otherInput() as HTMLTextAreaElement;
 
     input.value = text;
     input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -194,10 +194,12 @@ describe('EstimateField', () => {
       other().click();
       await fixture.whenStable();
 
-      const input = otherInput() as HTMLInputElement;
+      const input = otherInput() as HTMLTextAreaElement;
 
       expect(input).not.toBeNull();
-      expect(input.getAttribute('type')).toBe('text');
+      // A one-row textarea, because Chrome on Android shows its autofill bar on every text input.
+      expect(input.rows).toBe(1);
+      expect(input.parentElement?.classList.contains('asys-field__box')).toBe(true);
       expect(input.getAttribute('inputmode')).toBe('numeric');
       expect(Array.from(input.labels ?? []).map((l) => l.textContent?.trim())).toEqual(['Minutes']);
       expect(other().getAttribute('aria-pressed')).toBe('true');
@@ -234,7 +236,7 @@ describe('EstimateField', () => {
       host.value.set(30);
       await fixture.whenStable();
 
-      const input = otherInput() as HTMLInputElement;
+      const input = otherInput() as HTMLTextAreaElement;
 
       expect(input.value).toBe('30');
 
@@ -436,7 +438,7 @@ describe('EstimateField', () => {
 
       host.value.set(20);
       await fixture.whenStable();
-      (otherInput() as HTMLInputElement).dispatchEvent(new Event('blur'));
+      (otherInput() as HTMLTextAreaElement).dispatchEvent(new Event('blur'));
       await fixture.whenStable();
 
       expect(host.touches()).toBe(1);
@@ -538,7 +540,7 @@ describe('EstimateField', () => {
 
       const root = (): HTMLElement => fixture.nativeElement;
       const type = async (text: string) => {
-        const input = finders(root).otherInput() as HTMLInputElement;
+        const input = finders(root).otherInput() as HTMLTextAreaElement;
 
         input.value = text;
         input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -649,11 +651,11 @@ const setupRuler = async () => {
     Array.from(root().querySelectorAll<HTMLButtonElement>('button.asys-estimate__cell'));
   const toggle = (): HTMLButtonElement =>
     root().querySelector('button.asys-estimate__other-toggle') as HTMLButtonElement;
-  const otherInput = (): HTMLInputElement | null =>
-    root().querySelector<HTMLInputElement>('input.asys-field__input');
+  const otherInput = (): HTMLTextAreaElement | null =>
+    root().querySelector<HTMLTextAreaElement>('textarea.asys-field__line');
   const error = (): HTMLElement | null => root().querySelector('p.asys-field__error');
   const typeEvent = async (text: string, event: 'input' | 'change') => {
-    const input = otherInput() as HTMLInputElement;
+    const input = otherInput() as HTMLTextAreaElement;
 
     input.value = text;
     input.dispatchEvent(new Event(event, { bubbles: true }));
@@ -839,6 +841,72 @@ describe('EstimateField Ruler layout', () => {
 
       expect(seen).toEqual([42]);
       expect(error()).toBeNull();
+    });
+
+    it('commits the typed minutes on Enter, as a text input fires change on Enter', async () => {
+      const { fixture, host, toggle, typeEvent, otherInput } = await setupRuler();
+      const enter = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        bubbles: true,
+        cancelable: true,
+      });
+
+      toggle().click();
+      await fixture.whenStable();
+      host.value.set(null);
+      await typeEvent('42', 'input');
+      otherInput()?.dispatchEvent(enter);
+      await fixture.whenStable();
+
+      expect(enter.defaultPrevented).toBe(true);
+      expect(host.value()).toBe(42);
+      expect(otherInput()?.value).toBe('42');
+    });
+
+    it('commits a phone keyboard line break the same way', async () => {
+      const { fixture, host, toggle, typeEvent, otherInput } = await setupRuler();
+      const lineBreak = new InputEvent('beforeinput', {
+        inputType: 'insertLineBreak',
+        bubbles: true,
+        cancelable: true,
+      });
+
+      toggle().click();
+      await fixture.whenStable();
+      host.value.set(null);
+      await typeEvent('42', 'input');
+      otherInput()?.dispatchEvent(lineBreak);
+      await fixture.whenStable();
+
+      expect(lineBreak.defaultPrevented).toBe(true);
+      expect(host.value()).toBe(42);
+    });
+
+    it('leaves typing and Escape alone', async () => {
+      const { fixture, toggle, otherInput } = await setupRuler();
+
+      toggle().click();
+      await fixture.whenStable();
+
+      const keys = ['4', 'Escape'].map(
+        (key) => new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
+      );
+
+      for (const key of keys) {
+        otherInput()?.dispatchEvent(key);
+      }
+
+      expect(keys.map((key) => key.defaultPrevented)).toEqual([false, false]);
+    });
+
+    it('turns a pasted line break into a space', async () => {
+      const { fixture, toggle, typeEvent, otherInput } = await setupRuler();
+
+      toggle().click();
+      await fixture.whenStable();
+      await typeEvent('4\n2', 'input');
+
+      expect(otherInput()?.value).toBe('4 2');
     });
 
     it('shows no error while typing invalid text, and the error on change', async () => {

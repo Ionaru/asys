@@ -73,22 +73,28 @@
   @if (otherShown()) {
     <div class="asys-field asys-estimate__other" [class.asys-field--error]="showError()">
       <label class="asys-field__label" [for]="otherId">Minutes</label>
-      <input
-        #otherInput
-        class="asys-field__input"
-        type="text"
-        inputmode="numeric"
-        [id]="otherId"
-        [value]="otherText()"
-        [disabled]="disabled()"
-        [attr.aria-invalid]="showError() ? 'true' : null"
-        [attr.aria-describedby]="messageId()"
-        (input)="
-          layout() === Layout.Ruler ? keepTyped(otherInput.value) : typeOther(otherInput.value)
-        "
-        (change)="layout() === Layout.Ruler && typeOther(otherInput.value)"
-        (blur)="touch.emit()"
-      />
+      <div class="asys-field__input asys-field__box" (mousedown)="pressBox($event)">
+        <textarea
+          #otherInput
+          class="asys-field__line"
+          rows="1"
+          inputmode="numeric"
+          [id]="otherId"
+          [value]="otherText()"
+          [disabled]="disabled()"
+          [attr.aria-invalid]="showError() ? 'true' : null"
+          [attr.aria-describedby]="messageId()"
+          (input)="
+            layout() === Layout.Ruler
+              ? keepTyped(flattenLines(otherInput))
+              : typeOther(flattenLines(otherInput))
+          "
+          (change)="layout() === Layout.Ruler && typeOther(otherInput.value)"
+          (keydown)="otherEnter($event)"
+          (beforeinput)="otherEnter($event)"
+          (blur)="touch.emit()"
+        ></textarea>
+      </div>
     </div>
   }
   @if (showError()) {

@@ -26,6 +26,10 @@ Lint bans runtime imports of `@asys/contract`, `effect` and `@ionaru/effect-pass
 - A member only the class uses is an ES private `#` field (`readonly #api = inject(DataApi)`). A member the template reads is `protected`, and a signal query is `private`, because Angular refuses a `#` name for either.
 - Write templates and styles inline until the component's `.ts` file reaches 100 lines, then move them to `<name>.component.html` and `<name>.css` as the `angular-component-files` rule (`.agents/rules/`) says.
 - Forms use Signal Forms (`@angular/forms/signals`), and shared controls implement `FormValueControl<T>` (`ui/text-field`, `ui/segmented`). They extend `FieldControl` (`ui/field-control`), which holds `hint`, `errors`, `touched`, `disabled`, `touch` and the error and hint ids.
+- A one-line text field is a one-row textarea, never `<input type="text">`: Chrome on Android shows its passwords, cards and addresses bar above the keyboard on every text input, whatever its `autocomplete`, and never on a textarea.
+  - `asys-text-field` does this itself. Pass `[autofill]="true"` only where the browser's autofill helps, as on the sign-up Name and the Recovery code.
+  - A hand-made field puts a `textarea.asys-field__line` with `rows="1"` in a `div.asys-field__input.asys-field__box`, and wires `ui/single-line`: `flattenLines` on `input`, `enterAsInput` on `keydown` and `beforeinput` (or `breaksLine` and `submitImplicitly` for more), and `pressBox` on the box's `mousedown`. See `ui/log-progress-form`.
+  - A template event handler never returns `false`: Angular then prevents the event's default, which swallows typing and Escape.
 - Derive Task state on screen (Blocked, Overdue, Available, the reason line) from the `@asys/domain` rules, such as `blockedReasons`, `isBlocked`, `isOverdue` and `explainTask`, so a `RULES_VERSION` change reaches every screen.
 - **`ui` components:**
   - Use the selector `asys-<name>` and `ViewEncapsulation.None`.

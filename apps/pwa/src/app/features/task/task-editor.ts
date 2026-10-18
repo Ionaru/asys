@@ -56,6 +56,7 @@ import { QuadrantChip } from '../../ui/quadrant-chip/quadrant-chip';
 import { Segmented } from '../../ui/segmented/segmented';
 import { areaSelectOptions } from '../../ui/select-field/area-options';
 import { Sheet } from '../../ui/sheet/sheet';
+import { breaksLine, flattenLines } from '../../ui/single-line/single-line';
 import { StatusBadge, StatusBadgeStatus } from '../../ui/status-badge/status-badge';
 import { SyncNote } from '../../ui/sync-note/sync-note';
 import { byAreaName } from '../areas/area-order';
@@ -395,29 +396,14 @@ export class TaskEditor {
   }
 
   protected titleInput(event: Event): void {
-    const field = event.target as HTMLTextAreaElement;
-    // A textarea's value holds its line breaks as LF only, so each becomes one space and the selection keeps its offsets.
-    const title = field.value.replaceAll('\n', ' ');
-
-    if (title !== field.value) {
-      const { selectionStart, selectionEnd } = field;
-
-      field.value = title;
-      field.setSelectionRange(selectionStart, selectionEnd);
-    }
+    const title = flattenLines(event.target as HTMLTextAreaElement);
 
     this.saver.model.update((draft) => ({ ...draft, title }));
   }
 
-  protected titleBeforeInput(event: InputEvent): void {
-    if (event.inputType === 'insertLineBreak' || event.inputType === 'insertParagraph') {
-      event.preventDefault();
-      this.saver.commit();
-    }
-  }
-
-  protected titleKeydown(event: KeyboardEvent): void {
-    if (event.key === 'Enter' && !event.isComposing) {
+  /** Enter, or a phone keyboard's line break, commits the Title instead of breaking it. */
+  protected titleBreak(event: Event): void {
+    if (breaksLine(event)) {
       event.preventDefault();
       this.saver.commit();
     }

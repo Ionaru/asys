@@ -221,7 +221,7 @@ export class TaskBlockers {
 
   #findInput(): HTMLElement | undefined {
     return (
-      this.#host.nativeElement.querySelector<HTMLElement>('asys-text-field input') ?? undefined
+      this.#host.nativeElement.querySelector<HTMLElement>('asys-text-field textarea') ?? undefined
     );
   }
 

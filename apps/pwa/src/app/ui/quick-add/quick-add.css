@@ -47,56 +47,20 @@
   gap: var(--space-2);
 }
 
-/* The pill is drawn around the field, not on it: a textarea scrolls its text into its own padding, under the curve. */
+/* The pill around the field (see ui/single-line, which gives the box and the line their behaviour). */
 .asys-quickadd__field {
   flex: 1 1 auto;
-  display: flex;
-  align-items: center;
   min-width: 0;
   min-height: var(--tap-target);
   padding: 0 var(--space-4);
   background: var(--surface);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-pill);
-  cursor: text;
-}
-
-/* The focus ring goes around the pill, where a text input drew its own. */
-.asys-quickadd__field:focus-within {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.asys-quickadd__input {
-  flex: 1 1 auto;
-  min-width: 0;
-  margin: 0;
-  padding: var(--space-2) 0;
-  background: transparent;
-  color: var(--ink);
-  border: 0;
-  font-family: var(--font-sans);
-  font-size: var(--font-size-body);
-  line-height: var(--line-height-body);
-  font-weight: 400;
-  /* One line that scrolls sideways under the caret, as in a text input. */
-  white-space: pre;
-  overflow: hidden;
-  resize: none;
-}
-
-.asys-quickadd__input:focus-visible {
-  outline: none;
 }
 
 /* The root's overflow-wrap would let a squeezed button break its label mid-word, so the input gives way instead. */
 .asys-quickadd__row > .asys-button {
   flex: none;
-}
-
-.asys-quickadd__input::placeholder {
-  color: var(--ink-muted);
-  opacity: 1;
 }
 
 .asys-quickadd__hint {

@@ -28,7 +28,8 @@ const setup = async (estimateMinutes = 30, busy = false) => {
   await fixture.whenStable();
 
   const root = (): HTMLElement => fixture.nativeElement;
-  const input = (): HTMLInputElement => must(root().querySelector('input.asys-field__input'));
+  const input = (): HTMLTextAreaElement =>
+    must(root().querySelector<HTMLTextAreaElement>('textarea.asys-field__line'));
   const form = (): HTMLFormElement => must(root().querySelector('form.asys-progress'));
   const error = (): HTMLElement | null => root().querySelector('.asys-field__error');
   const buttons = (): HTMLButtonElement[] => Array.from(root().querySelectorAll('button'));
@@ -52,16 +53,51 @@ describe('LogProgressForm', () => {
     document.body.replaceChildren();
   });
 
-  it('labels the field and gives it a text input with a numeric keyboard', async () => {
+  // A one-row textarea, because Chrome on Android shows its autofill bar on every text input.
+  it('labels the field and makes it a one-row textarea with a numeric keyboard', async () => {
     const { root, input } = await setup();
     const label = must(root().querySelector('label.asys-field__label'));
 
     expect(label.textContent?.trim()).toBe('Time still needed');
     expect(label.getAttribute('for')).toBe(input().id);
     expect(input().id).not.toBe('');
-    expect(input().type).toBe('text');
+    expect(input().rows).toBe(1);
+    expect(input().parentElement?.classList.contains('asys-field__box')).toBe(true);
     expect(input().getAttribute('inputmode')).toBe('numeric');
     expect(input().getAttribute('autocomplete')).toBe('off');
+  });
+
+  it('saves on Enter through Save, inserting no line break', async () => {
+    const { fixture, input, type, save } = await setup(30);
+    const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+
+    await type('20');
+    input().dispatchEvent(enter);
+    await fixture.whenStable();
+
+    expect(enter.defaultPrevented).toBe(true);
+    expect(save).toHaveBeenCalledWith(20);
+  });
+
+  it('leaves typing and Escape alone', async () => {
+    const { input } = await setup();
+    const keys = ['4', 'Escape'].map(
+      (key) => new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
+    );
+
+    for (const key of keys) {
+      input().dispatchEvent(key);
+    }
+
+    expect(keys.map((key) => key.defaultPrevented)).toEqual([false, false]);
+  });
+
+  it('turns a pasted line break into a space', async () => {
+    const { input, type } = await setup();
+
+    await type('2\n0');
+
+    expect(input().value).toBe('2 0');
   });
 
   it('shows a hint with the stored Estimate and no error at first', async () => {

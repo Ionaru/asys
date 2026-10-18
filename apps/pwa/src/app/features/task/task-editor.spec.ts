@@ -186,7 +186,9 @@ const saveProgress = async (
   settle: () => Promise<void>,
   minutes: string,
 ): Promise<void> => {
-  const input = must(dialog().querySelector<HTMLInputElement>('asys-log-progress-form input'));
+  const input = must(
+    dialog().querySelector<HTMLTextAreaElement>('asys-log-progress-form textarea'),
+  );
 
   input.value = minutes;
   input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -1134,7 +1136,7 @@ describe('TaskEditor', () => {
 
       await click(root().querySelector('.asys-estimate__other-toggle'));
 
-      const other = must(root().querySelector<HTMLInputElement>('asys-estimate-field input'));
+      const other = must(root().querySelector<HTMLTextAreaElement>('asys-estimate-field textarea'));
 
       await typeInto(other, '');
       await changeOn(other);
@@ -1479,7 +1481,7 @@ describe('TaskEditor', () => {
 
       await click(root().querySelector('.asys-estimate__other-toggle'));
 
-      const other = must(root().querySelector<HTMLInputElement>('asys-estimate-field input'));
+      const other = must(root().querySelector<HTMLTextAreaElement>('asys-estimate-field textarea'));
 
       await typeInto(other, 'abc');
       await changeOn(other);
@@ -2118,7 +2120,7 @@ describe('TaskEditor', () => {
 
       await click(footerButton('Log progress'));
 
-      const input = must(dialog('Log progress').querySelector<HTMLInputElement>('input'));
+      const input = must(dialog('Log progress').querySelector<HTMLTextAreaElement>('textarea'));
 
       input.value = '15';
       input.dispatchEvent(new Event('input', { bubbles: true }));

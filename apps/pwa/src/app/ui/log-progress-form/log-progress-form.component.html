@@ -1,16 +1,21 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
 <form class="asys-progress" (submit)="submit($event)" (keydown.escape)="cancel.emit()">
   <label class="asys-field__label" [for]="inputId">Time still needed</label>
-  <input
-    #control
-    class="asys-field__input"
-    type="text"
-    inputmode="numeric"
-    autocomplete="off"
-    [id]="inputId"
-    [attr.aria-invalid]="error() ? 'true' : null"
-    [attr.aria-describedby]="messageId"
-  />
+  <div class="asys-field__input asys-field__box" (mousedown)="pressBox($event)">
+    <textarea
+      #control
+      class="asys-field__line"
+      rows="1"
+      inputmode="numeric"
+      autocomplete="off"
+      [id]="inputId"
+      [attr.aria-invalid]="error() ? 'true' : null"
+      [attr.aria-describedby]="messageId"
+      (input)="flattenLines(control)"
+      (keydown)="enterAsInput($event)"
+      (beforeinput)="enterAsInput($event)"
+    ></textarea>
+  </div>
   @if (error()) {
     <p asys-field-error [id]="messageId">
       Use whole minutes from 1 to {{ estimateMinutes() - 1 }}.
