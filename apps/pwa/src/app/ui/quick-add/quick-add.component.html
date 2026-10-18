@@ -33,18 +33,19 @@
   }
   <div class="asys-quickadd__row">
     <label class="asys-visually-hidden" [for]="inputId">Capture a Task</label>
-    <div class="asys-quickadd__field" (mousedown)="fieldMousedown($event)">
+    <div class="asys-quickadd__field asys-field__box" (mousedown)="pressBox($event)">
       <textarea
-        class="asys-quickadd__input"
+        #field
+        class="asys-quickadd__input asys-field__line"
         rows="1"
         placeholder="Capture a Task"
         autocomplete="off"
         enterkeyhint="send"
         [id]="inputId"
         [value]="value()"
-        (input)="fieldInput($event)"
-        (beforeinput)="fieldBeforeInput($any($event))"
-        (keydown)="fieldKeydown($event)"
+        (input)="value.set(flattenLines(field))"
+        (keydown)="enterAsInput($event)"
+        (beforeinput)="enterAsInput($event)"
       ></textarea>
     </div>
     <button

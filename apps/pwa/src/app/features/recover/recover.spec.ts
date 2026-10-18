@@ -90,6 +90,13 @@ describe('Recover', () => {
       expect(root().textContent).toContain('One of the codes you saved when you signed up.');
     });
 
+    it('keeps a text input, so a password manager that holds the code can fill it', async () => {
+      const { input } = await setup();
+
+      expect(input().tagName).toBe('INPUT');
+      expect(input().type).toBe('text');
+    });
+
     it('turns off autocomplete, spellcheck and auto-capitalisation on the input', async () => {
       const { input } = await setup();
 

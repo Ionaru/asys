@@ -88,7 +88,7 @@ const setup = async (url: string) => {
     await settle();
   };
 
-  const input = (): HTMLInputElement => root().querySelector('input') as HTMLInputElement;
+  const input = (): HTMLTextAreaElement => root().querySelector('textarea') as HTMLTextAreaElement;
   const addButton = (): HTMLButtonElement =>
     Array.from(root().querySelectorAll<HTMLButtonElement>('button')).find(
       (b) => b.textContent?.trim() === 'Add',

@@ -14,6 +14,7 @@ import { CommandTag, formatMinutes, type LogProgress, TaskStatus } from '@asys/d
 
 import { Button, ButtonVariant } from '../button/button';
 import { FieldError } from '../field-error/field-error';
+import { enterAsInput, flattenLines, pressBox } from '../single-line/single-line';
 
 let nextId = 0;
 
@@ -52,6 +53,12 @@ export class LogProgressForm {
 
   protected readonly messageId = `asys-progress-message-${this.#uid}`;
 
+  protected readonly enterAsInput = enterAsInput;
+
+  protected readonly flattenLines = flattenLines;
+
+  protected readonly pressBox = pressBox;
+
   protected readonly error = signal(false);
 
   /** The stored Estimate, at least 2. */
@@ -65,7 +72,7 @@ export class LogProgressForm {
 
   constructor() {
     afterNextRender(
-      () => this.#host.nativeElement.querySelector<HTMLInputElement>('input')?.focus(),
+      () => this.#host.nativeElement.querySelector<HTMLTextAreaElement>('textarea')?.focus(),
       { injector: this.#injector },
     );
   }
@@ -80,7 +87,7 @@ export class LogProgressForm {
       return;
     }
     const text = (
-      this.#host.nativeElement.querySelector<HTMLInputElement>('input')?.value ?? ''
+      this.#host.nativeElement.querySelector<HTMLTextAreaElement>('textarea')?.value ?? ''
     ).trim();
     const minutes = WHOLE_MINUTES.test(text) ? Number(text) : Number.NaN;
     if (!Number.isInteger(minutes) || minutes < 1 || minutes > this.estimateMinutes() - 1) {

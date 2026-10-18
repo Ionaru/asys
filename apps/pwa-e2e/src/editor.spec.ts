@@ -117,6 +117,39 @@ test('Due, its time and the Estimate are saved and change the Now reason', async
   ).toHaveAttribute('aria-pressed', 'true');
 });
 
+// The one-line fields are textareas, which keep Chrome's autofill bar off the Android keyboard, so they handle Enter
+// themselves and must leave Escape to the sheet.
+test('Enter saves Other minutes, and Escape in a text field closes its sheet', async ({ page }) => {
+  const taskId = await seedTask(page, {
+    title: 'Alpha task',
+    important: false,
+    estimateMinutes: 30,
+  });
+  await page.goto(`/tasks/${taskId}`);
+  await expect(editorTitle(page)).toHaveValue('Alpha task');
+
+  await page
+    .getByRole('group', { name: 'Estimate' })
+    .getByRole('button', { name: 'Other', exact: true })
+    .click();
+  const minutes = page.getByLabel('Minutes');
+  await minutes.fill('40');
+  await minutes.press('Enter');
+  await expect(saved(page)).toBeVisible();
+  await expect(minutes).toHaveValue('40');
+  await expect(minutes).toBeFocused();
+
+  await page.getByRole('button', { name: /^Blocked by/ }).click();
+  const find = sheet(page, 'Blocked by').getByLabel('Find a Task');
+  await find.fill('Nothing like this');
+  await expect(find).toHaveValue('Nothing like this');
+  await find.press('Escape');
+  await expect(sheet(page, 'Blocked by')).toBeHidden();
+
+  await page.reload();
+  await expect(page.getByLabel('Minutes')).toHaveValue('40');
+});
+
 test('A new Title is saved when the field loses focus', async ({ page }) => {
   const taskId = await seedTask(page, {
     title: 'Alpha task',
@@ -303,7 +336,7 @@ test('Log progress on the TopPick and in the editor lowers the Estimate', async 
   await page.getByRole('button', { name: 'Log progress', exact: true }).click();
   const log = sheet(page, 'Log progress');
   await log.getByLabel('Time still needed').fill('15');
-  await log.getByRole('button', { name: 'Save', exact: true }).click();
+  await log.getByLabel('Time still needed').press('Enter');
   await expect(log).toBeHidden();
   await expect(
     page.getByRole('status').filter({ hasText: 'Estimate is now 15 min.' }),

@@ -18,6 +18,7 @@ import { TextField } from './text-field';
       [touched]="touched()"
       [disabled]="disabled()"
       [multiline]="multiline()"
+      [autofill]="autofill()"
       [autocomplete]="autocomplete()"
       [spellcheck]="spellcheck()"
       [autocapitalize]="autocapitalize()"
@@ -42,6 +43,8 @@ class Host {
 
   readonly multiline = signal(false);
 
+  readonly autofill = signal(false);
+
   readonly autocomplete = signal<string | undefined>(undefined);
 
   readonly spellcheck = signal(true);
@@ -59,6 +62,28 @@ class Host {
   `,
 })
 class Pair {}
+
+@Component({
+  imports: [TextField],
+  template: `
+    <form (submit)="submit($event)">
+      <asys-text-field label="Title" [(value)]="value" />
+      <button type="submit" [disabled]="busy()">Add</button>
+    </form>
+  `,
+})
+class SubmitHost {
+  readonly value = signal('');
+
+  readonly busy = signal(false);
+
+  submitted = 0;
+
+  submit(event: Event): void {
+    event.preventDefault();
+    this.submitted++;
+  }
+}
 
 @Component({
   imports: [TextField, FormField],
@@ -80,10 +105,8 @@ const setup = async () => {
 
   const host = fixture.componentInstance;
   const root = (): HTMLElement => fixture.nativeElement;
-  const control = (): HTMLInputElement | HTMLTextAreaElement =>
-    root().querySelector<HTMLInputElement | HTMLTextAreaElement>(
-      '.asys-field__input',
-    ) as HTMLInputElement;
+  const control = (): HTMLTextAreaElement =>
+    root().querySelector<HTMLTextAreaElement>('textarea, input') as HTMLTextAreaElement;
 
   return { fixture, host, root, control };
 };
@@ -99,8 +122,6 @@ describe('TextField', () => {
     expect(label.textContent?.trim()).toBe('Name');
     expect(control().id).not.toBe('');
     expect(label.getAttribute('for')).toBe(control().id);
-    expect(control().tagName).toBe('INPUT');
-    expect(control().getAttribute('type')).toBe('text');
   });
 
   it('shows the value in the control', async () => {
@@ -292,8 +313,8 @@ describe('TextField', () => {
       const fixture = TestBed.createComponent(Pair);
       await fixture.whenStable();
 
-      const inputs: HTMLInputElement[] = Array.from(
-        fixture.nativeElement.querySelectorAll('input'),
+      const inputs: HTMLTextAreaElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('textarea'),
       );
       const hint = fixture.nativeElement.querySelector('p.asys-field__hint') as HTMLElement;
       const second = inputs[1];
@@ -304,6 +325,158 @@ describe('TextField', () => {
       expect(hint.id).not.toBe(inputs[0].id);
       expect(hint.id).not.toBe(second.id);
       expect(document.querySelectorAll(`[id="${hint.id}"]`).length).toBeLessThanOrEqual(1);
+    });
+  });
+
+  describe('single line', () => {
+    const enter = (init: KeyboardEventInit = {}): KeyboardEvent =>
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, ...init });
+
+    const setupSubmit = async () => {
+      const fixture = TestBed.createComponent(SubmitHost);
+      await fixture.whenStable();
+
+      const field = (): HTMLTextAreaElement => fixture.nativeElement.querySelector('textarea');
+
+      return { fixture, host: fixture.componentInstance, field };
+    };
+
+    // Chrome on Android shows its autofill bar on every text input and never on a textarea.
+    it('is a one-row textarea inside a box that draws the field', async () => {
+      const { root, control } = await setup();
+
+      const box = control().parentElement;
+
+      expect(control().tagName).toBe('TEXTAREA');
+      expect(control().rows).toBe(1);
+      expect(control().classList.contains('asys-field__line')).toBe(true);
+      expect(box?.classList.contains('asys-field__input')).toBe(true);
+      expect(box?.classList.contains('asys-field__box')).toBe(true);
+      expect(root().querySelector('input')).toBeNull();
+    });
+
+    it('is a text input when autofill is set', async () => {
+      const { fixture, host, root, control } = await setup();
+
+      host.autofill.set(true);
+      host.value.set('Ada');
+      await fixture.whenStable();
+
+      expect(control().tagName).toBe('INPUT');
+      expect(control().getAttribute('type')).toBe('text');
+      expect(control().classList.contains('asys-field__input')).toBe(true);
+      expect(control().value).toBe('Ada');
+      expect(root().querySelector('textarea')).toBeNull();
+      expect(root().querySelector('.asys-field__box')).toBeNull();
+    });
+
+    it('stays a textarea that may break lines when multiline, whatever autofill says', async () => {
+      const { fixture, host, control } = await setup();
+      const event = enter();
+
+      host.multiline.set(true);
+      host.autofill.set(true);
+      await fixture.whenStable();
+      control().dispatchEvent(event);
+
+      expect(control().classList.contains('asys-field__input')).toBe(true);
+      expect(event.defaultPrevented).toBe(false);
+    });
+
+    it.each([
+      ['Call\nMarit', 'Call Marit'],
+      ['Call\r\nMarit', 'Call Marit'],
+    ])('turns pasted %j into %j in the control and the value', async (pasted, expected) => {
+      const { fixture, host, control } = await setup();
+
+      control().value = pasted;
+      control().dispatchEvent(new Event('input'));
+      await fixture.whenStable();
+
+      expect(control().value).toBe(expected);
+      expect(host.value()).toBe(expected);
+    });
+
+    it('submits its form on Enter through the submit button, and inserts no line break', async () => {
+      const { fixture, host, field } = await setupSubmit();
+      const event = enter();
+
+      field().dispatchEvent(event);
+      await fixture.whenStable();
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(host.submitted).toBe(1);
+    });
+
+    it('submits on a beforeinput line break from a phone keyboard', async () => {
+      const { fixture, host, field } = await setupSubmit();
+      const event = new InputEvent('beforeinput', {
+        inputType: 'insertLineBreak',
+        bubbles: true,
+        cancelable: true,
+      });
+
+      field().dispatchEvent(event);
+      await fixture.whenStable();
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(host.submitted).toBe(1);
+    });
+
+    it('submits nothing on Enter while the submit button is disabled', async () => {
+      const { fixture, host, field } = await setupSubmit();
+      const event = enter();
+
+      host.busy.set(true);
+      await fixture.whenStable();
+      field().dispatchEvent(event);
+      await fixture.whenStable();
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(host.submitted).toBe(0);
+    });
+
+    it('leaves an Enter that ends a composition alone', async () => {
+      const { fixture, host, field } = await setupSubmit();
+      const event = enter({ isComposing: true });
+
+      field().dispatchEvent(event);
+      await fixture.whenStable();
+
+      expect(event.defaultPrevented).toBe(false);
+      expect(host.submitted).toBe(0);
+    });
+
+    // Angular prevents the default of an event whose handler returns false, which would swallow typing and Escape.
+    it('leaves typing, Escape and other keys alone', async () => {
+      const { control } = await setup();
+      const events = [
+        new KeyboardEvent('keydown', { key: 'a', bubbles: true, cancelable: true }),
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+        new InputEvent('beforeinput', {
+          inputType: 'insertText',
+          data: 'a',
+          bubbles: true,
+          cancelable: true,
+        }),
+      ];
+
+      for (const event of events) {
+        control().dispatchEvent(event);
+      }
+
+      expect(events.map((event) => event.defaultPrevented)).toEqual([false, false, false]);
+    });
+
+    it('focuses the control when the box around it is pressed', async () => {
+      const { fixture, control } = await setup();
+      const event = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+
+      document.body.appendChild(fixture.nativeElement);
+      control().parentElement?.dispatchEvent(event);
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(document.activeElement).toBe(control());
     });
   });
 
@@ -411,7 +584,7 @@ describe('TextField', () => {
       const fixture = TestBed.createComponent(FormHost);
       await fixture.whenStable();
 
-      const input = (): HTMLInputElement => fixture.nativeElement.querySelector('input');
+      const input = (): HTMLTextAreaElement => fixture.nativeElement.querySelector('textarea');
       const error = (): HTMLElement | null =>
         fixture.nativeElement.querySelector('p.asys-field__error');
 

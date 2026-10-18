@@ -149,8 +149,8 @@
       [attr.aria-invalid]="saver.needsTitle() ? 'true' : null"
       [attr.aria-describedby]="saver.needsTitle() ? titleErrorId : null"
       (input)="titleInput($event)"
-      (beforeinput)="titleBeforeInput($any($event))"
-      (keydown)="titleKeydown($event)"
+      (beforeinput)="titleBreak($event)"
+      (keydown)="titleBreak($event)"
       (change)="saver.commit()"
     ></textarea>
     @if (saver.needsTitle()) {

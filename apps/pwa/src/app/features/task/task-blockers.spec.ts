@@ -183,11 +183,11 @@ const setup = async (options: SetupOptions = {}) => {
     Array.from(dialog().querySelectorAll<HTMLButtonElement>('button'))
       .map((b) => text(b))
       .filter((t) => TITLES.includes(t));
-  const findInput = (): HTMLInputElement =>
+  const findInput = (): HTMLTextAreaElement =>
     must(
       Array.from(dialog().querySelectorAll<HTMLElement>('asys-text-field'))
         .find((f) => text(f.querySelector('label')) === 'Find a Task')
-        ?.querySelector<HTMLInputElement>('input'),
+        ?.querySelector<HTMLTextAreaElement>('textarea'),
     );
   const type = async (value: string): Promise<void> => {
     const el = findInput();

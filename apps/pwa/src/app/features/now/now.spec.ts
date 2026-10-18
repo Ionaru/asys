@@ -390,8 +390,8 @@ const setup = async (options: SetupOptions = {}) => {
   const article = (): HTMLElement => must(root().querySelector('.asys-top-pick'));
   const internals = (): NowInternals => fixture.componentInstance as unknown as NowInternals;
   const form = (): HTMLFormElement | null => root().querySelector('asys-log-progress-form form');
-  const formInput = (): HTMLInputElement | null =>
-    root().querySelector('asys-log-progress-form input');
+  const formInput = (): HTMLTextAreaElement | null =>
+    root().querySelector('asys-log-progress-form textarea');
   const formButton = (name: string): HTMLButtonElement | undefined =>
     Array.from(root().querySelectorAll('asys-log-progress-form button')).find(
       (b) => (b.textContent ?? '').trim() === name,
