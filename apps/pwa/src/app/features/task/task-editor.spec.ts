@@ -941,7 +941,65 @@ describe('TaskEditor', () => {
     });
   });
 
+  describe('the Title and Notes fields', () => {
+    it('draws the Title as a one-row title input with no box and no wrap', async () => {
+      const { titleField } = await setup();
+      const title = titleField();
+
+      expect(title.classList.contains('asys-input')).toBe(true);
+      expect(title.classList.contains('asys-input--title')).toBe(true);
+      expect(title.classList.contains('task-editor__title')).toBe(true);
+      expect(title.rows).toBe(1);
+      expect(title.hasAttribute('wrap')).toBe(false);
+      expect(title.classList.contains('asys-input-box__control')).toBe(false);
+      expect(title.closest('asys-input-box')).toBeNull();
+    });
+
+    it('keeps the Title attributes', async () => {
+      const { titleField } = await setup();
+
+      expect(titleField().getAttribute('aria-label')).toBe('Title');
+      expect(titleField().getAttribute('enterkeyhint')).toBe('done');
+      expect(titleField().getAttribute('data-task-id')).toBe('t1');
+    });
+
+    it('draws the Notes as a growing input', async () => {
+      const { notesField } = await setup({
+        state: domainState([{ ...CALL, notes: 'About the lease' }]),
+      });
+      const notes = must(notesField());
+
+      expect(notes.classList.contains('asys-input')).toBe(true);
+      expect(notes.classList.contains('asys-input--grow')).toBe(true);
+      expect(notes.classList.contains('task-editor__notes')).toBe(true);
+      expect(notes.classList.contains('asys-input--title')).toBe(false);
+    });
+  });
+
   describe('the Title keys', () => {
+    it('Enter commits and never submits a form around the editor', async () => {
+      const { fixture, send, typeTitle, titleField, settle } = await setup();
+      const form = document.createElement('form');
+      const submit = document.createElement('button');
+      const submits = vi.fn((event: Event) => event.preventDefault());
+      const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+
+      submit.type = 'submit';
+      form.addEventListener('submit', submits);
+      form.append(fixture.nativeElement, submit);
+      document.body.appendChild(form);
+      onTestFinished(() => form.remove());
+      await typeTitle('Call Marit back');
+      titleField().dispatchEvent(enter);
+      await settle();
+
+      expect(titleField().form).toBe(form);
+      expect(enter.defaultPrevented).toBe(true);
+      expect(submits).not.toHaveBeenCalled();
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(sent(send, 0)).toEqual(editTask('t1', { title: 'Call Marit back' }));
+    });
+
     it('typing alone sends nothing', async () => {
       const { send, typeTitle, titleField } = await setup();
 

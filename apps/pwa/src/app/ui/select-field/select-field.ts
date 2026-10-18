@@ -4,6 +4,8 @@ import type { FormValueControl } from '@angular/forms/signals';
 
 import { FieldControl } from '../field-control/field-control';
 import { FieldError } from '../field-error/field-error';
+import { Input } from '../input/input';
+import { Label } from '../label/label';
 
 let nextId = 0;
 
@@ -16,7 +18,7 @@ export interface SelectOption {
 /** A select, usable as a Signal Forms custom control. */
 @Component({
   selector: 'asys-select-field',
-  imports: [FieldError],
+  imports: [FieldError, Input, Label],
   encapsulation: ViewEncapsulation.None,
   template: `
     <div
@@ -24,10 +26,10 @@ export interface SelectOption {
       [class.asys-field--error]="showError()"
       [class.asys-field--disabled]="disabled()"
     >
-      <label class="asys-field__label" [for]="controlId">{{ label() }}</label>
+      <label asys-label [for]="controlId">{{ label() }}</label>
       <select
         #control
-        class="asys-field__input"
+        asys-input
         [id]="controlId"
         [disabled]="disabled()"
         [attr.aria-invalid]="showError() ? 'true' : null"

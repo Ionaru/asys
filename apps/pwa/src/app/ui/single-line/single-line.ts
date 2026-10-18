@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: EUPL-1.2
+import { Directive, ElementRef, inject, input, output } from '@angular/core';
 
-// A one-line field is a one-row textarea, not a text input: Chrome on Android shows its passwords, cards and addresses
-// bar above the keyboard on every text input, whatever its autocomplete, and never on a textarea. These helpers give
-// such a textarea a text input's behaviour. Its markup is a `.asys-field__box` around a `textarea.asys-field__line`
-// with `rows="1"`: a textarea scrolls its text into its own padding, so the box draws the border and padding.
+import { InputBox } from '../input-box/input-box';
 
 /** The input types that HTML's implicit submission counts: with one of these, a form without a submit button stays. */
 const BLOCKS_IMPLICIT_SUBMISSION = new Set([
@@ -77,22 +75,52 @@ export const submitImplicitly = (field: HTMLTextAreaElement): void => {
 };
 
 /**
- * Handles a keydown or beforeinput as a text input would: a line break is never inserted, and Enter submits the form
- * implicitly. It returns nothing, because Angular prevents the default of an event whose template handler returns false.
+ * A one-line field is a one-row textarea, not a text input: Chrome on Android shows its passwords, cards and addresses
+ * bar above the keyboard on every text input, whatever its autocomplete, and never on a textarea. This directive gives
+ * such a textarea a text input's behaviour: a line break is never inserted, and Enter submits the form implicitly.
+ * Inside an `asys-input-box` the textarea is the box's borderless control, because a textarea scrolls its text into its
+ * own padding, so the box draws the border and padding.
  */
-export const enterAsInput = (event: Event): void => {
-  if (breaksLine(event)) {
-    event.preventDefault();
-    submitImplicitly(event.target as HTMLTextAreaElement);
-  }
-};
+@Directive({
+  selector: 'textarea[asys-single-line]',
+  host: {
+    rows: '1',
+    '[class.asys-input-box__control]': 'box !== null',
+    '[attr.wrap]': 'box === null ? null : "off"',
+    '(input)': 'flatten()',
+    '(keydown)': 'breakLine($event)',
+    '(beforeinput)': 'breakLine($event)',
+  },
+})
+export class SingleLine {
+  readonly #field = inject<ElementRef<HTMLTextAreaElement>>(ElementRef);
 
-/** A press on the box around the line, outside the line itself, focuses the line and keeps the keyboard up. */
-export const pressBox = (event: MouseEvent): void => {
-  const box = event.currentTarget;
+  protected readonly box = inject(InputBox, { optional: true });
 
-  if (event.target === box && box instanceof HTMLElement) {
-    event.preventDefault();
-    box.querySelector('textarea')?.focus();
+  /** Whether Enter submits the form implicitly. A field that handles Enter itself turns it off. */
+  readonly submitOnEnter = input<boolean>(true);
+
+  /** Emits the text on every input, once its line breaks have become spaces. */
+  readonly lineChange = output<string>();
+
+  /** Emits when Enter, or the line break of a phone keyboard, was prevented, before any submission. */
+  readonly lineBreak = output<void>();
+
+  protected flatten(): void {
+    this.lineChange.emit(flattenLines(this.#field.nativeElement));
   }
-};
+
+  /** It returns nothing, because Angular prevents the default of an event whose handler returns false. */
+  protected breakLine(event: Event): void {
+    if (!breaksLine(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    this.lineBreak.emit();
+
+    if (this.submitOnEnter()) {
+      submitImplicitly(this.#field.nativeElement);
+    }
+  }
+}

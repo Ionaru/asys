@@ -2,7 +2,7 @@
 @if (layout() === Layout.Ruler) {
   <div class="asys-estimate asys-estimate--ruler" role="group" [attr.aria-labelledby]="legendId">
     <div class="asys-estimate__head">
-      <span class="asys-estimate__legend" [id]="legendId">{{ legend() }}</span>
+      <span asys-label class="asys-estimate__legend" [id]="legendId">{{ legend() }}</span>
       <button
         asys-button
         type="button"
@@ -38,7 +38,7 @@
   </div>
 } @else {
   <fieldset class="asys-fieldset-reset asys-estimate">
-    <legend class="asys-estimate__legend">{{ legend() }}</legend>
+    <legend asys-label class="asys-estimate__legend">{{ legend() }}</legend>
     <div class="asys-estimate__chips">
       @for (chip of chips; track chip.minutes) {
         <button
@@ -72,29 +72,23 @@
 <ng-template #extras>
   @if (otherShown()) {
     <div class="asys-field asys-estimate__other" [class.asys-field--error]="showError()">
-      <label class="asys-field__label" [for]="otherId">Minutes</label>
-      <div class="asys-field__input asys-field__box" (mousedown)="pressBox($event)">
+      <label asys-label [for]="otherId">Minutes</label>
+      <asys-input-box>
         <textarea
           #otherInput
-          class="asys-field__line"
-          rows="1"
+          asys-single-line
           inputmode="numeric"
           [id]="otherId"
           [value]="otherText()"
           [disabled]="disabled()"
           [attr.aria-invalid]="showError() ? 'true' : null"
           [attr.aria-describedby]="messageId()"
-          (input)="
-            layout() === Layout.Ruler
-              ? keepTyped(flattenLines(otherInput))
-              : typeOther(flattenLines(otherInput))
-          "
+          (lineChange)="layout() === Layout.Ruler ? keepTyped($event) : typeOther($event)"
           (change)="layout() === Layout.Ruler && typeOther(otherInput.value)"
-          (keydown)="otherEnter($event)"
-          (beforeinput)="otherEnter($event)"
+          (lineBreak)="layout() === Layout.Ruler && typeOther(otherInput.value)"
           (blur)="touch.emit()"
         ></textarea>
-      </div>
+      </asys-input-box>
     </div>
   }
   @if (showError()) {

@@ -22,6 +22,7 @@ import { TextField } from './text-field';
       [autocomplete]="autocomplete()"
       [spellcheck]="spellcheck()"
       [autocapitalize]="autocapitalize()"
+      [inputmode]="inputmode()"
       (touch)="touches.set(touches() + 1)"
     />
   `,
@@ -50,6 +51,8 @@ class Host {
   readonly spellcheck = signal(true);
 
   readonly autocapitalize = signal<string | undefined>(undefined);
+
+  readonly inputmode = signal<string | undefined>(undefined);
 
   readonly touches = signal(0);
 }
@@ -115,9 +118,7 @@ describe('TextField', () => {
   it('renders the label for the control id', async () => {
     const { root, control } = await setup();
 
-    const label = root().querySelector(
-      'div.asys-field > label.asys-field__label',
-    ) as HTMLLabelElement;
+    const label = root().querySelector('div.asys-field > label.asys-label') as HTMLLabelElement;
 
     expect(label.textContent?.trim()).toBe('Name');
     expect(control().id).not.toBe('');
@@ -342,16 +343,18 @@ describe('TextField', () => {
     };
 
     // Chrome on Android shows its autofill bar on every text input and never on a textarea.
-    it('is a one-row textarea inside a box that draws the field', async () => {
+    it('is a one-row textarea inside an input box that draws the field', async () => {
       const { root, control } = await setup();
 
       const box = control().parentElement;
 
       expect(control().tagName).toBe('TEXTAREA');
       expect(control().rows).toBe(1);
-      expect(control().classList.contains('asys-field__line')).toBe(true);
-      expect(box?.classList.contains('asys-field__input')).toBe(true);
-      expect(box?.classList.contains('asys-field__box')).toBe(true);
+      expect(control().getAttribute('wrap')).toBe('off');
+      expect(control().classList.contains('asys-input-box__control')).toBe(true);
+      expect(box?.tagName).toBe('ASYS-INPUT-BOX');
+      expect(box?.classList.contains('asys-input-box')).toBe(true);
+      expect(box?.classList.contains('asys-input-box--pill')).toBe(false);
       expect(root().querySelector('input')).toBeNull();
     });
 
@@ -364,10 +367,10 @@ describe('TextField', () => {
 
       expect(control().tagName).toBe('INPUT');
       expect(control().getAttribute('type')).toBe('text');
-      expect(control().classList.contains('asys-field__input')).toBe(true);
+      expect(control().classList.contains('asys-input')).toBe(true);
       expect(control().value).toBe('Ada');
       expect(root().querySelector('textarea')).toBeNull();
-      expect(root().querySelector('.asys-field__box')).toBeNull();
+      expect(root().querySelector('asys-input-box')).toBeNull();
     });
 
     it('stays a textarea that may break lines when multiline, whatever autofill says', async () => {
@@ -379,7 +382,7 @@ describe('TextField', () => {
       await fixture.whenStable();
       control().dispatchEvent(event);
 
-      expect(control().classList.contains('asys-field__input')).toBe(true);
+      expect(control().classList.contains('asys-input')).toBe(true);
       expect(event.defaultPrevented).toBe(false);
     });
 
@@ -473,7 +476,7 @@ describe('TextField', () => {
       const event = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
 
       document.body.appendChild(fixture.nativeElement);
-      control().parentElement?.dispatchEvent(event);
+      (control().parentElement as HTMLElement).dispatchEvent(event);
 
       expect(event.defaultPrevented).toBe(true);
       expect(document.activeElement).toBe(control());
@@ -503,11 +506,11 @@ describe('TextField', () => {
       host.value.set('Line one');
       await fixture.whenStable();
 
-      const area = root().querySelector('textarea.asys-field__input') as HTMLTextAreaElement;
-      const label = root().querySelector('label.asys-field__label') as HTMLLabelElement;
+      const area = root().querySelector('textarea.asys-input') as HTMLTextAreaElement;
+      const label = root().querySelector('label.asys-label') as HTMLLabelElement;
 
       expect(area).not.toBeNull();
-      expect(root().querySelector('input.asys-field__input')).toBeNull();
+      expect(root().querySelector('input.asys-input')).toBeNull();
       expect(area.value).toBe('Line one');
       expect(label.getAttribute('for')).toBe(area.id);
 
@@ -529,6 +532,27 @@ describe('TextField', () => {
       expect(control().getAttribute('placeholder')).toBe('Your name');
       expect(control().getAttribute('autocomplete')).toBe('given-name');
       expect(control().getAttribute('autocapitalize')).toBe('words');
+    });
+
+    it.each([
+      ['single line', {}],
+      ['multiline', { multiline: true }],
+      ['autofill', { autofill: true }],
+    ])('renders inputmode on the %s control', async (_name, shape) => {
+      const { fixture, host, control } = await setup();
+
+      host.multiline.set('multiline' in shape);
+      host.autofill.set('autofill' in shape);
+      host.inputmode.set('numeric');
+      await fixture.whenStable();
+
+      expect(control().getAttribute('inputmode')).toBe('numeric');
+    });
+
+    it('omits inputmode when undefined', async () => {
+      const { control } = await setup();
+
+      expect(control().hasAttribute('inputmode')).toBe(false);
     });
 
     it('omits those attributes when undefined', async () => {

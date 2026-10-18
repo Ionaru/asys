@@ -70,7 +70,7 @@ const finders = (root: () => HTMLElement) => {
     chips().filter((b) => b.classList.contains('asys-estimate__chip--num'));
   const other = (): HTMLButtonElement => chips()[6];
   const otherInput = (): HTMLTextAreaElement | null =>
-    root().querySelector<HTMLTextAreaElement>('textarea.asys-field__line');
+    root().querySelector<HTMLTextAreaElement>('textarea.asys-input-box__control');
   const error = (): HTMLElement | null => root().querySelector('p.asys-field__error');
   const pressedMinutes = (): string[] =>
     numberChips()
@@ -106,6 +106,7 @@ describe('EstimateField', () => {
       expect(
         root().querySelector('fieldset > legend.asys-estimate__legend')?.textContent?.trim(),
       ).toBe('Estimate');
+      expect(root().querySelector('legend.asys-estimate__legend.asys-label')).not.toBeNull();
     });
 
     it('uses a custom legend', async () => {
@@ -199,8 +200,14 @@ describe('EstimateField', () => {
       expect(input).not.toBeNull();
       // A one-row textarea, because Chrome on Android shows its autofill bar on every text input.
       expect(input.rows).toBe(1);
-      expect(input.parentElement?.classList.contains('asys-field__box')).toBe(true);
+      expect(input.parentElement?.tagName).toBe('ASYS-INPUT-BOX');
+      expect(input.parentElement?.classList.contains('asys-input-box')).toBe(true);
       expect(input.getAttribute('inputmode')).toBe('numeric');
+      expect(input.closest('div.asys-field.asys-estimate__other > asys-input-box')).not.toBeNull();
+      expect(
+        input.closest('div.asys-estimate__other')?.querySelector(':scope > label.asys-label')
+          ?.textContent,
+      ).toContain('Minutes');
       expect(Array.from(input.labels ?? []).map((l) => l.textContent?.trim())).toEqual(['Minutes']);
       expect(other().getAttribute('aria-pressed')).toBe('true');
       expect(document.activeElement).toBe(input);
@@ -652,7 +659,7 @@ const setupRuler = async () => {
   const toggle = (): HTMLButtonElement =>
     root().querySelector('button.asys-estimate__other-toggle') as HTMLButtonElement;
   const otherInput = (): HTMLTextAreaElement | null =>
-    root().querySelector<HTMLTextAreaElement>('textarea.asys-field__line');
+    root().querySelector<HTMLTextAreaElement>('textarea.asys-input-box__control');
   const error = (): HTMLElement | null => root().querySelector('p.asys-field__error');
   const typeEvent = async (text: string, event: 'input' | 'change') => {
     const input = otherInput() as HTMLTextAreaElement;
@@ -673,6 +680,8 @@ describe('EstimateField Ruler layout', () => {
     expect(root().querySelector('fieldset')).toBeNull();
     expect(root().querySelector('button.asys-estimate__chip')).toBeNull();
     expect(legend()?.textContent?.trim()).toBe('Estimate');
+    expect(legend()?.tagName).toBe('SPAN');
+    expect(legend()?.classList.contains('asys-label')).toBe(true);
     expect(legend()?.id).not.toBe('');
     expect(group().getAttribute('aria-labelledby')).toBe(legend()?.id);
   });

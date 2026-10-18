@@ -4,7 +4,10 @@ import type { FormValueControl } from '@angular/forms/signals';
 
 import { FieldControl } from '../field-control/field-control';
 import { FieldError } from '../field-error/field-error';
-import { enterAsInput, flattenLines, pressBox } from '../single-line/single-line';
+import { Input } from '../input/input';
+import { InputBox } from '../input-box/input-box';
+import { Label } from '../label/label';
+import { SingleLine } from '../single-line/single-line';
 
 let nextId = 0;
 
@@ -14,7 +17,7 @@ let nextId = 0;
  */
 @Component({
   selector: 'asys-text-field',
-  imports: [FieldError],
+  imports: [FieldError, Input, InputBox, Label, SingleLine],
   encapsulation: ViewEncapsulation.None,
   templateUrl: './text-field.component.html',
 })
@@ -39,15 +42,11 @@ export class TextField extends FieldControl implements FormValueControl<string> 
 
   readonly autocapitalize = input<string | undefined>();
 
+  readonly inputmode = input<string | undefined>();
+
   protected readonly controlId = `asys-text-field-${nextId}`;
 
   protected override readonly messageParagraphId = `asys-text-field-${nextId++}-message`;
-
-  protected readonly enterAsInput = enterAsInput;
-
-  protected readonly flattenLines = flattenLines;
-
-  protected readonly pressBox = pressBox;
 
   private readonly control =
     viewChild<ElementRef<HTMLInputElement | HTMLTextAreaElement>>('control');

@@ -79,7 +79,7 @@ const setup = async () => {
   const host = fixture.componentInstance;
   const root = (): HTMLElement => fixture.nativeElement;
   const select = (): HTMLSelectElement =>
-    root().querySelector('select.asys-field__input') as HTMLSelectElement;
+    root().querySelector('select.asys-input') as HTMLSelectElement;
   const choose = async (value: string) => {
     select().value = value;
     select().dispatchEvent(new Event('change', { bubbles: true }));
@@ -93,9 +93,7 @@ describe('SelectField', () => {
   it('renders the label for the select id', async () => {
     const { root, select } = await setup();
 
-    const label = root().querySelector(
-      'div.asys-field > label.asys-field__label',
-    ) as HTMLLabelElement;
+    const label = root().querySelector('div.asys-field > label.asys-label') as HTMLLabelElement;
 
     expect(label.textContent?.trim()).toBe('Area');
     expect(select().id).not.toBe('');

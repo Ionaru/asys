@@ -4,17 +4,18 @@
   [class.asys-field--error]="showError()"
   [class.asys-field--disabled]="disabled()"
 >
-  <label class="asys-field__label" [for]="controlId">{{ label() }}</label>
+  <label asys-label [for]="controlId">{{ label() }}</label>
   @if (multiline()) {
     <textarea
       #control
-      class="asys-field__input"
+      asys-input
       [id]="controlId"
       [value]="value()"
       [disabled]="disabled()"
       [attr.placeholder]="placeholder()"
       [attr.autocomplete]="autocomplete()"
       [attr.autocapitalize]="autocapitalize()"
+      [attr.inputmode]="inputmode()"
       [attr.spellcheck]="spellcheck() ? null : 'false'"
       [attr.aria-invalid]="showError() ? 'true' : null"
       [attr.aria-describedby]="messageId()"
@@ -24,7 +25,7 @@
   } @else if (autofill()) {
     <input
       #control
-      class="asys-field__input"
+      asys-input
       type="text"
       [id]="controlId"
       [value]="value()"
@@ -32,6 +33,7 @@
       [attr.placeholder]="placeholder()"
       [attr.autocomplete]="autocomplete()"
       [attr.autocapitalize]="autocapitalize()"
+      [attr.inputmode]="inputmode()"
       [attr.spellcheck]="spellcheck() ? null : 'false'"
       [attr.aria-invalid]="showError() ? 'true' : null"
       [attr.aria-describedby]="messageId()"
@@ -39,26 +41,24 @@
       (blur)="touch.emit()"
     />
   } @else {
-    <div class="asys-field__input asys-field__box" (mousedown)="pressBox($event)">
+    <asys-input-box>
       <textarea
         #control
-        class="asys-field__line"
-        rows="1"
+        asys-single-line
         [id]="controlId"
         [value]="value()"
         [disabled]="disabled()"
         [attr.placeholder]="placeholder()"
         [attr.autocomplete]="autocomplete()"
         [attr.autocapitalize]="autocapitalize()"
+        [attr.inputmode]="inputmode()"
         [attr.spellcheck]="spellcheck() ? null : 'false'"
         [attr.aria-invalid]="showError() ? 'true' : null"
         [attr.aria-describedby]="messageId()"
-        (input)="value.set(flattenLines(control))"
-        (keydown)="enterAsInput($event)"
-        (beforeinput)="enterAsInput($event)"
+        (lineChange)="value.set($event)"
         (blur)="touch.emit()"
       ></textarea>
-    </div>
+    </asys-input-box>
   }
   @if (showError()) {
     <p asys-field-error [id]="messageParagraphId">{{ message() }}</p>

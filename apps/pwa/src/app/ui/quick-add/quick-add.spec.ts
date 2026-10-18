@@ -49,7 +49,7 @@ const setup = async () => {
 
   const q = <T extends HTMLElement>(selector: string): T | null =>
     fixture.nativeElement.querySelector(selector);
-  const input = () => must(q<HTMLTextAreaElement>('.asys-quickadd__input'));
+  const input = () => must(q<HTMLTextAreaElement>('.asys-capture-field textarea'));
   const button = (label: string): HTMLButtonElement | undefined =>
     (Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[]).find(
       (b) => b.textContent?.trim() === label,
@@ -86,9 +86,40 @@ describe('QuickAdd', () => {
     expect(input().rows).toBe(1);
     expect(input().placeholder).toBe('Capture a Task');
     expect(input().getAttribute('autocomplete')).toBe('off');
-    expect(q('.asys-quickadd__hint')?.textContent?.trim()).toBe('Goes to the Inbox until Triage');
+    expect(q('.asys-capture-field__hint')?.textContent?.trim()).toBe(
+      'Goes to the Inbox until Triage',
+    );
     expect(button('Add')?.type).toBe('submit');
     expect(button('Close')?.type).toBe('button');
+  });
+
+  it('draws the field through a capture field, with Close projected into its row after Add', async () => {
+    const { q, button } = await setup();
+
+    const row = must(q('form.asys-quickadd > asys-capture-field > .asys-capture-field__row'));
+    const buttons = Array.from(row.querySelectorAll('button')).map((b) => b.textContent?.trim());
+
+    expect(row.querySelector('asys-input-box.asys-input-box--pill > textarea')).not.toBeNull();
+    expect(buttons).toEqual(['Add', 'Close']);
+    expect(button('Close')?.parentElement).toBe(row);
+    expect(button('Close')?.classList.contains('asys-button--quiet')).toBe(true);
+    expect(button('Close')?.classList.contains('asys-button--small')).toBe(true);
+  });
+
+  it('carries none of the removed quick add or field class names', async () => {
+    const { fixture } = await setup();
+    const removed = [
+      'asys-quickadd__row',
+      'asys-quickadd__field',
+      'asys-quickadd__input',
+      'asys-quickadd__hint',
+      'asys-field__box',
+      'asys-field__line',
+    ];
+
+    for (const name of removed) {
+      expect(fixture.nativeElement.querySelector(`.${name}`), name).toBeNull();
+    }
   });
 
   it('moves focus to the input when first rendered', async () => {
@@ -139,7 +170,7 @@ describe('QuickAdd', () => {
     const event = new MouseEvent('mousedown', { cancelable: true, bubbles: true });
 
     button('Close')?.focus();
-    must(q('.asys-quickadd__field')).dispatchEvent(event);
+    must(q('.asys-quickadd .asys-input-box')).dispatchEvent(event);
 
     expect(event.defaultPrevented).toBe(true);
     expect(document.activeElement).toBe(input());
@@ -399,7 +430,7 @@ describe('QuickAdd', () => {
       await fixture.whenStable();
 
       const rendered = rows(q);
-      const inputRow = q('.asys-quickadd__row') as HTMLElement;
+      const inputRow = q('.asys-capture-field__row') as HTMLElement;
 
       expect(rendered).toHaveLength(3);
       expect(

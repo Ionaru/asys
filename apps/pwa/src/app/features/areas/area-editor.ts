@@ -35,6 +35,8 @@ import { outcomeMessage } from '../../core/data/outcome-message';
 import { Ids } from '../../core/platform/ids';
 import { Button, ButtonSize, ButtonVariant } from '../../ui/button/button';
 import { FieldError } from '../../ui/field-error/field-error';
+import { Input } from '../../ui/input/input';
+import { Label } from '../../ui/label/label';
 import { LoadState } from '../../ui/load-state/load-state';
 import { type SelectOption, SelectField } from '../../ui/select-field/select-field';
 import { SyncNote } from '../../ui/sync-note/sync-note';
@@ -218,7 +220,17 @@ const buildAreaPatch = (baseline: AreaDraft, draft: AreaDraft): AreaPatch => {
 /** Edits an Area's name, palette and Active hours per weekday, or creates a new Area. */
 @Component({
   selector: 'asys-area-editor',
-  imports: [Button, FieldError, LoadState, RouterLink, SelectField, SyncNote, TextField],
+  imports: [
+    Button,
+    FieldError,
+    Input,
+    Label,
+    LoadState,
+    RouterLink,
+    SelectField,
+    SyncNote,
+    TextField,
+  ],
   providers: [CommandAttempts],
   templateUrl: './area-editor.component.html',
   styleUrl: './area-editor.css',

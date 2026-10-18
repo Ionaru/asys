@@ -15,17 +15,17 @@
     <p class="area-editor__hint">An end of 00:00 means the end of the day.</p>
     @for (day of dayViews(); track day.index) {
       <fieldset class="asys-fieldset-reset area-editor__day">
-        <legend class="asys-field__label">{{ day.name }}</legend>
+        <legend asys-label>{{ day.name }}</legend>
         @for (row of day.rows; track $index; let rowIndex = $index) {
           <div class="area-editor__row">
             @for (time of edges; track time.edge) {
               <div class="area-editor__time">
-                <label class="asys-field__label" [for]="inputId(day.index, rowIndex, time.edge)">
+                <label asys-label [for]="inputId(day.index, rowIndex, time.edge)">
                   {{ time.label }}
                 </label>
                 <input
                   #timeInput
-                  class="asys-field__input"
+                  asys-input
                   type="time"
                   [id]="inputId(day.index, rowIndex, time.edge)"
                   [value]="row[time.edge]"

@@ -288,6 +288,13 @@ describe('DatePick', () => {
   });
 
   describe('Other date', () => {
+    it('draws the label and input with the shared field classes', async () => {
+      const { input } = await setup();
+
+      expect(input().classList.contains('asys-input')).toBe(true);
+      expect(input().labels?.[0]?.classList.contains('asys-label')).toBe(true);
+    });
+
     it('renders a labelled date input with today as its minimum', async () => {
       const { input } = await setup();
 

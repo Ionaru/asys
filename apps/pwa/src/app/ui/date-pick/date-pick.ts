@@ -4,6 +4,8 @@ import { addDays, formatDate, isLocalDate, isoWeekdayOf, type LocalDate } from '
 
 import { Button, ButtonVariant } from '../button/button';
 import { FieldError } from '../field-error/field-error';
+import { Input } from '../input/input';
+import { Label } from '../label/label';
 import { dayLabel } from './day-label';
 
 let nextId = 0;
@@ -15,7 +17,7 @@ const CALENDAR_DAYS = 14;
 /** The body of a date sheet: quick dates, a two-week calendar and a native date input. It emits, it never stores. */
 @Component({
   selector: 'asys-date-pick',
-  imports: [Button, FieldError],
+  imports: [Button, FieldError, Input, Label],
   encapsulation: ViewEncapsulation.None,
   templateUrl: './date-pick.component.html',
   styleUrl: './date-pick.css',

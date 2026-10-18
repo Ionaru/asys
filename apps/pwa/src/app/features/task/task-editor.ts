@@ -45,6 +45,7 @@ import { DateSpecRow } from '../../ui/date-spec-row/date-spec-row';
 import { EstimateField, EstimateLayout } from '../../ui/estimate-field/estimate-field';
 import { FieldError } from '../../ui/field-error/field-error';
 import { Icon, IconName } from '../../ui/icon/icon';
+import { Input, InputVariant } from '../../ui/input/input';
 import { InlineConfirm } from '../../ui/inline-confirm/inline-confirm';
 import { LoadState } from '../../ui/load-state/load-state';
 import {
@@ -56,7 +57,7 @@ import { QuadrantChip } from '../../ui/quadrant-chip/quadrant-chip';
 import { Segmented } from '../../ui/segmented/segmented';
 import { areaSelectOptions } from '../../ui/select-field/area-options';
 import { Sheet } from '../../ui/sheet/sheet';
-import { breaksLine, flattenLines } from '../../ui/single-line/single-line';
+import { SingleLine } from '../../ui/single-line/single-line';
 import { StatusBadge, StatusBadgeStatus } from '../../ui/status-badge/status-badge';
 import { SyncNote } from '../../ui/sync-note/sync-note';
 import { byAreaName } from '../areas/area-order';
@@ -97,6 +98,7 @@ interface EditorView {
     FormField,
     Icon,
     InlineConfirm,
+    Input,
     LoadState,
     LogProgressForm,
     NgTemplateOutlet,
@@ -104,6 +106,7 @@ interface EditorView {
     RouterLink,
     Segmented,
     Sheet,
+    SingleLine,
     StatusBadge,
     SyncNote,
     TaskBlockers,
@@ -145,6 +148,8 @@ export class TaskEditor {
   protected readonly Variant = ButtonVariant;
 
   protected readonly Size = ButtonSize;
+
+  protected readonly InputVariants = InputVariant;
 
   protected readonly Icons = IconName;
 
@@ -395,18 +400,9 @@ export class TaskEditor {
     }
   }
 
-  protected titleInput(event: Event): void {
-    const title = flattenLines(event.target as HTMLTextAreaElement);
-
+  /** The Title as typed, its line breaks already turned into spaces. */
+  protected titleInput(title: string): void {
     this.saver.model.update((draft) => ({ ...draft, title }));
-  }
-
-  /** Enter, or a phone keyboard's line break, commits the Title instead of breaking it. */
-  protected titleBreak(event: Event): void {
-    if (breaksLine(event)) {
-      event.preventDefault();
-      this.saver.commit();
-    }
   }
 
   protected notesInput(event: Event): void {

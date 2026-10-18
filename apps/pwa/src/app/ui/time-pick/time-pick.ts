@@ -3,6 +3,8 @@ import { Component, input, output, ViewEncapsulation } from '@angular/core';
 import { isLocalTime, type LocalTime } from '@asys/domain';
 
 import { Button, ButtonVariant } from '../button/button';
+import { Input } from '../input/input';
+import { Label } from '../label/label';
 
 let nextId = 0;
 
@@ -11,7 +13,7 @@ const TIMES: readonly LocalTime[] = ['09:00', '10:00', '12:00', '14:00', '17:00'
 /** The body of a time sheet: six common times and a native time input. It emits, it never stores. */
 @Component({
   selector: 'asys-time-pick',
-  imports: [Button],
+  imports: [Button, Input, Label],
   encapsulation: ViewEncapsulation.None,
   template: `
     @if (context()) {
@@ -30,10 +32,11 @@ const TIMES: readonly LocalTime[] = ['09:00', '10:00', '12:00', '14:00', '17:00'
       }
     </div>
     <div class="asys-field asys-time-pick__other">
-      <label class="asys-field__label" [for]="otherId">Other time</label>
+      <label asys-label [for]="otherId">Other time</label>
       <input
         #otherInput
-        class="asys-field__input asys-num"
+        asys-input
+        class="asys-num"
         type="time"
         [id]="otherId"
         [value]="value() ?? ''"

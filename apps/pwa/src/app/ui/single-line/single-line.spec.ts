@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: EUPL-1.2
-import { breaksLine, enterAsInput, flattenLines, pressBox, submitImplicitly } from './single-line';
+import { Component, signal } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
+
+import { InputBox } from '../input-box/input-box';
+import { breaksLine, flattenLines, SingleLine, submitImplicitly } from './single-line';
 
 const enter = (init: KeyboardEventInit = {}): KeyboardEvent =>
   new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, ...init });
@@ -149,79 +153,143 @@ describe('single-line', () => {
     });
   });
 
-  describe('enterAsInput', () => {
-    it('prevents the line break of Enter and submits the form', () => {
-      const { field, submitters } = formOf('<textarea></textarea><button>Add</button>');
-      const event = enter();
+  describe('SingleLine', () => {
+    @Component({
+      imports: [SingleLine, InputBox],
+      template: `
+        <form (submit)="submitted.push($event.submitter); $event.preventDefault()">
+          @if (boxed()) {
+            <asys-input-box>
+              <textarea
+                asys-single-line
+                [submitOnEnter]="submitOnEnter()"
+                (lineChange)="changes.push($event)"
+                (lineBreak)="log.push('break')"
+              ></textarea>
+            </asys-input-box>
+          } @else {
+            <textarea
+              asys-single-line
+              [submitOnEnter]="submitOnEnter()"
+              (lineChange)="changes.push($event)"
+              (lineBreak)="log.push('break')"
+            ></textarea>
+          }
+          <button type="submit" (click)="log.push('submit')">Add</button>
+        </form>
+      `,
+    })
+    class Host {
+      readonly boxed = signal(true);
+      readonly submitOnEnter = signal(true);
+      readonly changes: string[] = [];
+      readonly log: string[] = [];
+      readonly submitted: (HTMLElement | null)[] = [];
+    }
 
-      field.addEventListener('keydown', enterAsInput);
+    const mount = async (setup: (host: Host) => void = () => undefined) => {
+      const fixture = TestBed.createComponent(Host);
+
+      setup(fixture.componentInstance);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const el = fixture.nativeElement as HTMLElement;
+
+      return {
+        fixture,
+        host: fixture.componentInstance,
+        field: el.querySelector('textarea') as HTMLTextAreaElement,
+      };
+    };
+
+    it('sets rows to 1', async () => {
+      const { field } = await mount();
+
+      expect(field.getAttribute('rows')).toBe('1');
+    });
+
+    it('adds the control class and wrap off in an input box', async () => {
+      const { field } = await mount();
+
+      expect(field.classList.contains('asys-input-box__control')).toBe(true);
+      expect(field.getAttribute('wrap')).toBe('off');
+    });
+
+    it('adds neither the control class nor wrap outside an input box', async () => {
+      const { field } = await mount((host) => host.boxed.set(false));
+
+      expect(field.getAttribute('rows')).toBe('1');
+      expect(field.classList.contains('asys-input-box__control')).toBe(false);
+      expect(field.hasAttribute('wrap')).toBe(false);
+    });
+
+    it('flattens line breaks on input and emits lineChange with the flat value', async () => {
+      const { field, host } = await mount();
+
+      field.value = 'a\nb';
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+
+      expect(field.value).toBe('a b');
+      expect(host.changes).toEqual(['a b']);
+    });
+
+    it('prevents Enter, emits lineBreak and then submits through the first submit button', async () => {
+      const { field, host } = await mount();
+      const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+
       field.dispatchEvent(event);
 
       expect(event.defaultPrevented).toBe(true);
-      expect(submitters).toHaveLength(1);
+      expect(host.log).toEqual(['break', 'submit']);
+      expect(host.submitted).toHaveLength(1);
     });
 
-    it('prevents a beforeinput line break and submits the form', () => {
-      const { field, submitters } = formOf('<textarea></textarea><button>Add</button>');
-      const event = beforeInput('insertParagraph');
+    it('prevents a beforeinput line break, emits lineBreak and submits', async () => {
+      const { field, host } = await mount();
+      const event = new InputEvent('beforeinput', {
+        inputType: 'insertParagraph',
+        bubbles: true,
+        cancelable: true,
+      });
 
-      field.addEventListener('beforeinput', enterAsInput);
       field.dispatchEvent(event);
 
       expect(event.defaultPrevented).toBe(true);
-      expect(submitters).toHaveLength(1);
+      expect(host.log).toEqual(['break', 'submit']);
     });
 
-    // An Angular template handler that returns false prevents the event's default.
-    it('leaves other keys and input alone, and returns nothing', () => {
-      const { field, submitters } = formOf('<textarea></textarea><button>Add</button>');
+    it('emits lineBreak but does not submit while submitOnEnter is false', async () => {
+      const { field, host } = await mount((h) => h.submitOnEnter.set(false));
+      const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+
+      field.dispatchEvent(event);
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(host.log).toEqual(['break']);
+      expect(host.submitted).toEqual([]);
+    });
+
+    it('leaves letters, Escape, composing Enter and insertText alone', async () => {
+      const { field, host } = await mount();
       const events = [
+        new KeyboardEvent('keydown', { key: 'a', bubbles: true, cancelable: true }),
         new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
-        beforeInput('insertText'),
+        new KeyboardEvent('keydown', {
+          key: 'Enter',
+          isComposing: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+        new InputEvent('beforeinput', { inputType: 'insertText', bubbles: true, cancelable: true }),
       ];
 
-      field.addEventListener('keydown', enterAsInput);
-      field.addEventListener('beforeinput', enterAsInput);
-
       for (const event of events) {
-        expect(enterAsInput(event)).toBeUndefined();
         field.dispatchEvent(event);
       }
 
-      expect(events.map((event) => event.defaultPrevented)).toEqual([false, false]);
-      expect(submitters).toEqual([]);
-    });
-  });
-
-  describe('pressBox', () => {
-    const boxed = () => {
-      const box = document.createElement('div');
-      const field = document.createElement('textarea');
-
-      box.appendChild(field);
-      box.addEventListener('mousedown', pressBox);
-      document.body.appendChild(box);
-
-      return { box, field };
-    };
-
-    it('focuses the line on a press on the box itself, keeping the press from moving focus', () => {
-      const { box, field } = boxed();
-      const event = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
-
-      box.dispatchEvent(event);
-
-      expect(event.defaultPrevented).toBe(true);
-      expect(document.activeElement).toBe(field);
-    });
-
-    it('leaves a press on the line alone, so it can place the caret', () => {
-      const { field } = boxed();
-      const event = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
-
-      field.dispatchEvent(event);
-
-      expect(event.defaultPrevented).toBe(false);
+      expect(events.map((event) => event.defaultPrevented)).toEqual([false, false, false, false]);
+      expect(host.log).toEqual([]);
     });
   });
 });

@@ -89,6 +89,7 @@ describe('Segmented', () => {
     expect(
       root().querySelector('fieldset > legend.asys-segmented__legend')?.textContent?.trim(),
     ).toBe('Importance');
+    expect(root().querySelector('legend.asys-segmented__legend.asys-label')).not.toBeNull();
     expect(root().querySelectorAll('fieldset > div.asys-segmented__options > button').length).toBe(
       2,
     );
