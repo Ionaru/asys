@@ -20,10 +20,14 @@ const SPAN_ATTRIBUTES: ReadonlySet<string> = new Set([
   'db.query.text',
   'db.system.name',
   'db.namespace',
-  'server.address',
-  'server.port',
   'job.kind',
   'job.outcome',
+] as const);
+
+// Kept on database spans only: on a server span they come from the request's Host header.
+const DATABASE_SPAN_ATTRIBUTES: ReadonlySet<string> = new Set([
+  'server.address',
+  'server.port',
 ] as const);
 
 const BARE_EVENTS: ReadonlySet<string> = new Set([
@@ -58,16 +62,23 @@ const scrubEvent = (event: SpanEvent): SpanEvent | undefined => {
   return BARE_EVENTS.has(event.name) ? { ...event, attributes: [] } : undefined;
 };
 
-const scrubSpan = (span: Span): Span => ({
-  ...span,
-  attributes: span.attributes.filter((attribute) => SPAN_ATTRIBUTES.has(attribute.key)),
-  links: [],
-  status: { code: span.status.code },
-  events: span.events.flatMap((event) => {
-    const scrubbed = scrubEvent(event);
-    return scrubbed === undefined ? [] : [scrubbed];
-  }),
-});
+const scrubSpan = (span: Span): Span => {
+  const isDatabase = span.attributes.some((attribute) => attribute.key === 'db.system.name');
+  return {
+    ...span,
+    attributes: span.attributes.filter(
+      (attribute) =>
+        SPAN_ATTRIBUTES.has(attribute.key) ||
+        (isDatabase && DATABASE_SPAN_ATTRIBUTES.has(attribute.key)),
+    ),
+    links: [],
+    status: { code: span.status.code },
+    events: span.events.flatMap((event) => {
+      const scrubbed = scrubEvent(event);
+      return scrubbed === undefined ? [] : [scrubbed];
+    }),
+  };
+};
 
 const scrubRecord = (record: LogRecord): LogRecord => {
   const { body, ...rest } = record;
@@ -81,9 +92,10 @@ const scrubRecord = (record: LogRecord): LogRecord => {
 };
 
 /**
- * Keeps only allowlisted span attributes, drops links and the status message, reduces
- * exception events to a safe `exception.type` and keeps only the database transaction
- * events. Resource, ids, names and timestamps stay as they are. Never mutates its input.
+ * Keeps only allowlisted span attributes (the server address and port on database spans
+ * only), drops links and the status message, reduces exception events to a safe
+ * `exception.type` and keeps only the database transaction events. Resource, ids, names
+ * and timestamps stay as they are. Never mutates its input.
  */
 export const scrubTraces = (data: OtlpTracer.TraceData): OtlpTracer.TraceData => ({
   ...data,

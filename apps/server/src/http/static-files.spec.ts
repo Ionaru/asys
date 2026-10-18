@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: EUPL-1.2
-import { chmodSync, mkdtempSync, rmSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readdirSync, readlinkSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { assert, describe, it, layer } from '@effect/vitest';
@@ -57,6 +57,16 @@ const waitFor = (condition: () => boolean) =>
       yield* Effect.sleep('50 millis');
     }
   });
+
+/** How many files under `root` this process holds open. Reads `/proc`, so Linux only. */
+const openFilesUnder = (root: string): number =>
+  readdirSync('/proc/self/fd').filter((fd) => {
+    try {
+      return readlinkSync(join('/proc/self/fd', fd)).startsWith(`${root}/`);
+    } catch {
+      return false;
+    }
+  }).length;
 
 describe('cacheControlFor', () => {
   const immutable = [
@@ -180,6 +190,26 @@ layer(appDatabase(), { excludeTestServices: true })('static files over a socket'
           const again = yield* get(server, path, { 'if-none-match': etag ?? '' });
           expectAnswer(again, 304, cacheControl);
         }
+      }),
+    TIMEOUT,
+  );
+
+  it.effect(
+    'leaves no file open after answering 304',
+    () =>
+      Effect.gen(function* () {
+        if (!existsSync('/proc/self/fd')) return;
+        const root = yield* makeStaticRoot;
+        const server = yield* startServer({ staticRoot: root });
+        const etag = (yield* get(server, '/main-ABCDEFGH.js')).headers.get('etag') ?? '';
+
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const again = yield* get(server, '/main-ABCDEFGH.js', { 'if-none-match': etag });
+          assert.strictEqual(again.status, 304);
+        }
+        yield* Effect.sleep('200 millis');
+
+        assert.strictEqual(openFilesUnder(root), 0);
       }),
     TIMEOUT,
   );

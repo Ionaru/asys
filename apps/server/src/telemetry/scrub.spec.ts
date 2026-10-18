@@ -171,6 +171,24 @@ describe('scrubTraces', () => {
     assert.deepStrictEqual(scrubbed.attributes, attributes);
   });
 
+  it('drops the server address and port of a span that is not a database span', () => {
+    const scrubbed = firstSpan(
+      scrubTraces(
+        makeTraces(
+          makeSpan({
+            attributes: [
+              str('http.request.method', 'GET'),
+              str('server.address', 'secret-123.example'),
+              int('server.port', 4200),
+            ],
+          }),
+        ),
+      ),
+    );
+
+    assert.deepStrictEqual(scrubbed.attributes, [str('http.request.method', 'GET')]);
+  });
+
   it('keeps the job attributes', () => {
     const attributes = [str('job.kind', 'prune'), str('job.outcome', 'succeeded')];
 
