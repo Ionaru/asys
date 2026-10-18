@@ -9,6 +9,7 @@ import { Label } from './label';
   template: `
     <label asys-label for="a">Name</label>
     <legend asys-label>Group</legend>
+    <span asys-label id="c">Estimate</span>
     <label for="b">Plain</label>
   `,
 })
@@ -33,6 +34,12 @@ describe('Label', () => {
     const root = await setup();
 
     expect(root.querySelector('legend')?.classList.contains('asys-label')).toBe(true);
+  });
+
+  it('adds asys-label to the span that names a group', async () => {
+    const root = await setup();
+
+    expect(root.querySelector('#c')?.classList.contains('asys-label')).toBe(true);
   });
 
   it('leaves a label without the attribute alone', async () => {

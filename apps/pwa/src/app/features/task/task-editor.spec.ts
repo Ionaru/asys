@@ -27,7 +27,6 @@ import { outcomeMessage } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
 import { Ids } from '../../core/platform/ids';
 import { TaskMorph } from '../../core/platform/task-morph';
-import { SingleLine } from '../../ui/single-line/single-line';
 import { TaskBlockers } from './task-blockers';
 import { TaskEditor } from './task-editor';
 import { TaskEditorRoute } from './task-editor-route';
@@ -978,14 +977,27 @@ describe('TaskEditor', () => {
   });
 
   describe('the Title keys', () => {
-    it('Enter never submits a form around the editor', async () => {
-      const { fixture, titleField } = await setup();
-      const line = fixture.debugElement
-        .queryAll(By.directive(SingleLine))
-        .find((element) => element.nativeElement === titleField());
+    it('Enter commits and never submits a form around the editor', async () => {
+      const { fixture, send, typeTitle, titleField, settle } = await setup();
+      const form = document.createElement('form');
+      const submit = document.createElement('button');
+      const submits = vi.fn((event: Event) => event.preventDefault());
+      const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
 
-      // The editor sits in no form here, so the directive's own switch is what keeps Enter from submitting one.
-      expect(line?.injector.get(SingleLine).submitOnEnter()).toBe(false);
+      submit.type = 'submit';
+      form.addEventListener('submit', submits);
+      form.append(fixture.nativeElement, submit);
+      document.body.appendChild(form);
+      onTestFinished(() => form.remove());
+      await typeTitle('Call Marit back');
+      titleField().dispatchEvent(enter);
+      await settle();
+
+      expect(titleField().form).toBe(form);
+      expect(enter.defaultPrevented).toBe(true);
+      expect(submits).not.toHaveBeenCalled();
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(sent(send, 0)).toEqual(editTask('t1', { title: 'Call Marit back' }));
     });
 
     it('typing alone sends nothing', async () => {

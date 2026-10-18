@@ -55,6 +55,8 @@ export class ShellLayout {
 
   private readonly bottomNav = viewChild(BottomNav);
 
+  private readonly quickAdd = viewChild(QuickAdd);
+
   private readonly bottomNavHost = viewChild(BottomNav, { read: ElementRef<HTMLElement> });
 
   private readonly pill = viewChild('pill', { read: ElementRef<HTMLElement> });
@@ -316,9 +318,7 @@ export class ShellLayout {
   }
 
   protected add(text: string): void {
-    const from = this.#host.nativeElement
-      .querySelector('.asys-quickadd .asys-input-box')
-      ?.getBoundingClientRect();
+    const from = this.quickAdd()?.fieldRect();
 
     this.text.set('');
     this.captureQueue.submit(text);

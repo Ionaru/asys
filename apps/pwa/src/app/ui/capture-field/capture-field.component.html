@@ -1,0 +1,31 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
+<div class="asys-capture-field__row">
+  <label class="asys-visually-hidden" [for]="inputId">{{ label() }}</label>
+  <asys-input-box [pill]="true">
+    <textarea
+      #field
+      asys-single-line
+      autocomplete="off"
+      enterkeyhint="send"
+      [id]="inputId"
+      [attr.placeholder]="placeholder()"
+      [attr.aria-describedby]="hint() ? hintId : null"
+      [value]="value()"
+      (lineChange)="value.set($event)"
+    ></textarea>
+  </asys-input-box>
+  <button
+    asys-button
+    type="submit"
+    [variant]="Variants.Primary"
+    [attr.aria-disabled]="blank() ? 'true' : null"
+    [class.is-disabled]="blank()"
+    (mousedown)="$event.preventDefault()"
+  >
+    Add
+  </button>
+  <ng-content />
+</div>
+@if (hint(); as text) {
+  <p class="asys-field__hint asys-capture-field__hint" [id]="hintId">{{ text }}</p>
+}

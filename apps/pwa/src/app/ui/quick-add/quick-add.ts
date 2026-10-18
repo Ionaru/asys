@@ -65,6 +65,11 @@ export class QuickAdd {
     this.capture().focus();
   }
 
+  /** Where the field is on screen, for a capture's flight to start from. */
+  fieldRect(): DOMRect {
+    return this.capture().fieldRect();
+  }
+
   /** The row goes away, so focus moves to the input first and the keyboard stays up. */
   protected retryFailure(id: string): void {
     this.focus();

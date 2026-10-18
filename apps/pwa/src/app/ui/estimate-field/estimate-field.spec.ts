@@ -106,6 +106,7 @@ describe('EstimateField', () => {
       expect(
         root().querySelector('fieldset > legend.asys-estimate__legend')?.textContent?.trim(),
       ).toBe('Estimate');
+      expect(root().querySelector('legend.asys-estimate__legend.asys-label')).not.toBeNull();
     });
 
     it('uses a custom legend', async () => {
@@ -679,6 +680,8 @@ describe('EstimateField Ruler layout', () => {
     expect(root().querySelector('fieldset')).toBeNull();
     expect(root().querySelector('button.asys-estimate__chip')).toBeNull();
     expect(legend()?.textContent?.trim()).toBe('Estimate');
+    expect(legend()?.tagName).toBe('SPAN');
+    expect(legend()?.classList.contains('asys-label')).toBe(true);
     expect(legend()?.id).not.toBe('');
     expect(group().getAttribute('aria-labelledby')).toBe(legend()?.id);
   });

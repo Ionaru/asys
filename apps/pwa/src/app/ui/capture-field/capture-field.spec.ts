@@ -144,13 +144,14 @@ describe('CaptureField', () => {
 
   describe('hint', () => {
     it('renders no hint paragraph without a hint', async () => {
-      const { root } = await setup();
+      const { root, input } = await setup();
 
       expect(root.querySelector('.asys-capture-field__hint')).toBeNull();
+      expect(input().hasAttribute('aria-describedby')).toBe(false);
     });
 
-    it('renders the hint after the row, and removes it again', async () => {
-      const { fixture, host, root, q } = await setup();
+    it('renders the hint after the row as the field description, and removes it again', async () => {
+      const { fixture, host, root, q, input } = await setup();
 
       host.hint.set('Goes to the Inbox until Triage');
       await fixture.whenStable();
@@ -158,12 +159,16 @@ describe('CaptureField', () => {
       const hint = q('p.asys-capture-field__hint');
 
       expect(hint.textContent?.trim()).toBe('Goes to the Inbox until Triage');
+      expect(hint.classList.contains('asys-field__hint')).toBe(true);
       expect(q('.asys-capture-field__row').nextElementSibling).toBe(hint);
+      expect(hint.id).toMatch(/^asys-capture-field-\d+-hint$/);
+      expect(input().getAttribute('aria-describedby')).toBe(hint.id);
 
       host.hint.set(undefined);
       await fixture.whenStable();
 
       expect(root.querySelector('.asys-capture-field__hint')).toBeNull();
+      expect(input().hasAttribute('aria-describedby')).toBe(false);
     });
   });
 
@@ -267,6 +272,15 @@ describe('CaptureField', () => {
     const { q } = await setup();
 
     expect(q('asys-capture-field').querySelector('form')).toBeNull();
+  });
+
+  it('gives the box around the field as its rect', async () => {
+    const { host, q } = await setup();
+    const rect = { left: 16, top: 600, width: 280, height: 48 } as DOMRect;
+
+    q('asys-input-box').getBoundingClientRect = () => rect;
+
+    expect(host.field().fieldRect()).toBe(rect);
   });
 
   it('focuses its textarea from focus()', async () => {

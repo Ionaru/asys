@@ -2,7 +2,7 @@
 @if (layout() === Layout.Ruler) {
   <div class="asys-estimate asys-estimate--ruler" role="group" [attr.aria-labelledby]="legendId">
     <div class="asys-estimate__head">
-      <span class="asys-estimate__legend" [id]="legendId">{{ legend() }}</span>
+      <span asys-label class="asys-estimate__legend" [id]="legendId">{{ legend() }}</span>
       <button
         asys-button
         type="button"
@@ -38,7 +38,7 @@
   </div>
 } @else {
   <fieldset class="asys-fieldset-reset asys-estimate">
-    <legend class="asys-estimate__legend">{{ legend() }}</legend>
+    <legend asys-label class="asys-estimate__legend">{{ legend() }}</legend>
     <div class="asys-estimate__chips">
       @for (chip of chips; track chip.minutes) {
         <button

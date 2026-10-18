@@ -254,7 +254,7 @@ test('opens the top pick with Push and moves its title, then goes back with Pop'
     {
       name: 'task-title',
       tag: 'textarea',
-      classes: 'asys-input task-editor__title asys-input--title',
+      classes: expect.stringMatching(/(^| )task-editor__title( |$)/),
     },
   ]);
 
@@ -274,7 +274,7 @@ test('opens the top pick with Push and moves its title, then goes back with Pop'
     {
       name: 'task-title',
       tag: 'textarea',
-      classes: 'asys-input task-editor__title asys-input--title',
+      classes: expect.stringMatching(/(^| )task-editor__title( |$)/),
     },
   ]);
   expect(withName(pop.newNames, 'task-title')).toEqual([
@@ -303,7 +303,7 @@ test("moves a ranked row's title into the editor", async ({ page }) => {
     {
       name: 'task-title',
       tag: 'textarea',
-      classes: 'asys-input task-editor__title asys-input--title',
+      classes: expect.stringMatching(/(^| )task-editor__title( |$)/),
     },
   ]);
 });

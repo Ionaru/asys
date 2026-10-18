@@ -106,9 +106,9 @@ body {
   letter-spacing: 0.01em;
 }
 
-.asys-input {
-  display: block;
-  width: 100%;
+/* The field chrome, on an input itself or on the box around a one-line field's textarea (ui/input-box). */
+.asys-input,
+.asys-input-box {
   min-width: 0;
   min-height: var(--tap-target);
   margin: 0;
@@ -117,13 +117,19 @@ body {
   color: var(--ink);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-md);
+}
+
+.asys-input {
+  display: block;
+  width: 100%;
   font-family: var(--font-sans);
   font-size: var(--font-size-body);
   line-height: var(--line-height-body);
   font-weight: 400;
 }
 
-.asys-input::placeholder {
+.asys-input::placeholder,
+.asys-input-box__control::placeholder {
   color: var(--ink-muted);
   opacity: 1;
 }
@@ -159,23 +165,16 @@ textarea.asys-input {
 }
 
 /* A one-line field is a one-row textarea (ui/single-line). A textarea scrolls its text into its own padding, so the
-   field's border and padding go on a box around it, and the focus ring with them. */
+   field's border and inline padding go on a box around it, and the focus ring with them. The block padding stays on
+   the textarea, so a press anywhere but the box's sides lands on the text and places the caret. */
 .asys-input-box {
   display: flex;
   align-items: center;
-  min-width: 0;
-  min-height: var(--tap-target);
-  margin: 0;
-  padding: var(--space-2) var(--space-3);
-  background: var(--surface);
-  color: var(--ink);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-md);
+  padding-block: 0;
   cursor: text;
 }
 
 .asys-input-box--pill {
-  flex: 1 1 0;
   padding-inline: var(--space-4);
   border-radius: var(--radius-pill);
 }
@@ -185,9 +184,8 @@ textarea.asys-input {
   flex: 1 1 auto;
   width: 100%;
   min-width: 0;
-  height: var(--line-height-body);
   margin: 0;
-  padding: 0;
+  padding: var(--space-2) 0;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -200,11 +198,6 @@ textarea.asys-input {
   white-space: pre;
   overflow: hidden;
   resize: none;
-}
-
-.asys-input-box__control::placeholder {
-  color: var(--ink-muted);
-  opacity: 1;
 }
 
 .asys-input-box__control:focus-visible {
@@ -245,7 +238,8 @@ textarea.asys-input {
 }
 
 .asys-field--error .asys-input,
-.asys-input[aria-invalid='true'] {
+.asys-input[aria-invalid='true'],
+.asys-input-box:has(> .asys-input-box__control[aria-invalid='true']) {
   border-width: 2px;
   border-color: var(--danger);
   padding-left: calc(var(--space-3) - 1px);
@@ -259,10 +253,9 @@ textarea.asys-input {
   box-shadow: inset 0 -2px 0 var(--danger);
 }
 
-.asys-input-box:has(> .asys-input-box__control[aria-invalid='true']) {
-  border-width: 2px;
-  border-color: var(--danger);
-  padding: calc(var(--space-2) - 1px) calc(var(--space-3) - 1px);
+/* The box's border grows by 1px each side, so the textarea gives back that much and the field keeps its height. */
+.asys-input-box__control[aria-invalid='true'] {
+  padding-block: calc(var(--space-2) - 1px);
 }
 
 .asys-input-box--pill:has(> .asys-input-box__control[aria-invalid='true']) {
