@@ -49,7 +49,7 @@ const setup = async () => {
 
   const q = <T extends HTMLElement>(selector: string): T | null =>
     fixture.nativeElement.querySelector(selector);
-  const input = () => must(q<HTMLInputElement>('.asys-quickadd__input'));
+  const input = () => must(q<HTMLTextAreaElement>('.asys-quickadd__input'));
   const button = (label: string): HTMLButtonElement | undefined =>
     (Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[]).find(
       (b) => b.textContent?.trim() === label,
@@ -72,7 +72,7 @@ describe('QuickAdd', () => {
     document.body.innerHTML = '';
   });
 
-  it('renders a form with a labelled input, the hint and Add and Close buttons', async () => {
+  it('renders a form with a labelled field, the hint and Add and Close buttons', async () => {
     const { q, input, button } = await setup();
 
     const label = q('label');
@@ -81,7 +81,9 @@ describe('QuickAdd', () => {
     expect(label?.textContent?.trim()).toBe('Capture a Task');
     expect(label?.classList.contains('asys-visually-hidden')).toBe(true);
     expect(label?.getAttribute('for')).toBe(input().id);
-    expect(input().type).toBe('text');
+    // A one-row textarea, because Chrome on Android shows its autofill bar on every text input.
+    expect(input().tagName).toBe('TEXTAREA');
+    expect(input().rows).toBe(1);
     expect(input().placeholder).toBe('Capture a Task');
     expect(input().getAttribute('autocomplete')).toBe('off');
     expect(q('.asys-quickadd__hint')?.textContent?.trim()).toBe('Goes to the Inbox until Triage');
@@ -130,6 +132,26 @@ describe('QuickAdd', () => {
     const { input } = await setup();
 
     expect(input().getAttribute('enterkeyhint')).toBe('send');
+  });
+
+  it('keeps focus in the field when the pill around it is pressed', async () => {
+    const { q, input, button } = await setup();
+    const event = new MouseEvent('mousedown', { cancelable: true, bubbles: true });
+
+    button('Close')?.focus();
+    must(q('.asys-quickadd__field')).dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(input());
+  });
+
+  it('leaves a mousedown on the field itself alone, so it can place the caret', async () => {
+    const { input } = await setup();
+    const event = new MouseEvent('mousedown', { cancelable: true, bubbles: true });
+
+    input().dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(false);
   });
 
   it('prevents the default of a mousedown on Add so focus stays in the input', async () => {
@@ -192,15 +214,103 @@ describe('QuickAdd', () => {
     expect(host.added).toEqual([]);
   });
 
-  it('submits when Enter is pressed in the input', async () => {
-    const { host, fixture, input, type } = await setup();
-    await type('Call Marit');
+  describe('the field keys', () => {
+    const enter = (init: KeyboardEventInit = {}): KeyboardEvent =>
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, ...init });
 
-    // Enter in a text input triggers the form's implicit submission, which is requestSubmit().
-    input().form?.requestSubmit();
-    await fixture.whenStable();
+    it('submits on Enter and inserts no line break', async () => {
+      const { host, fixture, input, type } = await setup();
+      const event = enter();
+      await type('Call Marit');
 
-    expect(host.added).toEqual(['Call Marit']);
+      input().dispatchEvent(event);
+      await fixture.whenStable();
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(host.added).toEqual(['Call Marit']);
+      expect(input().value).toBe('Call Marit');
+    });
+
+    it('emits nothing on Enter when the value is blank', async () => {
+      const { host, fixture, input, type } = await setup();
+      const event = enter();
+      await type('   ');
+
+      input().dispatchEvent(event);
+      await fixture.whenStable();
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(host.added).toEqual([]);
+    });
+
+    it('leaves an Enter that ends a composition alone', async () => {
+      const { host, fixture, input, type } = await setup();
+      const event = enter({ isComposing: true });
+      await type('Call Marit');
+
+      input().dispatchEvent(event);
+      await fixture.whenStable();
+
+      expect(event.defaultPrevented).toBe(false);
+      expect(host.added).toEqual([]);
+    });
+
+    it.each(['insertLineBreak', 'insertParagraph'])(
+      'prevents a beforeinput %s and submits',
+      async (inputType) => {
+        const { host, fixture, input, type } = await setup();
+        const event = new InputEvent('beforeinput', { inputType, bubbles: true, cancelable: true });
+        await type('Call Marit');
+
+        input().dispatchEvent(event);
+        await fixture.whenStable();
+
+        expect(event.defaultPrevented).toBe(true);
+        expect(host.added).toEqual(['Call Marit']);
+      },
+    );
+
+    it('leaves other beforeinput events alone', async () => {
+      const { host, fixture, input } = await setup();
+      const event = new InputEvent('beforeinput', {
+        inputType: 'insertText',
+        data: 'x',
+        bubbles: true,
+        cancelable: true,
+      });
+
+      input().dispatchEvent(event);
+      await fixture.whenStable();
+
+      expect(event.defaultPrevented).toBe(false);
+      expect(host.added).toEqual([]);
+    });
+
+    it.each([
+      ['Call\nMarit', 'Call Marit'],
+      ['Call\r\nMarit', 'Call Marit'],
+      ['a\n\nb\n', 'a  b '],
+    ])('turns pasted %j into %j in the field and the value', async (pasted, expected) => {
+      const { host, input, type } = await setup();
+
+      await type(pasted);
+
+      expect(input().value).toBe(expected);
+      expect(host.value()).toBe(expected);
+    });
+
+    it('keeps the caret where it was when a line break becomes a space', async () => {
+      const { fixture, input } = await setup();
+      const field = input();
+
+      field.value = 'Call\nMarit';
+      field.setSelectionRange(5, 5);
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+      await fixture.whenStable();
+
+      expect(field.value).toBe('Call Marit');
+      expect([field.selectionStart, field.selectionEnd]).toEqual([5, 5]);
+    });
   });
 
   it('emits close from the Close button', async () => {

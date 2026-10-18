@@ -67,6 +67,25 @@ test('Quick add keeps focus in the field when Add is clicked with the mouse', as
   await expect(input).toBeFocused();
 });
 
+// The field is a textarea, which keeps Chrome's autofill bar off the Android keyboard, so it keeps to one line itself.
+test('Enter in quick add captures the Task, and the field keeps to one line', async ({ page }) => {
+  const badge = page.getByRole('navigation', { name: 'Primary' }).locator('.asys-bottomnav__badge');
+  const input = page.getByLabel('Capture a Task');
+
+  await page.getByRole('button', { name: 'Capture' }).click();
+  const empty = await input.boundingBox();
+  await input.fill('Ring Van Dijk about the boiler service and ask for a morning slot next week');
+  expect((await input.boundingBox())?.height).toBe(empty?.height);
+
+  await input.press('Enter');
+  await expect(badge).toHaveText('1');
+  await expect(input).toHaveValue('');
+  await expect(input).toBeFocused();
+
+  await input.fill('Water\nthe plants');
+  await expect(input).toHaveValue('Water the plants');
+});
+
 test('A failed capture stays as a row until Try again sends it', async ({ page }) => {
   const badge = page.getByRole('navigation', { name: 'Primary' }).locator('.asys-bottomnav__badge');
   const input = page.getByLabel('Capture a Task');
