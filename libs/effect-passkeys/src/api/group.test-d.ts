@@ -23,8 +23,10 @@ test('registerOptions payload is the host payload fields', () => {
 
 test('authenticate succeeds with the host success type', () => {
   type Client = HttpApiClient.ForApi<typeof SampleApi>;
+  const authenticate = (client: Client, payload: PayloadOf<'authenticate'>) =>
+    client.passkeys.authenticate({ payload });
 
-  expectTypeOf<Effect.Success<ReturnType<Client['passkeys']['authenticate']>>>().toEqualTypeOf<{
+  expectTypeOf<Effect.Success<ReturnType<typeof authenticate>>>().toEqualTypeOf<{
     readonly name: string;
   }>();
 });

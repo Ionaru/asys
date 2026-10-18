@@ -57,15 +57,31 @@ const fetchFrom = (base: string, path: string, init: RequestInit = {}) =>
 /** Lets the server finish its spans before the scope closes. */
 const settle = Effect.sleep('300 millis');
 
-const serverSpanFor = (capture: Capture, route: string): OtlpSpan => {
+const serverSpanFor = (capture: Capture, route: string, method = 'GET'): OtlpSpan => {
   const span = spansOf(capture).find(
     (candidate) =>
-      candidate.name === 'http.server GET' &&
-      attributeOf(candidate.attributes, 'http.route') === route,
+      candidate.name === method && attributeOf(candidate.attributes, 'http.route') === route,
   );
   if (span === undefined) throw new Error(`No server span for ${route}`);
 
   return span;
+};
+
+/** No span has a status message, and every exception event carries only a safe type. */
+const expectOnlyExceptionTypes = (capture: Capture) => {
+  for (const span of spansOf(capture)) {
+    assert.isUndefined(span.status.message, span.name);
+    for (const event of span.events.filter((candidate) => candidate.name === 'exception')) {
+      assert.deepStrictEqual(
+        event.attributes.map((attribute) => attribute.key),
+        ['exception.type'],
+      );
+      assert.match(attributeOf(event.attributes, 'exception.type') ?? '', /^[A-Za-z0-9_.-]{1,64}$/);
+    }
+  }
+  const text = textOf(capture);
+  assert.notInclude(text, 'exception.message');
+  assert.notInclude(text, 'exception.stacktrace');
 };
 
 layer(appDatabase(), { excludeTestServices: true })('telemetry over a socket', (it) => {
@@ -85,10 +101,12 @@ layer(appDatabase(), { excludeTestServices: true })('telemetry over a socket', (
           }),
         );
 
-        const spans = spansOf(capture).filter((span) => span.name.startsWith('http.server'));
+        const spans = spansOf(capture).filter(
+          (span) => attributeOf(span.attributes, 'http.request.method') !== undefined,
+        );
         assert.strictEqual(spans.length, 1);
         const span = spans[0];
-        assert.strictEqual(span.name, 'http.server GET');
+        assert.strictEqual(span.name, 'GET');
         assert.strictEqual(attributeOf(span.attributes, 'http.route'), '/v1/meta');
         assert.strictEqual(attributeOf(span.attributes, 'http.response.status_code'), '401');
         for (const attribute of span.attributes) {
@@ -117,7 +135,7 @@ layer(appDatabase(), { excludeTestServices: true })('telemetry over a socket', (
           }),
         );
 
-        const spans = spansOf(capture).filter((span) => span.name === 'http.server GET');
+        const spans = spansOf(capture).filter((span) => span.name === 'GET');
         assert.strictEqual(spans.length, 1);
         assert.strictEqual(attributeOf(spans[0].attributes, 'http.response.status_code'), '401');
       }),
@@ -174,49 +192,27 @@ layer(appDatabase(), { excludeTestServices: true })('telemetry over a socket', (
   );
 
   it.effect(
-    'exports only the exception type of a failing API request',
+    'exports a failing API request without its error',
     () =>
       Effect.gen(function* () {
         const capture = makeCapture();
         yield* Effect.scoped(
           Effect.gen(function* () {
             const server = yield* startServer({ around: telemetryUnderTest(capture) });
-            yield* fetchFrom(server.base, '/v1/meta');
-            yield* fetchFrom(server.base, '/v1/auth/register/options', {
+            const status = yield* fetchFrom(server.base, '/v1/auth/register/options', {
               method: 'POST',
               headers: { origin: 'http://localhost:4200', 'content-type': 'application/json' },
               body: `{"secret":"${SECRET}"`,
             });
+            assert.strictEqual(status, 400);
             yield* settle;
           }),
         );
 
-        const spans = spansOf(capture);
-        assert.isTrue(
-          spans.some((span) => span.status.code === 2),
-          'no /v1 request produced a failed span',
-        );
-        const events = spans.flatMap((span) => span.events.filter((e) => e.name === 'exception'));
-        assert.isAbove(events.length, 0);
-        for (const event of events) {
-          assert.deepStrictEqual(
-            event.attributes.map((attribute) => attribute.key),
-            ['exception.type'],
-          );
-          assert.match(
-            attributeOf(event.attributes, 'exception.type') ?? '',
-            /^[A-Za-z0-9_.-]{1,64}$/,
-          );
-        }
-        for (const span of spans) {
-          assert.isUndefined(span.status.message, span.name);
-        }
-
-        const text = textOf(capture);
-        assert.notInclude(text, 'exception.message');
-        assert.notInclude(text, 'exception.stacktrace');
-        assert.notInclude(text, SECRET);
-        assert.isDefined(serverSpanFor(capture, '/v1/meta'));
+        const span = serverSpanFor(capture, '/v1/auth/register/options', 'POST');
+        assert.strictEqual(attributeOf(span.attributes, 'http.response.status_code'), '400');
+        expectOnlyExceptionTypes(capture);
+        assert.notInclude(textOf(capture), SECRET);
       }),
     TIMEOUT,
   );
@@ -326,6 +322,47 @@ layer(Layer.mergeAll(appDatabase(), JobRegistry.layer), { excludeTestServices: t
           for (const span of spans) {
             assert.notInclude(attributeOf(span.attributes, 'db.query.text') ?? '', 'claim_jobs');
           }
+        }),
+      TIMEOUT,
+    );
+
+    it.effect(
+      'exports only the exception type of a failing job',
+      () =>
+        Effect.gen(function* () {
+          const capture = makeCapture();
+          const owner = yield* scopedOwner();
+          const registry = yield* JobRegistry;
+          const kind = `test-${randomUUID()}`;
+          yield* registry.register(kind, () =>
+            Effect.die(new Error(`insert into x values (${SECRET})`)),
+          );
+          const id = randomUUID();
+          const db = yield* Db;
+          yield* withOwner(
+            owner,
+            db.insert(jobs).values({ ownerId: owner, id, kind, payload: {}, runAt: bandAt(0) }),
+          );
+
+          const runs = yield* runDueJobs({ max: 100 }).pipe(
+            Effect.provide(telemetryUnderTest(capture)),
+          );
+          assert.strictEqual(runs.find((run) => run.id === id)?.outcome, JobOutcome.Retrying);
+
+          const spans = spansOf(capture);
+          assert.isTrue(
+            spans.some((span) => span.status.code === 2),
+            'the failing job produced no failed span',
+          );
+          assert.isAbove(
+            spans.flatMap((span) => span.events.filter((event) => event.name === 'exception'))
+              .length,
+            0,
+          );
+          expectOnlyExceptionTypes(capture);
+          const text = textOf(capture);
+          assert.notInclude(text, SECRET);
+          assert.notInclude(text, 'insert into');
         }),
       TIMEOUT,
     );

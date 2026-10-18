@@ -9,7 +9,7 @@
   "dependencies": {
     "@simplewebauthn/browser": "jsr:14.0.0",
     "@simplewebauthn/server": "jsr:14.0.3",
-    "effect": "4.0.0",
+    "effect": "4.0.5",
     "tslib": "^2.3.0"
   }
 }
