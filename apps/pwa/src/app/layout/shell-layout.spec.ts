@@ -242,7 +242,8 @@ const setup = async (url = '/now', { motion }: SetupOptions = {}) => {
     Array.from(root().querySelectorAll<HTMLButtonElement>('button.asys-capture'));
   const page = (): HTMLElement | null => root().querySelector('main');
   const bar = (): HTMLElement | null => root().querySelector('asys-quick-add');
-  const input = (): HTMLTextAreaElement | null => root().querySelector('.asys-quickadd__input');
+  const input = (): HTMLTextAreaElement | null =>
+    root().querySelector('.asys-capture-field textarea');
   const status = (): string | null =>
     root().querySelector('.asys-quickadd__status')?.textContent?.trim() ?? null;
   const addButton = (): HTMLButtonElement | undefined =>
@@ -1191,7 +1192,7 @@ describe('ShellLayout', () => {
 
       await harness.open();
       await harness.type('Buy milk');
-      const field = harness.root().querySelector<HTMLElement>('.asys-quickadd__field');
+      const field = harness.root().querySelector<HTMLElement>('.asys-quickadd .asys-input-box');
 
       if (field !== null) {
         field.getBoundingClientRect = () => FIELD_RECT as DOMRect;

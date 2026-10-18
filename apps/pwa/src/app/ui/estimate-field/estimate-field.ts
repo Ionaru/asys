@@ -19,7 +19,9 @@ import { formatMinutes } from '@asys/domain';
 import { Button, ButtonSize, ButtonVariant } from '../button/button';
 import { FieldControl } from '../field-control/field-control';
 import { FieldError } from '../field-error/field-error';
-import { breaksLine, flattenLines, pressBox, submitImplicitly } from '../single-line/single-line';
+import { InputBox } from '../input-box/input-box';
+import { Label } from '../label/label';
+import { SingleLine } from '../single-line/single-line';
 
 /** How the Estimate choices are drawn: wrapping chips, or a single ruler under a head with the Other button. */
 export enum EstimateLayout {
@@ -38,7 +40,7 @@ const OTHER_ERROR = 'Use whole minutes from 1 to 100000.';
 /** Estimate chips plus an Other input, usable as a Signal Forms custom control. */
 @Component({
   selector: 'asys-estimate-field',
-  imports: [Button, FieldError, NgTemplateOutlet],
+  imports: [Button, FieldError, InputBox, Label, NgTemplateOutlet, SingleLine],
   encapsulation: ViewEncapsulation.None,
   templateUrl: './estimate-field.component.html',
   styleUrl: './estimate-field.css',
@@ -67,10 +69,6 @@ export class EstimateField extends FieldControl implements FormValueControl<numb
   protected readonly otherId = `asys-estimate-${nextId}-other`;
 
   protected override readonly messageParagraphId = `asys-estimate-${nextId++}-message`;
-
-  protected readonly flattenLines = flattenLines;
-
-  protected readonly pressBox = pressBox;
 
   readonly #injector = inject(Injector);
 
@@ -139,23 +137,6 @@ export class EstimateField extends FieldControl implements FormValueControl<numb
       this.#localError.set(true);
       this.value.set(null);
     }
-  }
-
-  /** Enter in Other commits what is typed, as the `change` that a text input fires on Enter did, and submits. */
-  protected otherEnter(event: Event): void {
-    if (!breaksLine(event)) {
-      return;
-    }
-
-    const field = event.target as HTMLTextAreaElement;
-
-    event.preventDefault();
-
-    if (this.layout() === EstimateLayout.Ruler) {
-      this.typeOther(field.value);
-    }
-
-    submitImplicitly(field);
   }
 
   /** Focuses the first chip or ruler cell, called by Signal Forms' `focusBoundControl()`. */

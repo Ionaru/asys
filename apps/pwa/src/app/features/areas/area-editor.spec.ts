@@ -392,6 +392,18 @@ describe('AreaEditor', () => {
       }
     });
 
+    it('draws the weekday legends, the name label and the time inputs with the shared classes', async () => {
+      const { root, timeInputs } = await setup();
+
+      expect(
+        Array.from(root().querySelectorAll('fieldset > legend')).every((l) =>
+          l.classList.contains('asys-label'),
+        ),
+      ).toBe(true);
+      expect(timeInputs('Monday')[0]?.classList.contains('asys-input')).toBe(true);
+      expect(timeInputs('Monday')[0]?.labels?.[0]?.classList.contains('asys-label')).toBe(true);
+    });
+
     it('shows Work hours on weekdays only', async () => {
       const { rows } = await setup({ areaId: 'work' });
 

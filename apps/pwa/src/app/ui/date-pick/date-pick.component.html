@@ -31,10 +31,10 @@
   }
 </div>
 <div class="asys-field asys-date-pick__other">
-  <label class="asys-field__label" [for]="otherId">Other date</label>
+  <label asys-label [for]="otherId">Other date</label>
   <input
     #otherInput
-    class="asys-field__input"
+    asys-input
     type="date"
     [id]="otherId"
     [attr.min]="today()"

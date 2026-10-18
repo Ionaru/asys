@@ -2,19 +2,18 @@
 import {
   afterNextRender,
   Component,
-  computed,
-  ElementRef,
   inject,
   Injector,
   input,
   model,
   output,
+  viewChild,
   ViewEncapsulation,
 } from '@angular/core';
 
 import { Button, ButtonSize, ButtonVariant } from '../button/button';
+import { CaptureField } from '../capture-field/capture-field';
 import { Icon, IconName } from '../icon/icon';
-import { enterAsInput, flattenLines, pressBox } from '../single-line/single-line';
 
 /** A capture that was not sent, shown above the input. */
 export interface QuickAddFailure {
@@ -24,19 +23,15 @@ export interface QuickAddFailure {
   readonly canRetry: boolean;
 }
 
-let nextId = 0;
-
-/** The quick-add bar that captures a Task into the Inbox. Its field is a one-row textarea (see `ui/single-line`). */
+/** The quick-add bar that captures a Task into the Inbox, around a capture field. */
 @Component({
   selector: 'asys-quick-add',
-  imports: [Button, Icon],
+  imports: [Button, CaptureField, Icon],
   encapsulation: ViewEncapsulation.None,
   templateUrl: './quick-add.component.html',
   styleUrl: './quick-add.css',
 })
 export class QuickAdd {
-  readonly #host = inject<ElementRef<HTMLElement>>(ElementRef);
-
   readonly #injector = inject(Injector);
 
   protected readonly Variants = ButtonVariant;
@@ -45,13 +40,7 @@ export class QuickAdd {
 
   protected readonly Icons = IconName;
 
-  protected readonly inputId = `asys-quickadd-${nextId++}-input`;
-
-  protected readonly enterAsInput = enterAsInput;
-
-  protected readonly flattenLines = flattenLines;
-
-  protected readonly pressBox = pressBox;
+  private readonly capture = viewChild.required(CaptureField);
 
   readonly value = model<string>('');
 
@@ -67,15 +56,13 @@ export class QuickAdd {
 
   readonly close = output<void>();
 
-  protected readonly blank = computed(() => this.value().trim() === '');
-
   constructor() {
     afterNextRender(() => this.focus(), { injector: this.#injector });
   }
 
   /** Moves focus to the input. */
   focus(): void {
-    this.#host.nativeElement.querySelector<HTMLElement>('.asys-quickadd__input')?.focus();
+    this.capture().focus();
   }
 
   /** The row goes away, so focus moves to the input first and the keyboard stays up. */

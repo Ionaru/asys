@@ -41,43 +41,9 @@
   gap: var(--space-2);
 }
 
-.asys-quickadd__row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-/* The pill around the field (see ui/single-line, which gives the box and the line their behaviour). */
-.asys-quickadd__field {
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: var(--tap-target);
-  padding: 0 var(--space-4);
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-pill);
-}
-
-/* The root's overflow-wrap would let a squeezed button break its label mid-word, so the input gives way instead. */
-.asys-quickadd__row > .asys-button {
-  flex: none;
-}
-
-.asys-quickadd__hint {
-  margin: var(--space-2) 0 0;
-  color: var(--ink-muted);
-  font-size: var(--font-size-reason);
-  line-height: var(--line-height-reason);
-  font-weight: 400;
-}
-
 .asys-quickadd__status {
   margin: var(--space-1) 0 0;
   color: var(--ink);
   font-size: var(--font-size-reason);
   line-height: var(--line-height-reason);
-}
-
-[data-theme='drive'] .asys-quickadd__field {
-  min-height: var(--tap-target-drive);
 }

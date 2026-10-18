@@ -94,7 +94,10 @@ body {
   gap: var(--space-1);
 }
 
-.asys-field__label {
+.asys-label {
+  display: block;
+  margin: 0;
+  padding: 0;
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: var(--font-size-label);
@@ -103,10 +106,12 @@ body {
   letter-spacing: 0.01em;
 }
 
-.asys-field__input {
+.asys-input {
   display: block;
   width: 100%;
+  min-width: 0;
   min-height: var(--tap-target);
+  margin: 0;
   padding: var(--space-2) var(--space-3);
   background: var(--surface);
   color: var(--ink);
@@ -118,54 +123,105 @@ body {
   font-weight: 400;
 }
 
-.asys-field__input::placeholder,
-.asys-field__line::placeholder {
+.asys-input::placeholder {
   color: var(--ink-muted);
   opacity: 1;
 }
 
+textarea.asys-input {
+  min-height: 96px;
+  padding: var(--space-3);
+  resize: vertical;
+}
+
+/* A notes area that grows with its text. The doubled class outweighs textarea.asys-input. */
+.asys-input.asys-input--grow {
+  min-height: var(--tap-target);
+  resize: none;
+  field-sizing: content;
+}
+
+/* The Task title: no border, display type, growing with its text. */
+.asys-input.asys-input--title {
+  min-height: var(--tap-target);
+  padding: var(--space-1) 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  resize: none;
+  field-sizing: content;
+  overflow-wrap: anywhere;
+  font-size: var(--font-size-display);
+  line-height: var(--line-height-display);
+  font-weight: 700;
+  letter-spacing: -0.005em;
+}
+
 /* A one-line field is a one-row textarea (ui/single-line). A textarea scrolls its text into its own padding, so the
    field's border and padding go on a box around it, and the focus ring with them. */
-.asys-field__box {
+.asys-input-box {
   display: flex;
   align-items: center;
-  padding-block: 0;
+  min-width: 0;
+  min-height: var(--tap-target);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
   cursor: text;
 }
 
-.asys-field__box:focus-within {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+.asys-input-box--pill {
+  flex: 1 1 0;
+  padding-inline: var(--space-4);
+  border-radius: var(--radius-pill);
 }
 
-.asys-field__box:has(> :disabled) {
-  cursor: not-allowed;
-}
-
-.asys-field__line {
+.asys-input-box__control {
+  display: block;
   flex: 1 1 auto;
+  width: 100%;
   min-width: 0;
+  height: var(--line-height-body);
   margin: 0;
-  padding: var(--space-2) 0;
+  padding: 0;
   border: 0;
+  border-radius: 0;
   background: transparent;
   color: inherit;
-  font: inherit;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  font-weight: 400;
   /* One line that scrolls sideways under the caret, as in a text input. */
   white-space: pre;
   overflow: hidden;
   resize: none;
 }
 
-.asys-field__line:focus-visible {
+.asys-input-box__control::placeholder {
+  color: var(--ink-muted);
+  opacity: 1;
+}
+
+.asys-input-box__control:focus-visible {
   outline: none;
 }
 
-textarea.asys-field__input,
-.asys-field__input--multiline {
-  min-height: 96px;
-  padding: var(--space-3);
-  resize: vertical;
+.asys-input-box:has(> .asys-input-box__control:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.asys-input-box:has(> .asys-input-box__control:disabled) {
+  cursor: not-allowed;
+}
+
+.asys-input-box__control:disabled {
+  cursor: not-allowed;
 }
 
 .asys-field__hint,
@@ -188,13 +244,29 @@ textarea.asys-field__input,
   font-weight: 700;
 }
 
-.asys-field--error .asys-field__input,
-.asys-field__input[aria-invalid='true'],
-.asys-field__box:has(> [aria-invalid='true']) {
+.asys-field--error .asys-input,
+.asys-input[aria-invalid='true'] {
   border-width: 2px;
   border-color: var(--danger);
   padding-left: calc(var(--space-3) - 1px);
   padding-right: calc(var(--space-3) - 1px);
+}
+
+.asys-input.asys-input--title[aria-invalid='true'],
+.asys-field--error .asys-input.asys-input--title {
+  padding: var(--space-1) 0;
+  border-width: 0;
+  box-shadow: inset 0 -2px 0 var(--danger);
+}
+
+.asys-input-box:has(> .asys-input-box__control[aria-invalid='true']) {
+  border-width: 2px;
+  border-color: var(--danger);
+  padding: calc(var(--space-2) - 1px) calc(var(--space-3) - 1px);
+}
+
+.asys-input-box--pill:has(> .asys-input-box__control[aria-invalid='true']) {
+  padding-inline: calc(var(--space-4) - 1px);
 }
 
 .asys-field--disabled,
@@ -202,18 +274,22 @@ textarea.asys-field__input,
   opacity: 0.4;
 }
 
-.asys-field__input:disabled,
-.asys-field__line:disabled {
+.asys-input:disabled {
   cursor: not-allowed;
 }
 
-[data-theme='drive'] .asys-field__input {
+[data-theme='drive'] .asys-input,
+[data-theme='drive'] .asys-input-box {
   min-height: var(--tap-target-drive);
 }
 
-[data-theme='drive'] textarea.asys-field__input,
-[data-theme='drive'] .asys-field__input--multiline {
+[data-theme='drive'] textarea.asys-input {
   min-height: 96px;
+}
+
+[data-theme='drive'] .asys-input.asys-input--grow,
+[data-theme='drive'] .asys-input.asys-input--title {
+  min-height: var(--tap-target-drive);
 }
 
 /* Layout: phone first, content at most 640px wide. */

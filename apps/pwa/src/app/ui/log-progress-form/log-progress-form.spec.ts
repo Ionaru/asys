@@ -29,7 +29,7 @@ const setup = async (estimateMinutes = 30, busy = false) => {
 
   const root = (): HTMLElement => fixture.nativeElement;
   const input = (): HTMLTextAreaElement =>
-    must(root().querySelector<HTMLTextAreaElement>('textarea.asys-field__line'));
+    must(root().querySelector<HTMLTextAreaElement>('textarea.asys-input-box__control'));
   const form = (): HTMLFormElement => must(root().querySelector('form.asys-progress'));
   const error = (): HTMLElement | null => root().querySelector('.asys-field__error');
   const buttons = (): HTMLButtonElement[] => Array.from(root().querySelectorAll('button'));
@@ -56,15 +56,25 @@ describe('LogProgressForm', () => {
   // A one-row textarea, because Chrome on Android shows its autofill bar on every text input.
   it('labels the field and makes it a one-row textarea with a numeric keyboard', async () => {
     const { root, input } = await setup();
-    const label = must(root().querySelector('label.asys-field__label'));
+    const label = must(root().querySelector('label.asys-label'));
 
     expect(label.textContent?.trim()).toBe('Time still needed');
     expect(label.getAttribute('for')).toBe(input().id);
-    expect(input().id).not.toBe('');
+    expect(input().id).toMatch(/^asys-text-field-\d+/);
     expect(input().rows).toBe(1);
-    expect(input().parentElement?.classList.contains('asys-field__box')).toBe(true);
+    expect(input().parentElement?.tagName).toBe('ASYS-INPUT-BOX');
+    expect(input().getAttribute('wrap')).toBe('off');
     expect(input().getAttribute('inputmode')).toBe('numeric');
     expect(input().getAttribute('autocomplete')).toBe('off');
+  });
+
+  it('draws the field through a text field inside the form, before the button group', async () => {
+    const { form } = await setup();
+    const field = must(form().querySelector('asys-text-field'));
+
+    expect(field.parentElement).toBe(form());
+    expect(field.nextElementSibling?.classList.contains('asys-button-group')).toBe(true);
+    expect(form().querySelector('[id^="asys-progress-"]')).toBeNull();
   });
 
   it('saves on Enter through Save, inserting no line break', async () => {
@@ -108,6 +118,48 @@ describe('LogProgressForm', () => {
     expect(error()).toBeNull();
     expect(input().getAttribute('aria-invalid')).not.toBe('true');
   });
+
+  it('shows the hint for an Estimate of 45 minutes', async () => {
+    const { root } = await setup(45);
+
+    expect(root().querySelector('.asys-field__hint')?.textContent?.trim()).toBe(
+      'Whole minutes, less than 45 min.',
+    );
+  });
+
+  it.each(['0', '45', 'abc', '2.5', ''])(
+    'shows "Use whole minutes from 1 to 44." for %j with an Estimate of 45',
+    async (text) => {
+      const { type, submit, error, save } = await setup(45);
+
+      await type(text);
+      await submit();
+
+      expect(save).not.toHaveBeenCalled();
+      expect(error()?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+        'Error: Use whole minutes from 1 to 44.',
+      );
+    },
+  );
+
+  it.each([
+    ['44', 44],
+    ['1', 1],
+    [' 20 ', 20],
+  ])(
+    'saves %j as %s minutes with an Estimate of 45 and clears the error',
+    async (text, minutes) => {
+      const { type, submit, error, save } = await setup(45);
+
+      await type('abc');
+      await submit();
+      await type(text);
+      await submit();
+
+      expect(save).toHaveBeenCalledExactlyOnceWith(minutes);
+      expect(error()).toBeNull();
+    },
+  );
 
   it('formats a long Estimate in the hint', async () => {
     const { root } = await setup(90);

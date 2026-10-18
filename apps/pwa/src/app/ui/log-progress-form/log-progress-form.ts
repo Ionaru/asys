@@ -2,21 +2,19 @@
 import {
   afterNextRender,
   Component,
-  ElementRef,
+  computed,
   inject,
   Injector,
   input,
   output,
   signal,
+  viewChild,
   ViewEncapsulation,
 } from '@angular/core';
 import { CommandTag, formatMinutes, type LogProgress, TaskStatus } from '@asys/domain';
 
 import { Button, ButtonVariant } from '../button/button';
-import { FieldError } from '../field-error/field-error';
-import { enterAsInput, flattenLines, pressBox } from '../single-line/single-line';
-
-let nextId = 0;
+import { TextField } from '../text-field/text-field';
 
 const WHOLE_MINUTES = /^\d+$/;
 
@@ -35,29 +33,19 @@ export const estimateNowText = (minutes: number): string =>
 /** The inline form that lowers a Task's Estimate to the time still needed. */
 @Component({
   selector: 'asys-log-progress-form',
-  imports: [Button, FieldError],
+  imports: [Button, TextField],
   encapsulation: ViewEncapsulation.None,
   templateUrl: './log-progress-form.component.html',
   styleUrl: './log-progress-form.css',
 })
 export class LogProgressForm {
-  readonly #host = inject<ElementRef<HTMLElement>>(ElementRef);
-
   readonly #injector = inject(Injector);
-
-  readonly #uid = nextId++;
 
   protected readonly Variants = ButtonVariant;
 
-  protected readonly inputId = `asys-progress-input-${this.#uid}`;
+  private readonly field = viewChild.required(TextField);
 
-  protected readonly messageId = `asys-progress-message-${this.#uid}`;
-
-  protected readonly enterAsInput = enterAsInput;
-
-  protected readonly flattenLines = flattenLines;
-
-  protected readonly pressBox = pressBox;
+  protected readonly text = signal('');
 
   protected readonly error = signal(false);
 
@@ -71,24 +59,25 @@ export class LogProgressForm {
   readonly cancel = output<void>();
 
   constructor() {
-    afterNextRender(
-      () => this.#host.nativeElement.querySelector<HTMLTextAreaElement>('textarea')?.focus(),
-      { injector: this.#injector },
-    );
+    afterNextRender(() => this.field().focus(), { injector: this.#injector });
   }
 
-  protected formatted(): string {
-    return formatMinutes(this.estimateMinutes());
-  }
+  protected readonly hint = computed(
+    () => `Whole minutes, less than ${formatMinutes(this.estimateMinutes())}.`,
+  );
+
+  protected readonly errors = computed(() =>
+    this.error()
+      ? [{ kind: 'range', message: `Use whole minutes from 1 to ${this.estimateMinutes() - 1}.` }]
+      : [],
+  );
 
   protected submit(event: Event): void {
     event.preventDefault();
     if (this.busy()) {
       return;
     }
-    const text = (
-      this.#host.nativeElement.querySelector<HTMLTextAreaElement>('textarea')?.value ?? ''
-    ).trim();
+    const text = this.text().trim();
     const minutes = WHOLE_MINUTES.test(text) ? Number(text) : Number.NaN;
     if (!Number.isInteger(minutes) || minutes < 1 || minutes > this.estimateMinutes() - 1) {
       this.error.set(true);

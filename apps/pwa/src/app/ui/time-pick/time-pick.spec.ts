@@ -132,6 +132,14 @@ describe('TimePick', () => {
       expect(input().value).toBe('17:30');
     });
 
+    it('draws the label and input with the shared field classes', async () => {
+      const { input } = await setup('17:30');
+
+      expect(input().classList.contains('asys-input')).toBe(true);
+      expect(input().classList.contains('asys-num')).toBe(true);
+      expect(input().labels?.[0]?.classList.contains('asys-label')).toBe(true);
+    });
+
     it('shows an empty input without a value', async () => {
       const { input } = await setup();
 

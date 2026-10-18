@@ -403,7 +403,7 @@ test('Nothing covers the last Now row, with the pill or the open quick add', asy
   await expectClearOf(lastRow, [quickAdd, nav]);
 
   // A label broken over two lines makes its button taller than the field.
-  const fieldBox = await quickAdd.locator('.asys-quickadd__field').boundingBox();
+  const fieldBox = await quickAdd.locator('.asys-quickadd .asys-input-box').boundingBox();
   if (fieldBox === null) throw new Error('field has no box');
   for (const name of ['Add', 'Close']) {
     const buttonBox = await quickAdd.getByRole('button', { name, exact: true }).boundingBox();

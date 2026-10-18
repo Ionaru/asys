@@ -27,6 +27,7 @@ import { outcomeMessage } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
 import { Ids } from '../../core/platform/ids';
 import { TaskMorph } from '../../core/platform/task-morph';
+import { SingleLine } from '../../ui/single-line/single-line';
 import { TaskBlockers } from './task-blockers';
 import { TaskEditor } from './task-editor';
 import { TaskEditorRoute } from './task-editor-route';
@@ -941,7 +942,52 @@ describe('TaskEditor', () => {
     });
   });
 
+  describe('the Title and Notes fields', () => {
+    it('draws the Title as a one-row title input with no box and no wrap', async () => {
+      const { titleField } = await setup();
+      const title = titleField();
+
+      expect(title.classList.contains('asys-input')).toBe(true);
+      expect(title.classList.contains('asys-input--title')).toBe(true);
+      expect(title.classList.contains('task-editor__title')).toBe(true);
+      expect(title.rows).toBe(1);
+      expect(title.hasAttribute('wrap')).toBe(false);
+      expect(title.classList.contains('asys-input-box__control')).toBe(false);
+      expect(title.closest('asys-input-box')).toBeNull();
+    });
+
+    it('keeps the Title attributes', async () => {
+      const { titleField } = await setup();
+
+      expect(titleField().getAttribute('aria-label')).toBe('Title');
+      expect(titleField().getAttribute('enterkeyhint')).toBe('done');
+      expect(titleField().getAttribute('data-task-id')).toBe('t1');
+    });
+
+    it('draws the Notes as a growing input', async () => {
+      const { notesField } = await setup({
+        state: domainState([{ ...CALL, notes: 'About the lease' }]),
+      });
+      const notes = must(notesField());
+
+      expect(notes.classList.contains('asys-input')).toBe(true);
+      expect(notes.classList.contains('asys-input--grow')).toBe(true);
+      expect(notes.classList.contains('task-editor__notes')).toBe(true);
+      expect(notes.classList.contains('asys-input--title')).toBe(false);
+    });
+  });
+
   describe('the Title keys', () => {
+    it('Enter never submits a form around the editor', async () => {
+      const { fixture, titleField } = await setup();
+      const line = fixture.debugElement
+        .queryAll(By.directive(SingleLine))
+        .find((element) => element.nativeElement === titleField());
+
+      // The editor sits in no form here, so the directive's own switch is what keeps Enter from submitting one.
+      expect(line?.injector.get(SingleLine).submitOnEnter()).toBe(false);
+    });
+
     it('typing alone sends nothing', async () => {
       const { send, typeTitle, titleField } = await setup();
 

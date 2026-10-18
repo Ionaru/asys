@@ -317,7 +317,7 @@ export class ShellLayout {
 
   protected add(text: string): void {
     const from = this.#host.nativeElement
-      .querySelector('.asys-quickadd__field')
+      .querySelector('.asys-quickadd .asys-input-box')
       ?.getBoundingClientRect();
 
     this.text.set('');

@@ -137,8 +137,11 @@
 <ng-template #card>
   <section class="task-editor__card" aria-label="Task">
     <textarea
+      asys-input
+      asys-single-line
       class="task-editor__title"
-      rows="1"
+      [variant]="InputVariants.Title"
+      [submitOnEnter]="false"
       aria-label="Title"
       placeholder="Title"
       enterkeyhint="done"
@@ -148,9 +151,8 @@
       [disabled]="readOnly()"
       [attr.aria-invalid]="saver.needsTitle() ? 'true' : null"
       [attr.aria-describedby]="saver.needsTitle() ? titleErrorId : null"
-      (input)="titleInput($event)"
-      (beforeinput)="titleBreak($event)"
-      (keydown)="titleBreak($event)"
+      (lineChange)="titleInput($event)"
+      (lineBreak)="saver.commit()"
       (change)="saver.commit()"
     ></textarea>
     @if (saver.needsTitle()) {
@@ -159,7 +161,9 @@
     @if (notesShown()) {
       <textarea
         #notesField
-        class="asys-field__input task-editor__notes"
+        asys-input
+        class="task-editor__notes"
+        [variant]="InputVariants.Grow"
         aria-label="Notes"
         placeholder="Add notes"
         rows="1"
