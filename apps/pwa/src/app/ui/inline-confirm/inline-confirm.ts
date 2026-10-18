@@ -10,7 +10,7 @@ import {
   ViewEncapsulation,
 } from '@angular/core';
 
-import { Button, ButtonVariant } from '../button/button';
+import { Button, ButtonVariant } from '../../components/atoms/button/button';
 
 /** An inline confirmation of a destructive action. Focus starts on Cancel, Escape cancels. */
 @Component({

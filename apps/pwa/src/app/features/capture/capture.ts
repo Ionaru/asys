@@ -19,7 +19,7 @@ import { CommandAttempts } from '../../core/data/command-attempts';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { sharedCapture } from '../../core/data/shared-capture';
 import { Ids } from '../../core/platform/ids';
-import { Button, ButtonVariant } from '../../ui/button/button';
+import { Button, ButtonVariant } from '../../components/atoms/button/button';
 import { TextField } from '../../ui/text-field/text-field';
 
 /** The share target: prefills what was shared and captures it into the Inbox with one tap. */

@@ -33,13 +33,13 @@ import { DataStore, SyncStatus } from '../../core/data/data-store';
 import { type DraftFields, followStore, settleSaved } from '../../core/data/draft-follow';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { Ids } from '../../core/platform/ids';
-import { Button, ButtonSize, ButtonVariant } from '../../ui/button/button';
-import { FieldError } from '../../ui/field-error/field-error';
-import { Input } from '../../ui/input/input';
-import { Label } from '../../ui/label/label';
+import { Button, ButtonSize, ButtonVariant } from '../../components/atoms/button/button';
+import { FieldError } from '../../components/atoms/field-error/field-error';
+import { Input } from '../../components/atoms/input/input';
+import { Label } from '../../components/atoms/label/label';
 import { LoadState } from '../../ui/load-state/load-state';
 import { type SelectOption, SelectField } from '../../ui/select-field/select-field';
-import { SyncNote } from '../../ui/sync-note/sync-note';
+import { SyncNote } from '../../components/atoms/sync-note/sync-note';
 import { TextField } from '../../ui/text-field/text-field';
 
 /** One row of Active hours as the time inputs hold it. */

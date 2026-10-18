@@ -43,6 +43,8 @@ jobs:
           fa-token: ${{ secrets.FA_TOKEN }}
       - name: Lint
         run: pnpm exec nx run-many -t lint
+      - name: Check the Atomic Design levels
+        run: node scripts/check-architecture.mts
 
   typecheck:
     needs: audit

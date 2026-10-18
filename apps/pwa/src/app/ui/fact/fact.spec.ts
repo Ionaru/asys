@@ -2,7 +2,7 @@
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
-import { IconName } from '../icon/icon';
+import { IconName } from '../../components/atoms/icon/icon';
 import { Fact } from './fact';
 
 @Component({

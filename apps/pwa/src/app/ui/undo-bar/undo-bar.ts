@@ -14,8 +14,8 @@ import {
 } from '@angular/core';
 
 import { type Activation, activationOf } from '../activation/activation';
-import { Button, ButtonVariant } from '../button/button';
-import { Icon, IconName } from '../icon/icon';
+import { Button, ButtonVariant } from '../../components/atoms/button/button';
+import { Icon, IconName } from '../../components/atoms/icon/icon';
 
 /** Which layout the Undo bar shows. */
 export enum UndoBarVariant {

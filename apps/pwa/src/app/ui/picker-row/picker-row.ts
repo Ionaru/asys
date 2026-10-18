@@ -2,8 +2,8 @@
 import { Component, input, ViewEncapsulation } from '@angular/core';
 import { Quadrant } from '@asys/domain';
 
-import { QuadrantChip } from '../quadrant-chip/quadrant-chip';
-import { StatusBadge, StatusBadgeStatus } from '../status-badge/status-badge';
+import { QuadrantChip } from '../../components/atoms/quadrant-chip/quadrant-chip';
+import { StatusBadge, StatusBadgeStatus } from '../../components/atoms/status-badge/status-badge';
 
 /** The kind of row a picker list shows. */
 export enum PickerRowVariant {

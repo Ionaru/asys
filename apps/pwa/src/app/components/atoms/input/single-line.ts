@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { Directive, ElementRef, inject, input, output } from '@angular/core';
 
-import { InputBox } from '../input-box/input-box';
+import { InputBox } from './input-box';
 
 /** The input types that HTML's implicit submission counts: with one of these, a form without a submit button stays. */
 const BLOCKS_IMPLICIT_SUBMISSION = new Set([

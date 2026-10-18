@@ -27,7 +27,7 @@ import { pathOf } from '../core/platform/url-path';
 import { leafRoute } from '../core/platform/view-transitions';
 import type { Activation } from '../ui/activation/activation';
 import { BottomNav } from '../ui/bottom-nav/bottom-nav';
-import { CaptureButton } from '../ui/capture-button/capture-button';
+import { CaptureButton } from '../components/atoms/capture-button/capture-button';
 import { QuickAdd } from '../ui/quick-add/quick-add';
 import { UndoBar, UndoBarVariant } from '../ui/undo-bar/undo-bar';
 import { flyCapture, tabInView } from './capture-flight';
