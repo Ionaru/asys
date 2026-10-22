@@ -11,7 +11,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { CommandTag, type Command } from '@asys/domain';
 
 import { CommandOutcomeTag } from '../../core/api/data-api';
@@ -19,16 +19,22 @@ import { CommandAttempts } from '../../core/data/command-attempts';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { sharedCapture } from '../../core/data/shared-capture';
 import { Ids } from '../../core/platform/ids';
-import { Button, ButtonVariant } from '../../components/atoms/button/button';
-import { TextField } from '../../components/molecules/text-field/text-field';
+import { CaptureTemplate } from '../../components/templates/capture-template/capture-template';
 
 /** The share target: prefills what was shared and captures it into the Inbox with one tap. */
 @Component({
   selector: 'app-capture',
-  imports: [RouterLink, Button, TextField],
+  imports: [CaptureTemplate],
   providers: [CommandAttempts],
-  templateUrl: './capture.component.html',
-  styleUrl: './capture.css',
+  template: `
+    <asys-capture-template
+      [(title)]="field"
+      [canAdd]="canAdd()"
+      [confirmation]="confirmation()"
+      [message]="message()"
+      (add)="add()"
+    />
+  `,
 })
 export class Capture {
   readonly #router = inject(Router);
@@ -41,7 +47,7 @@ export class Capture {
 
   readonly #destroyRef = inject(DestroyRef);
 
-  private readonly titleField = viewChild(TextField);
+  private readonly template = viewChild(CaptureTemplate);
 
   #pending: Command | null = null;
 
@@ -50,8 +56,6 @@ export class Capture {
   readonly text = input<string | undefined>();
 
   readonly url = input<string | undefined>();
-
-  protected readonly Variant = ButtonVariant;
 
   protected readonly shared = computed(() =>
     sharedCapture({ title: this.title(), text: this.text(), url: this.url() }),
@@ -68,9 +72,7 @@ export class Capture {
   protected readonly canAdd = computed(() => this.field().trim() !== '' && !this.busy());
 
   /** Sends the capture once; the shared URL is replaced after it is applied. */
-  protected async add(event: Event): Promise<void> {
-    event.preventDefault();
-
+  protected async add(): Promise<void> {
     const title = this.field().trim();
 
     if (title === '' || this.busy()) {
@@ -135,6 +137,6 @@ export class Capture {
   }
 
   #focusTitle(): void {
-    afterNextRender(() => this.titleField()?.focus(), { injector: this.#injector });
+    afterNextRender(() => this.template()?.focusTitle(), { injector: this.#injector });
   }
 }

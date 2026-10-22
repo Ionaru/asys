@@ -2,7 +2,7 @@
 import { Routes } from '@angular/router';
 
 import { signedInGuard, signedOutGuard } from './core/auth/guards';
-import { Capture } from './features/capture/capture';
+import { Capture } from './pages/capture/capture';
 import { Now } from './features/now/now';
 import { Today } from './pages/today/today';
 import { ShellLayout } from './layout/shell-layout';
@@ -56,7 +56,7 @@ export const routes: Routes = [
       },
       {
         path: 'settings',
-        loadComponent: () => import('./features/settings/settings').then((m) => m.Settings),
+        loadComponent: () => import('./pages/settings/settings').then((m) => m.Settings),
         title: 'Settings · ASYS',
         data: { level: 1 },
       },

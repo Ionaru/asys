@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { Component, computed, inject, linkedSignal, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { CommandTag } from '@asys/domain';
 
 import { CommandOutcomeTag } from '../../core/api/data-api';
@@ -10,13 +9,8 @@ import { DataStore, SyncStatus } from '../../core/data/data-store';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { TimeZoneSync } from '../../core/data/time-zone-sync';
 import { DeviceZone } from '../../core/platform/device-zone';
-import { Button, ButtonVariant } from '../../components/atoms/button/button';
-import { LoadState } from '../../components/molecules/load-state/load-state';
-import {
-  type SelectOption,
-  SelectField,
-} from '../../components/molecules/select-field/select-field';
-import { SyncNote } from '../../components/atoms/sync-note/sync-note';
+import type { SelectOption } from '../../components/molecules/select-field/select-field';
+import { SettingsTemplate } from '../../components/templates/settings-template/settings-template';
 
 const MAX_URGENCY_DAYS = 14;
 
@@ -43,10 +37,27 @@ const zoneOptions = (stored: string | undefined): readonly SelectOption[] => {
 /** Sets the Urgency window and the time zone, and links to Areas and Account. */
 @Component({
   selector: 'app-settings',
-  imports: [Button, LoadState, RouterLink, SelectField, SyncNote],
+  imports: [SettingsTemplate],
   providers: [CommandAttempts],
-  templateUrl: './settings.component.html',
-  styleUrl: './settings.css',
+  template: `
+    <asys-settings-template
+      [statusLine]="statusLine()"
+      [loaded]="dataStore.state() !== null"
+      [failed]="dataStore.status() === Status.Failed"
+      [busy]="busy()"
+      [awaitingSync]="dataStore.awaitingSync().has(settingsSubject)"
+      [urgencyOptions]="urgencyOptions"
+      [(urgency)]="urgencyValue"
+      (urgencyChange)="chooseUrgency($event)"
+      [zoneOptions]="timeZoneOptions()"
+      [(zone)]="zoneValue"
+      (zoneChange)="chooseZone($event)"
+      [currentZone]="dataStore.state()?.settings.timeZone ?? ''"
+      [deviceZone]="deviceZone()"
+      (useDeviceZone)="chooseZone($event)"
+      (retry)="dataStore.refresh()"
+    />
+  `,
 })
 export class Settings {
   protected readonly dataStore = inject(DataStore);
@@ -58,8 +69,6 @@ export class Settings {
   readonly #timeZoneSync = inject(TimeZoneSync);
 
   protected readonly Status = SyncStatus;
-
-  protected readonly Variant = ButtonVariant;
 
   protected readonly settingsSubject = SETTINGS_SUBJECT;
 
