@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { Component } from '@angular/core';
 
-/** Placeholder for the Today screen. */
+/** Lays out the Today screen, a placeholder until Today arrives. */
 @Component({
-  selector: 'app-today',
+  selector: 'asys-today-template',
   template: `
     <h1 class="asys-page__title today__title">Today</h1>
     <p class="today__text">Today arrives in a later version.</p>
@@ -16,4 +16,4 @@ import { Component } from '@angular/core';
     }
   `,
 })
-export class Today {}
+export class TodayTemplate {}

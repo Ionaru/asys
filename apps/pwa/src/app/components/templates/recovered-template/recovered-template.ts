@@ -2,11 +2,11 @@
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-import { Button, ButtonVariant } from '../../components/atoms/button/button';
+import { Button, ButtonVariant } from '../../atoms/button/button';
 
-/** Shown after a recovery code sign-in, nudging the Owner to replace lost passkeys. */
+/** Lays out the screen shown after a recovery code sign-in, which nudges the Owner to replace lost passkeys. */
 @Component({
-  selector: 'asys-recovered',
+  selector: 'asys-recovered-template',
   imports: [Button, RouterLink],
   template: `
     <main class="asys-page recovered">
@@ -34,6 +34,6 @@ import { Button, ButtonVariant } from '../../components/atoms/button/button';
     }
   `,
 })
-export class Recovered {
+export class RecoveredTemplate {
   protected readonly Variant = ButtonVariant;
 }

@@ -14,6 +14,7 @@ The PWA's presentational components move from `apps/pwa/src/app/ui/` into the At
 - **Focus methods and projection.** Public `focus…()` methods that move focus inside a component, and projected content, are allowed beside inputs and outputs. Replacing them would change behaviour across the specs.
 - **Swipe.** `swipe-actions` keeps its `core/platform` seams (`Motion`, `Haptics`, `theme`), as the only component that may import `core` at runtime.
 - **Enforcement.** `scripts/check-architecture.mts` checks every import under `components/` and `pages/` against the level rules, and runs in the `lint` CI job. A script was chosen over oxlint overrides, because overrides replace rather than merge, so the PWA's shared import bans would be copied once per level.
+- **One template per screen.** Every page gets a template of its own, also where the design system draws none (Recovered, the Areas list and editor, the auth screens, Capture, Settings, Account). Those templates follow what the screen shows today, and the design system is left as it is (decided 2026-10-22).
 - **The shell stays outside.** `layout/` (the shell with the router outlet) and `app.ts` are not a template with inputs and outputs only. They are looked at once the screens are done.
 
 ## Pull requests
@@ -24,7 +25,7 @@ Each lands on `main` with every check green and no visual change unless it says 
 2. **Molecules and support.** Fact, InlineConfirm, LoadState, AreaPick, CaptureField, TextField, Segmented, SelectField, PickerRow, ReviewItem and UndoBar; `activation` and `field-control` into `support/`.
 3. **Organisms.** BottomNav, QuickAdd, LogProgressForm, NowHeader, SectionHeader, Sheet, TimePick, DatePick, EstimateField, ChoiceRow, DateSpecRow, TopPick, TriageCard and SwipeActions; `ui/` is deleted. ChoiceRow, DateSpecRow and SectionHeader go in as organisms although the design system names molecules for them, because they hold a Sheet; the later splits make the molecules real.
 4. **Pages and templates for Today, Recovered and the Areas list**, the lowest risk, to set the pattern.
-5. **Sign-in, Sign-up and Recover**, sharing one template.
+5. **Sign-in, Sign-up and Recover.**
 6. **Capture and Settings.**
 7. **Account.**
 8. **Inbox.**
@@ -41,5 +42,4 @@ Each lands on `main` with every check green and no visual change unless it says 
 
 ## Open questions
 
-- Several screens have no template in the design system (Recovered, the Areas list and editor, the auth screens, Capture, Settings, Account). Before PR 4: add templates for them to the design system, or share one simple screen template.
 - SyncNote may be the design system's SaveStatus. It moves as SyncNote until that is settled.
