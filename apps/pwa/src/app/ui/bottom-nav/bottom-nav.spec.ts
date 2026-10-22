@@ -190,6 +190,89 @@ describe('BottomNav', () => {
     expect(links()[1].getAttribute('aria-current')).toBe('page');
   });
 
+  describe('the pressed pill', () => {
+    /** A pointer event; the defaults are the primary touch pointer's main button. */
+    const pointer = (target: EventTarget, type: string, init: PointerEventInit = {}): void => {
+      target.dispatchEvent(
+        new PointerEvent(type, {
+          pointerId: 1,
+          pointerType: 'touch',
+          isPrimary: true,
+          button: 0,
+          bubbles: true,
+          cancelable: true,
+          ...init,
+        }),
+      );
+    };
+
+    const pressed = (links: HTMLAnchorElement[]): boolean[] =>
+      links.map((a) => a.classList.contains('is-pressed'));
+
+    it('marks only the pressed link while the press lasts, and leaves aria-current alone', async () => {
+      const { fixture, links, go } = await setup();
+
+      await go('/inbox');
+      pointer(links()[0], 'pointerdown');
+      await fixture.whenStable();
+
+      expect(pressed(links())).toEqual([true, false, false]);
+      expect(links().map((a) => a.getAttribute('aria-current'))).toEqual([null, null, 'page']);
+    });
+
+    it.each(['pointerup', 'pointercancel'])(
+      'drops it on %s, wherever the pointer ends',
+      async (type) => {
+        const { fixture, links, go } = await setup();
+
+        await go('/inbox');
+        pointer(links()[0], 'pointerdown');
+        await fixture.whenStable();
+        pointer(document.body, type);
+        await fixture.whenStable();
+
+        expect(pressed(links())).toEqual([false, false, false]);
+      },
+    );
+
+    it('drops it when a context menu opens on the bar', async () => {
+      const { fixture, links, go } = await setup();
+
+      await go('/inbox');
+      pointer(links()[0], 'pointerdown');
+      await fixture.whenStable();
+      links()[0].dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+      await fixture.whenStable();
+
+      expect(pressed(links())).toEqual([false, false, false]);
+    });
+
+    it.each([
+      ['a second finger', { isPrimary: false }],
+      ['a right click', { pointerType: 'mouse', button: 2 }],
+    ])('shows nothing for %s', async (_, init) => {
+      const { fixture, links, go } = await setup();
+
+      await go('/inbox');
+      pointer(links()[0], 'pointerdown', init);
+      await fixture.whenStable();
+
+      expect(pressed(links())).toEqual([false, false, false]);
+    });
+
+    it('drops it when the current tab changes before the press ends, as the back gesture does', async () => {
+      const { fixture, links, go } = await setup();
+
+      await go('/now');
+      pointer(links()[0], 'pointerdown');
+      await fixture.whenStable();
+      await go('/inbox');
+
+      expect(pressed(links())).toEqual([false, false, false]);
+      expect(links().map((a) => a.getAttribute('aria-current'))).toEqual([null, null, 'page']);
+    });
+  });
+
   it('shows no badge at 0', async () => {
     const { fixture } = await setup();
 
