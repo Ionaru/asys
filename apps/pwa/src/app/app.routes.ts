@@ -4,7 +4,7 @@ import { Routes } from '@angular/router';
 import { signedInGuard, signedOutGuard } from './core/auth/guards';
 import { Capture } from './features/capture/capture';
 import { Now } from './features/now/now';
-import { Today } from './features/today/today';
+import { Today } from './pages/today/today';
 import { ShellLayout } from './layout/shell-layout';
 
 export const routes: Routes = [
@@ -29,7 +29,7 @@ export const routes: Routes = [
   },
   {
     path: 'recovered',
-    loadComponent: () => import('./features/recovered/recovered').then((m) => m.Recovered),
+    loadComponent: () => import('./pages/recovered/recovered').then((m) => m.Recovered),
     canActivate: [signedInGuard],
     title: 'Signed in · ASYS',
   },
@@ -62,7 +62,7 @@ export const routes: Routes = [
       },
       {
         path: 'settings/areas',
-        loadComponent: () => import('./features/areas/area-list').then((m) => m.AreaList),
+        loadComponent: () => import('./pages/area-list/area-list').then((m) => m.AreaList),
         title: 'Areas · ASYS',
         data: { level: 2 },
       },
