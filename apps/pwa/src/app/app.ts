@@ -95,7 +95,8 @@ export class App {
             this.#timeZoneSync.stop();
           }
 
-          if (before === SessionState.SignedIn || before === SessionState.Unreachable) {
+          // From Unknown, the guards are still waiting and send the person to sign-in themselves.
+          if (before !== SessionState.Unknown) {
             this.#leave();
           }
         } else if (current === SessionState.Unreachable) {
@@ -138,7 +139,10 @@ export class App {
   }
 
   #leave(): void {
-    const url = this.#router.url;
+    // A navigation still under way, such as a remembered launch's, names the screen being left.
+    const navigation = this.#router.currentNavigation();
+    const target = navigation?.finalUrl ?? navigation?.extractedUrl;
+    const url = target === undefined ? this.#router.url : this.#router.serializeUrl(target);
     const path = pathOf(url);
 
     if (SIGNED_OUT_PATHS.includes(path)) {

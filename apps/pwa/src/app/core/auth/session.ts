@@ -3,12 +3,15 @@ import { inject, Service, signal } from '@angular/core';
 
 import { AuthApi, AuthError, AuthResultTag, type AuthResult, type Me } from '../api/auth-api';
 import { AreaPickStore } from '../data/area-pick-store';
+import { DeviceStorage } from '../platform/device-storage';
 import { ReportedZone } from '../platform/reported-zone';
 import { Theme } from '../platform/theme';
 
 /** What the PWA knows about the sign-in. */
 export enum SessionState {
   Unknown = 'unknown',
+  /** This device was signed in when the server last answered, and it has not answered since launch. */
+  Remembered = 'remembered',
   SignedIn = 'signed_in',
   SignedOut = 'signed_out',
   Unreachable = 'unreachable',
@@ -25,7 +28,13 @@ export enum SignOutReason {
 /** How long `check()` waits for the server before reporting it unreachable. */
 export const SESSION_CHECK_TIMEOUT_MS = 10_000;
 
-/** Whether someone is signed in, learned from `GET /v1/auth/me` (the session cookie is HttpOnly). */
+/** Where DeviceStorage keeps that this device is signed in, so the next launch need not wait for the server. */
+export const SIGNED_IN_KEY = 'asys.signedIn';
+
+/**
+ * Whether someone is signed in, learned from `GET /v1/auth/me` (the session cookie is HttpOnly). A launch
+ * on a device that was signed in starts Remembered, so the signed-in screens show without the network.
+ */
 @Service()
 export class Session {
   readonly #api = inject(AuthApi);
@@ -36,7 +45,11 @@ export class Session {
 
   readonly #theme = inject(Theme);
 
-  readonly #stateSignal = signal(SessionState.Unknown);
+  readonly #storage = inject(DeviceStorage);
+
+  readonly #stateSignal = signal(
+    this.#storage.get(SIGNED_IN_KEY) === null ? SessionState.Unknown : SessionState.Remembered,
+  );
 
   readonly #meSignal = signal<Me | null>(null);
 
@@ -95,6 +108,7 @@ export class Session {
     this.#record(reason);
     this.#stateSignal.set(SessionState.SignedOut);
     this.#meSignal.set(null);
+    this.#storage.remove(SIGNED_IN_KEY);
     this.#reportedZone.clear();
     this.#areaPickStore.clear();
     this.#theme.clearPalette();
@@ -104,6 +118,7 @@ export class Session {
     this.#stateSignal.set(SessionState.SignedIn);
     this.#meSignal.set(me);
     this.#signOutReasonSignal.set(null);
+    this.#storage.set(SIGNED_IN_KEY, 'true');
   }
 
   #record(reason: SignOutReason): void {
@@ -151,6 +166,7 @@ export class Session {
       this.#record(SignOutReason.Revoked);
       this.#stateSignal.set(SessionState.SignedOut);
       this.#meSignal.set(null);
+      this.#storage.remove(SIGNED_IN_KEY);
 
       return;
     }

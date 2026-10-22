@@ -40,12 +40,15 @@ describe('guards', () => {
   };
 
   describe('signedInGuard', () => {
-    it.each([SessionState.SignedIn, SessionState.Unreachable])('allows %s', async (value) => {
-      state.set(value);
+    it.each([SessionState.SignedIn, SessionState.Remembered, SessionState.Unreachable])(
+      'allows %s without waiting for the server',
+      async (value) => {
+        state.set(value);
 
-      expect(await run(signedInGuard, '/capture')).toBe(true);
-      expect(check).not.toHaveBeenCalled();
-    });
+        expect(await run(signedInGuard, '/capture')).toBe(true);
+        expect(check).not.toHaveBeenCalled();
+      },
+    );
 
     it('redirects SignedOut to /signin with the encoded returnUrl', async () => {
       state.set(SessionState.SignedOut);
@@ -102,10 +105,14 @@ describe('guards', () => {
     });
 
     it.each([
-      [SessionState.SignedIn, '/now'],
-      [SessionState.SignedOut, true],
-      [SessionState.Unreachable, true],
-    ])('Unknown awaits check, then decides on %s', async (after, expected) => {
+      [SessionState.Unknown, SessionState.SignedIn, '/now'],
+      [SessionState.Unknown, SessionState.SignedOut, true],
+      [SessionState.Unknown, SessionState.Unreachable, true],
+      [SessionState.Remembered, SessionState.SignedIn, '/now'],
+      [SessionState.Remembered, SessionState.SignedOut, true],
+      [SessionState.Remembered, SessionState.Unreachable, true],
+    ])('%s awaits check, then decides on %s', async (before, after, expected) => {
+      state.set(before);
       check.mockImplementation(() => {
         state.set(after);
 

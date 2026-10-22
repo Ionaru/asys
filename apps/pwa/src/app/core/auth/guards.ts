@@ -7,7 +7,10 @@ import { Session, SessionState } from './session';
 
 const SIGN_UP_PATH = '/signup';
 
-/** Lets signed-in (or unreachable, so offline works) visitors in; sends the rest to sign-in. */
+/**
+ * Lets signed-in, remembered and unreachable visitors in, so a launch works offline; sends the rest to
+ * sign-in. Only an Unknown session waits for the server, because a remembered one needs no answer to show.
+ */
 export const signedInGuard: CanActivateFn = async (_route, state) => {
   const session = inject(Session);
   const router = inject(Router);
@@ -23,12 +26,15 @@ export const signedInGuard: CanActivateFn = async (_route, state) => {
   return true;
 };
 
-/** Keeps signed-in visitors off the sign-in screens, except sign-up, which says so itself. */
+/**
+ * Keeps signed-in visitors off the sign-in screens, except sign-up, which says so itself. A remembered
+ * session waits for the server here too, because only its answer tells a sign-in screen from Now.
+ */
 export const signedOutGuard: CanActivateFn = async (_route, state) => {
   const session = inject(Session);
   const router = inject(Router);
 
-  if (session.state() === SessionState.Unknown) {
+  if (session.state() === SessionState.Unknown || session.state() === SessionState.Remembered) {
     await session.check();
   }
 

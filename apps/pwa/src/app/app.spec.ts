@@ -77,6 +77,8 @@ const setup = async (initial: SessionState, url = '/now', realSession = false) =
           { path: 'signin', component: Stub },
           { path: 'signup', component: Stub },
           { path: 'recover', component: Stub },
+          // A lazy screen that never finishes loading, so a navigation to it stays under way.
+          { path: 'inbox', loadComponent: () => new Promise<typeof Stub>(() => undefined) },
         ],
         withComponentInputBinding(),
       ),
@@ -162,6 +164,10 @@ const setupWithRealSession = async (url: string) => ({
 });
 
 describe('App', () => {
+  afterEach(() => {
+    localStorage.clear();
+  });
+
   it('renders the router outlet', async () => {
     const { root } = await setup(SessionState.Unknown);
 
@@ -177,17 +183,20 @@ describe('App', () => {
       expect(discardPreload).not.toHaveBeenCalled();
     });
 
-    it('starts, keeping the preload for it, when the session becomes signed in', async () => {
-      const { sessionState, settle, start, discardPreload } = await setup(SessionState.Unknown);
+    it.each([SessionState.Unknown, SessionState.Remembered])(
+      'starts, keeping the preload for it, when %s becomes signed in',
+      async (initial) => {
+        const { sessionState, settle, start, discardPreload } = await setup(initial);
 
-      expect(start).not.toHaveBeenCalled();
+        expect(start).not.toHaveBeenCalled();
 
-      sessionState.set(SessionState.SignedIn);
-      await settle();
+        sessionState.set(SessionState.SignedIn);
+        await settle();
 
-      expect(start).toHaveBeenCalledTimes(1);
-      expect(discardPreload).not.toHaveBeenCalled();
-    });
+        expect(start).toHaveBeenCalledTimes(1);
+        expect(discardPreload).not.toHaveBeenCalled();
+      },
+    );
 
     it('stops once and discards the preload when the session becomes signed out after a start', async () => {
       const { sessionState, settle, start, stop, discardPreload } = await setup(
@@ -202,12 +211,15 @@ describe('App', () => {
       expect(discardPreload).toHaveBeenCalledTimes(1);
     });
 
-    it.each([SessionState.SignedOut, SessionState.Unreachable])(
-      'discards the preload, starting and stopping nothing, when unknown becomes %s',
-      async (end) => {
-        const { sessionState, settle, start, stop, discardPreload } = await setup(
-          SessionState.Unknown,
-        );
+    it.each([
+      [SessionState.Unknown, SessionState.SignedOut],
+      [SessionState.Unknown, SessionState.Unreachable],
+      [SessionState.Remembered, SessionState.SignedOut],
+      [SessionState.Remembered, SessionState.Unreachable],
+    ])(
+      'discards the preload, starting and stopping nothing, when %s becomes %s',
+      async (initial, end) => {
+        const { sessionState, settle, start, stop, discardPreload } = await setup(initial);
 
         sessionState.set(end);
         await settle();
@@ -329,6 +341,36 @@ describe('App', () => {
       await settle();
 
       expect(router.url).toBe('/signin?returnUrl=%2Fnow');
+    });
+
+    it('navigates from /now to sign-in with the return URL when remembered becomes signed out', async () => {
+      const { router, sessionState, signOutReason, settle } = await setup(
+        SessionState.Remembered,
+        '/now',
+      );
+
+      signOutReason.set(SignOutReason.Revoked);
+      sessionState.set(SessionState.SignedOut);
+      await settle();
+
+      expect(router.url).toBe('/signin?returnUrl=%2Fnow');
+    });
+
+    it('returns to where a navigation under way was going, not to the screen it leaves', async () => {
+      const { router, sessionState, signOutReason, settle } = await setup(
+        SessionState.Remembered,
+        '/now',
+      );
+
+      void router.navigateByUrl('/inbox?from=launch');
+      await new Promise<void>((resolve) => setTimeout(resolve));
+      expect(router.currentNavigation()).not.toBeNull();
+
+      signOutReason.set(SignOutReason.Revoked);
+      sessionState.set(SessionState.SignedOut);
+      await settle();
+
+      expect(router.url).toBe('/signin?returnUrl=%2Finbox%3Ffrom%3Dlaunch');
     });
 
     it('navigates from /account to /signin without a return URL when the person chose to sign out', async () => {
@@ -501,7 +543,12 @@ describe('App', () => {
     });
 
     it('is absent in the other session states', async () => {
-      for (const state of [SessionState.Unknown, SessionState.SignedIn, SessionState.SignedOut]) {
+      for (const state of [
+        SessionState.Unknown,
+        SessionState.Remembered,
+        SessionState.SignedIn,
+        SessionState.SignedOut,
+      ]) {
         TestBed.resetTestingModule();
         const { banners } = await setup(state);
 
@@ -581,18 +628,20 @@ describe('App', () => {
       expect(check).toHaveBeenCalledTimes(1);
     });
 
-    it.each([SessionState.Unknown, SessionState.SignedIn, SessionState.SignedOut])(
-      'does not check the session on focus or online while %s',
-      async (initial) => {
-        const { check, settle } = await setup(initial);
+    it.each([
+      SessionState.Unknown,
+      SessionState.Remembered,
+      SessionState.SignedIn,
+      SessionState.SignedOut,
+    ])('does not check the session on focus or online while %s', async (initial) => {
+      const { check, settle } = await setup(initial);
 
-        window.dispatchEvent(new Event('focus'));
-        window.dispatchEvent(new Event('online'));
-        await settle();
+      window.dispatchEvent(new Event('focus'));
+      window.dispatchEvent(new Event('online'));
+      await settle();
 
-        expect(check).not.toHaveBeenCalled();
-      },
-    );
+      expect(check).not.toHaveBeenCalled();
+    });
 
     it('stops checking once the session is reachable again', async () => {
       const { sessionState, check, settle } = await setup(SessionState.Unreachable);
