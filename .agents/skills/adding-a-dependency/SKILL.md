@@ -20,8 +20,10 @@ Every dependency is a supply-chain and licence decision (ADR 0011). The workspac
      - the `effect` and `@effect/platform-node-shared` overrides in `pnpm-workspace.yaml` (the `typescript` override is separate);
      - the `effect` pins in `libs/contract/package.json` and `libs/effect-passkeys/package.json`.
 
-     Then recheck the `effect/unstable/sql/SqlError` path in `tsconfig.base.json`, the type test and the `drizzle-orm/effect-postgres` smoke import in `cd.yaml`.
+     Then recheck the type test and the `drizzle-orm/effect-postgres` smoke import in `cd.yaml`.
 
+   - A drizzle-kit upgrade can change the snapshot format, and `drizzle-kit generate` then asks for `drizzle-kit up`. Run `pnpm exec drizzle-kit up --config apps/server/drizzle.config.ts`, which rewrites only the `snapshot.json` files, then the empty `generate` check from `adding-an-owned-table`.
+   - pnpm 11 holds back versions published less than a day ago (`minimumReleaseAge`, 1440 minutes by default). For a younger version, `pnpm install` adds it to `minimumReleaseAgeExclude` in `pnpm-workspace.yaml`. Never commit that entry. Without it, CI's frozen install fails its lockfile check (`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`) until the version is a day old, so push the upgrade after that. A local frozen install can still pass, because pnpm caches its lockfile verification.
    - A lib manifest's version of a shared package stays equal to the root's.
    - After an oxlint upgrade, check that a banned import still turns lint red, because the boundary bridge is experimental.
 4. **Build scripts.** pnpm runs none by default. A package that needs one must be added to `allowBuilds` in `pnpm-workspace.yaml`. Keep that list minimal, and record a reviewed denial as `false`.

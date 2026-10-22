@@ -1,79 +1,37 @@
 {
-  "version": "8",
+  "type": "diff",
+  "version": "9",
   "dialect": "postgres",
   "id": "af387332-5a88-4a7a-bc57-744e09d806ab",
   "prevIds": [
     "73fd9aed-cf65-46ef-a7bb-c2a14e51124a"
   ],
-  "ddl": [
+  "footprints": [
     {
-      "isRlsEnabled": true,
-      "name": "trial_items",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "gen_random_uuid()",
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "trial_items"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "owner_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "trial_items"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "title",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "trial_items"
-    },
-    {
-      "columns": [
-        "id"
+      "statementType": "alter_policy",
+      "statementTarget": [
+        "table",
+        "public",
+        "trial_items"
       ],
-      "nameExplicit": false,
-      "name": "trial_items_pkey",
-      "schema": "public",
-      "table": "trial_items",
-      "entityType": "pks"
-    },
-    {
-      "as": "PERMISSIVE",
-      "for": "ALL",
-      "roles": [
-        "public"
+      "writes": [
+        "s|pol|public.trial_items.trial_items_owner"
       ],
-      "using": "\"trial_items\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
-      "withCheck": "\"trial_items\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
-      "name": "trial_items_owner",
-      "entityType": "policies",
-      "schema": "public",
-      "table": "trial_items"
+      "reads": [
+        "n|tbl|public.trial_items",
+        "n|sch|public"
+      ],
+      "sqlHash": "77c94f182729e9c9"
     }
   ],
-  "renames": []
+  "deltas": [
+    {
+      "op": "alter",
+      "key": "policies\u0000[\"public\",\"trial_items\",\"trial_items_owner\"]",
+      "set": {
+        "using": "\"trial_items\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
+        "withCheck": "\"trial_items\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid"
+      }
+    }
+  ]
 }
