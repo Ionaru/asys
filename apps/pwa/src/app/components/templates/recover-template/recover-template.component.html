@@ -1,9 +1,9 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
 <main class="asys-page recover">
   <h1 class="asys-page__title asys-page__title--flush recover__title">Use a recovery code</h1>
-  <form class="recover__form" [formRoot]="codeForm">
+  <form class="recover__form" [formRoot]="codeForm()">
     <asys-text-field
-      [formField]="codeForm.code"
+      [formField]="codeForm().code"
       label="Recovery code"
       hint="One of the codes you saved when you signed up."
       autocomplete="off"

@@ -1,20 +1,10 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { Location } from '@angular/common';
-import {
-  afterRenderEffect,
-  Component,
-  computed,
-  DestroyRef,
-  effect,
-  ElementRef,
-  inject,
-  signal,
-  viewChild,
-} from '@angular/core';
+import { Component, computed, DestroyRef, effect, inject, signal } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { form, FormField, FormRoot, validate } from '@angular/forms/signals';
-import { NavigationEnd, Router, RouterLink } from '@angular/router';
+import { form, validate } from '@angular/forms/signals';
+import { NavigationEnd, Router } from '@angular/router';
 import { filter, take } from 'rxjs';
 import { CeremonyResultTag, PasskeyFailure } from '@ionaru/effect-passkeys/client';
 
@@ -23,22 +13,14 @@ import { PasskeyCeremony } from '../../core/api/passkey-ceremony';
 import { Session, SessionState } from '../../core/auth/session';
 import { GENERIC_MESSAGE } from '../../core/data/outcome-message';
 import { DeviceZone } from '../../core/platform/device-zone';
-import { Button, ButtonVariant } from '../../components/atoms/button/button';
-import { IconName } from '../../components/atoms/icon/icon';
-import { TextField } from '../../components/molecules/text-field/text-field';
-import { ceremonyOptions } from '../auth/ceremony-options';
-import { nameError } from '../auth/name-rule';
-import { MISCONFIGURED_MESSAGE, TRY_AGAIN_MESSAGE } from '../auth/passkey-messages';
-import { recoveryCodes } from '../auth/recovery-codes';
-
-/** The screens of the sign-up flow. */
-export enum SignUpStep {
-  Name = 'name',
-  Passkey = 'passkey',
-  Codes = 'codes',
-  LinkInvalid = 'link_invalid',
-  AlreadySignedIn = 'already_signed_in',
-}
+import {
+  SignUpStep,
+  SignUpTemplate,
+} from '../../components/templates/sign-up-template/sign-up-template';
+import { ceremonyOptions } from '../../features/auth/ceremony-options';
+import { nameError } from '../../features/auth/name-rule';
+import { MISCONFIGURED_MESSAGE, TRY_AGAIN_MESSAGE } from '../../features/auth/passkey-messages';
+import { recoveryCodes } from '../../features/auth/recovery-codes';
 
 const ALREADY_REGISTERED_MESSAGE = 'This device already has a passkey for ASYS. Sign in instead.';
 
@@ -62,9 +44,25 @@ const messageForFailure = (failure: PasskeyFailure): string => {
 /** Signs up a new User from a Sign-up link: name, passkey, recovery codes. */
 @Component({
   selector: 'asys-sign-up',
-  imports: [Button, FormField, FormRoot, RouterLink, TextField],
-  templateUrl: './sign-up.component.html',
-  styleUrl: './sign-up.css',
+  imports: [SignUpTemplate],
+  template: `
+    <asys-sign-up-template
+      [step]="step()"
+      [nameForm]="nameForm"
+      [name]="submittedName()"
+      [ready]="options() !== null"
+      [busy]="busy()"
+      [message]="shownMessage()"
+      [loadFailed]="loadError() !== null"
+      [codes]="codes()"
+      [copyStatus]="copyStatus()"
+      (createPasskey)="createPasskey()"
+      (changeName)="changeName()"
+      (retry)="discard()"
+      (copyCodes)="copy()"
+      (finish)="finish()"
+    />
+  `,
 })
 export class SignUp {
   readonly #authApi = inject(AuthApi);
@@ -78,14 +76,6 @@ export class SignUp {
   readonly #router = inject(Router);
 
   readonly #destroyRef = inject(DestroyRef);
-
-  protected readonly Variant = ButtonVariant;
-
-  protected readonly Icons = IconName;
-
-  protected readonly Step = SignUpStep;
-
-  private readonly title = viewChild<ElementRef<HTMLElement>>('title');
 
   /** The Sign-up token: a credential, kept in memory only. */
   #token = '';
@@ -105,17 +95,6 @@ export class SignUp {
   readonly #message = signal<string | null>(null);
 
   protected readonly copyStatus = this.#recovery.copyStatus;
-
-  protected readonly heading = computed(() => {
-    switch (this.step()) {
-      case SignUpStep.Codes:
-        return 'Your recovery codes';
-      case SignUpStep.LinkInvalid:
-        return 'This Sign-up link does not work';
-      default:
-        return 'Sign up';
-    }
-  });
 
   readonly #model = signal({ name: '' });
 
@@ -192,20 +171,6 @@ export class SignUp {
       if (this.loadError() === AuthError.SignUpLinkInvalid) {
         this.step.set(SignUpStep.LinkInvalid);
       }
-    });
-
-    let first = true;
-
-    afterRenderEffect(() => {
-      this.step();
-
-      if (first) {
-        first = false;
-
-        return;
-      }
-
-      this.title()?.nativeElement.focus();
     });
   }
 
