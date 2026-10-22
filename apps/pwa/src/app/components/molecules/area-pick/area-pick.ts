@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { Component, ElementRef, input, output, viewChild, ViewEncapsulation } from '@angular/core';
 
-import { IconName, Icon } from '../../components/atoms/icon/icon';
+import { IconName, Icon } from '../../atoms/icon/icon';
 
 /** One Area the control offers. */
 export interface AreaChoice {

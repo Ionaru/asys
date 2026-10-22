@@ -29,8 +29,11 @@ import { CommandAttempts } from '../../core/data/command-attempts';
 import { DataStore, SyncStatus } from '../../core/data/data-store';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { Button, ButtonSize, ButtonVariant } from '../../components/atoms/button/button';
-import { LoadState } from '../../ui/load-state/load-state';
-import { ReviewItem, ReviewItemActionKind } from '../../ui/review-item/review-item';
+import { LoadState } from '../../components/molecules/load-state/load-state';
+import {
+  ReviewItem,
+  ReviewItemActionKind,
+} from '../../components/molecules/review-item/review-item';
 import { SyncNote } from '../../components/atoms/sync-note/sync-note';
 import { type AreaChoice, TriageCard, type TriageDraft } from '../../ui/triage-card/triage-card';
 import { byAreaName } from '../areas/area-order';

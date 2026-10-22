@@ -12,7 +12,7 @@ import {
 } from '@angular/core';
 
 import { Button, ButtonSize, ButtonVariant } from '../../components/atoms/button/button';
-import { CaptureField } from '../capture-field/capture-field';
+import { CaptureField } from '../../components/molecules/capture-field/capture-field';
 import { Icon, IconName } from '../../components/atoms/icon/icon';
 
 /** A capture that was not sent, shown above the input. */

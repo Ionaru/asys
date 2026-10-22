@@ -7,7 +7,7 @@ import { AuthApi, AuthError, AuthResultTag } from '../../core/api/auth-api';
 import { Session } from '../../core/auth/session';
 import { GENERIC_MESSAGE } from '../../core/data/outcome-message';
 import { Button, ButtonVariant } from '../../components/atoms/button/button';
-import { TextField } from '../../ui/text-field/text-field';
+import { TextField } from '../../components/molecules/text-field/text-field';
 
 /** The longest recovery code the server accepts. */
 export const MAX_CODE_LENGTH = 64;

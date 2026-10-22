@@ -23,7 +23,7 @@ import { Clock } from '../../core/platform/clock';
 import { DeviceZone } from '../../core/platform/device-zone';
 import { Button, ButtonSize, ButtonVariant } from '../../components/atoms/button/button';
 import { IconName } from '../../components/atoms/icon/icon';
-import { TextField } from '../../ui/text-field/text-field';
+import { TextField } from '../../components/molecules/text-field/text-field';
 import { messageForAuthError, type AuthErrorMessages } from '../auth/auth-error-message';
 import { ceremonyOptions } from '../auth/ceremony-options';
 import { nameError } from '../auth/name-rule';

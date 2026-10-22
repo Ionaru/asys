@@ -30,7 +30,7 @@ import { Button, ButtonSize, ButtonVariant } from '../../components/atoms/button
 import { IconName } from '../../components/atoms/icon/icon';
 import { SectionHeader, SectionHeaderAction } from '../../ui/section-header/section-header';
 import { Sheet } from '../../ui/sheet/sheet';
-import { TextField } from '../../ui/text-field/text-field';
+import { TextField } from '../../components/molecules/text-field/text-field';
 import { blockerSummary } from './blocker-summary';
 
 /** The Blocked by section of the Task editor: a header with a one-line summary that opens a sheet. */
