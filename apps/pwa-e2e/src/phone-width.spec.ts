@@ -161,7 +161,7 @@ test('The Task editor has no nav, its footer clears the card and nothing scrolls
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('Editor phone Task');
   await expect(page.getByRole('navigation', { name: 'Primary' })).toHaveCount(0);
 
-  const done = page.getByRole('button', { name: 'Done', exact: true });
+  const done = page.getByRole('button', { name: 'Mark Done', exact: true });
   await expect(done).toBeVisible();
 
   await scrollToBottom(page);

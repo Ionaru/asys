@@ -319,7 +319,7 @@ test("goes back from the editor's Done without a morph", async ({ page }) => {
   await lastSettled(page, before);
 
   before = await recordCount(page);
-  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await page.getByRole('button', { name: 'Mark Done', exact: true }).click();
   await expect(page).toHaveURL(/\/now$/);
   const pop = await lastSettled(page, before);
 
@@ -338,7 +338,7 @@ test("captures the Undo bar on the editor's Done Pop", async ({ page }) => {
   await lastSettled(page, before);
 
   before = await recordCount(page);
-  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await page.getByRole('button', { name: 'Mark Done', exact: true }).click();
   await expect(page).toHaveURL(/\/now$/);
   const pop = await lastSettled(page, before);
 
