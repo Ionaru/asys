@@ -2,10 +2,10 @@
 import { Component, computed, input, output, signal, ViewEncapsulation } from '@angular/core';
 import { addDays, formatDate, isLocalDate, isoWeekdayOf, type LocalDate } from '@asys/domain';
 
-import { Button, ButtonVariant } from '../../components/atoms/button/button';
-import { FieldError } from '../../components/atoms/field-error/field-error';
-import { Input } from '../../components/atoms/input/input';
-import { Label } from '../../components/atoms/label/label';
+import { Button, ButtonVariant } from '../../atoms/button/button';
+import { FieldError } from '../../atoms/field-error/field-error';
+import { Input } from '../../atoms/input/input';
+import { Label } from '../../atoms/label/label';
 import { dayLabel } from './day-label';
 
 let nextId = 0;

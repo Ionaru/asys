@@ -40,9 +40,12 @@ import { observeBlockSize } from '../../core/platform/observe-block-size';
 import { TaskMorph } from '../../core/platform/task-morph';
 import { activationOf } from '../../components/support/activation';
 import { Button, ButtonSize, ButtonVariant } from '../../components/atoms/button/button';
-import { ChoiceRow } from '../../ui/choice-row/choice-row';
-import { DateSpecRow } from '../../ui/date-spec-row/date-spec-row';
-import { EstimateField, EstimateLayout } from '../../ui/estimate-field/estimate-field';
+import { ChoiceRow } from '../../components/organisms/choice-row/choice-row';
+import { DateSpecRow } from '../../components/organisms/date-spec-row/date-spec-row';
+import {
+  EstimateField,
+  EstimateLayout,
+} from '../../components/organisms/estimate-field/estimate-field';
 import { FieldError } from '../../components/atoms/field-error/field-error';
 import { Icon, IconName } from '../../components/atoms/icon/icon';
 import { Input, InputVariant } from '../../components/atoms/input/input';
@@ -52,11 +55,11 @@ import {
   estimateNowText,
   LogProgressForm,
   logProgressCommand,
-} from '../../ui/log-progress-form/log-progress-form';
+} from '../../components/organisms/log-progress-form/log-progress-form';
 import { QuadrantChip } from '../../components/atoms/quadrant-chip/quadrant-chip';
 import { Segmented } from '../../components/molecules/segmented/segmented';
 import { areaSelectOptions } from '../../components/molecules/select-field/area-options';
-import { Sheet } from '../../ui/sheet/sheet';
+import { Sheet } from '../../components/organisms/sheet/sheet';
 import { SingleLine } from '../../components/atoms/input/single-line';
 import { StatusBadge, StatusBadgeStatus } from '../../components/atoms/status-badge/status-badge';
 import { SyncNote } from '../../components/atoms/sync-note/sync-note';

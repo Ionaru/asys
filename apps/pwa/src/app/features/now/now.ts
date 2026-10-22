@@ -48,13 +48,13 @@ import {
   estimateNowText,
   LogProgressForm,
   logProgressCommand,
-} from '../../ui/log-progress-form/log-progress-form';
-import { NowHeader } from '../../ui/now-header/now-header';
+} from '../../components/organisms/log-progress-form/log-progress-form';
+import { NowHeader } from '../../components/organisms/now-header/now-header';
 import { PickerRow, PickerRowVariant } from '../../components/molecules/picker-row/picker-row';
-import { SectionHeader } from '../../ui/section-header/section-header';
-import { SwipeActions } from '../../ui/swipe-actions/swipe-actions';
+import { SectionHeader } from '../../components/organisms/section-header/section-header';
+import { SwipeActions } from '../../components/organisms/swipe-actions/swipe-actions';
 import { SyncNote } from '../../components/atoms/sync-note/sync-note';
-import { TopPick } from '../../ui/top-pick/top-pick';
+import { TopPick } from '../../components/organisms/top-pick/top-pick';
 import { byAreaName } from '../areas/area-order';
 import {
   areaNamesText,

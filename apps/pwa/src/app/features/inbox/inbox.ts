@@ -35,7 +35,11 @@ import {
   ReviewItemActionKind,
 } from '../../components/molecules/review-item/review-item';
 import { SyncNote } from '../../components/atoms/sync-note/sync-note';
-import { type AreaChoice, TriageCard, type TriageDraft } from '../../ui/triage-card/triage-card';
+import {
+  type AreaChoice,
+  TriageCard,
+  type TriageDraft,
+} from '../../components/organisms/triage-card/triage-card';
 import { byAreaName } from '../areas/area-order';
 import { reviewCopy } from './review-copy';
 

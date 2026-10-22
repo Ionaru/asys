@@ -11,7 +11,7 @@ import {
 } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 
-import { Icon, IconName } from '../../components/atoms/icon/icon';
+import { Icon, IconName } from '../../atoms/icon/icon';
 
 /**
  * The primary navigation bar with Now, Today and Inbox, each an icon over its word, and room at its end for

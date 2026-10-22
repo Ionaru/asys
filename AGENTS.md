@@ -32,7 +32,7 @@ Use Node 24 and pnpm 11. `package.json` has no scripts, so everything runs throu
 
 - **Database:** `docker compose up -d --wait`, then `pnpm exec drizzle-kit migrate --config apps/server/drizzle.config.ts`. The root `.env` holds the passwords and `DATABASE_URL_OWNER` / `DATABASE_URL_APP` (see `README.md`).
 - **Dev stack:** start `pnpm exec nx serve pwa` before `pnpm exec nx serve server`, because generating the PWA's API client rebuilds the server bundle. Open `http://localhost:4200` exactly. On `127.0.0.1`, the Origin guard answers 403 and passkeys fail.
-- **One project:** `pnpm exec nx <target> <project>`, for example `pnpm exec nx test domain` or `pnpm exec nx typecheck pwa`. **One spec:** `pnpm exec nx test domain -- src/lib/picker/picker.spec.ts`; the PWA's unit-test builder takes `--include` instead: `pnpm exec nx test pwa --include=apps/pwa/src/app/ui/sheet/sheet.spec.ts`.
+- **One project:** `pnpm exec nx <target> <project>`, for example `pnpm exec nx test domain` or `pnpm exec nx typecheck pwa`. **One spec:** `pnpm exec nx test domain -- src/lib/picker/picker.spec.ts`; the PWA's unit-test builder takes `--include` instead: `pnpm exec nx test pwa --include=apps/pwa/src/app/components/organisms/sheet/sheet.spec.ts`.
 - **JSON from Nx:** `pnpm exec` prints "Already up to date" first, so for JSON run `node_modules/.bin/nx show project <name> --json`.
 
 CI (`.github/workflows/cd.yaml`) runs each check below as its own job. Run the ones your change touches before you call it done:

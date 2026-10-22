@@ -13,8 +13,8 @@ import {
 } from '@angular/core';
 import { CommandTag, formatMinutes, type LogProgress, TaskStatus } from '@asys/domain';
 
-import { Button, ButtonVariant } from '../../components/atoms/button/button';
-import { TextField } from '../../components/molecules/text-field/text-field';
+import { Button, ButtonVariant } from '../../atoms/button/button';
+import { TextField } from '../../molecules/text-field/text-field';
 
 const WHOLE_MINUTES = /^\d+$/;
 

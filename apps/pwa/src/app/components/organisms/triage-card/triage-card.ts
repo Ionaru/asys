@@ -14,15 +14,12 @@ import {
   ViewEncapsulation,
 } from '@angular/core';
 
-import { Button, ButtonSize, ButtonVariant } from '../../components/atoms/button/button';
+import { Button, ButtonSize, ButtonVariant } from '../../atoms/button/button';
 import { EstimateField } from '../estimate-field/estimate-field';
-import { InlineConfirm } from '../../components/molecules/inline-confirm/inline-confirm';
-import { Segmented } from '../../components/molecules/segmented/segmented';
-import {
-  areaSelectOptions,
-  NO_AREA_LABEL,
-} from '../../components/molecules/select-field/area-options';
-import { SelectField } from '../../components/molecules/select-field/select-field';
+import { InlineConfirm } from '../../molecules/inline-confirm/inline-confirm';
+import { Segmented } from '../../molecules/segmented/segmented';
+import { areaSelectOptions, NO_AREA_LABEL } from '../../molecules/select-field/area-options';
+import { SelectField } from '../../molecules/select-field/select-field';
 
 /** The Triage choices for one Inbox Task. */
 export interface TriageDraft {

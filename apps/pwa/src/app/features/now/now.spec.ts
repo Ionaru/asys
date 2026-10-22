@@ -37,7 +37,7 @@ import { Clock } from '../../core/platform/clock';
 import { Ids } from '../../core/platform/ids';
 import { Motion, MotionDuration, MotionEasing } from '../../core/platform/motion';
 import { TaskMorph } from '../../core/platform/task-morph';
-import { SwipeActions } from '../../ui/swipe-actions/swipe-actions';
+import { SwipeActions } from '../../components/organisms/swipe-actions/swipe-actions';
 import { Now } from './now';
 
 const ZONE = 'Europe/Amsterdam';

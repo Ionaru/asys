@@ -3,9 +3,9 @@ import { Component, ErrorHandler, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router, RouterLink } from '@angular/router';
 
-import { Haptics } from '../../core/platform/haptics';
-import { Motion, MotionDuration, MotionEasing } from '../../core/platform/motion';
-import { ThemeName } from '../../core/platform/theme';
+import { Haptics } from '../../../core/platform/haptics';
+import { Motion, MotionDuration, MotionEasing } from '../../../core/platform/motion';
+import { ThemeName } from '../../../core/platform/theme';
 import { SwipeActions } from './swipe-actions';
 import { CLICK_SUPPRESS_MS, EDGE_DEAD_ZONE_PX } from './swipe-decision';
 

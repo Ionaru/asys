@@ -2,7 +2,7 @@
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
-import { IconName } from '../../components/atoms/icon/icon';
+import { IconName } from '../../atoms/icon/icon';
 import { SectionHeader, SectionHeaderAction } from './section-header';
 
 @Component({
