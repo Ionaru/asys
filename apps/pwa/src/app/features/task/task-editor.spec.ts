@@ -593,7 +593,7 @@ describe('TaskEditor', () => {
     it('never shows the missing line once a Done is held, and keeps the last title', async () => {
       const { text, heading, footerButton, press, update, doneUndo } = await setup();
 
-      await press(footerButton('Done'));
+      await press(footerButton('Mark Done'));
 
       expect(doneUndo.complete).toHaveBeenCalledTimes(1);
 
@@ -1290,7 +1290,7 @@ describe('TaskEditor', () => {
       expect(cardControls().length).toBeGreaterThan(10);
       expect(cardControls().filter((c) => !c.disabled)).toEqual([]);
       expect(moreButton()).toBeNull();
-      expect(must(footerButton('Done')).disabled).toBe(true);
+      expect(must(footerButton('Mark Done')).disabled).toBe(true);
     });
 
     it('shows a save message in place of the Log progress confirmation', async () => {
@@ -1553,7 +1553,7 @@ describe('TaskEditor', () => {
     it('holds the Task and goes to Now at once when there is no history', async () => {
       const { doneUndo, send, footerButton, press, navigate, back } = await setup();
 
-      await press(footerButton('Done'));
+      await press(footerButton('Mark Done'));
 
       expect(doneUndo.complete).toHaveBeenCalledExactlyOnceWith(
         CALL,
@@ -1570,7 +1570,7 @@ describe('TaskEditor', () => {
         withHistory: true,
       });
 
-      await press(footerButton('Done'));
+      await press(footerButton('Mark Done'));
 
       expect(doneUndo.complete).toHaveBeenCalledExactlyOnceWith(
         CALL,
@@ -1585,7 +1585,7 @@ describe('TaskEditor', () => {
     it('a pointer Done does not ask the Undo bar for focus', async () => {
       const { doneUndo, footerButton, press } = await setup();
 
-      await press(footerButton('Done'));
+      await press(footerButton('Mark Done'));
 
       expect(doneUndo.requestFocus).not.toHaveBeenCalled();
     });
@@ -1593,7 +1593,7 @@ describe('TaskEditor', () => {
     it('a keyboard Done asks the Undo bar for focus, between holding the Task and leaving', async () => {
       const { doneUndo, footerButton, click, navigate } = await setup();
 
-      await click(footerButton('Done'));
+      await click(footerButton('Mark Done'));
 
       expect(doneUndo.requestFocus).toHaveBeenCalledTimes(1);
 
@@ -1610,9 +1610,9 @@ describe('TaskEditor', () => {
       await press(importanceButton('Not important'));
 
       expect(send).toHaveBeenCalledTimes(1);
-      expect(must(footerButton('Done')).disabled).toBe(false);
+      expect(must(footerButton('Mark Done')).disabled).toBe(false);
 
-      await press(footerButton('Done'));
+      await press(footerButton('Mark Done'));
 
       expect(doneUndo.complete).toHaveBeenCalledExactlyOnceWith(
         CALL,
@@ -1627,7 +1627,7 @@ describe('TaskEditor', () => {
       const { doneUndo, send, footerButton, press, importanceButton, finish } = await setup();
 
       await press(importanceButton('Not important'));
-      await press(footerButton('Done'));
+      await press(footerButton('Mark Done'));
 
       const after = doneUndo.complete.mock.calls[0]?.[2];
       let settled = false;
@@ -1655,7 +1655,7 @@ describe('TaskEditor', () => {
       title.value = 'Call Marit back';
       title.dispatchEvent(new Event('input', { bubbles: true }));
       title.dispatchEvent(new Event('change', { bubbles: true }));
-      must(footerButton('Done')).dispatchEvent(
+      must(footerButton('Mark Done')).dispatchEvent(
         new MouseEvent('click', { bubbles: true, detail: 1 }),
       );
       await settle();
@@ -1672,7 +1672,7 @@ describe('TaskEditor', () => {
       const { send, footerButton, typeTitle, press } = await setup();
 
       await typeTitle('Call Marit back');
-      await press(footerButton('Done'));
+      await press(footerButton('Mark Done'));
 
       expect(send).toHaveBeenCalledTimes(1);
       expect(sent(send, 0)).toEqual(editTask('t1', { title: 'Call Marit back' }));
@@ -1681,9 +1681,9 @@ describe('TaskEditor', () => {
     it('disables Done, Log progress and the blockers once it is leaving, and shows no message', async () => {
       const { footerButton, press, statusLine, send, moreButton, blockers } = await setup();
 
-      await press(footerButton('Done'));
+      await press(footerButton('Mark Done'));
 
-      expect(must(footerButton('Done')).disabled).toBe(true);
+      expect(must(footerButton('Mark Done')).disabled).toBe(true);
       expect(must(footerButton('Log progress')).disabled).toBe(true);
       expect(moreButton()).toBeNull();
       expect(blockers().busy()).toBe(true);
@@ -1697,10 +1697,10 @@ describe('TaskEditor', () => {
       awaitingSync.set(new Set(['t1']));
       await settle();
 
-      expect(must(footerButton('Done')).disabled).toBe(true);
+      expect(must(footerButton('Mark Done')).disabled).toBe(true);
       expect(must(footerButton('Log progress')).disabled).toBe(true);
 
-      await press(footerButton('Done'));
+      await press(footerButton('Mark Done'));
 
       expect(doneUndo.complete).not.toHaveBeenCalled();
       expect(navigate).not.toHaveBeenCalled();
@@ -1712,16 +1712,26 @@ describe('TaskEditor', () => {
       });
 
       expect(footer()).toBeNull();
-      expect(footerButton('Done')).toBeUndefined();
+      expect(footerButton('Mark Done')).toBeUndefined();
     });
 
-    it('draws the check icon on Done and the progress bar on Log progress', async () => {
+    it('draws the check icon on Mark Done and the progress bar on Log progress', async () => {
       const { footerButton } = await setup();
 
-      expect(must(footerButton('Done')).querySelector('svg[data-icon="check"]')).not.toBeNull();
+      expect(
+        must(footerButton('Mark Done')).querySelector('svg[data-icon="check"]'),
+      ).not.toBeNull();
       expect(
         must(footerButton('Log progress')).querySelector('svg[data-icon="bar-progress-half"]'),
       ).not.toBeNull();
+    });
+
+    it('names the change to the Task and draws no primary button, so nothing reads as Save', async () => {
+      const { footer, footerButton } = await setup();
+
+      expect(footerButton('Done')).toBeUndefined();
+      expect(must(footerButton('Mark Done')).classList).toContain('asys-button--secondary');
+      expect(must(footer()).querySelector('.asys-button--primary')).toBeNull();
     });
 
     describe('the Title the Undo bar names', () => {
@@ -1729,7 +1739,7 @@ describe('TaskEditor', () => {
         const { doneUndo, footerButton, typeTitle, press } = await setup();
 
         await typeTitle('  Call Marit back ');
-        await press(footerButton('Done'));
+        await press(footerButton('Mark Done'));
 
         expect(doneUndo.complete).toHaveBeenCalledTimes(1);
 
@@ -1743,7 +1753,7 @@ describe('TaskEditor', () => {
         const { doneUndo, footerButton, typeTitle, press } = await setup();
 
         await typeTitle('   ');
-        await press(footerButton('Done'));
+        await press(footerButton('Mark Done'));
 
         expect(doneUndo.complete).toHaveBeenCalledTimes(1);
         expect(must(doneUndo.complete.mock.calls[0])[0]).toEqual(CALL);
@@ -1752,7 +1762,7 @@ describe('TaskEditor', () => {
       it('is the stored Task unchanged when nothing was edited', async () => {
         const { doneUndo, footerButton, press } = await setup();
 
-        await press(footerButton('Done'));
+        await press(footerButton('Mark Done'));
 
         expect(doneUndo.complete).toHaveBeenCalledTimes(1);
         expect(must(doneUndo.complete.mock.calls[0])[0]).toEqual(CALL);
@@ -1775,7 +1785,7 @@ describe('TaskEditor', () => {
     it('Back after Done goes back once', async () => {
       const { backButton, footerButton, press, back } = await setup({ withHistory: true });
 
-      await press(footerButton('Done'));
+      await press(footerButton('Mark Done'));
       await press(backButton());
 
       expect(back).toHaveBeenCalledTimes(1);
@@ -2031,7 +2041,7 @@ describe('TaskEditor', () => {
 
       await s.click(confirm);
 
-      expect(must(s.footerButton('Done')).disabled).toBe(true);
+      expect(must(s.footerButton('Mark Done')).disabled).toBe(true);
       expect(must(s.footerButton('Log progress')).disabled).toBe(true);
       expect(s.blockers().busy()).toBe(true);
       expect(s.cardControls().length).toBeGreaterThan(10);
@@ -2048,7 +2058,7 @@ describe('TaskEditor', () => {
       expect(s.text(s.dialog('More'))).toContain(outcomeMessage(NOT_APPLICABLE));
       expect(s.dialog('More').open).toBe(true);
       expect(s.navigate).not.toHaveBeenCalled();
-      expect(must(s.footerButton('Done')).disabled).toBe(false);
+      expect(must(s.footerButton('Mark Done')).disabled).toBe(false);
 
       await s.press(s.importanceButton('Not important'));
 
@@ -2260,7 +2270,7 @@ describe('TaskEditor', () => {
     it('Done navigates once even when destroyed right after', async () => {
       const { fixture, handleError, navigate, back, footerButton, press } = await setup();
 
-      await press(footerButton('Done'));
+      await press(footerButton('Mark Done'));
       fixture.destroy();
       await wait();
 
@@ -2274,7 +2284,7 @@ describe('TaskEditor', () => {
         withHistory: true,
       });
 
-      await press(footerButton('Done'));
+      await press(footerButton('Mark Done'));
       fixture.destroy();
       await wait();
 

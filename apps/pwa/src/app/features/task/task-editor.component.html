@@ -53,16 +53,17 @@
   <asys-task-blockers [taskId]="taskId()" [busy]="blockersBusy()" />
   @if (v.task.status === TaskStatuses.Open) {
     <footer #footer class="task-editor__actions">
+      <!-- Not "Done" and not primary: in an editor a filled Done at the bottom reads as save and close. -->
       <button
         asys-button
         type="button"
-        [variant]="Variant.Primary"
+        [variant]="Variant.Secondary"
         [size]="Size.Large"
         [icon]="Icons.Check"
         [disabled]="doneBlocked()"
         (click)="done($event)"
       >
-        Done
+        Mark Done
       </button>
       @if (canLogProgress()) {
         <button

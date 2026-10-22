@@ -183,7 +183,7 @@ test('One tap on Done after typing Notes leaves and saves the Notes', async ({ p
 
   await page.getByRole('button', { name: 'Add notes' }).click();
   await page.getByRole('textbox', { name: 'Notes' }).fill('Ring the supplier first');
-  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await page.getByRole('button', { name: 'Mark Done', exact: true }).click();
   await expect(page).toHaveURL(/\/now$/);
 
   // The Done itself is held for the Undo window; the Notes are saved before it.
@@ -208,7 +208,7 @@ test('One tap on Done right after a tap on Important saves the Importance', asyn
   const sent = recordCommands(page);
 
   await page.getByRole('button', { name: 'Important', exact: true }).click();
-  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await page.getByRole('button', { name: 'Mark Done', exact: true }).click();
   await expect(page).toHaveURL(/\/now$/);
 
   await page.clock.fastForward(5_000);
@@ -269,7 +269,7 @@ test('The editor blocks and unblocks a Task through the Blocked by sheet', async
   await bravoBlockers.getByRole('button', { name: 'Close', exact: true }).click();
 
   // Done on Bravo releases Alpha.
-  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await page.getByRole('button', { name: 'Mark Done', exact: true }).click();
   await expect(page).toHaveURL(/\/now$/);
   await expect(topPick(page).locator('.asys-top-pick__title')).toHaveText('Alpha task');
   await expect(page.getByRole('button', { name: /^Waiting/ })).toHaveCount(0);
