@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { Component, ElementRef, inject, input, output, ViewEncapsulation } from '@angular/core';
 
-import { Button, ButtonVariant } from '../../components/atoms/button/button';
-import { Icon, IconName } from '../../components/atoms/icon/icon';
+import { Button, ButtonVariant } from '../../atoms/button/button';
+import { Icon, IconName } from '../../atoms/icon/icon';
 
 /** The weight of a review action button. */
 export enum ReviewItemActionKind {

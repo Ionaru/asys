@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Quadrant } from '@asys/domain';
 
-import type { Activation } from '../activation/activation';
+import type { Activation } from '../../components/support/activation';
 import { TopPick } from './top-pick';
 
 @Component({

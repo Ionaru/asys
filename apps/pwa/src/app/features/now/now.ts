@@ -40,17 +40,17 @@ import { outcomeMessage } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
 import { Motion, MotionDuration, MotionEasing } from '../../core/platform/motion';
 import { TaskMorph } from '../../core/platform/task-morph';
-import { AreaPickControl } from '../../ui/area-pick/area-pick';
+import { AreaPickControl } from '../../components/molecules/area-pick/area-pick';
 import { Button, ButtonVariant } from '../../components/atoms/button/button';
 import { IconName } from '../../components/atoms/icon/icon';
-import { LoadState } from '../../ui/load-state/load-state';
+import { LoadState } from '../../components/molecules/load-state/load-state';
 import {
   estimateNowText,
   LogProgressForm,
   logProgressCommand,
 } from '../../ui/log-progress-form/log-progress-form';
 import { NowHeader } from '../../ui/now-header/now-header';
-import { PickerRow, PickerRowVariant } from '../../ui/picker-row/picker-row';
+import { PickerRow, PickerRowVariant } from '../../components/molecules/picker-row/picker-row';
 import { SectionHeader } from '../../ui/section-header/section-header';
 import { SwipeActions } from '../../ui/swipe-actions/swipe-actions';
 import { SyncNote } from '../../components/atoms/sync-note/sync-note';

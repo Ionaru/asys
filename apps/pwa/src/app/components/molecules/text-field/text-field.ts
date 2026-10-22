@@ -2,12 +2,12 @@
 import { Component, ElementRef, input, model, viewChild, ViewEncapsulation } from '@angular/core';
 import type { FormValueControl } from '@angular/forms/signals';
 
-import { FieldControl } from '../field-control/field-control';
-import { FieldError } from '../../components/atoms/field-error/field-error';
-import { Input } from '../../components/atoms/input/input';
-import { InputBox } from '../../components/atoms/input/input-box';
-import { Label } from '../../components/atoms/label/label';
-import { SingleLine } from '../../components/atoms/input/single-line';
+import { FieldControl } from '../../support/field-control';
+import { FieldError } from '../../atoms/field-error/field-error';
+import { Input } from '../../atoms/input/input';
+import { InputBox } from '../../atoms/input/input-box';
+import { Label } from '../../atoms/label/label';
+import { SingleLine } from '../../atoms/input/single-line';
 
 let nextId = 0;
 

@@ -25,11 +25,11 @@ import { observeBlockSize } from '../core/platform/observe-block-size';
 import { TAB_PATHS } from '../core/platform/tabs';
 import { pathOf } from '../core/platform/url-path';
 import { leafRoute } from '../core/platform/view-transitions';
-import type { Activation } from '../ui/activation/activation';
+import type { Activation } from '../components/support/activation';
 import { BottomNav } from '../ui/bottom-nav/bottom-nav';
 import { CaptureButton } from '../components/atoms/capture-button/capture-button';
 import { QuickAdd } from '../ui/quick-add/quick-add';
-import { UndoBar, UndoBarVariant } from '../ui/undo-bar/undo-bar';
+import { UndoBar, UndoBarVariant } from '../components/molecules/undo-bar/undo-bar';
 import { flyCapture, tabInView } from './capture-flight';
 import { leaveMarked } from './shell-motion';
 

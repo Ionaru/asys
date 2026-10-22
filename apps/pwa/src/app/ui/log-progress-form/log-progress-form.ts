@@ -14,7 +14,7 @@ import {
 import { CommandTag, formatMinutes, type LogProgress, TaskStatus } from '@asys/domain';
 
 import { Button, ButtonVariant } from '../../components/atoms/button/button';
-import { TextField } from '../text-field/text-field';
+import { TextField } from '../../components/molecules/text-field/text-field';
 
 const WHOLE_MINUTES = /^\d+$/;
 

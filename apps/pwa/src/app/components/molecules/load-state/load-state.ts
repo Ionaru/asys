@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { Component, input, output, ViewEncapsulation } from '@angular/core';
 
-import { Button, ButtonVariant } from '../../components/atoms/button/button';
-import { IconName } from '../../components/atoms/icon/icon';
+import { Button, ButtonVariant } from '../../atoms/button/button';
+import { IconName } from '../../atoms/icon/icon';
 
 /** The "Loading…" line of a screen, or its could-not-load alert with a retry button. */
 @Component({
