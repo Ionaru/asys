@@ -5,7 +5,13 @@ import { AuthApi, AuthError, AuthResultTag, type AuthResult, type Me } from '../
 import { AreaPickStore } from '../data/area-pick-store';
 import { ReportedZone } from '../platform/reported-zone';
 import { Theme } from '../platform/theme';
-import { SESSION_CHECK_TIMEOUT_MS, Session, SessionState, SignOutReason } from './session';
+import {
+  SESSION_CHECK_TIMEOUT_MS,
+  SIGNED_IN_KEY,
+  Session,
+  SessionState,
+  SignOutReason,
+} from './session';
 
 const ada: Me = { name: 'Ada', recoveryCodesLeft: 4 };
 
@@ -65,6 +71,16 @@ describe('Session', () => {
     expect(session.state()).toBe(SessionState.Unknown);
     expect(session.me()).toBeNull();
     expect(session.signOutReason()).toBeNull();
+  });
+
+  it('starts Remembered with no Me when this device was signed in', () => {
+    localStorage.setItem(SIGNED_IN_KEY, 'true');
+
+    const launched = TestBed.runInInjectionContext(() => new Session());
+
+    expect(launched.state()).toBe(SessionState.Remembered);
+    expect(launched.me()).toBeNull();
+    expect(launched.signOutReason()).toBeNull();
   });
 
   it('exposes the documented timeout', () => {
@@ -246,6 +262,91 @@ describe('Session', () => {
         await vi.advanceTimersByTimeAsync(SESSION_CHECK_TIMEOUT_MS);
 
         expect(session.state()).toBe(SessionState.SignedIn);
+      });
+    });
+  });
+
+  describe('the sign-in kept on this device', () => {
+    const kept = (): string | null => localStorage.getItem(SIGNED_IN_KEY);
+
+    it('is kept once the server answers Ok', async () => {
+      me.mockResolvedValue(ok(ada));
+
+      await session.check();
+
+      expect(kept()).toBe('true');
+    });
+
+    it('is kept by signedIn with a Me', async () => {
+      await session.signedIn(grace);
+
+      expect(kept()).toBe('true');
+    });
+
+    it('stays kept while the server is unreachable', async () => {
+      await session.signedIn(ada);
+      me.mockResolvedValue(failed(AuthError.Network));
+
+      await session.check();
+
+      expect(session.state()).toBe(SessionState.Unreachable);
+      expect(kept()).toBe('true');
+    });
+
+    it('is forgotten when the server answers Unauthorized', async () => {
+      await session.signedIn(ada);
+      me.mockResolvedValue(failed(AuthError.Unauthorized));
+
+      await session.check();
+
+      expect(kept()).toBeNull();
+    });
+
+    it.each([SignOutReason.Chosen, SignOutReason.Revoked])(
+      'is forgotten by a %s sign-out',
+      async (reason) => {
+        await session.signedIn(ada);
+
+        session.signedOut(reason);
+
+        expect(kept()).toBeNull();
+      },
+    );
+
+    describe('at a launch that remembers it', () => {
+      let launched: Session;
+
+      beforeEach(() => {
+        localStorage.setItem(SIGNED_IN_KEY, 'true');
+        launched = TestBed.runInInjectionContext(() => new Session());
+      });
+
+      it.each([
+        ['Ok', ok(ada), SessionState.SignedIn],
+        ['Unauthorized', failed(AuthError.Unauthorized), SessionState.SignedOut],
+        ['Network', failed(AuthError.Network), SessionState.Unreachable],
+      ])('check answering %s becomes %s', async (_name, result, expected) => {
+        me.mockResolvedValue(result);
+
+        await launched.check();
+
+        expect(launched.state()).toBe(expected);
+      });
+
+      it('stays Remembered until the timeout, then becomes Unreachable', async () => {
+        vi.useFakeTimers();
+        me.mockReturnValue(defer().promise);
+
+        const done = launched.check();
+        await vi.advanceTimersByTimeAsync(SESSION_CHECK_TIMEOUT_MS - 1);
+
+        expect(launched.state()).toBe(SessionState.Remembered);
+
+        await vi.advanceTimersByTimeAsync(1);
+        await done;
+
+        expect(launched.state()).toBe(SessionState.Unreachable);
+        expect(kept()).toBe('true');
       });
     });
   });
