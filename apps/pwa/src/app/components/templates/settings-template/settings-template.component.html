@@ -1,24 +1,22 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
 <h1 class="asys-page__title settings__title">Settings</h1>
 <p class="asys-page__status settings__status" role="status">{{ statusLine() }}</p>
-@if (dataStore.state(); as state) {
+@if (loaded()) {
   <section class="settings__section">
     <asys-select-field
       label="Urgency window"
-      [options]="urgencyOptions"
-      [(value)]="urgencyValue"
-      (valueChange)="chooseUrgency($event)"
+      [options]="urgencyOptions()"
+      [(value)]="urgency"
       [disabled]="busy()"
       hint="A Task counts as urgent this many days before its Latest start."
     />
   </section>
   <section class="settings__section">
-    <p class="settings__text">Current time zone: {{ state.settings.timeZone }}</p>
+    <p class="settings__text">Current time zone: {{ currentZone() }}</p>
     <asys-select-field
       label="Time zone"
-      [options]="timeZoneOptions()"
-      [(value)]="zoneValue"
-      (valueChange)="chooseZone($event)"
+      [options]="zoneOptions()"
+      [(value)]="zone"
       [disabled]="busy()"
       hint="Dates without a time follow this time zone. Your phone keeps it up to date."
     />
@@ -29,18 +27,18 @@
           type="button"
           [variant]="Variant.Secondary"
           [disabled]="busy()"
-          (click)="chooseZone(zone)"
+          (click)="useDeviceZone.emit(zone)"
         >
           Use this device's time zone ({{ zone }})
         </button>
       </div>
     }
   </section>
-  @if (dataStore.awaitingSync().has(settingsSubject)) {
+  @if (awaitingSync()) {
     <p asys-sync-note class="settings__sync"></p>
   }
 } @else {
-  <asys-load-state [failed]="dataStore.status() === Status.Failed" (retry)="dataStore.refresh()" />
+  <asys-load-state [failed]="failed()" (retry)="retry.emit()" />
 }
 <nav class="settings__links" aria-label="More settings">
   <a class="settings__link" routerLink="/settings/areas">Areas</a>
