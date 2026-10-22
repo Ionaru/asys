@@ -28,8 +28,11 @@ import { outcomeMessage } from '../../core/data/outcome-message';
 import { Ids } from '../../core/platform/ids';
 import { Button, ButtonSize, ButtonVariant } from '../../components/atoms/button/button';
 import { IconName } from '../../components/atoms/icon/icon';
-import { SectionHeader, SectionHeaderAction } from '../../ui/section-header/section-header';
-import { Sheet } from '../../ui/sheet/sheet';
+import {
+  SectionHeader,
+  SectionHeaderAction,
+} from '../../components/organisms/section-header/section-header';
+import { Sheet } from '../../components/organisms/sheet/sheet';
 import { TextField } from '../../components/molecules/text-field/text-field';
 import { blockerSummary } from './blocker-summary';
 

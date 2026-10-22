@@ -3,8 +3,8 @@ import { Component, signal, viewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { disabled, form, FormField, validate, type ValidationError } from '@angular/forms/signals';
 
-import { IconName } from '../../components/atoms/icon/icon';
-import type { SelectOption } from '../../components/molecules/select-field/select-field';
+import { IconName } from '../../atoms/icon/icon';
+import type { SelectOption } from '../../molecules/select-field/select-field';
 import { ChoiceRow } from './choice-row';
 
 const OPTIONS: readonly SelectOption[] = [

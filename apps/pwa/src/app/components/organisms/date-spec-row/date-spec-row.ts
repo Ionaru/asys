@@ -14,9 +14,9 @@ import { formatDay, type DateSpec, type LocalDate, type LocalTime } from '@asys/
 
 import { DatePick } from '../date-pick/date-pick';
 import { dayLabel } from '../date-pick/day-label';
-import { FieldControl } from '../../components/support/field-control';
-import { FieldError } from '../../components/atoms/field-error/field-error';
-import { Icon, IconName } from '../../components/atoms/icon/icon';
+import { FieldControl } from '../../support/field-control';
+import { FieldError } from '../../atoms/field-error/field-error';
+import { Icon, IconName } from '../../atoms/icon/icon';
 import { Sheet } from '../sheet/sheet';
 import { TimePick } from '../time-pick/time-pick';
 

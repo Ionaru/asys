@@ -16,12 +16,12 @@ import { NgTemplateOutlet } from '@angular/common';
 import type { FormValueControl } from '@angular/forms/signals';
 import { formatMinutes } from '@asys/domain';
 
-import { Button, ButtonSize, ButtonVariant } from '../../components/atoms/button/button';
-import { FieldControl } from '../../components/support/field-control';
-import { FieldError } from '../../components/atoms/field-error/field-error';
-import { InputBox } from '../../components/atoms/input/input-box';
-import { Label } from '../../components/atoms/label/label';
-import { SingleLine } from '../../components/atoms/input/single-line';
+import { Button, ButtonSize, ButtonVariant } from '../../atoms/button/button';
+import { FieldControl } from '../../support/field-control';
+import { FieldError } from '../../atoms/field-error/field-error';
+import { InputBox } from '../../atoms/input/input-box';
+import { Label } from '../../atoms/label/label';
+import { SingleLine } from '../../atoms/input/single-line';
 
 /** How the Estimate choices are drawn: wrapping chips, or a single ruler under a head with the Other button. */
 export enum EstimateLayout {
