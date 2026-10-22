@@ -1,1342 +1,2133 @@
 {
-  "version": "8",
+  "type": "diff",
+  "version": "9",
   "dialect": "postgres",
   "id": "e054f349-83bc-40da-9478-6f8690f64250",
   "prevIds": [
     "2eba6620-7513-44fa-ae65-efc3eb1b004e"
   ],
-  "ddl": [
+  "footprints": [
     {
-      "values": [
-        "task",
-        "blocker",
-        "area",
-        "review_item",
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "change_entity"
+      ],
+      "writes": [
+        "s|enum|public.change_entity",
+        "n|enum|public.change_entity",
+        "e|enum|public.change_entity",
+        "n|type|public.change_entity"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "change_op"
+      ],
+      "writes": [
+        "s|enum|public.change_op",
+        "n|enum|public.change_op",
+        "e|enum|public.change_op",
+        "n|type|public.change_op"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "privacy"
+      ],
+      "writes": [
+        "s|enum|public.privacy",
+        "n|enum|public.privacy",
+        "e|enum|public.privacy",
+        "n|type|public.privacy"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "task_kind"
+      ],
+      "writes": [
+        "s|enum|public.task_kind",
+        "n|enum|public.task_kind",
+        "e|enum|public.task_kind",
+        "n|type|public.task_kind"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "task_status"
+      ],
+      "writes": [
+        "s|enum|public.task_status",
+        "n|enum|public.task_status",
+        "e|enum|public.task_status",
+        "n|type|public.task_status"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "voice"
+      ],
+      "writes": [
+        "s|enum|public.voice",
+        "n|enum|public.voice",
+        "e|enum|public.voice",
+        "n|type|public.voice"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "areas"
+      ],
+      "writes": [
+        "s|tbl|public.areas",
+        "n|tbl|public.areas",
+        "e|tbl|public.areas",
+        "n|rel|public.areas",
+        "n|type|public.areas",
+        "n|rel|public.areas_pkey"
+      ],
+      "reads": [
+        "n|sch|public",
+        "n|enum|public.privacy"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "change_counters"
+      ],
+      "writes": [
+        "s|tbl|public.change_counters",
+        "n|tbl|public.change_counters",
+        "e|tbl|public.change_counters",
+        "n|rel|public.change_counters",
+        "n|type|public.change_counters",
+        "n|rel|public.change_counters_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "change_log"
+      ],
+      "writes": [
+        "s|tbl|public.change_log",
+        "n|tbl|public.change_log",
+        "e|tbl|public.change_log",
+        "n|rel|public.change_log",
+        "n|type|public.change_log",
+        "n|rel|public.change_log_pkey"
+      ],
+      "reads": [
+        "n|sch|public",
+        "n|enum|public.change_entity",
+        "n|enum|public.change_op"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "idempotency_keys"
+      ],
+      "writes": [
+        "s|tbl|public.idempotency_keys",
+        "n|tbl|public.idempotency_keys",
+        "e|tbl|public.idempotency_keys",
+        "n|rel|public.idempotency_keys",
+        "n|type|public.idempotency_keys",
+        "n|rel|public.idempotency_keys_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "review_items"
+      ],
+      "writes": [
+        "s|tbl|public.review_items",
+        "n|tbl|public.review_items",
+        "e|tbl|public.review_items",
+        "n|rel|public.review_items",
+        "n|type|public.review_items",
+        "n|rel|public.review_items_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
         "settings"
       ],
-      "name": "change_entity",
-      "entityType": "enums",
-      "schema": "public"
-    },
-    {
-      "values": [
-        "put",
-        "remove"
+      "writes": [
+        "s|tbl|public.settings",
+        "n|tbl|public.settings",
+        "e|tbl|public.settings",
+        "n|rel|public.settings",
+        "n|type|public.settings",
+        "n|rel|public.settings_pkey"
       ],
-      "name": "change_op",
-      "entityType": "enums",
-      "schema": "public"
+      "reads": [
+        "n|sch|public"
+      ]
     },
     {
-      "values": [
-        "visible",
-        "private",
-        "hidden"
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "task_blockers"
       ],
-      "name": "privacy",
-      "entityType": "enums",
-      "schema": "public"
-    },
-    {
-      "values": [
-        "task",
-        "check_in",
-        "member_template"
+      "writes": [
+        "s|tbl|public.task_blockers",
+        "n|tbl|public.task_blockers",
+        "e|tbl|public.task_blockers",
+        "n|rel|public.task_blockers",
+        "n|type|public.task_blockers",
+        "n|rel|public.task_blockers_pkey",
+        "n|rel|public.task_blockers_link_key"
       ],
-      "name": "task_kind",
-      "entityType": "enums",
-      "schema": "public"
+      "reads": [
+        "n|sch|public"
+      ]
     },
     {
-      "values": [
-        "open",
-        "done",
-        "dropped",
-        "delegated",
-        "skipped"
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "tasks"
       ],
-      "name": "task_status",
-      "entityType": "enums",
-      "schema": "public"
-    },
-    {
-      "values": [
-        "out_loud",
-        "closed_door"
+      "writes": [
+        "s|tbl|public.tasks",
+        "n|tbl|public.tasks",
+        "e|tbl|public.tasks",
+        "n|rel|public.tasks",
+        "n|type|public.tasks",
+        "n|rel|public.tasks_pkey"
       ],
-      "name": "voice",
-      "entityType": "enums",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": true,
-      "name": "areas",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": true,
-      "name": "change_counters",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": true,
-      "name": "change_log",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": true,
-      "name": "idempotency_keys",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": true,
-      "name": "review_items",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": true,
-      "name": "settings",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": true,
-      "name": "task_blockers",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": true,
-      "name": "tasks",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": true,
-      "name": "trial_items",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": true,
-      "name": "users",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "owner_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "areas"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "areas"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "areas"
-    },
-    {
-      "type": "jsonb",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "active_hours",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "areas"
-    },
-    {
-      "type": "privacy",
-      "typeSchema": "public",
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "default_privacy",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "areas"
-    },
-    {
-      "type": "integer",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "version",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "areas"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "owner_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "change_counters"
-    },
-    {
-      "type": "bigint",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "0",
-      "generated": null,
-      "identity": null,
-      "name": "last_seq",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "change_counters"
-    },
-    {
-      "type": "bigint",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "0",
-      "generated": null,
-      "identity": null,
-      "name": "pruned_through",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "change_counters"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "owner_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "change_log"
-    },
-    {
-      "type": "bigint",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "seq",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "change_log"
-    },
-    {
-      "type": "change_entity",
-      "typeSchema": "public",
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "entity",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "change_log"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "entity_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "change_log"
-    },
-    {
-      "type": "change_op",
-      "typeSchema": "public",
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "op",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "change_log"
-    },
-    {
-      "type": "jsonb",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "data",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "change_log"
-    },
-    {
-      "type": "timestamp(3) with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "change_log"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "owner_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "idempotency_keys"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "key",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "idempotency_keys"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "command",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "idempotency_keys"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "request_hash",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "idempotency_keys"
-    },
-    {
-      "type": "jsonb",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "result",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "idempotency_keys"
-    },
-    {
-      "type": "timestamp(3) with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "idempotency_keys"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "owner_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "review_items"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "review_items"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "kind",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "review_items"
-    },
-    {
-      "type": "jsonb",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "subjects",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "review_items"
-    },
-    {
-      "type": "jsonb",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "payload",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "review_items"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "dedupe_key",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "review_items"
-    },
-    {
-      "type": "timestamp(3) with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "review_items"
-    },
-    {
-      "type": "timestamp(3) with time zone",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "resolved_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "review_items"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "owner_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "settings"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "time_zone",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "settings"
-    },
-    {
-      "type": "integer",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "urgency_window_days",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "settings"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "owner_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "task_blockers"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "task_blockers"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "task_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "task_blockers"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "blocker_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "task_blockers"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "owner_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "type": "task_kind",
-      "typeSchema": "public",
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "kind",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "type": "task_status",
-      "typeSchema": "public",
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "status",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "title",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "notes",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "capture_text",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "area_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "type": "date",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "available_from_date",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "available_from_time",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "type": "date",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "due_date",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "due_time",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "type": "integer",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "estimate_minutes",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "type": "boolean",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "important",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "type": "voice",
-      "typeSchema": "public",
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "voice",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "type": "privacy",
-      "typeSchema": "public",
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "privacy",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "type": "integer",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "due_move_count",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "type": "integer",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "version",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "type": "timestamp(3) with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "type": "timestamp(3) with time zone",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "closed_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "gen_random_uuid()",
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "trial_items"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "owner_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "trial_items"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "title",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "trial_items"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "owner_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "users"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "users"
-    },
-    {
-      "type": "timestamp(3) with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "users"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "owner_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        },
-        {
-          "value": "dedupe_key",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
+      "reads": [
+        "n|sch|public",
+        "n|enum|public.task_kind",
+        "n|enum|public.task_status",
+        "n|enum|public.voice",
+        "n|enum|public.privacy"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "users"
       ],
-      "isUnique": true,
-      "where": "\"resolved_at\" is null",
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "review_items_open_dedupe_key",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "review_items"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        "owner_id",
-        "task_id"
+      "writes": [
+        "s|tbl|public.users",
+        "n|tbl|public.users",
+        "e|tbl|public.users",
+        "n|rel|public.users",
+        "n|type|public.users",
+        "n|rel|public.users_pkey"
       ],
-      "schemaTo": "public",
-      "tableTo": "tasks",
-      "columnsTo": [
-        "owner_id",
-        "id"
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "review_items",
+        "review_items_open_dedupe_key"
       ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "name": "task_blockers_task_fk",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "task_blockers"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        "owner_id",
-        "blocker_id"
+      "writes": [
+        "s|idx|public.review_items_open_dedupe_key",
+        "n|idx|public.review_items_open_dedupe_key",
+        "e|idx|public.review_items_open_dedupe_key",
+        "n|rel|public.review_items_open_dedupe_key"
       ],
-      "schemaTo": "public",
-      "tableTo": "tasks",
-      "columnsTo": [
-        "owner_id",
-        "id"
+      "reads": [
+        "n|tbl|public.review_items",
+        "n|sch|public",
+        "n|col|public.review_items.owner_id",
+        "n|col|public.review_items.dedupe_key"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "task_blockers"
       ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "name": "task_blockers_blocker_fk",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "task_blockers"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        "owner_id",
-        "area_id"
+      "writes": [
+        "s|fk|public.task_blockers.task_blockers_task_fk",
+        "n|fk|public.task_blockers.task_blockers_task_fk",
+        "e|fk|public.task_blockers.task_blockers_task_fk",
+        "n|con|public.task_blockers.task_blockers_task_fk"
       ],
-      "schemaTo": "public",
-      "tableTo": "areas",
-      "columnsTo": [
-        "owner_id",
-        "id"
+      "reads": [
+        "n|tbl|public.task_blockers",
+        "n|sch|public",
+        "n|tbl|public.tasks",
+        "n|sch|public",
+        "n|col|public.task_blockers.owner_id",
+        "n|col|public.task_blockers.task_id",
+        "n|col|public.tasks.owner_id",
+        "n|col|public.tasks.id",
+        "e|uniqueness|public.tasks.id.owner_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "task_blockers"
       ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "name": "tasks_area_fk",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "columns": [
-        "owner_id",
-        "id"
+      "writes": [
+        "s|fk|public.task_blockers.task_blockers_blocker_fk",
+        "n|fk|public.task_blockers.task_blockers_blocker_fk",
+        "e|fk|public.task_blockers.task_blockers_blocker_fk",
+        "n|con|public.task_blockers.task_blockers_blocker_fk"
       ],
-      "nameExplicit": true,
-      "name": "areas_pkey",
-      "entityType": "pks",
-      "schema": "public",
-      "table": "areas"
+      "reads": [
+        "n|tbl|public.task_blockers",
+        "n|sch|public",
+        "n|tbl|public.tasks",
+        "n|sch|public",
+        "n|col|public.task_blockers.owner_id",
+        "n|col|public.task_blockers.blocker_id",
+        "n|col|public.tasks.owner_id",
+        "n|col|public.tasks.id",
+        "e|uniqueness|public.tasks.id.owner_id"
+      ]
     },
     {
-      "columns": [
-        "owner_id"
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "tasks"
       ],
-      "nameExplicit": true,
-      "name": "change_counters_pkey",
-      "entityType": "pks",
-      "schema": "public",
-      "table": "change_counters"
-    },
-    {
-      "columns": [
-        "owner_id",
-        "seq"
+      "writes": [
+        "s|fk|public.tasks.tasks_area_fk",
+        "n|fk|public.tasks.tasks_area_fk",
+        "e|fk|public.tasks.tasks_area_fk",
+        "n|con|public.tasks.tasks_area_fk"
       ],
-      "nameExplicit": true,
-      "name": "change_log_pkey",
-      "entityType": "pks",
-      "schema": "public",
-      "table": "change_log"
+      "reads": [
+        "n|tbl|public.tasks",
+        "n|sch|public",
+        "n|tbl|public.areas",
+        "n|sch|public",
+        "n|col|public.tasks.owner_id",
+        "n|col|public.tasks.area_id",
+        "n|col|public.areas.owner_id",
+        "n|col|public.areas.id",
+        "e|uniqueness|public.areas.id.owner_id"
+      ]
     },
     {
-      "columns": [
-        "owner_id",
-        "key"
+      "statementType": "create_policy",
+      "statementTarget": [
+        "table",
+        "public",
+        "areas"
       ],
-      "nameExplicit": true,
-      "name": "idempotency_keys_pkey",
-      "entityType": "pks",
-      "schema": "public",
-      "table": "idempotency_keys"
-    },
-    {
-      "columns": [
-        "owner_id",
-        "id"
+      "writes": [
+        "s|pol|public.areas.areas_owner",
+        "n|pol|public.areas.areas_owner",
+        "e|pol|public.areas.areas_owner"
       ],
-      "nameExplicit": true,
-      "name": "review_items_pkey",
-      "entityType": "pks",
-      "schema": "public",
-      "table": "review_items"
+      "reads": [
+        "n|tbl|public.areas",
+        "n|sch|public",
+        "e|rls|public.areas"
+      ]
     },
     {
-      "columns": [
-        "owner_id"
+      "statementType": "create_policy",
+      "statementTarget": [
+        "table",
+        "public",
+        "change_counters"
       ],
-      "nameExplicit": true,
-      "name": "settings_pkey",
-      "entityType": "pks",
-      "schema": "public",
-      "table": "settings"
-    },
-    {
-      "columns": [
-        "owner_id",
-        "id"
+      "writes": [
+        "s|pol|public.change_counters.change_counters_owner",
+        "n|pol|public.change_counters.change_counters_owner",
+        "e|pol|public.change_counters.change_counters_owner"
       ],
-      "nameExplicit": true,
-      "name": "task_blockers_pkey",
-      "entityType": "pks",
-      "schema": "public",
-      "table": "task_blockers"
+      "reads": [
+        "n|tbl|public.change_counters",
+        "n|sch|public",
+        "e|rls|public.change_counters"
+      ]
     },
     {
-      "columns": [
-        "owner_id",
-        "id"
+      "statementType": "create_policy",
+      "statementTarget": [
+        "table",
+        "public",
+        "change_log"
       ],
-      "nameExplicit": true,
-      "name": "tasks_pkey",
-      "entityType": "pks",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "columns": [
-        "owner_id"
+      "writes": [
+        "s|pol|public.change_log.change_log_owner",
+        "n|pol|public.change_log.change_log_owner",
+        "e|pol|public.change_log.change_log_owner"
       ],
-      "nameExplicit": true,
-      "name": "users_pkey",
-      "entityType": "pks",
-      "schema": "public",
-      "table": "users"
+      "reads": [
+        "n|tbl|public.change_log",
+        "n|sch|public",
+        "e|rls|public.change_log"
+      ]
     },
     {
-      "columns": [
-        "id"
+      "statementType": "create_policy",
+      "statementTarget": [
+        "table",
+        "public",
+        "idempotency_keys"
       ],
-      "nameExplicit": false,
-      "name": "trial_items_pkey",
-      "schema": "public",
-      "table": "trial_items",
-      "entityType": "pks"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        "owner_id",
-        "task_id",
-        "blocker_id"
+      "writes": [
+        "s|pol|public.idempotency_keys.idempotency_keys_owner",
+        "n|pol|public.idempotency_keys.idempotency_keys_owner",
+        "e|pol|public.idempotency_keys.idempotency_keys_owner"
       ],
-      "nullsNotDistinct": false,
-      "name": "task_blockers_link_key",
-      "entityType": "uniques",
-      "schema": "public",
-      "table": "task_blockers"
+      "reads": [
+        "n|tbl|public.idempotency_keys",
+        "n|sch|public",
+        "e|rls|public.idempotency_keys"
+      ]
     },
     {
-      "value": "0 <= \"pruned_through\" and \"pruned_through\" <= \"last_seq\"",
-      "name": "change_counters_seq_check",
-      "entityType": "checks",
-      "schema": "public",
-      "table": "change_counters"
-    },
-    {
-      "value": "(\"entity\" = 'settings') = (\"entity_id\" is null)",
-      "name": "change_log_entity_id_check",
-      "entityType": "checks",
-      "schema": "public",
-      "table": "change_log"
-    },
-    {
-      "value": "(\"op\" = 'remove') = (\"data\" is null)",
-      "name": "change_log_data_check",
-      "entityType": "checks",
-      "schema": "public",
-      "table": "change_log"
-    },
-    {
-      "value": "\"urgency_window_days\" > 0",
-      "name": "settings_urgency_window_check",
-      "entityType": "checks",
-      "schema": "public",
-      "table": "settings"
-    },
-    {
-      "value": "\"task_id\" <> \"blocker_id\"",
-      "name": "task_blockers_not_self_check",
-      "entityType": "checks",
-      "schema": "public",
-      "table": "task_blockers"
-    },
-    {
-      "value": "\"available_from_time\" is null or (\"available_from_date\" is not null and \"available_from_time\" ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$')",
-      "name": "tasks_available_from_time_check",
-      "entityType": "checks",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "value": "\"due_time\" is null or (\"due_date\" is not null and \"due_time\" ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$')",
-      "name": "tasks_due_time_check",
-      "entityType": "checks",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "value": "\"estimate_minutes\" > 0",
-      "name": "tasks_estimate_check",
-      "entityType": "checks",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "as": "PERMISSIVE",
-      "for": "ALL",
-      "roles": [
-        "public"
+      "statementType": "create_policy",
+      "statementTarget": [
+        "table",
+        "public",
+        "review_items"
       ],
-      "using": "\"areas\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
-      "withCheck": "\"areas\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
-      "name": "areas_owner",
-      "entityType": "policies",
-      "schema": "public",
-      "table": "areas"
+      "writes": [
+        "s|pol|public.review_items.review_items_owner",
+        "n|pol|public.review_items.review_items_owner",
+        "e|pol|public.review_items.review_items_owner"
+      ],
+      "reads": [
+        "n|tbl|public.review_items",
+        "n|sch|public",
+        "e|rls|public.review_items"
+      ]
     },
     {
-      "as": "PERMISSIVE",
-      "for": "ALL",
-      "roles": [
-        "public"
+      "statementType": "create_policy",
+      "statementTarget": [
+        "table",
+        "public",
+        "settings"
       ],
-      "using": "\"change_counters\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
-      "withCheck": "\"change_counters\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
-      "name": "change_counters_owner",
-      "entityType": "policies",
-      "schema": "public",
-      "table": "change_counters"
+      "writes": [
+        "s|pol|public.settings.settings_owner",
+        "n|pol|public.settings.settings_owner",
+        "e|pol|public.settings.settings_owner"
+      ],
+      "reads": [
+        "n|tbl|public.settings",
+        "n|sch|public",
+        "e|rls|public.settings"
+      ]
     },
     {
-      "as": "PERMISSIVE",
-      "for": "ALL",
-      "roles": [
-        "public"
+      "statementType": "create_policy",
+      "statementTarget": [
+        "table",
+        "public",
+        "task_blockers"
       ],
-      "using": "\"change_log\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
-      "withCheck": "\"change_log\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
-      "name": "change_log_owner",
-      "entityType": "policies",
-      "schema": "public",
-      "table": "change_log"
+      "writes": [
+        "s|pol|public.task_blockers.task_blockers_owner",
+        "n|pol|public.task_blockers.task_blockers_owner",
+        "e|pol|public.task_blockers.task_blockers_owner"
+      ],
+      "reads": [
+        "n|tbl|public.task_blockers",
+        "n|sch|public",
+        "e|rls|public.task_blockers"
+      ]
     },
     {
-      "as": "PERMISSIVE",
-      "for": "ALL",
-      "roles": [
-        "public"
+      "statementType": "create_policy",
+      "statementTarget": [
+        "table",
+        "public",
+        "tasks"
       ],
-      "using": "\"idempotency_keys\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
-      "withCheck": "\"idempotency_keys\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
-      "name": "idempotency_keys_owner",
-      "entityType": "policies",
-      "schema": "public",
-      "table": "idempotency_keys"
+      "writes": [
+        "s|pol|public.tasks.tasks_owner",
+        "n|pol|public.tasks.tasks_owner",
+        "e|pol|public.tasks.tasks_owner"
+      ],
+      "reads": [
+        "n|tbl|public.tasks",
+        "n|sch|public",
+        "e|rls|public.tasks"
+      ]
     },
     {
-      "as": "PERMISSIVE",
-      "for": "ALL",
-      "roles": [
-        "public"
+      "statementType": "create_policy",
+      "statementTarget": [
+        "table",
+        "public",
+        "users"
       ],
-      "using": "\"review_items\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
-      "withCheck": "\"review_items\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
-      "name": "review_items_owner",
-      "entityType": "policies",
-      "schema": "public",
-      "table": "review_items"
-    },
-    {
-      "as": "PERMISSIVE",
-      "for": "ALL",
-      "roles": [
-        "public"
+      "writes": [
+        "s|pol|public.users.users_owner",
+        "n|pol|public.users.users_owner",
+        "e|pol|public.users.users_owner"
       ],
-      "using": "\"settings\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
-      "withCheck": "\"settings\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
-      "name": "settings_owner",
-      "entityType": "policies",
-      "schema": "public",
-      "table": "settings"
-    },
-    {
-      "as": "PERMISSIVE",
-      "for": "ALL",
-      "roles": [
-        "public"
-      ],
-      "using": "\"task_blockers\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
-      "withCheck": "\"task_blockers\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
-      "name": "task_blockers_owner",
-      "entityType": "policies",
-      "schema": "public",
-      "table": "task_blockers"
-    },
-    {
-      "as": "PERMISSIVE",
-      "for": "ALL",
-      "roles": [
-        "public"
-      ],
-      "using": "\"tasks\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
-      "withCheck": "\"tasks\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
-      "name": "tasks_owner",
-      "entityType": "policies",
-      "schema": "public",
-      "table": "tasks"
-    },
-    {
-      "as": "PERMISSIVE",
-      "for": "ALL",
-      "roles": [
-        "public"
-      ],
-      "using": "\"trial_items\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
-      "withCheck": "\"trial_items\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
-      "name": "trial_items_owner",
-      "entityType": "policies",
-      "schema": "public",
-      "table": "trial_items"
-    },
-    {
-      "as": "PERMISSIVE",
-      "for": "ALL",
-      "roles": [
-        "public"
-      ],
-      "using": "\"users\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
-      "withCheck": "\"users\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
-      "name": "users_owner",
-      "entityType": "policies",
-      "schema": "public",
-      "table": "users"
+      "reads": [
+        "n|tbl|public.users",
+        "n|sch|public",
+        "e|rls|public.users"
+      ]
     }
   ],
-  "renames": []
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "areas",
+        "isRlsEnabled": true,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "change_counters",
+        "isRlsEnabled": true,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "change_log",
+        "isRlsEnabled": true,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "idempotency_keys",
+        "isRlsEnabled": true,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "review_items",
+        "isRlsEnabled": true,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "settings",
+        "isRlsEnabled": true,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "task_blockers",
+        "isRlsEnabled": true,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "tasks",
+        "isRlsEnabled": true,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "users",
+        "isRlsEnabled": true,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "change_entity",
+        "values": [
+          "task",
+          "blocker",
+          "area",
+          "review_item",
+          "settings"
+        ],
+        "entityType": "enums"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "change_op",
+        "values": [
+          "put",
+          "remove"
+        ],
+        "entityType": "enums"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "privacy",
+        "values": [
+          "visible",
+          "private",
+          "hidden"
+        ],
+        "entityType": "enums"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "task_kind",
+        "values": [
+          "task",
+          "check_in",
+          "member_template"
+        ],
+        "entityType": "enums"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "task_status",
+        "values": [
+          "open",
+          "done",
+          "dropped",
+          "delegated",
+          "skipped"
+        ],
+        "entityType": "enums"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "voice",
+        "values": [
+          "out_loud",
+          "closed_door"
+        ],
+        "entityType": "enums"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "areas",
+        "name": "owner_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "areas",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "areas",
+        "name": "name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "areas",
+        "name": "active_hours",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "areas",
+        "name": "default_privacy",
+        "type": "privacy",
+        "typeSchema": "public",
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "areas",
+        "name": "version",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "change_counters",
+        "name": "owner_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "change_counters",
+        "name": "last_seq",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "change_counters",
+        "name": "pruned_through",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "change_log",
+        "name": "owner_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "change_log",
+        "name": "seq",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "change_log",
+        "name": "entity",
+        "type": "change_entity",
+        "typeSchema": "public",
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "change_log",
+        "name": "entity_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "change_log",
+        "name": "op",
+        "type": "change_op",
+        "typeSchema": "public",
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "change_log",
+        "name": "data",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "change_log",
+        "name": "created_at",
+        "type": "timestamp(3) with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "idempotency_keys",
+        "name": "owner_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "idempotency_keys",
+        "name": "key",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "idempotency_keys",
+        "name": "command",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "idempotency_keys",
+        "name": "request_hash",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "idempotency_keys",
+        "name": "result",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "idempotency_keys",
+        "name": "created_at",
+        "type": "timestamp(3) with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "review_items",
+        "name": "owner_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "review_items",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "review_items",
+        "name": "kind",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "review_items",
+        "name": "subjects",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "review_items",
+        "name": "payload",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "review_items",
+        "name": "dedupe_key",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "review_items",
+        "name": "created_at",
+        "type": "timestamp(3) with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "review_items",
+        "name": "resolved_at",
+        "type": "timestamp(3) with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "settings",
+        "name": "owner_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "settings",
+        "name": "time_zone",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "settings",
+        "name": "urgency_window_days",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task_blockers",
+        "name": "owner_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task_blockers",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task_blockers",
+        "name": "task_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task_blockers",
+        "name": "blocker_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "owner_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "kind",
+        "type": "task_kind",
+        "typeSchema": "public",
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "status",
+        "type": "task_status",
+        "typeSchema": "public",
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "title",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "notes",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "capture_text",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "area_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "available_from_date",
+        "type": "date",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "available_from_time",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "due_date",
+        "type": "date",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "due_time",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "estimate_minutes",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "important",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "voice",
+        "type": "voice",
+        "typeSchema": "public",
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "privacy",
+        "type": "privacy",
+        "typeSchema": "public",
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "due_move_count",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "version",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "created_at",
+        "type": "timestamp(3) with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "closed_at",
+        "type": "timestamp(3) with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "users",
+        "name": "owner_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "users",
+        "name": "name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "users",
+        "name": "created_at",
+        "type": "timestamp(3) with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "review_items",
+        "name": "review_items_open_dedupe_key",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "owner_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "dedupe_key",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": true,
+        "where": "\"resolved_at\" is null",
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task_blockers",
+        "name": "task_blockers_task_fk",
+        "nameExplicit": true,
+        "columns": [
+          "owner_id",
+          "task_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "tasks",
+        "columnsTo": [
+          "owner_id",
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task_blockers",
+        "name": "task_blockers_blocker_fk",
+        "nameExplicit": true,
+        "columns": [
+          "owner_id",
+          "blocker_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "tasks",
+        "columnsTo": [
+          "owner_id",
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "tasks_area_fk",
+        "nameExplicit": true,
+        "columns": [
+          "owner_id",
+          "area_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "areas",
+        "columnsTo": [
+          "owner_id",
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "areas",
+        "name": "areas_pkey",
+        "columns": [
+          "owner_id",
+          "id"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "change_counters",
+        "name": "change_counters_pkey",
+        "columns": [
+          "owner_id"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "change_log",
+        "name": "change_log_pkey",
+        "columns": [
+          "owner_id",
+          "seq"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "idempotency_keys",
+        "name": "idempotency_keys_pkey",
+        "columns": [
+          "owner_id",
+          "key"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "review_items",
+        "name": "review_items_pkey",
+        "columns": [
+          "owner_id",
+          "id"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "settings",
+        "name": "settings_pkey",
+        "columns": [
+          "owner_id"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task_blockers",
+        "name": "task_blockers_pkey",
+        "columns": [
+          "owner_id",
+          "id"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "tasks_pkey",
+        "columns": [
+          "owner_id",
+          "id"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "users",
+        "name": "users_pkey",
+        "columns": [
+          "owner_id"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task_blockers",
+        "name": "task_blockers_link_key",
+        "nameExplicit": true,
+        "columns": [
+          "owner_id",
+          "task_id",
+          "blocker_id"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "change_counters",
+        "name": "change_counters_seq_check",
+        "value": "0 <= \"pruned_through\" and \"pruned_through\" <= \"last_seq\"",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "change_log",
+        "name": "change_log_entity_id_check",
+        "value": "(\"entity\" = 'settings') = (\"entity_id\" is null)",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "change_log",
+        "name": "change_log_data_check",
+        "value": "(\"op\" = 'remove') = (\"data\" is null)",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "settings",
+        "name": "settings_urgency_window_check",
+        "value": "\"urgency_window_days\" > 0",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task_blockers",
+        "name": "task_blockers_not_self_check",
+        "value": "\"task_id\" <> \"blocker_id\"",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "tasks_available_from_time_check",
+        "value": "\"available_from_time\" is null or (\"available_from_date\" is not null and \"available_from_time\" ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "tasks_due_time_check",
+        "value": "\"due_time\" is null or (\"due_date\" is not null and \"due_time\" ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "tasks_estimate_check",
+        "value": "\"estimate_minutes\" > 0",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "areas",
+        "name": "areas_owner",
+        "as": "PERMISSIVE",
+        "for": "ALL",
+        "roles": [
+          "public"
+        ],
+        "using": "\"areas\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
+        "withCheck": "\"areas\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
+        "entityType": "policies"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "change_counters",
+        "name": "change_counters_owner",
+        "as": "PERMISSIVE",
+        "for": "ALL",
+        "roles": [
+          "public"
+        ],
+        "using": "\"change_counters\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
+        "withCheck": "\"change_counters\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
+        "entityType": "policies"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "change_log",
+        "name": "change_log_owner",
+        "as": "PERMISSIVE",
+        "for": "ALL",
+        "roles": [
+          "public"
+        ],
+        "using": "\"change_log\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
+        "withCheck": "\"change_log\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
+        "entityType": "policies"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "idempotency_keys",
+        "name": "idempotency_keys_owner",
+        "as": "PERMISSIVE",
+        "for": "ALL",
+        "roles": [
+          "public"
+        ],
+        "using": "\"idempotency_keys\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
+        "withCheck": "\"idempotency_keys\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
+        "entityType": "policies"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "review_items",
+        "name": "review_items_owner",
+        "as": "PERMISSIVE",
+        "for": "ALL",
+        "roles": [
+          "public"
+        ],
+        "using": "\"review_items\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
+        "withCheck": "\"review_items\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
+        "entityType": "policies"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "settings",
+        "name": "settings_owner",
+        "as": "PERMISSIVE",
+        "for": "ALL",
+        "roles": [
+          "public"
+        ],
+        "using": "\"settings\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
+        "withCheck": "\"settings\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
+        "entityType": "policies"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "task_blockers",
+        "name": "task_blockers_owner",
+        "as": "PERMISSIVE",
+        "for": "ALL",
+        "roles": [
+          "public"
+        ],
+        "using": "\"task_blockers\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
+        "withCheck": "\"task_blockers\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
+        "entityType": "policies"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "tasks",
+        "name": "tasks_owner",
+        "as": "PERMISSIVE",
+        "for": "ALL",
+        "roles": [
+          "public"
+        ],
+        "using": "\"tasks\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
+        "withCheck": "\"tasks\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
+        "entityType": "policies"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "users",
+        "name": "users_owner",
+        "as": "PERMISSIVE",
+        "for": "ALL",
+        "roles": [
+          "public"
+        ],
+        "using": "\"users\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
+        "withCheck": "\"users\".\"owner_id\" = nullif(current_setting('app.owner_id', true), '')::uuid",
+        "entityType": "policies"
+      }
+    }
+  ]
 }
