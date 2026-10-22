@@ -11,19 +11,19 @@ export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'now' },
   {
     path: 'signin',
-    loadComponent: () => import('./features/sign-in/sign-in').then((m) => m.SignIn),
+    loadComponent: () => import('./pages/sign-in/sign-in').then((m) => m.SignIn),
     canActivate: [signedOutGuard],
     title: 'Sign in · ASYS',
   },
   {
     path: 'signup',
-    loadComponent: () => import('./features/sign-up/sign-up').then((m) => m.SignUp),
+    loadComponent: () => import('./pages/sign-up/sign-up').then((m) => m.SignUp),
     canActivate: [signedOutGuard],
     title: 'Sign up · ASYS',
   },
   {
     path: 'recover',
-    loadComponent: () => import('./features/recover/recover').then((m) => m.Recover),
+    loadComponent: () => import('./pages/recover/recover').then((m) => m.Recover),
     canActivate: [signedOutGuard],
     title: 'Recovery code · ASYS',
   },

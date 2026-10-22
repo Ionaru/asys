@@ -5,9 +5,9 @@
   </h1>
   @switch (step()) {
     @case (Step.Name) {
-      <form class="sign-up__block" animate.enter="asys-enter" [formRoot]="nameForm">
+      <form class="sign-up__block" animate.enter="asys-enter" [formRoot]="nameForm()">
         <asys-text-field
-          [formField]="nameForm.name"
+          [formField]="nameForm().name"
           label="Name"
           hint="How ASYS addresses you."
           autocomplete="name"
@@ -20,14 +20,14 @@
     }
     @case (Step.Passkey) {
       <div class="sign-up__block" animate.enter="asys-enter">
-        <p class="sign-up__body">Next, create a passkey for {{ submittedName() }}.</p>
+        <p class="sign-up__body">Next, create a passkey for {{ name() }}.</p>
         <button
           asys-button
           type="button"
           [block]="true"
           [variant]="Variant.Primary"
-          [disabled]="options() === null || busy()"
-          (click)="createPasskey()"
+          [disabled]="!ready() || busy()"
+          (click)="createPasskey.emit()"
         >
           Create passkey
         </button>
@@ -36,20 +36,20 @@
           type="button"
           [variant]="Variant.Quiet"
           [disabled]="busy()"
-          (click)="changeName()"
+          (click)="changeName.emit()"
         >
           Change name
         </button>
-        @if (shownMessage(); as text) {
+        @if (message(); as text) {
           <p class="sign-up__message" role="alert">{{ text }}</p>
         }
-        @if (loadError() !== null) {
+        @if (loadFailed()) {
           <button
             asys-button
             type="button"
             [variant]="Variant.Quiet"
             [icon]="Icons.RotateRight"
-            (click)="discard()"
+            (click)="retry.emit()"
           >
             Try again
           </button>
@@ -64,7 +64,7 @@
           }
         </ol>
         <p class="sign-up__body">These codes are shown only now. Keep them somewhere safe.</p>
-        <button asys-button type="button" [variant]="Variant.Secondary" (click)="copy()">
+        <button asys-button type="button" [variant]="Variant.Secondary" (click)="copyCodes.emit()">
           Copy
         </button>
         @if (copyStatus(); as text) {
@@ -75,7 +75,7 @@
           type="button"
           [block]="true"
           [variant]="Variant.Primary"
-          (click)="finish()"
+          (click)="finish.emit()"
         >
           Continue
         </button>

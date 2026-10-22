@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { afterNextRender, Component, inject, Injector, signal } from '@angular/core';
-import { form, FormField, FormRoot, validate } from '@angular/forms/signals';
-import { Router, RouterLink } from '@angular/router';
+import { form, validate } from '@angular/forms/signals';
+import { Router } from '@angular/router';
 
 import { AuthApi, AuthError, AuthResultTag } from '../../core/api/auth-api';
 import { Session } from '../../core/auth/session';
 import { GENERIC_MESSAGE } from '../../core/data/outcome-message';
-import { Button, ButtonVariant } from '../../components/atoms/button/button';
-import { TextField } from '../../components/molecules/text-field/text-field';
+import { RecoverTemplate } from '../../components/templates/recover-template/recover-template';
 
 /** The longest recovery code the server accepts. */
 export const MAX_CODE_LENGTH = 64;
@@ -15,22 +14,8 @@ export const MAX_CODE_LENGTH = 64;
 /** Signs in with a recovery code. */
 @Component({
   selector: 'asys-recover',
-  imports: [Button, FormField, FormRoot, RouterLink, TextField],
-  templateUrl: './recover.component.html',
-  styles: `
-    .recover {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-4);
-      padding-block-end: var(--space-5);
-    }
-
-    .recover__form {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-4);
-    }
-  `,
+  imports: [RecoverTemplate],
+  template: '<asys-recover-template [codeForm]="codeForm" />',
 })
 export class Recover {
   readonly #authApi = inject(AuthApi);
@@ -40,8 +25,6 @@ export class Recover {
   readonly #router = inject(Router);
 
   readonly #injector = inject(Injector);
-
-  protected readonly Variant = ButtonVariant;
 
   readonly #model = signal({ code: '' });
 

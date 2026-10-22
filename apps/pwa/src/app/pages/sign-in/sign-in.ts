@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { Component, computed, inject, input, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { CeremonyResultTag, PasskeyFailure } from '@ionaru/effect-passkeys/client';
 
 import { AuthApi, AuthError, AuthResultTag } from '../../core/api/auth-api';
@@ -8,10 +8,9 @@ import { PasskeyCeremony } from '../../core/api/passkey-ceremony';
 import { safeReturnUrl } from '../../core/auth/safe-return-url';
 import { Session } from '../../core/auth/session';
 import { GENERIC_MESSAGE } from '../../core/data/outcome-message';
-import { Button, ButtonVariant } from '../../components/atoms/button/button';
-import { IconName } from '../../components/atoms/icon/icon';
-import { ceremonyOptions } from '../auth/ceremony-options';
-import { MISCONFIGURED_MESSAGE, TRY_AGAIN_MESSAGE } from '../auth/passkey-messages';
+import { SignInTemplate } from '../../components/templates/sign-in-template/sign-in-template';
+import { ceremonyOptions } from '../../features/auth/ceremony-options';
+import { MISCONFIGURED_MESSAGE, TRY_AGAIN_MESSAGE } from '../../features/auth/passkey-messages';
 
 const messageForFailure = (failure: PasskeyFailure): string => {
   switch (failure) {
@@ -39,9 +38,17 @@ const messageForError = (error: AuthError): string => {
 /** Signs in with a passkey. */
 @Component({
   selector: 'asys-sign-in',
-  imports: [Button, RouterLink],
-  templateUrl: './sign-in.component.html',
-  styleUrl: './sign-in.css',
+  imports: [SignInTemplate],
+  template: `
+    <asys-sign-in-template
+      [ready]="options() !== null"
+      [busy]="busy()"
+      [message]="shownMessage()"
+      [loadFailed]="loadError() !== null"
+      (signIn)="signIn()"
+      (retry)="discard()"
+    />
+  `,
 })
 export class SignIn {
   readonly #authApi = inject(AuthApi);
@@ -51,10 +58,6 @@ export class SignIn {
   readonly #session = inject(Session);
 
   readonly #router = inject(Router);
-
-  protected readonly Variant = ButtonVariant;
-
-  protected readonly Icons = IconName;
 
   readonly returnUrl = input<string | undefined>();
 

@@ -7,21 +7,21 @@
     type="button"
     [block]="true"
     [variant]="Variant.Primary"
-    [disabled]="options() === null || busy()"
-    (click)="signIn()"
+    [disabled]="!ready() || busy()"
+    (click)="signIn.emit()"
   >
     Sign in with passkey
   </button>
-  @if (shownMessage(); as text) {
+  @if (message(); as text) {
     <p class="sign-in__message" role="alert">{{ text }}</p>
   }
-  @if (loadError() !== null) {
+  @if (loadFailed()) {
     <button
       asys-button
       type="button"
       [variant]="Variant.Quiet"
       [icon]="Icons.RotateRight"
-      (click)="discard()"
+      (click)="retry.emit()"
     >
       Try again
     </button>
