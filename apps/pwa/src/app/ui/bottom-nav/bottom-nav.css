@@ -51,7 +51,8 @@
   transition: background-color var(--duration-quick) var(--ease-out);
 }
 
-.asys-bottomnav__item:active .asys-bottomnav__icon {
+/* Set from the pointer rather than :active, which a phone can leave on a destination after the press. */
+.asys-bottomnav__item.is-pressed .asys-bottomnav__icon {
   background: var(--signal-soft);
 }
 
