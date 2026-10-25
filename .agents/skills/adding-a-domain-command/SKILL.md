@@ -63,7 +63,7 @@ Every domain write goes through `POST /v1/commands`. Never add a bespoke mutatio
 15. Exhaustive switches:
     - `core/data/command-subject.ts`: every new tag needs a `case`. It is compile-checked, and it drives `CommandAttempts` and the sync.
     - `core/data/outcome-message.ts`: one `case` per new `RejectedReason`. It is compile-checked.
-    - `features/inbox/review-copy.ts` is **not** compile-checked; its switches have a `default`. If the command can become NotApplicable, add its `taskQuestion` case (or the Area branch) by hand, or the Inbox shows the generic "ASYS needs a decision."
+    - `pages/inbox/review-copy.ts` is **not** compile-checked; its switches have a `default`. If the command can become NotApplicable, add its `taskQuestion` case (or the Area branch) by hand, or the Inbox shows the generic "ASYS needs a decision."
 16. In the screen:
     - List `CommandAttempts` in the component's `providers`; it is `autoProvided: false`.
     - Take a key from `keyFor(command)`, call `DataStore.send(command, key)`, then call `attempts.settle(...)` and show `outcomeMessage(outcome)`.

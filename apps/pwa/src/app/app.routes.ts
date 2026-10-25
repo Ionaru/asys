@@ -42,7 +42,7 @@ export const routes: Routes = [
       { path: 'today', component: Today, title: 'Today · ASYS', data: { level: 0 } },
       {
         path: 'inbox',
-        loadComponent: () => import('./features/inbox/inbox').then((m) => m.Inbox),
+        loadComponent: () => import('./pages/inbox/inbox').then((m) => m.Inbox),
         title: 'Inbox · ASYS',
         data: { level: 0 },
       },

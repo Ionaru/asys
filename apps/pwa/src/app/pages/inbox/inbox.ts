@@ -4,16 +4,14 @@ import {
   Component,
   computed,
   DestroyRef,
-  ElementRef,
   inject,
   Injector,
   linkedSignal,
   signal,
   untracked,
   viewChild,
-  viewChildren,
 } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import {
   type Command,
   CommandTag,
@@ -28,19 +26,13 @@ import { CommandOutcomeTag } from '../../core/api/data-api';
 import { CommandAttempts } from '../../core/data/command-attempts';
 import { DataStore, SyncStatus } from '../../core/data/data-store';
 import { outcomeMessage } from '../../core/data/outcome-message';
-import { Button, ButtonSize, ButtonVariant } from '../../components/atoms/button/button';
-import { LoadState } from '../../components/molecules/load-state/load-state';
 import {
-  ReviewItem,
-  ReviewItemActionKind,
-} from '../../components/molecules/review-item/review-item';
-import { SyncNote } from '../../components/atoms/sync-note/sync-note';
-import {
-  type AreaChoice,
-  TriageCard,
-  type TriageDraft,
-} from '../../components/organisms/triage-card/triage-card';
-import { byAreaName } from '../areas/area-order';
+  type InboxCard,
+  InboxTemplate,
+  type InboxReview,
+} from '../../components/templates/inbox-template/inbox-template';
+import type { AreaChoice, TriageDraft } from '../../components/organisms/triage-card/triage-card';
+import { byAreaName } from '../../features/areas/area-order';
 import { reviewCopy } from './review-copy';
 
 const NO_IDS: ReadonlySet<string> = new Set();
@@ -62,10 +54,30 @@ const areaChoices = (state: DomainState): readonly AreaChoice[] =>
 /** Where captured Tasks wait for Triage, and where ASYS asks for decisions. */
 @Component({
   selector: 'app-inbox',
-  imports: [Button, LoadState, ReviewItem, RouterLink, SyncNote, TriageCard],
+  imports: [InboxTemplate],
   providers: [CommandAttempts],
-  templateUrl: './inbox.component.html',
-  styleUrl: './inbox.css',
+  template: `
+    <asys-inbox-template
+      [loaded]="dataStore.state() !== null"
+      [loadFailed]="dataStore.status() === Status.Failed"
+      [statusLine]="statusLine()"
+      [reviews]="reviews()"
+      [card]="card()"
+      [position]="handled() + 1"
+      [total]="handled() + inbox().length"
+      [areas]="areas()"
+      [cardBusy]="cardBusy()"
+      [canLater]="inbox().length > 1"
+      [empty]="reviews().length === 0 && inbox().length === 0"
+      [(draft)]="draftState"
+      (retry)="dataStore.refresh()"
+      (dismiss)="dismiss($event)"
+      (triage)="triage($event)"
+      (dropTask)="drop()"
+      (later)="later($event)"
+      (edit)="edit($event)"
+    />
+  `,
 })
 export class Inbox {
   protected readonly dataStore = inject(DataStore);
@@ -80,17 +92,7 @@ export class Inbox {
 
   protected readonly Status = SyncStatus;
 
-  protected readonly Variant = ButtonVariant;
-
-  protected readonly Size = ButtonSize;
-
-  protected readonly dismissActions = [{ label: 'Dismiss', kind: ReviewItemActionKind.Secondary }];
-
-  private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
-
-  private readonly triageCard = viewChild(TriageCard);
-
-  private readonly reviewItems = viewChildren(ReviewItem);
+  private readonly template = viewChild(InboxTemplate);
 
   protected readonly statusLine = signal('');
 
@@ -104,12 +106,27 @@ export class Inbox {
     return state === null ? [] : inboxTasks(state);
   });
 
-  protected readonly reviewRows = computed(() => {
+  protected readonly reviews = computed<readonly InboxReview[]>(() => {
     const state = this.dataStore.state();
 
-    return state === null
-      ? []
-      : openReviewItems(state).map((item) => ({ item, copy: reviewCopy(item, state) }));
+    if (state === null) {
+      return [];
+    }
+
+    const waiting = this.dataStore.awaitingSync();
+
+    return openReviewItems(state).map((item) => {
+      const copy = reviewCopy(item, state);
+
+      return {
+        id: item.id,
+        question: copy.question,
+        reason: copy.reason,
+        taskId: copy.taskId,
+        busy: this.#attempts.busy(item.id),
+        awaitingSync: waiting.has(item.id),
+      };
+    });
   });
 
   protected readonly areas = computed<readonly AreaChoice[]>(() => {
@@ -131,10 +148,17 @@ export class Inbox {
     return this.inbox().find((task) => !deferred.has(task.id)) ?? null;
   });
 
-  protected readonly cardTasks = computed<readonly Task[]>(() => {
-    const card = this.#card();
+  protected readonly card = computed<InboxCard | null>(() => {
+    const task = this.#card();
 
-    return card === null ? [] : [card];
+    return task === null
+      ? null
+      : {
+          id: task.id,
+          title: task.title,
+          rawText: task.captureText,
+          awaitingSync: this.dataStore.awaitingSync().has(task.id),
+        };
   });
 
   /** The Tasks triaged or dropped here that have left the Inbox. */
@@ -164,11 +188,6 @@ export class Inbox {
 
     return id !== undefined && this.#attempts.busy(id);
   });
-
-  /** Whether this Review item's Dismiss is pending or waits for the server. */
-  protected reviewBusy(id: string): boolean {
-    return this.#attempts.busy(id);
-  }
 
   protected async triage(draft: TriageDraft): Promise<void> {
     const task = this.#card();
@@ -224,13 +243,13 @@ export class Inbox {
   }
 
   protected async dismiss(reviewItemId: string): Promise<void> {
-    if (this.reviewBusy(reviewItemId)) {
+    if (this.#attempts.busy(reviewItemId)) {
       return;
     }
 
     this.statusLine.set('');
 
-    const index = this.reviewRows().findIndex((row) => row.item.id === reviewItemId);
+    const index = this.reviews().findIndex((review) => review.id === reviewItemId);
     const command: Command = { _tag: CommandTag.ResolveReviewItem, reviewItemId };
 
     const outcome = await this.#attempts.send(command);
@@ -240,18 +259,7 @@ export class Inbox {
     }
 
     if (outcome._tag === CommandOutcomeTag.Applied) {
-      afterNextRender(
-        () => {
-          const next = this.reviewItems()[index];
-
-          if (next === undefined) {
-            this.heading()?.nativeElement.focus();
-          } else {
-            next.focus();
-          }
-        },
-        { injector: this.#injector },
-      );
+      afterNextRender(() => this.template()?.focusReview(index), { injector: this.#injector });
     } else {
       this.statusLine.set(outcomeMessage(outcome) ?? '');
     }
@@ -283,17 +291,6 @@ export class Inbox {
 
   /** After the next render, moves focus to the card's title, or to the heading when no card is left. */
   #focusCard(): void {
-    afterNextRender(
-      () => {
-        const card = this.triageCard();
-
-        if (card === undefined) {
-          this.heading()?.nativeElement.focus();
-        } else {
-          card.focusTitle();
-        }
-      },
-      { injector: this.#injector },
-    );
+    afterNextRender(() => this.template()?.focusCard(), { injector: this.#injector });
   }
 }

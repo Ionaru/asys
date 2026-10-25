@@ -1,0 +1,58 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
+<h1 #heading class="asys-page__title inbox__title" tabindex="-1">Inbox</h1>
+<p class="asys-page__status inbox__status" role="status">{{ statusLine() }}</p>
+@if (loaded()) {
+  @if (reviews().length > 0) {
+    <ul class="inbox__reviews">
+      @for (review of reviews(); track review.id) {
+        <li>
+          <asys-review-item
+            [question]="review.question"
+            [reason]="review.reason"
+            [actions]="dismissActions"
+            [busy]="review.busy"
+            (decide)="dismiss.emit(review.id)"
+          >
+            @if (review.taskId !== null) {
+              <a
+                asys-button
+                [variant]="Variant.Quiet"
+                [size]="Size.Small"
+                [routerLink]="['/tasks', review.taskId]"
+              >
+                Open Task
+              </a>
+            }
+          </asys-review-item>
+          @if (review.awaitingSync) {
+            <p asys-sync-note class="inbox__sync"></p>
+          }
+        </li>
+      }
+    </ul>
+  }
+  @for (task of cards(); track task.id) {
+    <asys-triage-card
+      [position]="position()"
+      [total]="total()"
+      [title]="task.title"
+      [rawText]="task.rawText"
+      [areas]="areas()"
+      [(draft)]="draft"
+      [busy]="cardBusy()"
+      [canLater]="canLater()"
+      (triage)="triage.emit($event)"
+      (dropTask)="dropTask.emit()"
+      (later)="later.emit(task.id)"
+      (edit)="edit.emit(task.id)"
+    />
+    @if (task.awaitingSync) {
+      <p asys-sync-note class="inbox__sync"></p>
+    }
+  }
+  @if (empty()) {
+    <p class="inbox__text">Nothing waits here.</p>
+  }
+} @else {
+  <asys-load-state [failed]="loadFailed()" (retry)="retry.emit()" />
+}
