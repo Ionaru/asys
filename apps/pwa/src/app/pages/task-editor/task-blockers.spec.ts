@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { Component, ErrorHandler, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import {
   CommandTag,
@@ -11,16 +12,22 @@ import {
   type BlockerLink,
   type Command,
   type DomainState,
+  type Instant,
   type Task,
 } from '@asys/domain';
 
-import { CommandOutcomeTag, type CommandOutcome } from '../../core/api/data-api';
+import { CommandOutcomeTag, DataApi, type CommandOutcome } from '../../core/api/data-api';
 import { CommandAttempts } from '../../core/data/command-attempts';
 import { DataStore, SyncStatus } from '../../core/data/data-store';
+import { DoneUndo, type DoneUndone, type PendingDone } from '../../core/data/done-undo';
 import { outcomeMessage } from '../../core/data/outcome-message';
+import { Clock } from '../../core/platform/clock';
 import { Ids } from '../../core/platform/ids';
 import { ThemeName } from '../../core/platform/theme';
-import { TaskBlockers } from './task-blockers';
+import { TaskEditor } from './task-editor';
+
+// 10:00 in Amsterdam, on Sunday 4 October 2026.
+const T0 = Date.parse('2026-10-04T08:00:00.000Z') as Instant;
 
 const APPLIED: CommandOutcome = { _tag: CommandOutcomeTag.Applied, seq: 1 };
 
@@ -105,14 +112,11 @@ const deferred = <T>() => {
 };
 
 @Component({
-  imports: [TaskBlockers],
-  providers: [CommandAttempts],
-  template: '<asys-task-blockers [taskId]="id()" [busy]="busy()" />',
+  imports: [TaskEditor],
+  template: '<asys-task-editor [taskId]="id()" />',
 })
 class Host {
   readonly id = signal('t1');
-
-  readonly busy = signal(false);
 }
 
 @Component({ template: '' })
@@ -136,14 +140,27 @@ const setup = async (options: SetupOptions = {}) => {
   let counter = 0;
   const next = vi.fn<() => string>(() => `key-${++counter}`);
   const handleError = vi.fn<(error: unknown) => void>();
+  const refresh = vi.fn<() => void>();
+  const runCommand = vi.fn<(command: Command, key: string) => Promise<CommandOutcome>>(() =>
+    Promise.resolve(APPLIED),
+  );
+  const doneUndo = {
+    complete: vi.fn<() => void>(),
+    requestFocus: vi.fn<() => void>(),
+    pending: signal<PendingDone | null>(null),
+    undone: signal<DoneUndone | null>(null),
+  };
 
   TestBed.configureTestingModule({
     providers: [
       provideRouter([{ path: 'tasks/:taskId', component: Stub }]),
       {
         provide: DataStore,
-        useValue: { state, status: signal(SyncStatus.Ready), awaitingSync, send },
+        useValue: { state, status: signal(SyncStatus.Ready), awaitingSync, send, refresh },
       },
+      { provide: DataApi, useValue: { runCommand } },
+      { provide: DoneUndo, useValue: doneUndo },
+      { provide: Clock, useValue: { now: signal(T0) } },
       { provide: Ids, useValue: { next } },
       { provide: ErrorHandler, useValue: { handleError } },
     ],
@@ -167,7 +184,14 @@ const setup = async (options: SetupOptions = {}) => {
     must(el).dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
     await settle();
   };
-  const dialog = (): HTMLDialogElement => must(root().querySelector('dialog.asys-sheet'));
+  // The editor holds other sheets too, so the Blocked by one is found by its heading.
+  const dialog = (): HTMLDialogElement =>
+    must(
+      Array.from(root().querySelectorAll<HTMLDialogElement>('dialog.asys-sheet')).find(
+        (d) => text(d.querySelector('h2.asys-sheet__heading')) === 'Blocked by',
+      ),
+      'the Blocked by sheet',
+    );
   const header = (): HTMLButtonElement => must(root().querySelector('button.asys-section-header'));
   const openSheet = async (): Promise<void> => {
     await press(header());
@@ -215,8 +239,7 @@ const setup = async (options: SetupOptions = {}) => {
 
   return {
     fixture,
-    host: fixture.componentInstance,
-    attempts: fixture.debugElement.injector.get(CommandAttempts),
+    attempts: fixture.debugElement.query(By.directive(TaskEditor)).injector.get(CommandAttempts),
     state,
     awaitingSync,
     sends,
@@ -449,13 +472,13 @@ describe('TaskBlockers', () => {
     });
 
     it('disables every Remove while busy holds', async () => {
-      const { openSheet, removes, host, settle } = await setup({ state: LINKED });
+      const { openSheet, removes, awaitingSync, settle } = await setup({ state: LINKED });
 
       await openSheet();
 
       expect(removes().map((b) => b.disabled)).toEqual([false, false]);
 
-      host.busy.set(true);
+      awaitingSync.set(new Set(['t1']));
       await settle();
 
       expect(removes().map((b) => b.disabled)).toEqual([true, true]);
@@ -639,19 +662,19 @@ describe('TaskBlockers', () => {
     });
 
     it('disables the candidates while busy holds', async () => {
-      const { openSheet, candidate, host, settle } = await setup();
+      const { openSheet, candidate, awaitingSync, settle } = await setup();
 
       await openSheet();
 
       expect(must(candidate('Water form')).disabled).toBe(false);
 
-      host.busy.set(true);
+      awaitingSync.set(new Set(['t1']));
       await settle();
 
       expect(must(candidate('Water form')).disabled).toBe(true);
       expect(must(candidate('Send invoice')).disabled).toBe(true);
 
-      host.busy.set(false);
+      awaitingSync.set(new Set());
       await settle();
 
       expect(must(candidate('Water form')).disabled).toBe(false);

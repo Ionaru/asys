@@ -83,4 +83,4 @@ Pages are specific instances of templates that inject data and content into the 
 - **Inputs and outputs.** Besides its input and output bindings, a component may take projected content and may expose public `focus…()` methods that move focus inside itself. It has no other imperative API.
 - **Support code.** Helpers that several levels share, such as `activation.ts` and `field-control.ts`, live in `./support`. Every level may import them, and they import nothing from `components/`. A helper that one component owns stays in that component's folder.
 - **Services.** No component injects a service from `core/`. The one exception is `organisms/swipe-actions`, which uses the `core/platform` seams `Motion`, `Haptics` and `theme`.
-- **Upwards and sideways.** Nothing in `components/` imports from `pages/`, `features/` or `layout/`.
+- **Upwards and sideways.** Nothing in `components/` imports from `pages/` or `layout/`.

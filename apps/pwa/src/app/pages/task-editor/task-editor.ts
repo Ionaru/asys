@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: EUPL-1.2
-import { DOCUMENT, Location, NgTemplateOutlet } from '@angular/common';
+import { DOCUMENT, Location } from '@angular/common';
 import {
   afterNextRender,
   Component,
   computed,
   DestroyRef,
   effect,
-  ElementRef,
   inject,
   Injector,
   input,
@@ -15,8 +14,8 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { disabled, form, FormField, validate } from '@angular/forms/signals';
-import { Router, RouterLink } from '@angular/router';
+import { disabled, form, validate } from '@angular/forms/signals';
+import { Router } from '@angular/router';
 import {
   canLogProgress,
   CommandTag,
@@ -25,7 +24,6 @@ import {
   isBlocked,
   isOverdue,
   type Task,
-  TaskExplanationTag,
   TaskStatus,
   toLocalDateTime,
 } from '@asys/domain';
@@ -39,34 +37,12 @@ import { outcomeMessage } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
 import { observeBlockSize } from '../../core/platform/observe-block-size';
 import { TaskMorph } from '../../core/platform/task-morph';
-import { activationOf } from '../../components/support/activation';
-import { Button, ButtonSize, ButtonVariant } from '../../components/atoms/button/button';
-import { ChoiceRow } from '../../components/organisms/choice-row/choice-row';
-import { DateSpecRow } from '../../components/organisms/date-spec-row/date-spec-row';
-import {
-  EstimateField,
-  EstimateLayout,
-} from '../../components/organisms/estimate-field/estimate-field';
-import { FieldError } from '../../components/atoms/field-error/field-error';
-import { Icon, IconName } from '../../components/atoms/icon/icon';
-import { Input, InputVariant } from '../../components/atoms/input/input';
-import { InlineConfirm } from '../../components/molecules/inline-confirm/inline-confirm';
-import { LoadState } from '../../components/molecules/load-state/load-state';
-import { LogProgressForm } from '../../components/organisms/log-progress-form/log-progress-form';
-import { QuadrantChip } from '../../components/atoms/quadrant-chip/quadrant-chip';
-import { Segmented } from '../../components/molecules/segmented/segmented';
-import { areaSelectOptions } from '../../components/molecules/select-field/area-options';
-import { Sheet } from '../../components/organisms/sheet/sheet';
-import { SingleLine } from '../../components/atoms/input/single-line';
-import { StatusBadge, StatusBadgeStatus } from '../../components/atoms/status-badge/status-badge';
-import { SyncNote } from '../../components/atoms/sync-note/sync-note';
+import { TaskEditorTemplate } from '../../components/templates/task-editor-template/task-editor-template';
 import { byAreaName } from '../../core/data/area-order';
 import { SaveState, TaskDraftSaver } from './task-draft-saver';
-import { TaskBlockers } from './task-blockers';
+import { TaskBlockerActions } from './task-blocker-actions';
 import { previewTask } from './task-preview';
 import { buildTaskPatch, savableDraft, TASK_DRAFT_FIELDS } from './task-patch';
-
-let nextId = 0;
 
 /** How many live editors have published their chrome on the root element; the last one out removes it. */
 let chromeEditors = 0;
@@ -89,31 +65,76 @@ interface EditorView {
  */
 @Component({
   selector: 'asys-task-editor',
-  imports: [
-    Button,
-    ChoiceRow,
-    DateSpecRow,
-    EstimateField,
-    FieldError,
-    FormField,
-    Icon,
-    InlineConfirm,
-    Input,
-    LoadState,
-    LogProgressForm,
-    NgTemplateOutlet,
-    QuadrantChip,
-    RouterLink,
-    Segmented,
-    Sheet,
-    SingleLine,
-    StatusBadge,
-    SyncNote,
-    TaskBlockers,
-  ],
-  providers: [CommandAttempts, TaskDraftSaver],
-  templateUrl: './task-editor.component.html',
-  styleUrl: './task-editor.css',
+  imports: [TaskEditorTemplate],
+  providers: [CommandAttempts, TaskDraftSaver, TaskBlockerActions],
+  template: `
+    <asys-task-editor-template
+      [taskId]="taskId()"
+      [morph]="morph()"
+      [heading]="headingText()"
+      [statusText]="statusText()"
+      [saved]="saver.saved()"
+      [saveFailed]="saver.state() === Saves.Failed"
+      [loaded]="dataStore.state() !== null"
+      [loadFailed]="dataStore.status() === Status.Failed"
+      [found]="view() !== null"
+      [taskOpen]="taskOpen()"
+      [readOnly]="readOnly()"
+      [leaving]="leaving()"
+      [dirty]="dirty()"
+      [awaiting]="dataStore.awaitingSync().has(taskId())"
+      [title]="saver.model().title"
+      [notes]="saver.model().notes"
+      [needsTitle]="saver.needsTitle()"
+      [notesShown]="notesShown()"
+      [capturedText]="capturedText()"
+      [importantField]="editForm.important"
+      [estimateField]="editForm.estimateMinutes"
+      [areaField]="editForm.areaId"
+      [availableFromField]="editForm.availableFrom"
+      [dueField]="editForm.due"
+      [areas]="areas()"
+      [today]="today()"
+      [explanation]="explanation()"
+      [overdue]="overdue()"
+      [blocked]="blocked()"
+      [doneBlocked]="doneBlocked()"
+      [actionBlocked]="actionBlocked()"
+      [canLogProgress]="canLogProgress()"
+      [(logOpen)]="logOpen"
+      [logMessage]="logMessage()"
+      [logEstimate]="logEstimate()"
+      [(moreOpen)]="moreOpen"
+      [(confirmingDrop)]="confirmingDrop"
+      [dropMessage]="dropMessage()"
+      [dropTitle]="dropTitle()"
+      [blockersBusy]="blockersBusy()"
+      [blockerSummary]="blockers.summary()"
+      [blockedBy]="blockers.blockedBy()"
+      [blocks]="blockers.blocks()"
+      [blockerCandidates]="blockers.candidates()"
+      [blockerMessage]="blockers.message()"
+      [blockerAdding]="blockers.adding()"
+      [(blockerFilter)]="blockers.filter"
+      (back)="back()"
+      (more)="openMore()"
+      (done)="done($event)"
+      (retrySave)="saver.retry()"
+      (retry)="dataStore.refresh()"
+      (titleChange)="titleInput($event)"
+      (notesChange)="notesInput($event)"
+      (commit)="saver.commit()"
+      (addNotes)="addNotes()"
+      (logProgress)="logProgress($event)"
+      (logOpenChange)="sheetClosed($event, Sheets.Log)"
+      (moreOpenChange)="sheetClosed($event, Sheets.More)"
+      (cancelLog)="logOpen.set(false)"
+      (dropTask)="drop()"
+      (cancelDrop)="cancelDrop()"
+      (addBlocker)="addBlocker($event)"
+      (removeBlocker)="removeBlocker($event)"
+    />
+  `,
 })
 export class TaskEditor {
   readonly taskId = input.required<string>();
@@ -136,6 +157,8 @@ export class TaskEditor {
 
   readonly #injector = inject(Injector);
 
+  protected readonly blockers = inject(TaskBlockerActions);
+
   readonly #document = inject(DOCUMENT);
 
   readonly #destroyRef = inject(DestroyRef);
@@ -145,41 +168,11 @@ export class TaskEditor {
 
   protected readonly Status = SyncStatus;
 
-  protected readonly Variant = ButtonVariant;
-
-  protected readonly Size = ButtonSize;
-
-  protected readonly InputVariants = InputVariant;
-
-  protected readonly Icons = IconName;
-
-  protected readonly Badge = StatusBadgeStatus;
-
-  protected readonly TaskStatuses = TaskStatus;
-
-  protected readonly Tags = TaskExplanationTag;
-
   protected readonly Saves = SaveState;
-
-  protected readonly Layout = EstimateLayout;
 
   protected readonly Sheets = EditorSheet;
 
-  protected readonly titleErrorId = `task-editor-${nextId++}-title-error`;
-
-  private readonly headingElement = viewChild<ElementRef<HTMLElement>>('heading');
-
-  private readonly notesField = viewChild<ElementRef<HTMLTextAreaElement>>('notesField');
-
-  private readonly dropButton = viewChild('dropButton', { read: ElementRef<HTMLElement> });
-
-  private readonly moreButton = viewChild('moreButton', { read: ElementRef<HTMLElement> });
-
-  private readonly logButton = viewChild('logButton', { read: ElementRef<HTMLElement> });
-
-  private readonly bar = viewChild<ElementRef<HTMLElement>>('bar');
-
-  private readonly footer = viewChild<ElementRef<HTMLElement>>('footer');
+  private readonly template = viewChild(TaskEditorTemplate);
 
   /** Action messages; a message of the saver wins over it in the status text. */
   readonly #statusLine = signal('');
@@ -282,9 +275,15 @@ export class TaskEditor {
     () => toLocalDateTime(this.#clock.now(), this.#timeZone()).date,
   );
 
-  protected readonly areaOptions = computed(() =>
-    areaSelectOptions([...(this.dataStore.state()?.areas ?? [])].sort(byAreaName)),
+  /** The Areas to choose from, sorted by name. */
+  protected readonly areas = computed(() =>
+    [...(this.dataStore.state()?.areas ?? [])].sort(byAreaName),
   );
+
+  protected readonly taskOpen = computed(() => this.view()?.task?.status === TaskStatus.Open);
+
+  /** The title the Drop confirmation names. */
+  protected readonly dropTitle = computed(() => this.view()?.task?.title ?? this.headingText());
 
   /** The draft as it would save; typed, uncommitted text leaves it equal, so the reason line is not rebuilt per keystroke. */
   readonly #savable = computed(
@@ -380,6 +379,10 @@ export class TaskEditor {
 
   constructor() {
     this.saver.connect(() => this.taskId());
+    this.blockers.connect(
+      () => this.taskId(),
+      () => this.blockersBusy(),
+    );
 
     // A save in flight ends the Log progress confirmation, so a later save message is the one shown.
     effect(() => {
@@ -394,8 +397,8 @@ export class TaskEditor {
   /** A person closed the Log progress or More sheet: focus returns to its opener, or the heading. */
   protected sheetClosed(open: boolean, sheet: EditorSheet): void {
     if (!open) {
-      this.#focusAfterRender(
-        () => (sheet === EditorSheet.Log ? this.logButton() : this.moreButton())?.nativeElement,
+      this.#focusAfterRender((template) =>
+        sheet === EditorSheet.Log ? template.focusLogButton() : template.focusMoreButton(),
       );
     }
   }
@@ -405,15 +408,13 @@ export class TaskEditor {
     this.saver.model.update((draft) => ({ ...draft, title }));
   }
 
-  protected notesInput(event: Event): void {
-    const notes = (event.target as HTMLTextAreaElement).value;
-
+  protected notesInput(notes: string): void {
     this.saver.model.update((draft) => ({ ...draft, notes }));
   }
 
   protected addNotes(): void {
     this.#notesRequested.set(true);
-    this.#focusAfterRender(() => this.notesField()?.nativeElement);
+    this.#focusAfterRender((template) => template.focusNotes());
   }
 
   protected openMore(): void {
@@ -427,7 +428,7 @@ export class TaskEditor {
   }
 
   /** Saves the draft, holds the Task through DoneUndo and leaves at once; the send waits for its Undo window. */
-  protected done(event: MouseEvent): void {
+  protected done(keyboard: boolean): void {
     const task = this.saver.task();
 
     if (this.doneBlocked() || task === undefined) {
@@ -442,7 +443,7 @@ export class TaskEditor {
 
     this.#doneUndo.complete({ ...task, title }, DoneOrigin.Button, this.saver.idle());
 
-    if (activationOf(event).keyboard) {
+    if (keyboard) {
       this.#doneUndo.requestFocus();
     }
 
@@ -472,7 +473,7 @@ export class TaskEditor {
     if (outcome._tag === CommandOutcomeTag.Applied) {
       this.#statusLine.set(estimateNowText(minutes));
       this.logOpen.set(false);
-      this.#focusAfterRender(() => this.logButton()?.nativeElement);
+      this.#focusAfterRender((template) => template.focusLogButton());
     } else {
       this.logMessage.set(outcomeMessage(outcome) ?? '');
     }
@@ -521,7 +522,23 @@ export class TaskEditor {
 
   protected cancelDrop(): void {
     this.confirmingDrop.set(false);
-    this.#focusAfterRender(() => this.dropButton()?.nativeElement);
+    this.#focusAfterRender((template) => template.focusDropButton());
+  }
+
+  /** Makes a Task a blocker; on Applied, focus returns to the Find a Task field. */
+  protected async addBlocker(blockerId: string): Promise<void> {
+    if (await this.blockers.add(blockerId)) {
+      this.#focusAfterRender((template) => template.focusBlockerFilter());
+    }
+  }
+
+  /** Removes a blocker; on Applied, focus moves to the Remove button now at its place. */
+  protected async removeBlocker(linkId: string): Promise<void> {
+    const index = this.blockers.blockedBy().findIndex((row) => row.linkId === linkId);
+
+    if (await this.blockers.remove(linkId)) {
+      this.#focusAfterRender((template) => template.focusBlockerRemove(index));
+    }
   }
 
   /**
@@ -539,7 +556,7 @@ export class TaskEditor {
     root.classList.add('task-editor-open');
 
     effect((onCleanup) => {
-      const element = this.bar()?.nativeElement;
+      const element = this.template()?.barElement();
 
       if (element) {
         onCleanup(
@@ -551,7 +568,7 @@ export class TaskEditor {
     });
 
     effect((onCleanup) => {
-      const element = this.footer()?.nativeElement;
+      const element = this.template()?.footerElement();
 
       if (element) {
         onCleanup(
@@ -605,10 +622,17 @@ export class TaskEditor {
     this.dropMessage.set('');
   }
 
-  /** After the next render, focuses the element, or the heading when it is gone. */
-  #focusAfterRender(target: () => HTMLElement | undefined): void {
-    afterNextRender(() => (target() ?? this.headingElement()?.nativeElement)?.focus(), {
-      injector: this.#injector,
-    });
+  /** After the next render, runs a focus method of the template. */
+  #focusAfterRender(focus: (template: TaskEditorTemplate) => void): void {
+    afterNextRender(
+      () => {
+        const template = this.template();
+
+        if (template !== undefined) {
+          focus(template);
+        }
+      },
+      { injector: this.#injector },
+    );
   }
 }

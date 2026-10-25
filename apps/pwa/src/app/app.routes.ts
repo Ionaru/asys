@@ -50,7 +50,7 @@ export const routes: Routes = [
       {
         path: 'tasks/:taskId',
         loadComponent: () =>
-          import('./features/task/task-editor-route').then((m) => m.TaskEditorRoute),
+          import('./pages/task-editor/task-editor-route').then((m) => m.TaskEditorRoute),
         title: 'Task · ASYS',
         data: { level: 1, hideNav: true },
       },

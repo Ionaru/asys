@@ -22,8 +22,8 @@ import { Ids } from './core/platform/ids';
 import { routeMotion } from './core/platform/view-transitions';
 import { AreaEditor } from './pages/area-editor/area-editor';
 import { AreaEditorRoute } from './pages/area-editor/area-editor-route';
-import { TaskEditor } from './features/task/task-editor';
-import { TaskEditorRoute } from './features/task/task-editor-route';
+import { TaskEditor } from './pages/task-editor/task-editor';
+import { TaskEditorRoute } from './pages/task-editor/task-editor-route';
 import { ShellLayout } from './layout/shell-layout';
 
 const NOW = Date.parse('2026-10-03T08:05:00Z') as Instant;

@@ -22,8 +22,8 @@
                 class="task-blockers__remove"
                 [variant]="Variant.Quiet"
                 [size]="Size.Small"
-                [disabled]="removeBusy(row.linkId)"
-                (click)="removeBlocker(row.linkId)"
+                [disabled]="busy() || row.busy"
+                (click)="remove.emit(row.linkId)"
               >
                 Remove
               </button>
@@ -47,8 +47,8 @@
                 type="button"
                 class="task-blockers__candidate"
                 [variant]="Variant.Quiet"
-                [disabled]="addBusy()"
-                (click)="addBlocker(candidate.id)"
+                [disabled]="busy() || adding()"
+                (click)="add.emit(candidate.id)"
               >
                 {{ candidate.title }}
               </button>
@@ -58,11 +58,11 @@
       } @else {
         <p class="task-blockers__text">No Task matches.</p>
       }
-      <p class="task-blockers__message" role="status">{{ blockerMessage() }}</p>
+      <p class="task-blockers__message" role="status">{{ message() }}</p>
       <h3 class="task-blockers__subtitle">Blocks</h3>
-      @if (blocksTasks().length > 0) {
+      @if (blocks().length > 0) {
         <ul class="task-blockers__list">
-          @for (dependant of blocksTasks(); track dependant.id) {
+          @for (dependant of blocks(); track dependant.id) {
             <li>
               <a
                 class="task-blockers__link"

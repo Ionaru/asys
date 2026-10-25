@@ -28,7 +28,7 @@ import { Clock } from '../../core/platform/clock';
 import { Ids } from '../../core/platform/ids';
 import { TaskMorph } from '../../core/platform/task-morph';
 import { ThemeName } from '../../core/platform/theme';
-import { TaskBlockers } from './task-blockers';
+import { TaskBlockers } from '../../components/organisms/task-blockers/task-blockers';
 import { TaskEditor } from './task-editor';
 import { TaskEditorRoute } from './task-editor-route';
 
@@ -2155,11 +2155,10 @@ describe('TaskEditor', () => {
   });
 
   describe('Blocked by', () => {
-    it('renders the blockers section with the Task id', async () => {
+    it('renders the blockers section, not busy', async () => {
       const { blockers, root } = await setup();
 
       expect(root().querySelector('asys-task-blockers')).not.toBeNull();
-      expect(blockers().taskId()).toBe('t1');
       expect(blockers().busy()).toBe(false);
     });
 
