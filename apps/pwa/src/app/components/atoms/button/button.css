@@ -18,10 +18,10 @@
   line-height: var(--line-height-body-strong);
   font-weight: 600;
   transition: opacity var(--duration-quick) var(--ease-out);
-}
 
-a.asys-button {
-  text-decoration: none;
+  a& {
+    text-decoration: none;
+  }
 }
 
 .asys-button--primary {
@@ -50,10 +50,10 @@ a.asys-button {
   min-height: var(--tap-target-large);
   padding: var(--space-2) var(--space-4);
   font-weight: 700;
-}
 
-.asys-button--large .asys-icon {
-  font-size: 1.125em;
+  & .asys-icon {
+    font-size: 1.125em;
+  }
 }
 
 .asys-button--small {
@@ -65,12 +65,12 @@ a.asys-button {
   line-height: var(--line-height-label);
   font-weight: 700;
   letter-spacing: 0.01em;
-}
 
-.asys-button--small::after {
-  content: '';
-  position: absolute;
-  inset: -6px;
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+  }
 }
 
 /* Icon only is a square tap target holding one icon; the consumer gives it an aria-label. */
@@ -80,10 +80,10 @@ a.asys-button {
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--ink);
-}
 
-.asys-button--icon .asys-icon {
-  font-size: 1.25em;
+  & .asys-icon {
+    font-size: 1.25em;
+  }
 }
 
 .asys-button-group {

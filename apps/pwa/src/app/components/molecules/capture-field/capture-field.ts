@@ -34,16 +34,16 @@ let nextId = 0;
       display: flex;
       align-items: center;
       gap: var(--space-2);
-    }
 
-    /* The field takes the room the buttons leave. */
-    .asys-capture-field__row > .asys-input-box {
-      flex: 1 1 0;
-    }
+      /* The field takes the room the buttons leave. */
+      & > .asys-input-box {
+        flex: 1 1 0;
+      }
 
-    /* The root's overflow-wrap would let a squeezed button break its label mid-word, so the field gives way instead. */
-    .asys-capture-field__row > .asys-button {
-      flex: none;
+      /* The root's overflow-wrap would let a squeezed button break its label mid-word, so the field gives way instead. */
+      & > .asys-button {
+        flex: none;
+      }
     }
 
     .asys-capture-field__hint {

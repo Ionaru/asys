@@ -122,10 +122,10 @@ export const SOLID_ICONS: Readonly<Partial<Record<IconName, IconDefinition>>> = 
 
     .asys-icon--lg {
       font-size: 1.25em;
-    }
 
-    .asys-icon--lg svg {
-      vertical-align: -0.2em;
+      & svg {
+        vertical-align: -0.2em;
+      }
     }
 
     @media (forced-colors: active) {

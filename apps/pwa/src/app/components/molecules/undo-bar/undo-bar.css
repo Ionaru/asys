@@ -74,13 +74,13 @@
   inline-size: 1.25em;
   block-size: 1.25em;
   color: var(--signal);
-}
 
-.asys-undo__timer svg {
-  display: block;
-  inline-size: 100%;
-  block-size: 100%;
-  overflow: visible;
+  & svg {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+    overflow: visible;
+  }
 }
 
 .asys-undo__ring {
@@ -98,12 +98,12 @@
   /* linear on purpose: the disc is a clock that must agree with the timer, not motion. */
   animation: asys-undo-fill var(--asys-undo-duration, 5s) linear var(--asys-undo-delay, 0ms)
     forwards;
-}
 
-.asys-undo.is-paused .asys-undo__fill,
-.asys-undo:focus-within .asys-undo__fill,
-.asys-undo:active .asys-undo__fill {
-  animation-play-state: paused;
+  .asys-undo.is-paused &,
+  .asys-undo:focus-within &,
+  .asys-undo:active & {
+    animation-play-state: paused;
+  }
 }
 
 @keyframes asys-undo-fill {

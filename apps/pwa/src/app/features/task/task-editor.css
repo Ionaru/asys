@@ -89,10 +89,10 @@
 .task-editor__rows {
   margin-inline: calc(var(--space-4) * -1);
   border-top: 1px solid var(--line);
-}
 
-.task-editor__rows > * + * {
-  border-top: 1px solid var(--line);
+  & > * + * {
+    border-top: 1px solid var(--line);
+  }
 }
 
 .task-editor__reason {
@@ -106,11 +106,11 @@
   color: var(--ink-muted);
   font-size: var(--font-size-reason);
   line-height: var(--line-height-reason);
-}
 
-/* The reason's line meets the last row, as the line above the first row meets it. */
-.task-editor__rows + .task-editor__reason {
-  margin-top: calc(var(--space-4) * -1);
+  /* The reason's line meets the last row, as the line above the first row meets it. */
+  .task-editor__rows + & {
+    margin-top: calc(var(--space-4) * -1);
+  }
 }
 
 .task-editor__reason-text {
@@ -128,13 +128,13 @@
   background: var(--surface);
   border-top: 1px solid var(--line);
   box-shadow: 0 env(safe-area-inset-bottom) 0 0 var(--surface);
-}
 
-.task-editor__actions > .asys-button--large {
-  flex: 1 1 0;
-  min-width: min-content;
-  padding-inline: var(--space-3);
-  white-space: nowrap;
+  & > .asys-button--large {
+    flex: 1 1 0;
+    min-width: min-content;
+    padding-inline: var(--space-3);
+    white-space: nowrap;
+  }
 }
 
 .task-editor__missing,
@@ -149,8 +149,8 @@
   display: inline-flex;
   align-items: center;
   min-height: var(--tap-target);
-}
 
-[data-theme='drive'] .task-editor__link {
-  min-height: var(--tap-target-drive);
+  [data-theme='drive'] & {
+    min-height: var(--tap-target-drive);
+  }
 }

@@ -52,11 +52,11 @@
   font-size: var(--font-size-reason);
   line-height: var(--line-height-reason);
   font-weight: 400;
-}
 
-.asys-triage__area strong {
-  color: var(--ink);
-  font-weight: 600;
+  & strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
 }
 
 .asys-triage__footer {

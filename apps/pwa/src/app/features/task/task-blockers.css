@@ -71,10 +71,10 @@
   display: flex;
   align-items: center;
   min-height: var(--tap-target);
-}
 
-[data-theme='drive'] .task-blockers__link {
-  min-height: var(--tap-target-drive);
+  [data-theme='drive'] & {
+    min-height: var(--tap-target-drive);
+  }
 }
 
 .task-blockers__body {

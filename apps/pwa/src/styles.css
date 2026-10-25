@@ -46,20 +46,20 @@ body {
   background: var(--paper);
   -webkit-font-smoothing: antialiased;
   overflow-wrap: anywhere;
-}
 
-.asys-root :focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
+  & :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
 
-:where(.asys-root button) {
-  font: inherit;
-  color: inherit;
-}
+  :where(& button) {
+    font: inherit;
+    color: inherit;
+  }
 
-:where(.asys-root a:not(.asys-button)) {
-  color: var(--signal);
+  :where(& a:not(.asys-button)) {
+    color: var(--signal);
+  }
 }
 
 .asys-num {
@@ -198,10 +198,10 @@ textarea.asys-input {
   white-space: pre;
   overflow: hidden;
   resize: none;
-}
 
-.asys-input-box__control:focus-visible {
-  outline: none;
+  &:focus-visible {
+    outline: none;
+  }
 }
 
 .asys-input-box:has(> .asys-input-box__control:focus-visible) {
@@ -311,10 +311,10 @@ textarea.asys-input {
   margin: 0 0 var(--space-3);
   font-size: var(--font-size-body);
   line-height: var(--line-height-body);
-}
 
-.asys-page__status:empty {
-  margin: 0;
+  &:empty {
+    margin: 0;
+  }
 }
 
 /* The pill that holds a count. Use it with asys-num, and set the colours in the component. */
@@ -356,15 +356,15 @@ textarea.asys-input {
   font-size: var(--font-size-body);
   line-height: var(--line-height-body);
   transition: background var(--duration-quick) var(--ease-out);
-}
 
-.asys-row:active {
-  background: var(--signal-soft);
-}
+  &:active {
+    background: var(--signal-soft);
+  }
 
-.asys-row:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
 }
 
 .asys-row__label {

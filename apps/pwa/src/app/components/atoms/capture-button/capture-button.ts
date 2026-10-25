@@ -36,14 +36,14 @@ import { Icon, IconName } from '../icon/icon';
       font-size: var(--font-size-body-strong);
       line-height: var(--line-height-body-strong);
       font-weight: 700;
-    }
 
-    .asys-capture .asys-icon {
-      font-size: 1.125em;
-    }
+      & .asys-icon {
+        font-size: 1.125em;
+      }
 
-    .asys-capture:active {
-      opacity: 0.85;
+      &:active {
+        opacity: 0.85;
+      }
     }
 
     .asys-capture__count {
