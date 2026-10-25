@@ -28,15 +28,15 @@
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   position: relative;
-}
 
-.asys-date-row__time::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: var(--space-3);
-  bottom: var(--space-3);
-  border-left: 1px solid var(--line);
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: var(--space-3);
+    bottom: var(--space-3);
+    border-left: 1px solid var(--line);
+  }
 }
 
 .asys-date-row__time--set {

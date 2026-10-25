@@ -49,21 +49,21 @@
   border-radius: var(--radius-pill);
   font-size: calc(var(--font-size-label) * 1.5);
   transition: background-color var(--duration-quick) var(--ease-out);
-}
 
-/* Set from the pointer rather than :active, which a phone can leave on a destination after the press. */
-.asys-bottomnav__item.is-pressed .asys-bottomnav__icon {
-  background: var(--signal-soft);
+  /* Set from the pointer rather than :active, which a phone can leave on a destination after the press. */
+  .asys-bottomnav__item.is-pressed & {
+    background: var(--signal-soft);
+  }
 }
 
 .asys-bottomnav__item[aria-current='page'] {
   color: var(--ink);
   font-weight: 700;
-}
 
-.asys-bottomnav__item[aria-current='page'] .asys-bottomnav__icon {
-  background: var(--signal-soft);
-  color: var(--on-signal-soft);
+  & .asys-bottomnav__icon {
+    background: var(--signal-soft);
+    color: var(--on-signal-soft);
+  }
 }
 
 .asys-bottomnav__label {
@@ -86,36 +86,34 @@
 .asys-bottomnav > .asys-capture {
   flex: none;
   margin-left: auto;
-}
 
-/* When the words would crowd the destinations (narrow phone, large text), Capture keeps its plus in a
-   tap-target-large circle and its word stays for screen readers. */
-@container asys-bottomnav (max-width: 23.75em) {
-  .asys-bottomnav > .asys-capture {
+  /* When the words would crowd the destinations (narrow phone, large text), Capture keeps its plus in a
+     tap-target-large circle and its word stays for screen readers. */
+  @container asys-bottomnav (max-width: 23.75em) {
     width: var(--tap-target-large);
     padding: 0;
-  }
 
-  .asys-bottomnav > .asys-capture .asys-capture__label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-    border: 0;
+    & .asys-capture__label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0;
+    }
   }
 }
 
 /* Voice only: the destinations go, and Capture stays and fills the bar. A bar with no Capture has nothing to show. */
 [data-theme='drive'] .asys-bottomnav {
   padding: var(--space-3) var(--space-4);
-}
 
-[data-theme='drive'] .asys-bottomnav:not(:has(.asys-capture)) {
-  display: none;
+  &:not(:has(.asys-capture)) {
+    display: none;
+  }
 }
 
 [data-theme='drive'] .asys-bottomnav__item {
@@ -127,13 +125,13 @@
   margin-left: 0;
   width: auto;
   padding: var(--space-2) var(--space-5);
-}
 
-[data-theme='drive'] .asys-bottomnav > .asys-capture .asys-capture__label {
-  position: static;
-  width: auto;
-  height: auto;
-  margin: 0;
-  overflow: visible;
-  clip: auto;
+  & .asys-capture__label {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+  }
 }

@@ -27,14 +27,14 @@ asys-section-header {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: background-color var(--duration-quick) var(--ease-out);
-}
 
-.asys-section .asys-section-header {
-  border-radius: 0;
-}
+  .asys-section & {
+    border-radius: 0;
+  }
 
-.asys-section-header:active {
-  background: var(--signal-soft);
+  &:active {
+    background: var(--signal-soft);
+  }
 }
 
 .asys-section-header__icon {
@@ -76,14 +76,14 @@ asys-section-header {
 .asys-section-header__chevron {
   font-size: 1.125em;
   color: var(--ink-muted);
-}
 
-.asys-section-header__chevron svg {
-  transition: transform var(--duration-quick) var(--ease-out);
-}
+  & svg {
+    transition: transform var(--duration-quick) var(--ease-out);
+  }
 
-.asys-section-header[aria-expanded='true'] .asys-section-header__chevron svg {
-  transform: rotate(180deg);
+  .asys-section-header[aria-expanded='true'] & svg {
+    transform: rotate(180deg);
+  }
 }
 
 .asys-section__body {

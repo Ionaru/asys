@@ -15,32 +15,32 @@ asys-sheet {
   background: var(--surface);
   color: var(--ink);
   box-shadow: var(--shadow-sheet);
-}
 
-/* The dialog is a container, so it takes focus without a ring. */
-.asys-sheet:focus-visible {
-  outline: none;
-}
-
-.asys-sheet[open] {
-  display: flex;
-  flex-direction: column;
-  translate: 0 0;
-  transition: translate var(--duration-moderate) var(--ease-emphasized);
-
-  @starting-style {
-    translate: 0 100%;
+  /* The dialog is a container, so it takes focus without a ring. */
+  &:focus-visible {
+    outline: none;
   }
-}
 
-/* Enter motion only: closing is instant. */
-.asys-sheet::backdrop {
-  background: var(--scrim);
-  opacity: 1;
-  transition: opacity var(--duration-quick) var(--ease-out);
+  &[open] {
+    display: flex;
+    flex-direction: column;
+    translate: 0 0;
+    transition: translate var(--duration-moderate) var(--ease-emphasized);
 
-  @starting-style {
-    opacity: 0;
+    @starting-style {
+      translate: 0 100%;
+    }
+  }
+
+  /* Enter motion only: closing is instant. */
+  &::backdrop {
+    background: var(--scrim);
+    opacity: 1;
+    transition: opacity var(--duration-quick) var(--ease-out);
+
+    @starting-style {
+      opacity: 0;
+    }
   }
 }
 

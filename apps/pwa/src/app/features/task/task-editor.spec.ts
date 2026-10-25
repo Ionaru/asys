@@ -27,6 +27,7 @@ import { outcomeMessage } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
 import { Ids } from '../../core/platform/ids';
 import { TaskMorph } from '../../core/platform/task-morph';
+import { ThemeName } from '../../core/platform/theme';
 import { TaskBlockers } from './task-blockers';
 import { TaskEditor } from './task-editor';
 import { TaskEditorRoute } from './task-editor-route';
@@ -558,6 +559,17 @@ describe('TaskEditor', () => {
       expect(heading().textContent?.trim()).toBe('Task');
       expect(card()).toBeNull();
       expect(footer()).toBeNull();
+    });
+
+    it('makes the link to Now a Voice tap target', async () => {
+      document.documentElement.setAttribute('data-theme', ThemeName.Drive);
+      onTestFinished(() => document.documentElement.removeAttribute('data-theme'));
+
+      const { root } = await setup({ taskId: 'nope' });
+
+      const link = must(root().querySelector<HTMLAnchorElement>('a[href="/now"]'));
+
+      expect(getComputedStyle(link).minHeight).toBe('var(--tap-target-drive)');
     });
 
     it('keeps the last known title in the heading and shows no card when a clean Task leaves the store', async () => {

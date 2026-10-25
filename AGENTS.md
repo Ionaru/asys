@@ -101,6 +101,7 @@ These fail lint, a test or a CI check when broken.
   - Components use signals (`input()`, `output()`, `model()`, `inject()`) and Signal Forms. They are zoneless, with OnPush by default.
   - Templates and styles start inline and move to files of their own once a component's `.ts` file reaches 100 lines. Follow the `angular-component-files` rule.
   - Colours, spacing and type come only from token CSS variables.
+  - Stylesheets nest states, parts, descendants, contexts and at-rules under the rule they belong to, within the limits in `building-pwa-ui`.
   - Test seams are services overridden in TestBed, because the builder refuses `vi.mock` of relative imports.
   - Use `building-pwa-ui`.
 - **Files:** YAML ends in `.yaml`. Helper scripts are `.mts` files run by Node, never bash scripts. CI is parallel jobs in `cd.yaml`.

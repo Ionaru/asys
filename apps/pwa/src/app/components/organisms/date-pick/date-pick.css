@@ -22,12 +22,12 @@ asys-date-pick {
   font-size: var(--font-size-body-strong);
   line-height: var(--line-height-body-strong);
   font-weight: 600;
-}
 
-.asys-date-pick__chip[aria-pressed='true'] {
-  background: var(--signal-soft);
-  color: var(--on-signal-soft);
-  border-color: var(--signal);
+  &[aria-pressed='true'] {
+    background: var(--signal-soft);
+    color: var(--on-signal-soft);
+    border-color: var(--signal);
+  }
 }
 
 .asys-date-pick__calendar {

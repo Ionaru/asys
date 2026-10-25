@@ -106,10 +106,10 @@
   background: var(--signal-soft);
   color: var(--on-signal-soft);
   border-color: var(--signal);
-}
 
-.asys-estimate__cell[aria-pressed='true'] .asys-estimate__unit {
-  color: var(--on-signal-soft);
+  & .asys-estimate__unit {
+    color: var(--on-signal-soft);
+  }
 }
 
 .asys-estimate__cell:disabled {

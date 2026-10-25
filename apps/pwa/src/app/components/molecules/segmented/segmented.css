@@ -22,19 +22,19 @@
   line-height: var(--line-height-body-strong);
   font-weight: 600;
   transition: background var(--duration-quick) var(--ease-out);
-}
 
-.asys-segmented__option[aria-pressed='true'] {
-  background: var(--signal-soft);
-  color: var(--on-signal-soft);
-  border-color: var(--signal);
-}
+  &[aria-pressed='true'] {
+    background: var(--signal-soft);
+    color: var(--on-signal-soft);
+    border-color: var(--signal);
+  }
 
-.asys-segmented__option:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
 
-[data-theme='drive'] .asys-segmented__option {
-  min-height: var(--tap-target-drive);
+  [data-theme='drive'] & {
+    min-height: var(--tap-target-drive);
+  }
 }

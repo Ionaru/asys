@@ -35,10 +35,10 @@
   text-decoration: none;
   border-radius: var(--radius-sm);
   -webkit-tap-highlight-color: transparent;
-}
 
-.asys-top-pick__link:active {
-  background: var(--signal-soft);
+  &:active {
+    background: var(--signal-soft);
+  }
 }
 
 .asys-top-pick__title-text {
@@ -82,11 +82,11 @@
   width: 24px;
   height: 24px;
   flex: none;
-}
 
-.asys-top-pick__check path {
-  stroke-dasharray: 1;
-  animation: asys-check-draw var(--duration-quick) var(--ease-out);
+  & path {
+    stroke-dasharray: 1;
+    animation: asys-check-draw var(--duration-quick) var(--ease-out);
+  }
 }
 
 @keyframes asys-check-draw {

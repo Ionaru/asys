@@ -32,10 +32,10 @@ let nextId = 0;
       list-style: none;
       border-top: 1px solid var(--line);
       border-bottom: 1px solid var(--line);
-    }
 
-    .asys-choice-row__options > li + li {
-      border-top: 1px solid var(--line);
+      & > li + li {
+        border-top: 1px solid var(--line);
+      }
     }
 
     .asys-choice-row__check {
@@ -45,10 +45,10 @@ let nextId = 0;
 
     .asys-choice-row__option[aria-pressed='true'] {
       font-weight: 600;
-    }
 
-    .asys-choice-row__option[aria-pressed='true'] .asys-choice-row__check {
-      visibility: visible;
+      & .asys-choice-row__check {
+        visibility: visible;
+      }
     }
   `,
 })

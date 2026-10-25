@@ -29,14 +29,14 @@ asys-time-pick {
   font-size: var(--font-size-time);
   line-height: var(--line-height-time);
   font-weight: 500;
-}
 
-.asys-time-pick__chip[aria-pressed='true'] {
-  background: var(--signal-soft);
-  color: var(--on-signal-soft);
-  border-color: var(--signal);
-}
+  &[aria-pressed='true'] {
+    background: var(--signal-soft);
+    color: var(--on-signal-soft);
+    border-color: var(--signal);
+  }
 
-[data-theme='drive'] .asys-time-pick__chip {
-  min-height: var(--tap-target-drive);
+  [data-theme='drive'] & {
+    min-height: var(--tap-target-drive);
+  }
 }

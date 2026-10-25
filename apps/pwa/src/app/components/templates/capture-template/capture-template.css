@@ -20,10 +20,10 @@
   margin: 0;
   font-size: var(--font-size-body);
   line-height: var(--line-height-body);
-}
 
-.capture__links a {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--tap-target);
+  & a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-target);
+  }
 }

@@ -51,14 +51,14 @@
   font-size: var(--font-size-reason);
   line-height: var(--line-height-reason);
   font-weight: 400;
-}
 
-.asys-picker-row__reason > * {
-  margin-right: var(--space-2);
-}
+  & > * {
+    margin-right: var(--space-2);
+  }
 
-.asys-picker-row__reason > :last-child {
-  margin-right: 0;
+  & > :last-child {
+    margin-right: 0;
+  }
 }
 
 .asys-picker-row__reason-text {
@@ -96,10 +96,10 @@
 /* Inside a section card the rows sit on the card's ground, with no line under the last one. */
 .asys-section__body .asys-picker-row {
   background: transparent;
-}
 
-.asys-section__body .asys-picker-row:active {
-  background: var(--signal-soft);
+  &:active {
+    background: var(--signal-soft);
+  }
 }
 
 .asys-section__body li:last-child > .asys-picker-row,
