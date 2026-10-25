@@ -1,9 +1,9 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
-<div class="asys-date-pick__chips" role="group" aria-label="Quick dates">
+<div class="asys-date-picker__chips" role="group" aria-label="Quick dates">
   @for (chip of chips(); track $index) {
     <button
       type="button"
-      class="asys-date-pick__chip"
+      class="asys-date-picker__chip"
       [attr.aria-pressed]="value() === chip.date ? 'true' : 'false'"
       (click)="choose(chip.date)"
     >
@@ -11,15 +11,15 @@
     </button>
   }
 </div>
-<div class="asys-date-pick__calendar" role="group" [attr.aria-label]="calendarLabel()">
+<div class="asys-date-picker__calendar" role="group" [attr.aria-label]="calendarLabel()">
   @for (name of weekdays; track name) {
-    <span class="asys-date-pick__dow" aria-hidden="true">{{ name }}</span>
+    <span class="asys-date-picker__dow" aria-hidden="true">{{ name }}</span>
   }
   @for (day of days(); track day.date) {
     <button
       type="button"
-      class="asys-num asys-date-pick__day"
-      [class.asys-date-pick__day--today]="day.isToday"
+      class="asys-num asys-date-picker__day"
+      [class.asys-date-picker__day--today]="day.isToday"
       [attr.aria-label]="day.label"
       [attr.aria-pressed]="value() === day.date ? 'true' : 'false'"
       [attr.aria-current]="day.isToday ? 'date' : null"
@@ -30,7 +30,7 @@
     </button>
   }
 </div>
-<div class="asys-field asys-date-pick__other">
+<div class="asys-field asys-date-picker__other">
   <label asys-label [for]="otherId">Other date</label>
   <input
     #otherInput
@@ -51,7 +51,7 @@
   <button
     asys-button
     type="button"
-    class="asys-date-pick__remove"
+    class="asys-date-picker__remove"
     [variant]="Variant.Secondary"
     [block]="true"
     (click)="remove.emit()"
