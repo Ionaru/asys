@@ -16,6 +16,8 @@ The PWA's presentational components move from `apps/pwa/src/app/ui/` into the At
 - **Enforcement.** `scripts/check-architecture.mts` checks every import under `components/` and `pages/` against the level rules, and runs in the `lint` CI job. A script was chosen over oxlint overrides, because overrides replace rather than merge, so the PWA's shared import bans would be copied once per level.
 - **One template per screen.** Every page gets a template of its own, also where the design system draws none (Recovered, the Areas list and editor, the auth screens, Capture, Settings, Account). Those templates follow what the screen shows today, and the design system is left as it is (decided 2026-10-22).
 - **Area order.** `byAreaName` moves from `features/areas/` to `core/data/area-order.ts` with the Area editor, because Now, the Task editor, the Inbox and the Areas list all sort by it and no one page owns it (decided 2026-10-25).
+- **Log progress helpers.** `logProgressCommand` and `estimateNowText` move from the LogProgressForm organism to `core/data/log-progress.ts` with Now, because the form never uses them, and Now and the Task editor build the Command and its status line themselves, which a page cannot import from an organism (decided 2026-10-25).
+- **Now's motion.** A component may not use `Motion`, so NowTemplate hands the page its card through `cardElement()` for the Done exit and rise, and emits each row's `animate.leave` and `animate.enter` events for the page to collapse and expand the row (decided 2026-10-25).
 - **The shell stays outside.** `layout/` (the shell with the router outlet) and `app.ts` are not a template with inputs and outputs only. They are looked at once the screens are done.
 
 ## Pull requests

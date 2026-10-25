@@ -7,7 +7,6 @@ import {
   computed,
   DestroyRef,
   effect,
-  ElementRef,
   inject,
   Injector,
   linkedSignal,
@@ -15,7 +14,6 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import {
   automaticAreaIds,
   canLogProgress,
@@ -36,25 +34,21 @@ import { AreaPickStore } from '../../core/data/area-pick-store';
 import { CommandAttempts } from '../../core/data/command-attempts';
 import { DataStore, SyncStatus, zoneOrUtc } from '../../core/data/data-store';
 import { DoneOrigin, DoneUndo } from '../../core/data/done-undo';
+import { estimateNowText, logProgressCommand } from '../../core/data/log-progress';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
 import { Motion, MotionDuration, MotionEasing } from '../../core/platform/motion';
 import { TaskMorph } from '../../core/platform/task-morph';
-import { AreaPickControl } from '../../components/molecules/area-pick/area-pick';
-import { Button, ButtonVariant } from '../../components/atoms/button/button';
-import { IconName } from '../../components/atoms/icon/icon';
-import { LoadState } from '../../components/molecules/load-state/load-state';
 import {
-  estimateNowText,
-  LogProgressForm,
-  logProgressCommand,
-} from '../../components/organisms/log-progress-form/log-progress-form';
-import { NowHeader } from '../../components/organisms/now-header/now-header';
-import { PickerRow, PickerRowVariant } from '../../components/molecules/picker-row/picker-row';
-import { SectionHeader } from '../../components/organisms/section-header/section-header';
-import { SwipeActions } from '../../components/organisms/swipe-actions/swipe-actions';
-import { SyncNote } from '../../components/atoms/sync-note/sync-note';
-import { TopPick } from '../../components/organisms/top-pick/top-pick';
+  type NowAreaControl,
+  type NowCard,
+  type NowDone,
+  type NowOtherArea,
+  type NowRow,
+  NowTemplate,
+  type NowSwipeDone,
+  type NowWaitingRow,
+} from '../../components/templates/now-template/now-template';
 import { byAreaName } from '../../core/data/area-order';
 import {
   areaNamesText,
@@ -80,22 +74,37 @@ const RISE_KEYFRAMES: Keyframe[] = [
 /** What to do now: the top pick with its actions, the other ranked Tasks, and the ones that wait. */
 @Component({
   selector: 'app-now',
-  imports: [
-    AreaPickControl,
-    Button,
-    LoadState,
-    LogProgressForm,
-    NowHeader,
-    PickerRow,
-    RouterLink,
-    SectionHeader,
-    SwipeActions,
-    SyncNote,
-    TopPick,
-  ],
+  imports: [NowTemplate],
   providers: [CommandAttempts],
-  templateUrl: './now.component.html',
-  styleUrl: './now.css',
+  template: `
+    <asys-now-template
+      [moment]="moment()"
+      [datetime]="momentDatetime()"
+      [areaControl]="areaControl()"
+      [statusLine]="statusLine()"
+      [loaded]="dataStore.now() !== null"
+      [loadFailed]="dataStore.status() === Status.Failed"
+      [card]="card()"
+      [leaving]="leaving() !== null"
+      [inboxTaskCount]="inboxTaskCount()"
+      [rows]="rows()"
+      [otherAreas]="otherAreas()"
+      [waiting]="waiting()"
+      [waitingSummary]="waitingLine()"
+      [(waitingExpanded)]="waitingExpanded"
+      (retry)="dataStore.refresh()"
+      (areaPicked)="pickArea($event)"
+      (otherAreaPicked)="pickOtherArea($event)"
+      (done)="doneFromCard($event)"
+      (swipeDone)="swipeDone($event)"
+      (logProgress)="openForm($event)"
+      (saveProgress)="saveProgress($event)"
+      (cancelForm)="cancelForm()"
+      (formFocus)="focusInside = $event"
+      (rowLeave)="collapse($event)"
+      (rowEnter)="expand($event.event, $event.taskId)"
+    />
+  `,
 })
 export class Now {
   protected readonly dataStore = inject(DataStore);
@@ -116,29 +125,11 @@ export class Now {
 
   readonly #document = inject(DOCUMENT);
 
-  readonly #host = inject<ElementRef<HTMLElement>>(ElementRef);
-
   protected readonly Status = SyncStatus;
 
-  protected readonly Rows = PickerRowVariant;
+  readonly #morphId = inject(TaskMorph).taskId;
 
-  protected readonly Origins = DoneOrigin;
-
-  protected readonly Variants = ButtonVariant;
-
-  protected readonly Icons = IconName;
-
-  protected readonly morphId = inject(TaskMorph).taskId;
-
-  private readonly nowHeader = viewChild(NowHeader);
-
-  private readonly areaPickControl = viewChild(AreaPickControl);
-
-  private readonly topPick = viewChild(TopPick);
-
-  private readonly topPickHost = viewChild<TopPick, ElementRef<HTMLElement>>(TopPick, {
-    read: ElementRef,
-  });
+  private readonly template = viewChild(NowTemplate);
 
   protected readonly waitingExpanded = signal(false);
 
@@ -205,7 +196,7 @@ export class Now {
   readonly #openFormId = computed(() => {
     const id = this.#logProgressFor();
 
-    return id !== null && this.canLogProgress(id) ? id : null;
+    return id !== null && this.#canLogProgress(id) ? id : null;
   });
 
   protected readonly inboxTaskCount = computed(() => {
@@ -237,7 +228,7 @@ export class Now {
   );
 
   /** What the header's Current Area control shows, or null while there is no state. */
-  protected readonly areaControl = computed(() => {
+  protected readonly areaControl = computed<NowAreaControl | null>(() => {
     const state = this.dataStore.state();
     const current = this.dataStore.currentArea();
 
@@ -259,7 +250,7 @@ export class Now {
   });
 
   /** The Other Areas line's buttons: each counted Area with its text; an Area of unknown name is skipped. */
-  protected readonly otherAreas = computed(() => {
+  protected readonly otherAreas = computed<readonly NowOtherArea[]>(() => {
     const names = this.#areaNames();
 
     return (this.dataStore.now()?.otherAreas ?? []).flatMap((other) => {
@@ -270,6 +261,65 @@ export class Now {
         : [{ areaId: other.areaId, text: otherAreaText(name, other.count, other.overdue) }];
     });
   });
+
+  /** The card's Task as the template shows it, or null when none shows. */
+  protected readonly card = computed<NowCard | null>(() => {
+    const top = this.displayed();
+
+    if (top === null) {
+      return null;
+    }
+
+    const id = top.task.id;
+
+    return {
+      id,
+      title: top.task.title,
+      reason: top.reasonText,
+      quadrant: top.reason.quadrant,
+      overdue: top.reason.overdue,
+      dueFact: this.#dueFact(top),
+      estimate: this.#estimateText(top.task),
+      area: this.#areaName(top.task),
+      morph: this.#morphId() === id,
+      canLogProgress: this.#canLogProgress(id),
+      busy: this.#busy(id),
+      awaitingSync: this.dataStore.awaitingSync().has(id),
+      formEstimate: this.#formEstimateOf(id),
+    };
+  });
+
+  /** The ranked Tasks under the card as the template shows them. */
+  protected readonly rows = computed<readonly NowRow[]>(() =>
+    this.listed().map((item) => {
+      const id = item.task.id;
+
+      return {
+        id,
+        title: item.task.title,
+        reason: item.reasonText,
+        quadrant: item.reason.quadrant,
+        overdue: item.reason.overdue,
+        estimate: this.#estimateText(item.task),
+        morph: this.#morphId() === id,
+        canLogProgress: this.#canLogProgress(id),
+        busy: this.#busy(id),
+        formEstimate: this.#formEstimateOf(id),
+      };
+    }),
+  );
+
+  /** The Tasks in the Waiting section as the template shows them. */
+  protected readonly waiting = computed<readonly NowWaitingRow[]>(() =>
+    (this.dataStore.now()?.waiting ?? []).map((item) => ({
+      id: item.task.id,
+      title: item.task.title,
+      reason: item.reasonText,
+      estimate: this.#estimateText(item.task),
+      overdue: this.#overdue(item.task),
+      morph: this.#morphId() === item.task.id,
+    })),
+  );
 
   constructor() {
     effect(() => {
@@ -330,7 +380,7 @@ export class Now {
   /** Picks the Area from the Other Areas line, then moves focus to the control after the next render. */
   protected pickOtherArea(areaId: string): void {
     this.pickArea(areaId);
-    afterNextRender(() => this.areaPickControl()?.focus(), { injector: this.#injector });
+    afterNextRender(() => this.template()?.focusAreaPick(), { injector: this.#injector });
   }
 
   /** Collapses a leaving row; focus inside it moves to the top pick first, so it never falls to the body. */
@@ -352,40 +402,45 @@ export class Now {
   }
 
   /** Whether a Done or Log progress for this Task is pending or waits for the server. */
-  protected busy(taskId: string): boolean {
+  #busy(taskId: string): boolean {
     return this.#attempts.busy(taskId);
   }
 
   /** The stored Estimate of the Task in minutes, or null when it has none or is not in the state. */
-  protected estimateOf(taskId: string): number | null {
+  #estimateOf(taskId: string): number | null {
     return this.#tasksById().get(taskId)?.estimateMinutes ?? null;
   }
 
   /** Whether progress can be logged on the Task, by the domain's `canLogProgress`. */
-  protected canLogProgress(taskId: string): boolean {
+  #canLogProgress(taskId: string): boolean {
     return canLogProgress(this.#tasksById().get(taskId));
   }
 
   /** Whether the Log progress form shows for the Task, in the card or under its row. */
-  protected formOpenFor(taskId: string): boolean {
-    return this.#logProgressFor() === taskId && this.canLogProgress(taskId);
+  #formOpenFor(taskId: string): boolean {
+    return this.#logProgressFor() === taskId && this.#canLogProgress(taskId);
   }
 
-  protected estimateText(task: Task): string {
+  /** The stored Estimate in minutes while the Task's Log progress form shows, else null. */
+  #formEstimateOf(taskId: string): number | null {
+    return this.#formOpenFor(taskId) ? this.#estimateOf(taskId) : null;
+  }
+
+  #estimateText(task: Task): string {
     return task.estimateMinutes === null ? '' : formatMinutes(task.estimateMinutes);
   }
 
-  protected overdue(task: Task): boolean {
+  #overdue(task: Task): boolean {
     return isOverdue(task, this.#clock.now(), this.#timeZone());
   }
 
   /** The name of the Task's Area, or null when it has none. */
-  protected areaName(task: Task): string | null {
+  #areaName(task: Task): string | null {
     return task.areaId === null ? null : (this.#areaNames().get(task.areaId) ?? null);
   }
 
   /** The Due fact that opens an Overdue Task's reason, or null when the Task is not Overdue. */
-  protected dueFact(item: RankedTask): string | null {
+  #dueFact(item: RankedTask): string | null {
     return item.reason.overdue
       ? reasonFact(item.task, item.reason, this.#clock.now(), this.#timeZone())
       : null;
@@ -404,12 +459,21 @@ export class Now {
     if (taskId !== null && taskId !== this.#rankedIds()[0]) {
       this.#focusLinkAfterRender(taskId);
     } else {
-      afterNextRender(() => this.topPick()?.focusLogProgress(), { injector: this.#injector });
+      afterNextRender(() => this.template()?.focusLogProgress(), { injector: this.#injector });
+    }
+  }
+
+  /** Marks the card's Task Done from its button. */
+  protected doneFromCard(event: NowDone): void {
+    const top = this.displayed();
+
+    if (top !== null && top.task.id === event.taskId) {
+      void this.done(top.task, DoneOrigin.Button, event.keyboard);
     }
   }
 
   /** Marks the Task Done from a swipe; a row keeps focus off itself when it had it, so it never falls to the body. */
-  protected swipeDone(taskId: string): void {
+  protected swipeDone({ taskId, hadFocus }: NowSwipeDone): void {
     const task = this.dataStore.now()?.ranked.find((item) => item.task.id === taskId)?.task;
 
     if (task === undefined) {
@@ -423,9 +487,6 @@ export class Now {
       return;
     }
 
-    const row = this.#linkOf(taskId)?.closest('li') ?? null;
-    const focused = this.#document.activeElement;
-    const hadFocus = row !== null && focused !== null && row.contains(focused);
     const neighbourId = hadFocus ? this.#neighbourIdOf(taskId) : null;
 
     void this.done(task, DoneOrigin.Swipe);
@@ -484,7 +545,7 @@ export class Now {
 
   protected async saveProgress(minutes: number): Promise<void> {
     const taskId = this.#logProgressFor();
-    if (taskId === null || this.busy(taskId)) {
+    if (taskId === null || this.#busy(taskId)) {
       return;
     }
     this.statusLine.set('');
@@ -511,7 +572,7 @@ export class Now {
   /** Whether a Done for this Task is refused: it is busy, already held in DoneUndo, or its card is leaving. */
   #refusesDone(taskId: string): boolean {
     return (
-      this.busy(taskId) ||
+      this.#busy(taskId) ||
       this.#doneUndo.pending()?.taskId === taskId ||
       this.leaving()?.task.id === taskId
     );
@@ -526,7 +587,7 @@ export class Now {
 
   /** The card's `<article>`, the element that is animated, or null while no card shows. */
   #cardElement(): HTMLElement | null {
-    return this.topPickHost()?.nativeElement.querySelector<HTMLElement>('.asys-top-pick') ?? null;
+    return this.template()?.cardElement() ?? null;
   }
 
   /** Ends a running exit at once: its animation stops and the card shows the top pick again. */
@@ -587,30 +648,12 @@ export class Now {
   }
 
   #focusTopNow(): void {
-    const topPick = this.topPick();
-    if (topPick === undefined) {
-      this.nowHeader()?.focusHeading();
-    } else {
-      topPick.focusTitle();
-    }
-  }
-
-  /** The link of the Task's row or card, skipping one that is leaving, or null when none shows. */
-  #linkOf(taskId: string): HTMLElement | null {
-    const title = Array.from(
-      this.#host.nativeElement.querySelectorAll<HTMLElement>('[data-task-id]'),
-    ).find(
-      (element) =>
-        element.getAttribute('data-task-id') === taskId &&
-        element.closest('[data-leaving]') === null,
-    );
-
-    return title?.closest('a') ?? null;
+    this.template()?.focusTop();
   }
 
   /** After the next render, moves focus to the link of the Task's row. */
   #focusLinkAfterRender(taskId: string): void {
-    afterNextRender(() => this.#linkOf(taskId)?.focus(), { injector: this.#injector });
+    afterNextRender(() => this.template()?.focusTask(taskId), { injector: this.#injector });
   }
 
   /** The id of the row after this one in the list, else the one before it, else null. Read it before the Done. */
@@ -623,12 +666,8 @@ export class Now {
 
   /** Moves focus now to the link of the row, or to the top pick when there is none. */
   #focusRowOrTop(taskId: string | null): void {
-    const link = taskId === null ? null : this.#linkOf(taskId);
-
-    if (link === null) {
+    if (taskId === null || this.template()?.focusTask(taskId) !== true) {
       this.#focusTopNow();
-    } else {
-      link.focus();
     }
   }
 

@@ -34,6 +34,7 @@ import { CommandOutcomeTag } from '../../core/api/data-api';
 import { CommandAttempts } from '../../core/data/command-attempts';
 import { DataStore, SyncStatus, zoneOrUtc } from '../../core/data/data-store';
 import { DoneOrigin, DoneUndo } from '../../core/data/done-undo';
+import { estimateNowText, logProgressCommand } from '../../core/data/log-progress';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
 import { observeBlockSize } from '../../core/platform/observe-block-size';
@@ -51,11 +52,7 @@ import { Icon, IconName } from '../../components/atoms/icon/icon';
 import { Input, InputVariant } from '../../components/atoms/input/input';
 import { InlineConfirm } from '../../components/molecules/inline-confirm/inline-confirm';
 import { LoadState } from '../../components/molecules/load-state/load-state';
-import {
-  estimateNowText,
-  LogProgressForm,
-  logProgressCommand,
-} from '../../components/organisms/log-progress-form/log-progress-form';
+import { LogProgressForm } from '../../components/organisms/log-progress-form/log-progress-form';
 import { QuadrantChip } from '../../components/atoms/quadrant-chip/quadrant-chip';
 import { Segmented } from '../../components/molecules/segmented/segmented';
 import { areaSelectOptions } from '../../components/molecules/select-field/area-options';

@@ -3,7 +3,7 @@ import { Routes } from '@angular/router';
 
 import { signedInGuard, signedOutGuard } from './core/auth/guards';
 import { Capture } from './pages/capture/capture';
-import { Now } from './features/now/now';
+import { Now } from './pages/now/now';
 import { Today } from './pages/today/today';
 import { ShellLayout } from './layout/shell-layout';
 

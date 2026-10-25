@@ -578,7 +578,7 @@ describe('Now', () => {
       async (_, options) => {
         const { root, nowHeader, heading, statusLine } = await setup(options);
 
-        expect(root().firstElementChild).toBe(nowHeader());
+        expect(root().querySelector('asys-now-template')?.firstElementChild).toBe(nowHeader());
         expect(root().querySelectorAll('asys-now-header')).toHaveLength(1);
         expect(root().querySelectorAll('h1')).toHaveLength(1);
         expect(heading().closest('asys-now-header')).toBe(nowHeader());
