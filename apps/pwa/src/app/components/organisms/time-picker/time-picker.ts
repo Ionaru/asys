@@ -12,7 +12,7 @@ const TIMES: readonly LocalTime[] = ['09:00', '10:00', '12:00', '14:00', '17:00'
 
 /** The body of a time sheet: six common times and a native time input. It emits, it never stores. */
 @Component({
-  selector: 'asys-time-pick',
+  selector: 'asys-time-picker',
   imports: [Button, Input, Label],
   encapsulation: ViewEncapsulation.None,
   template: `
@@ -55,9 +55,9 @@ const TIMES: readonly LocalTime[] = ['09:00', '10:00', '12:00', '14:00', '17:00'
       </button>
     }
   `,
-  styleUrl: './time-pick.css',
+  styleUrl: './time-picker.css',
 })
-export class TimePick {
+export class TimePicker {
   protected readonly Variant = ButtonVariant;
 
   protected readonly times = TIMES;

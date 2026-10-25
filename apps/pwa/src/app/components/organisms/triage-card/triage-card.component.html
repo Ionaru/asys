@@ -5,7 +5,7 @@
   @if (showRaw()) {
     <p class="asys-triage__raw">{{ rawText() }}</p>
   }
-  <asys-segmented
+  <asys-segmented-control
     legend="Importance"
     trueLabel="Important"
     falseLabel="Not important"
@@ -13,7 +13,7 @@
     [value]="draft().important"
     (valueChange)="draft.set({ ...draft(), important: $event })"
   />
-  <asys-estimate-field
+  <asys-estimate-picker
     legend="Estimate"
     [disabled]="busy()"
     [value]="draft().estimateMinutes"

@@ -419,7 +419,7 @@ describe('TopPick', () => {
       const { fixture, host, facts } = await setup();
       const chip = (): HTMLElement => must(facts().at(-1));
 
-      expect(chip().hasAttribute('asys-quadrant-chip')).toBe(true);
+      expect(chip().hasAttribute('asys-quadrant-label')).toBe(true);
       expect(chip().classList.contains('asys-quadrant--plan')).toBe(true);
       expect(collapsed(chip())).toBe('Quadrant: Plan');
 

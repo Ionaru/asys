@@ -3,14 +3,14 @@ import { Component, signal, viewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { form, FormField, validate, type ValidationError } from '@angular/forms/signals';
 
-import { EstimateField, EstimateLayout } from './estimate-field';
+import { EstimatePicker, EstimateLayout } from './estimate-picker';
 
 const RANGE_ERROR = 'Error: Use whole minutes from 1 to 100000.';
 
 @Component({
-  imports: [EstimateField],
+  imports: [EstimatePicker],
   template: `
-    <asys-estimate-field
+    <asys-estimate-picker
       [value]="value()"
       (valueChange)="value.set($event)"
       [hint]="hint()"
@@ -22,7 +22,7 @@ const RANGE_ERROR = 'Error: Use whole minutes from 1 to 100000.';
   `,
 })
 class Host {
-  readonly field = viewChild.required(EstimateField);
+  readonly field = viewChild.required(EstimatePicker);
 
   readonly value = signal<number | null>(null);
 
@@ -38,17 +38,17 @@ class Host {
 }
 
 @Component({
-  imports: [EstimateField],
+  imports: [EstimatePicker],
   template: `
-    <asys-estimate-field legend="Custom legend" />
-    <asys-estimate-field hint="Some hint" />
+    <asys-estimate-picker legend="Custom legend" />
+    <asys-estimate-picker hint="Some hint" />
   `,
 })
 class Pair {}
 
 @Component({
-  imports: [EstimateField, FormField],
-  template: `<asys-estimate-field [formField]="f.estimate" />`,
+  imports: [EstimatePicker, FormField],
+  template: `<asys-estimate-picker [formField]="f.estimate" />`,
 })
 class FormHost {
   readonly model = signal<{ estimate: number | null }>({ estimate: null });
@@ -97,7 +97,7 @@ const setup = async () => {
   return { fixture, host, root, type, ...finders(root) };
 };
 
-describe('EstimateField', () => {
+describe('EstimatePicker', () => {
   describe('markup', () => {
     it('renders a fieldset with the default legend', async () => {
       const { root } = await setup();
@@ -522,7 +522,7 @@ describe('EstimateField', () => {
       const fixture = TestBed.createComponent(Pair);
       await fixture.whenStable();
 
-      const fields = fixture.nativeElement.querySelectorAll('asys-estimate-field');
+      const fields = fixture.nativeElement.querySelectorAll('asys-estimate-picker');
       const hint = fixture.nativeElement.querySelector('p.asys-field__hint') as HTMLElement;
 
       expect(hint.id).not.toBe('');
@@ -613,9 +613,9 @@ describe('EstimateField', () => {
 });
 
 @Component({
-  imports: [EstimateField],
+  imports: [EstimatePicker],
   template: `
-    <asys-estimate-field
+    <asys-estimate-picker
       [layout]="layout"
       [value]="value()"
       (valueChange)="value.set($event)"
@@ -630,7 +630,7 @@ describe('EstimateField', () => {
 class RulerHost {
   readonly layout = EstimateLayout.Ruler;
 
-  readonly field = viewChild.required(EstimateField);
+  readonly field = viewChild.required(EstimatePicker);
 
   readonly value = signal<number | null>(null);
 
@@ -672,7 +672,7 @@ const setupRuler = async () => {
   return { fixture, host, root, group, legend, cells, toggle, otherInput, error, typeEvent };
 };
 
-describe('EstimateField Ruler layout', () => {
+describe('EstimatePicker Ruler layout', () => {
   it('is a group named by its legend, not a fieldset or a chip row', async () => {
     const { root, group, legend } = await setupRuler();
 

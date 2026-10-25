@@ -29,7 +29,7 @@ const openAt = async (page: Page, time: Date): Promise<void> => {
 };
 
 const shown = (page: Page, title: string) =>
-  page.locator('.asys-top-pick__title, a.asys-picker-row').filter({ hasText: title });
+  page.locator('.asys-top-pick__title, a.asys-task-row').filter({ hasText: title });
 
 const otherAreas = (page: Page) => page.getByRole('group', { name: 'Other Areas' });
 

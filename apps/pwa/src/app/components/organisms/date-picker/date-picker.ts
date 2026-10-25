@@ -16,13 +16,13 @@ const CALENDAR_DAYS = 14;
 
 /** The body of a date sheet: quick dates, a two-week calendar and a native date input. It emits, it never stores. */
 @Component({
-  selector: 'asys-date-pick',
+  selector: 'asys-date-picker',
   imports: [Button, FieldError, Input, Label],
   encapsulation: ViewEncapsulation.None,
-  templateUrl: './date-pick.component.html',
-  styleUrl: './date-pick.css',
+  templateUrl: './date-picker.component.html',
+  styleUrl: './date-picker.css',
 })
-export class DatePick {
+export class DatePicker {
   protected readonly Variant = ButtonVariant;
 
   protected readonly weekdays = WEEKDAY_HEADERS;

@@ -227,7 +227,7 @@ test('The editor blocks and unblocks a Task through the Blocked by sheet', async
   await seedTask(page, { title: 'Bravo task', important: false, estimateMinutes: 30 });
   await page.reload();
 
-  const row = (title: string) => page.locator('a.asys-picker-row').filter({ hasText: title });
+  const row = (title: string) => page.locator('a.asys-task-row').filter({ hasText: title });
 
   // Block Alpha by Bravo.
   await expect(topPick(page).locator('.asys-top-pick__title')).toHaveText('Alpha task');
@@ -252,7 +252,7 @@ test('The editor blocks and unblocks a Task through the Blocked by sheet', async
   const waiting = page.getByRole('button', { name: /^Waiting/ });
   await waiting.click();
   await expect(waiting).toHaveAttribute('aria-expanded', 'true');
-  await expect(row('Alpha task').locator('.asys-picker-row__reason-text')).toHaveText(
+  await expect(row('Alpha task').locator('.asys-task-row__reason-text')).toHaveText(
     'Blocked by Bravo task',
   );
 

@@ -2,12 +2,12 @@
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
-import { DatePick } from './date-pick';
+import { DatePicker } from './date-picker';
 
 @Component({
-  imports: [DatePick],
+  imports: [DatePicker],
   template: `
-    <asys-date-pick
+    <asys-date-picker
       [today]="today()"
       [value]="value()"
       [removeLabel]="'Remove Due'"
@@ -72,7 +72,7 @@ const setup = async (today = '2026-10-13', value: string | null = null) => {
   };
 };
 
-describe('DatePick', () => {
+describe('DatePicker', () => {
   describe('quick dates', () => {
     it('labels the group and shows three chips', async () => {
       const { root, chips } = await setup();

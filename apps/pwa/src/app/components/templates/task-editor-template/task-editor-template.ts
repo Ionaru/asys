@@ -24,16 +24,16 @@ import { FieldError } from '../../atoms/field-error/field-error';
 import { Icon, IconName } from '../../atoms/icon/icon';
 import { Input, InputVariant } from '../../atoms/input/input';
 import { SingleLine } from '../../atoms/input/single-line';
-import { QuadrantChip } from '../../atoms/quadrant-chip/quadrant-chip';
+import { QuadrantLabel } from '../../atoms/quadrant-label/quadrant-label';
 import { StatusBadge, StatusBadgeStatus } from '../../atoms/status-badge/status-badge';
 import { SyncNote } from '../../atoms/sync-note/sync-note';
 import { InlineConfirm } from '../../molecules/inline-confirm/inline-confirm';
 import { LoadState } from '../../molecules/load-state/load-state';
-import { Segmented } from '../../molecules/segmented/segmented';
+import { SegmentedControl } from '../../molecules/segmented-control/segmented-control';
 import { areaSelectOptions } from '../../molecules/select-field/area-options';
 import { ChoiceRow } from '../../organisms/choice-row/choice-row';
-import { DateSpecRow } from '../../organisms/date-spec-row/date-spec-row';
-import { EstimateField, EstimateLayout } from '../../organisms/estimate-field/estimate-field';
+import { DateRow } from '../../organisms/date-row/date-row';
+import { EstimatePicker, EstimateLayout } from '../../organisms/estimate-picker/estimate-picker';
 import { LogProgressForm } from '../../organisms/log-progress-form/log-progress-form';
 import { Sheet } from '../../organisms/sheet/sheet';
 import {
@@ -51,8 +51,8 @@ let nextId = 0;
   imports: [
     Button,
     ChoiceRow,
-    DateSpecRow,
-    EstimateField,
+    DateRow,
+    EstimatePicker,
     FieldError,
     FormField,
     Icon,
@@ -61,9 +61,9 @@ let nextId = 0;
     LoadState,
     LogProgressForm,
     NgTemplateOutlet,
-    QuadrantChip,
+    QuadrantLabel,
     RouterLink,
-    Segmented,
+    SegmentedControl,
     Sheet,
     SingleLine,
     StatusBadge,

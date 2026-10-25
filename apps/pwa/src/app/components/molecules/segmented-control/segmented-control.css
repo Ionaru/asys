@@ -1,24 +1,15 @@
 /* SPDX-License-Identifier: EUPL-1.2 */
-asys-time-pick {
+.asys-segmented-control__legend {
+  margin: 0 0 var(--space-2);
+}
+
+.asys-segmented-control__options {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.asys-time-pick__context {
-  margin: 0;
-  color: var(--ink-muted);
-  font-size: var(--font-size-reason);
-  line-height: var(--line-height-reason);
-}
-
-.asys-time-pick__chips {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-2);
 }
 
-.asys-time-pick__chip {
+.asys-segmented-control__option {
+  flex: 1 1 0;
   min-height: var(--tap-target);
   padding: var(--space-2) var(--space-3);
   background: var(--surface);
@@ -26,14 +17,21 @@ asys-time-pick {
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: var(--font-size-time);
-  line-height: var(--line-height-time);
-  font-weight: 500;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-body-strong);
+  line-height: var(--line-height-body-strong);
+  font-weight: 600;
+  transition: background var(--duration-quick) var(--ease-out);
 
   &[aria-pressed='true'] {
     background: var(--signal-soft);
     color: var(--on-signal-soft);
     border-color: var(--signal);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 
   [data-theme='drive'] & {

@@ -68,7 +68,7 @@ test('Triage defers, drops and triages Inbox Tasks while the badge counts down',
   await expect(topPick.locator('.asys-top-pick__title')).toHaveText('Fix the bike');
   await expect(topPick.locator('.asys-top-pick__reason')).toHaveText('No Due \u00b7 important');
   await expect(topPick.locator('.asys-fact--strong .asys-num')).toHaveText('25 min');
-  await expect(page.locator('a.asys-picker-row')).toHaveCount(0);
+  await expect(page.locator('a.asys-task-row')).toHaveCount(0);
   await expect(page.getByRole('button', { name: /^Waiting/ })).toHaveCount(0);
   await expect(page.getByText('Book the dentist')).toHaveCount(0);
 });

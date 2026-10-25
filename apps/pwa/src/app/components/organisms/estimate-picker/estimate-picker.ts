@@ -39,13 +39,13 @@ const OTHER_ERROR = 'Use whole minutes from 1 to 100000.';
 
 /** Estimate chips plus an Other input, usable as a Signal Forms custom control. */
 @Component({
-  selector: 'asys-estimate-field',
+  selector: 'asys-estimate-picker',
   imports: [Button, FieldError, InputBox, Label, NgTemplateOutlet, SingleLine],
   encapsulation: ViewEncapsulation.None,
-  templateUrl: './estimate-field.component.html',
-  styleUrl: './estimate-field.css',
+  templateUrl: './estimate-picker.component.html',
+  styleUrl: './estimate-picker.css',
 })
-export class EstimateField extends FieldControl implements FormValueControl<number | null> {
+export class EstimatePicker extends FieldControl implements FormValueControl<number | null> {
   readonly value = model<number | null>(null);
 
   readonly legend = input<string>('Estimate');

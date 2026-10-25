@@ -18,9 +18,9 @@ import { IconName } from '../../atoms/icon/icon';
 import { SyncNote } from '../../atoms/sync-note/sync-note';
 import { AreaPickControl, type AreaChoice } from '../../molecules/area-pick/area-pick';
 import { LoadState } from '../../molecules/load-state/load-state';
-import { PickerRow, PickerRowVariant } from '../../molecules/picker-row/picker-row';
+import { TaskRow, TaskRowVariant } from '../../molecules/task-row/task-row';
 import { LogProgressForm } from '../../organisms/log-progress-form/log-progress-form';
-import { NowHeader } from '../../organisms/now-header/now-header';
+import { ScreenHeader } from '../../organisms/screen-header/screen-header';
 import { SectionHeader } from '../../organisms/section-header/section-header';
 import { SwipeActions } from '../../organisms/swipe-actions/swipe-actions';
 import { TopPick } from '../../organisms/top-pick/top-pick';
@@ -116,8 +116,8 @@ export interface NowRowEnter {
     Button,
     LoadState,
     LogProgressForm,
-    NowHeader,
-    PickerRow,
+    ScreenHeader,
+    TaskRow,
     RouterLink,
     SectionHeader,
     SwipeActions,
@@ -207,7 +207,7 @@ export class NowTemplate {
   /** A row is entering the list. */
   readonly rowEnter = output<NowRowEnter>();
 
-  private readonly nowHeader = viewChild(NowHeader);
+  private readonly screenHeader = viewChild(ScreenHeader);
 
   private readonly areaPickControl = viewChild(AreaPickControl);
 
@@ -221,14 +221,14 @@ export class NowTemplate {
 
   protected readonly Icons = IconName;
 
-  protected readonly Rows = PickerRowVariant;
+  protected readonly Rows = TaskRowVariant;
 
   /** Moves focus to the top pick's title link, or to the heading when no card shows. */
   focusTop(): void {
     const topPick = this.topPick();
 
     if (topPick === undefined) {
-      this.nowHeader()?.focusHeading();
+      this.screenHeader()?.focusHeading();
     } else {
       topPick.focusTitle();
     }

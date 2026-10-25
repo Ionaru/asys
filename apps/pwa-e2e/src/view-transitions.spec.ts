@@ -287,7 +287,7 @@ test("moves a ranked row's title into the editor", async ({ page }) => {
   await seedTask(page, { title: 'Water the plants', important: false, estimateMinutes: 25 });
   await page.reload();
 
-  const row = page.locator('a.asys-picker-row');
+  const row = page.locator('a.asys-task-row');
   await expect(row).toHaveCount(1);
 
   const before = await recordCount(page);
@@ -297,7 +297,7 @@ test("moves a ranked row's title into the editor", async ({ page }) => {
 
   expect(push.kind).toBe('push');
   expect(withName(push.oldNames, 'task-title')).toEqual([
-    { name: 'task-title', tag: 'span', classes: 'asys-picker-row__title' },
+    { name: 'task-title', tag: 'span', classes: 'asys-task-row__title' },
   ]);
   expect(withName(push.newNames, 'task-title')).toEqual([
     {

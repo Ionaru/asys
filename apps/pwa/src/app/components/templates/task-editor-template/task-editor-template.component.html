@@ -200,13 +200,13 @@
         <span class="task-editor__captured-text">{{ text }}</span>
       </p>
     }
-    <asys-segmented
+    <asys-segmented-control
       [formField]="importantField()"
       legend="Importance"
       trueLabel="Important"
       falseLabel="Not important"
     />
-    <asys-estimate-field [formField]="estimateField()" [layout]="Layout.Ruler" />
+    <asys-estimate-picker [formField]="estimateField()" [layout]="Layout.Ruler" />
     <div class="task-editor__rows">
       <asys-choice-row
         [formField]="areaField()"
@@ -214,7 +214,7 @@
         [options]="areaOptions()"
         [icon]="Icons.Folder"
       />
-      <asys-date-spec-row
+      <asys-date-row
         [formField]="availableFromField()"
         label="Available from"
         noneLabel="Any time"
@@ -222,7 +222,7 @@
         timePrefix="Available from"
         [today]="today()"
       />
-      <asys-date-spec-row
+      <asys-date-row
         [formField]="dueField()"
         label="Due"
         noneLabel="None"
@@ -239,7 +239,7 @@
         </div>
       } @else if (e._tag === Tags.Available || e._tag === Tags.Waiting) {
         <div class="task-editor__reason">
-          <asys-quadrant-chip [quadrant]="e.reason.quadrant" [strong]="true" />
+          <asys-quadrant-label [quadrant]="e.reason.quadrant" [strong]="true" />
           <ng-container [ngTemplateOutlet]="badges" />
           <span class="task-editor__reason-text">{{ e.reasonText }}</span>
         </div>

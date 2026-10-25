@@ -58,12 +58,12 @@ const seedScrollTasks = async (page: Page): Promise<void> => {
   }
   await page.reload();
   await expect(page.locator('.asys-top-pick__title')).toHaveText('Renew the permit');
-  await expect(page.locator('a.asys-picker-row', { hasText: 'Scroll Task 12' })).toBeVisible();
+  await expect(page.locator('a.asys-task-row', { hasText: 'Scroll Task 12' })).toBeVisible();
 };
 
 const row = (page: Page, title: string): Locator =>
   page.locator('ul.now__list li').filter({
-    has: page.locator('a.asys-picker-row', { hasText: title }),
+    has: page.locator('a.asys-task-row', { hasText: title }),
   });
 
 const rowSwipe = (page: Page, title: string): Locator =>

@@ -390,13 +390,15 @@ const setup = async (options: SetupOptions = {}) => {
   const importanceButton = (label: string): HTMLButtonElement =>
     must(
       Array.from(
-        root().querySelectorAll<HTMLButtonElement>('asys-segmented .asys-segmented__option'),
+        root().querySelectorAll<HTMLButtonElement>(
+          'asys-segmented-control .asys-segmented-control__option',
+        ),
       ).find((b) => text(b) === label),
       `the ${label} option`,
     );
   const pressedImportance = (): string | null => {
     const pressed = Array.from(
-      root().querySelectorAll('asys-segmented .asys-segmented__option'),
+      root().querySelectorAll('asys-segmented-control .asys-segmented-control__option'),
     ).find((b) => b.getAttribute('aria-pressed') === 'true');
 
     return pressed === undefined ? null : text(pressed);
@@ -413,7 +415,7 @@ const setup = async (options: SetupOptions = {}) => {
   // The Area, Available from and Due rows.
   const row = (label: string): HTMLElement =>
     must(
-      Array.from(root().querySelectorAll<HTMLElement>('asys-choice-row, asys-date-spec-row')).find(
+      Array.from(root().querySelectorAll<HTMLElement>('asys-choice-row, asys-date-row')).find(
         (r) => text(r.querySelector('.asys-row__label')) === label,
       ),
       `the ${label} row`,
@@ -427,7 +429,7 @@ const setup = async (options: SetupOptions = {}) => {
   const reasonText = (): string => text(reason()?.querySelector('.task-editor__reason-text'));
   const badges = (): string[] =>
     Array.from(reason()?.querySelectorAll('asys-status-badge') ?? []).map((b) => text(b));
-  const chip = (): HTMLElement | null => reason()?.querySelector('asys-quadrant-chip') ?? null;
+  const chip = (): HTMLElement | null => reason()?.querySelector('asys-quadrant-label') ?? null;
 
   // The controls of the card, for a read-only check.
   const cardControls = (): (HTMLButtonElement | HTMLTextAreaElement | HTMLInputElement)[] =>
@@ -437,7 +439,7 @@ const setup = async (options: SetupOptions = {}) => {
           'textarea[aria-label="Title"]',
           'textarea[aria-label="Notes"]',
           'button.task-editor__add-notes',
-          '.asys-segmented__option',
+          '.asys-segmented-control__option',
           '.asys-estimate__cell',
           '.asys-estimate__other-toggle',
           'button.asys-choice-row__open',
@@ -1206,7 +1208,9 @@ describe('TaskEditor', () => {
 
       await click(root().querySelector('.asys-estimate__other-toggle'));
 
-      const other = must(root().querySelector<HTMLTextAreaElement>('asys-estimate-field textarea'));
+      const other = must(
+        root().querySelector<HTMLTextAreaElement>('asys-estimate-picker textarea'),
+      );
 
       await typeInto(other, '');
       await changeOn(other);
@@ -1551,7 +1555,9 @@ describe('TaskEditor', () => {
 
       await click(root().querySelector('.asys-estimate__other-toggle'));
 
-      const other = must(root().querySelector<HTMLTextAreaElement>('asys-estimate-field textarea'));
+      const other = must(
+        root().querySelector<HTMLTextAreaElement>('asys-estimate-picker textarea'),
+      );
 
       await typeInto(other, 'abc');
       await changeOn(other);

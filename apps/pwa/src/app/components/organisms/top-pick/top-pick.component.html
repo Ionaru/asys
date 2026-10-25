@@ -32,7 +32,7 @@
     @if (area() !== null) {
       <li asys-fact [icon]="Icons.Folder" label="Area:">{{ area() }}</li>
     }
-    <li asys-quadrant-chip [quadrant]="quadrant()"></li>
+    <li asys-quadrant-label [quadrant]="quadrant()"></li>
   </ul>
   <div class="asys-top-pick__actions">
     @if (completed()) {

@@ -46,14 +46,14 @@ test(`Now ranks the TopPick and the Tasks after it with a one-line reason (${E2E
   await expect(topPick.locator('.asys-top-pick__reason')).toHaveText('Due yesterday');
   await expect(topPick.locator('asys-status-badge')).toHaveText('Overdue');
 
-  const row = (title: string) => page.locator('a.asys-picker-row').filter({ hasText: title });
-  await expect(row('Plan the year').locator('.asys-picker-row__reason-text')).toHaveText(
+  const row = (title: string) => page.locator('a.asys-task-row').filter({ hasText: title });
+  await expect(row('Plan the year').locator('.asys-task-row__reason-text')).toHaveText(
     'No Due · important',
   );
-  await expect(row('Send the report').locator('.asys-picker-row__reason-text')).toHaveText(
+  await expect(row('Send the report').locator('.asys-task-row__reason-text')).toHaveText(
     'Latest start 23:34',
   );
-  await expect(row('Water the plants').locator('.asys-picker-row__reason-text')).toHaveText(
+  await expect(row('Water the plants').locator('.asys-task-row__reason-text')).toHaveText(
     'Latest start tomorrow 11:35',
   );
 });
@@ -62,7 +62,7 @@ test('Now rows of ranked Tasks use the ink colour and no underline', async ({ pa
   skipNearMidnight(test);
   await seedNowTasks(page);
 
-  const rows = page.locator('a.asys-picker-row');
+  const rows = page.locator('a.asys-task-row');
   await expect(rows).toHaveCount(3);
 
   const ink = await page.evaluate(() => {
