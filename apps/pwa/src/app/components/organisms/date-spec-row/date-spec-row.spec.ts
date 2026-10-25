@@ -417,7 +417,7 @@ describe('DateSpecRow', () => {
 
       expect(timeDialog().open).toBe(true);
       expect(dateDialog().open).toBe(false);
-      expect(timeDialog().querySelector('asys-time-pick')).not.toBeNull();
+      expect(timeDialog().querySelector('asys-time-picker')).not.toBeNull();
       expect(squash(timeDialog().querySelector('.asys-time-pick__context')?.textContent)).toBe(
         'Due tomorrow',
       );
@@ -449,7 +449,7 @@ describe('DateSpecRow', () => {
 
       expect(host.value()).toStrictEqual({ date: '2026-10-14', time: '17:00' });
       expect(timeDialog().open).toBe(false);
-      expect(timeDialog().querySelector('asys-time-pick')).toBeNull();
+      expect(timeDialog().querySelector('asys-time-picker')).toBeNull();
     });
 
     it('replaces an existing time', async () => {

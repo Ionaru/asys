@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: EUPL-1.2 */
-asys-time-pick {
+asys-time-picker {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);

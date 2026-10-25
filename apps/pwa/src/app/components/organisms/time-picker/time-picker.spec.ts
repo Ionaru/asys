@@ -2,12 +2,12 @@
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
-import { TimePick } from './time-pick';
+import { TimePicker } from './time-picker';
 
 @Component({
-  imports: [TimePick],
+  imports: [TimePicker],
   template: `
-    <asys-time-pick
+    <asys-time-picker
       [value]="value()"
       [context]="context()"
       (pick)="picks.push($event)"
@@ -69,7 +69,7 @@ const setup = async (value: string | null = null, context = '') => {
   };
 };
 
-describe('TimePick', () => {
+describe('TimePicker', () => {
   describe('chips', () => {
     it('renders the six times in order in a labelled group', async () => {
       const { root, chips } = await setup();

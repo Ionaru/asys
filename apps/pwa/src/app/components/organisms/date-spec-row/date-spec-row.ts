@@ -18,14 +18,14 @@ import { FieldControl } from '../../support/field-control';
 import { FieldError } from '../../atoms/field-error/field-error';
 import { Icon, IconName } from '../../atoms/icon/icon';
 import { Sheet } from '../sheet/sheet';
-import { TimePick } from '../time-pick/time-pick';
+import { TimePicker } from '../time-picker/time-picker';
 
 let nextId = 0;
 
 /** A Due or Available from as a row: the date opens a sheet, a split button beside it opens the time sheet. */
 @Component({
   selector: 'asys-date-spec-row',
-  imports: [DatePicker, FieldError, Icon, Sheet, TimePick],
+  imports: [DatePicker, FieldError, Icon, Sheet, TimePicker],
   encapsulation: ViewEncapsulation.None,
   templateUrl: './date-spec-row.component.html',
   styleUrl: './date-spec-row.css',
