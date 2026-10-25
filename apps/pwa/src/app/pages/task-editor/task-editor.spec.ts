@@ -1208,7 +1208,9 @@ describe('TaskEditor', () => {
 
       await click(root().querySelector('.asys-estimate__other-toggle'));
 
-      const other = must(root().querySelector<HTMLTextAreaElement>('asys-estimate-field textarea'));
+      const other = must(
+        root().querySelector<HTMLTextAreaElement>('asys-estimate-picker textarea'),
+      );
 
       await typeInto(other, '');
       await changeOn(other);
@@ -1553,7 +1555,9 @@ describe('TaskEditor', () => {
 
       await click(root().querySelector('.asys-estimate__other-toggle'));
 
-      const other = must(root().querySelector<HTMLTextAreaElement>('asys-estimate-field textarea'));
+      const other = must(
+        root().querySelector<HTMLTextAreaElement>('asys-estimate-picker textarea'),
+      );
 
       await typeInto(other, 'abc');
       await changeOn(other);

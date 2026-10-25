@@ -15,7 +15,7 @@ import {
 } from '@angular/core';
 
 import { Button, ButtonSize, ButtonVariant } from '../../atoms/button/button';
-import { EstimateField } from '../estimate-field/estimate-field';
+import { EstimatePicker } from '../estimate-picker/estimate-picker';
 import { InlineConfirm } from '../../molecules/inline-confirm/inline-confirm';
 import { SegmentedControl } from '../../molecules/segmented-control/segmented-control';
 import { areaSelectOptions, NO_AREA_LABEL } from '../../molecules/select-field/area-options';
@@ -39,7 +39,7 @@ let nextId = 0;
 /** The card that triages one Inbox Task: Importance, Estimate and Area. */
 @Component({
   selector: 'asys-triage-card',
-  imports: [Button, SegmentedControl, EstimateField, SelectField, InlineConfirm],
+  imports: [Button, SegmentedControl, EstimatePicker, SelectField, InlineConfirm],
   encapsulation: ViewEncapsulation.None,
   templateUrl: './triage-card.component.html',
   styleUrl: './triage-card.css',

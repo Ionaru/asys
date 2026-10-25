@@ -13,7 +13,7 @@
     [value]="draft().important"
     (valueChange)="draft.set({ ...draft(), important: $event })"
   />
-  <asys-estimate-field
+  <asys-estimate-picker
     legend="Estimate"
     [disabled]="busy()"
     [value]="draft().estimateMinutes"

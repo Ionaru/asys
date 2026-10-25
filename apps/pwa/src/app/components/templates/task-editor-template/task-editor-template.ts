@@ -33,7 +33,7 @@ import { SegmentedControl } from '../../molecules/segmented-control/segmented-co
 import { areaSelectOptions } from '../../molecules/select-field/area-options';
 import { ChoiceRow } from '../../organisms/choice-row/choice-row';
 import { DateSpecRow } from '../../organisms/date-spec-row/date-spec-row';
-import { EstimateField, EstimateLayout } from '../../organisms/estimate-field/estimate-field';
+import { EstimatePicker, EstimateLayout } from '../../organisms/estimate-picker/estimate-picker';
 import { LogProgressForm } from '../../organisms/log-progress-form/log-progress-form';
 import { Sheet } from '../../organisms/sheet/sheet';
 import {
@@ -52,7 +52,7 @@ let nextId = 0;
     Button,
     ChoiceRow,
     DateSpecRow,
-    EstimateField,
+    EstimatePicker,
     FieldError,
     FormField,
     Icon,
