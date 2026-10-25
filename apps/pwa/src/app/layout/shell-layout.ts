@@ -27,7 +27,7 @@ import { pathOf } from '../core/platform/url-path';
 import { leafRoute } from '../core/platform/view-transitions';
 import type { Activation } from '../components/support/activation';
 import { BottomNav } from '../components/organisms/bottom-nav/bottom-nav';
-import { CaptureButton } from '../components/atoms/capture-button/capture-button';
+import { Button } from '../components/atoms/button/button';
 import { QuickAdd } from '../components/organisms/quick-add/quick-add';
 import { UndoBar, UndoBarVariant } from '../components/molecules/undo-bar/undo-bar';
 import { flyCapture, tabInView } from './capture-flight';
@@ -36,7 +36,7 @@ import { leaveMarked } from './shell-motion';
 /** The signed-in frame: the routed screen, quick add, the Undo bar and the bottom navigation. */
 @Component({
   selector: 'app-shell-layout',
-  imports: [RouterOutlet, BottomNav, CaptureButton, QuickAdd, UndoBar],
+  imports: [RouterOutlet, BottomNav, Button, QuickAdd, UndoBar],
   providers: [CommandAttempts, CaptureQueue, DoneUndo],
   host: { '[class.shell--bare]': 'navHidden()' },
   templateUrl: './shell-layout.component.html',

@@ -41,7 +41,7 @@ Each lands on `main` with every check green and no visual change unless it says 
 ## Later, out of scope for the moves
 
 - The design-system renames landed after the moves, one commit each: QuadrantChip to QuadrantLabel, PickerRow to TaskRow, Segmented to SegmentedControl, DatePick to DatePicker, TimePick to TimePicker, EstimateField to EstimatePicker, DateSpecRow to DateRow and NowHeader to ScreenHeader. They changed selectors, classes, e2e specs and `styles.css`.
-- Folding CaptureButton into Button `--capture`.
+- CaptureButton was folded into Button as `[capture]="true"`, which draws the `asys-button--capture` pill with its `__label` and a `__count` for the `waiting` captures, as the design system's Button does.
 - The splits: SectionHeader into SectionHeader and CollapsibleSection, DateRow and ChoiceRow into FieldRow with a Sheet and OptionList, and the Calendar molecule.
 - New atoms and molecules: Count, Segment, Countdown, Text, Link, ButtonGroup, NavItem, GapSummary.
 

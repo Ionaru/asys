@@ -83,7 +83,7 @@
 }
 
 /* Capture, projected into the bar, sits at its end. */
-.asys-bottomnav > .asys-capture {
+.asys-bottomnav > .asys-button--capture {
   flex: none;
   margin-left: auto;
 
@@ -93,7 +93,7 @@
     width: var(--tap-target-large);
     padding: 0;
 
-    & .asys-capture__label {
+    & .asys-button__label {
       position: absolute;
       width: 1px;
       height: 1px;
@@ -111,7 +111,7 @@
 [data-theme='drive'] .asys-bottomnav {
   padding: var(--space-3) var(--space-4);
 
-  &:not(:has(.asys-capture)) {
+  &:not(:has(.asys-button--capture)) {
     display: none;
   }
 }
@@ -120,13 +120,13 @@
   display: none;
 }
 
-[data-theme='drive'] .asys-bottomnav > .asys-capture {
+[data-theme='drive'] .asys-bottomnav > .asys-button--capture {
   flex: 1 1 auto;
   margin-left: 0;
   width: auto;
   padding: var(--space-2) var(--space-5);
 
-  & .asys-capture__label {
+  & .asys-button__label {
     position: static;
     width: auto;
     height: auto;
