@@ -4,14 +4,14 @@ import { TestBed } from '@angular/core/testing';
 import { disabled, form, FormField, validate, type ValidationError } from '@angular/forms/signals';
 import type { DateSpec } from '@asys/domain';
 
-import { DateSpecRow } from './date-spec-row';
+import { DateRow } from './date-row';
 
 const TODAY = '2026-10-13';
 
 @Component({
-  imports: [DateSpecRow],
+  imports: [DateRow],
   template: `
-    <asys-date-spec-row
+    <asys-date-row
       label="Due"
       noneLabel="None"
       removeLabel="Remove Due"
@@ -28,7 +28,7 @@ const TODAY = '2026-10-13';
   `,
 })
 class Host {
-  readonly field = viewChild.required(DateSpecRow);
+  readonly field = viewChild.required(DateRow);
 
   readonly today = TODAY;
 
@@ -46,9 +46,9 @@ class Host {
 }
 
 @Component({
-  imports: [DateSpecRow, FormField],
+  imports: [DateRow, FormField],
   template: `
-    <asys-date-spec-row
+    <asys-date-row
       [formField]="f.due"
       label="Due"
       noneLabel="None"
@@ -74,9 +74,9 @@ class FormHost {
 }
 
 @Component({
-  imports: [DateSpecRow],
+  imports: [DateRow],
   template: `
-    <asys-date-spec-row
+    <asys-date-row
       label="Available from"
       noneLabel="Any time"
       removeLabel="Remove Available from"
@@ -174,7 +174,7 @@ const setup = async (value: DateSpec | null = null) => {
   };
 };
 
-describe('DateSpecRow', () => {
+describe('DateRow', () => {
   describe('the row', () => {
     it('shows the label and the none label while there is no value', async () => {
       const { row } = await setup();

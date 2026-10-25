@@ -336,7 +336,7 @@ textarea.asys-input {
   min-width: 0;
 }
 
-/* The row of a bottom-sheet control: a label, its value and a chevron. Used by asys-date-spec-row and asys-choice-row. */
+/* The row of a bottom-sheet control: a label, its value and a chevron. Used by asys-date-row and asys-choice-row. */
 .asys-row {
   appearance: none;
   margin: 0;
