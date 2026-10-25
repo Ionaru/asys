@@ -30,8 +30,11 @@ const MAY_IMPORT: Readonly<Record<LevelName, readonly LevelName[]>> = {
   [Level.Support]: [],
 };
 
-// An atom may hold the Icon atom as part of its label.
+// The Icon atom, the one place Font Awesome is imported.
 const ICON = 'atoms/icon';
+
+// An atom may hold the Icon and Count atoms as parts of its label.
+const ATOM_PARTS = [ICON, 'atoms/count'];
 
 // The one component that may use core at runtime, and the seams it may use.
 const CORE_EXCEPTIONS: Readonly<Record<string, readonly string[]>> = {
@@ -134,7 +137,7 @@ const checkComponent = (file: string, level: LevelName, folder: string): void =>
     }
     const [targetLevel, targetFolder] = component;
     if (targetFolder === folder) continue;
-    if (level === Level.Atom && targetFolder === ICON) continue;
+    if (level === Level.Atom && ATOM_PARTS.includes(targetFolder)) continue;
     if (!MAY_IMPORT[level].some((allowed) => allowed === targetLevel)) {
       fail(file, line, `${level} may not import ${targetLevel} (${specifier})`);
     }

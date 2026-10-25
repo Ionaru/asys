@@ -58,13 +58,6 @@ asys-section-header {
   font-weight: 700;
 }
 
-.asys-section-header__count {
-  font-size: var(--font-size-time);
-  line-height: var(--line-height-time);
-  font-weight: 500;
-  color: var(--ink-muted);
-}
-
 .asys-section-header__summary {
   color: var(--ink-muted);
   font-size: var(--font-size-reason);

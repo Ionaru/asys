@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 
+import { Count } from '../../atoms/count/count';
 import { Icon, IconName } from '../../atoms/icon/icon';
 
 /**
@@ -23,7 +24,7 @@ import { Icon, IconName } from '../../atoms/icon/icon';
  */
 @Component({
   selector: 'asys-bottom-nav',
-  imports: [RouterLink, RouterLinkActive, Icon],
+  imports: [RouterLink, RouterLinkActive, Icon, Count],
   encapsulation: ViewEncapsulation.None,
   host: {
     '(document:pointerup)': 'release()',

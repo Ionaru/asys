@@ -76,10 +76,7 @@
   position: absolute;
   top: calc(var(--space-1) * -1.5);
   right: calc(var(--space-1) * -0.5);
-  background: var(--ink);
-  color: var(--paper);
   box-shadow: 0 0 0 2px var(--surface);
-  letter-spacing: 0;
 }
 
 /* Capture, projected into the bar, sits at its end. */

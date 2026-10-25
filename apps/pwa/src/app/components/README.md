@@ -26,7 +26,7 @@ Atoms are the foundational building blocks that comprise all our user interfaces
 
 **Rule of Thumb**:
 
-- Atoms must not import other atoms. The one exception is the Icon atom, which an atom may hold as part of its label, as the design system allows for an Icon inside a Button.
+- Atoms must not import other atoms. The exceptions are the Icon and Count atoms, which an atom may hold as part of its label, as the design system builds Button from Icon and Count.
 - An atom may be several files in one folder when together they are one design-system atom. The Input atom is `input.ts`, `input-box.ts` and `single-line.ts`.
 - Atoms have no HTML file, and ideally only have a single line of HTML.
 - Atoms may have a .css or .scss file for styling.

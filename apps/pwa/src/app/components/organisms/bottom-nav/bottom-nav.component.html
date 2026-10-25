@@ -49,15 +49,19 @@
         @for (key of [popKey]; track key) {
           @if (popKey > 0) {
             <span
-              class="asys-num asys-count asys-bottomnav__badge"
+              asys-count
+              class="asys-bottomnav__badge"
               aria-hidden="true"
               animate.enter="asys-pop"
-              >{{ inboxCount() }}</span
-            >
+              [value]="inboxCount() ?? 0"
+            ></span>
           } @else {
-            <span class="asys-num asys-count asys-bottomnav__badge" aria-hidden="true">{{
-              inboxCount()
-            }}</span>
+            <span
+              asys-count
+              class="asys-bottomnav__badge"
+              aria-hidden="true"
+              [value]="inboxCount() ?? 0"
+            ></span>
           }
         }
       }

@@ -227,6 +227,29 @@ describe('SectionHeader', () => {
     expect(title()?.textContent?.trim()).toBe('Waiting');
   });
 
+  it('draws the count with the quiet Count atom inside the title', async () => {
+    const { fixture, host, part } = await setup();
+
+    host.count.set(3);
+    await fixture.whenStable();
+
+    const count = part('span.asys-section-header__count');
+
+    expect(count?.classList.contains('asys-count')).toBe(true);
+    expect(count?.classList.contains('asys-count--quiet')).toBe(true);
+    expect(count?.textContent).toBe('3');
+    expect(count?.parentElement).toBe(part('.asys-section-header__title'));
+  });
+
+  it('caps the count at 99+', async () => {
+    const { fixture, host, part } = await setup();
+
+    host.count.set(120);
+    await fixture.whenStable();
+
+    expect(part('.asys-section-header__count')?.textContent).toBe('99+');
+  });
+
   it('shows the summary after the title, and only for a non-empty string', async () => {
     const { fixture, host, part } = await setup();
     const summary = (): HTMLElement | null => part('.asys-section-header__summary');

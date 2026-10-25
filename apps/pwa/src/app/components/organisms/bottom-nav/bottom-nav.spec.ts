@@ -303,6 +303,34 @@ describe('BottomNav', () => {
     expect(fixture.nativeElement.querySelector('.asys-bottomnav__badge')).toBeNull();
   });
 
+  it('draws the badge with the Count atom, as the last child of the Inbox icon', async () => {
+    const { fixture, host, links } = await setup();
+
+    host.count.set(4);
+    await fixture.whenStable();
+
+    const icon = links()[2].querySelector('.asys-bottomnav__icon');
+    const badge = fixture.nativeElement.querySelector('.asys-bottomnav__badge') as HTMLElement;
+
+    expect(badge.tagName).toBe('SPAN');
+    expect(badge.classList.contains('asys-count')).toBe(true);
+    expect(badge.classList.contains('asys-count--on-signal')).toBe(false);
+    expect(badge.classList.contains('asys-count--quiet')).toBe(false);
+    expect(badge.getAttribute('aria-hidden')).toBe('true');
+    expect(badge.textContent).toBe('4');
+    expect(icon?.lastElementChild).toBe(badge);
+  });
+
+  it('caps the badge at 99+ while the Inbox link still says the real number', async () => {
+    const { fixture, host, links } = await setup();
+
+    host.count.set(150);
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.querySelector('.asys-bottomnav__badge')?.textContent).toBe('99+');
+    expect(links()[2].getAttribute('aria-label')).toBe('Inbox, 150 waiting');
+  });
+
   it('keeps the badge out of the Now and Today icons', async () => {
     const { fixture, host, links } = await setup();
 

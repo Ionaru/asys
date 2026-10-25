@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { Component, computed, input, model, output, ViewEncapsulation } from '@angular/core';
 
+import { Count, CountVariant } from '../../atoms/count/count';
 import { Icon, IconName } from '../../atoms/icon/icon';
 
 /** What a click on the header does: expand its body, or ask the parent to open something (a sheet). */
@@ -18,7 +19,7 @@ let nextId = 0;
  */
 @Component({
   selector: 'asys-section-header',
-  imports: [Icon],
+  imports: [Icon, Count],
   encapsulation: ViewEncapsulation.None,
   template: `
     <section class="asys-section" [attr.aria-label]="title()">
@@ -35,7 +36,12 @@ let nextId = 0;
           <span class="asys-section-header__title"
             >{{ title() }}
             @if (count() > 0) {
-              <span class="asys-num asys-section-header__count">{{ count() }}</span>
+              <span
+                asys-count
+                class="asys-section-header__count"
+                [variant]="CountVariant.Quiet"
+                [value]="count()"
+              ></span>
             }
           </span>
           @if (summary(); as text) {
@@ -54,6 +60,8 @@ let nextId = 0;
   styleUrl: './section-header.css',
 })
 export class SectionHeader {
+  protected readonly CountVariant = CountVariant;
+
   protected readonly bodyId = `asys-section-body-${nextId++}`;
 
   /** The Icon that marks the section, such as the hourglass for Waiting. */
