@@ -282,12 +282,12 @@ describe('DateSpecRow', () => {
       const { fixture, row, press, dateDialog } = await setup();
 
       expect(dateDialog().open).toBe(false);
-      expect(dateDialog().querySelector('asys-date-pick')).toBeNull();
+      expect(dateDialog().querySelector('asys-date-picker')).toBeNull();
 
       await press(row());
 
       expect(dateDialog().open).toBe(true);
-      expect(dateDialog().querySelector('asys-date-pick')).not.toBeNull();
+      expect(dateDialog().querySelector('asys-date-picker')).not.toBeNull();
       expect(fixture.nativeElement.querySelectorAll('dialog.asys-sheet')).toHaveLength(2);
     });
 
@@ -327,7 +327,7 @@ describe('DateSpecRow', () => {
       expect(host.value()).toStrictEqual({ date: '2026-10-14' });
       expect(Object.keys(host.value() as DateSpec)).toEqual(['date']);
       expect(dateDialog().open).toBe(false);
-      expect(dateDialog().querySelector('asys-date-pick')).toBeNull();
+      expect(dateDialog().querySelector('asys-date-picker')).toBeNull();
     });
 
     it('picks a calendar day', async () => {

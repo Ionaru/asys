@@ -12,8 +12,8 @@ import {
 import type { FormValueControl } from '@angular/forms/signals';
 import { formatDay, type DateSpec, type LocalDate, type LocalTime } from '@asys/domain';
 
-import { DatePick } from '../date-pick/date-pick';
-import { dayLabel } from '../date-pick/day-label';
+import { DatePicker } from '../date-picker/date-picker';
+import { dayLabel } from '../date-picker/day-label';
 import { FieldControl } from '../../support/field-control';
 import { FieldError } from '../../atoms/field-error/field-error';
 import { Icon, IconName } from '../../atoms/icon/icon';
@@ -25,7 +25,7 @@ let nextId = 0;
 /** A Due or Available from as a row: the date opens a sheet, a split button beside it opens the time sheet. */
 @Component({
   selector: 'asys-date-spec-row',
-  imports: [DatePick, FieldError, Icon, Sheet, TimePick],
+  imports: [DatePicker, FieldError, Icon, Sheet, TimePick],
   encapsulation: ViewEncapsulation.None,
   templateUrl: './date-spec-row.component.html',
   styleUrl: './date-spec-row.css',
