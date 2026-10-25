@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { DestroyRef, inject, signal, type Signal } from '@angular/core';
 
-import { AppUpdate } from '../../core/platform/app-update';
+import { AppUpdate } from '../platform/app-update';
 
 /** What the copy status reads after the codes were written to the clipboard. */
 const COPIED_MESSAGE = 'Copied.';

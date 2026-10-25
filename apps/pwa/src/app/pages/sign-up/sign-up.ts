@@ -10,6 +10,10 @@ import { CeremonyResultTag, PasskeyFailure } from '@ionaru/effect-passkeys/clien
 
 import { AuthApi, AuthError, AuthResultTag } from '../../core/api/auth-api';
 import { PasskeyCeremony } from '../../core/api/passkey-ceremony';
+import { ceremonyOptions } from '../../core/auth/ceremony-options';
+import { nameError } from '../../core/auth/name-rule';
+import { MISCONFIGURED_MESSAGE, TRY_AGAIN_MESSAGE } from '../../core/auth/passkey-messages';
+import { recoveryCodes } from '../../core/auth/recovery-codes';
 import { Session, SessionState } from '../../core/auth/session';
 import { GENERIC_MESSAGE } from '../../core/data/outcome-message';
 import { DeviceZone } from '../../core/platform/device-zone';
@@ -17,10 +21,6 @@ import {
   SignUpStep,
   SignUpTemplate,
 } from '../../components/templates/sign-up-template/sign-up-template';
-import { ceremonyOptions } from '../../features/auth/ceremony-options';
-import { nameError } from '../../features/auth/name-rule';
-import { MISCONFIGURED_MESSAGE, TRY_AGAIN_MESSAGE } from '../../features/auth/passkey-messages';
-import { recoveryCodes } from '../../features/auth/recovery-codes';
 
 const ALREADY_REGISTERED_MESSAGE = 'This device already has a passkey for ASYS. Sign in instead.';
 

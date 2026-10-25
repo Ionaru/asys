@@ -2,24 +2,24 @@
 <div class="account">
   <header class="account__block">
     <h1 class="asys-page__title asys-page__title--flush account__title">Account</h1>
-    <p class="account__reason">{{ session.me()?.name }}</p>
+    <p class="account__reason">{{ name() }}</p>
   </header>
 
   <section class="account__block">
     <h2 #passkeysHeading class="account__heading" tabindex="-1">Passkeys</h2>
-    @if (passkeys.hasValue()) {
+    @if (passkeysLoaded()) {
       <ul class="account__list">
-        @for (row of rows(); track row.passkey.credentialId) {
+        @for (row of rows(); track row.credentialId) {
           <li class="account__row">
-            <span class="account__strong">{{ row.passkey.name }}</span>
+            <span class="account__strong">{{ row.name }}</span>
             <span class="account__reason">Created {{ row.created }}</span>
             <span class="account__reason">
               {{ row.lastUsed === null ? 'Never used' : 'Last used ' + row.lastUsed }}
             </span>
-            @if (confirmingRemoval() === row.passkey.credentialId) {
+            @if (confirmingRemoval() === row.credentialId) {
               <div class="account__confirm" animate.enter="asys-enter">
                 <p class="account__body">
-                  Remove {{ row.passkey.name }}? You cannot sign in with it afterwards.
+                  Remove {{ row.name }}? You cannot sign in with it afterwards.
                 </p>
                 <div class="account__actions">
                   <button
@@ -28,7 +28,7 @@
                     [variant]="Variant.Danger"
                     [size]="Size.Small"
                     [disabled]="removing()"
-                    (click)="remove(row.passkey.credentialId)"
+                    (click)="removePasskey.emit(row.credentialId)"
                   >
                     Remove passkey
                   </button>
@@ -50,16 +50,16 @@
                   type="button"
                   [variant]="Variant.Quiet"
                   [size]="Size.Small"
-                  (click)="confirmingRemoval.set(row.passkey.credentialId)"
+                  (click)="confirmingRemoval.set(row.credentialId)"
                 >
-                  Remove<span class="asys-visually-hidden"> {{ row.passkey.name }}</span>
+                  Remove<span class="asys-visually-hidden"> {{ row.name }}</span>
                 </button>
               </div>
             }
           </li>
         }
       </ul>
-    } @else if (passkeys.isLoading()) {
+    } @else if (passkeysLoading()) {
       <p class="account__reason">Loading your passkeys…</p>
     } @else {
       <p class="account__reason">Could not load your passkeys.</p>
@@ -70,7 +70,7 @@
           [variant]="Variant.Quiet"
           [size]="Size.Small"
           [icon]="Icons.RotateRight"
-          (click)="reload()"
+          (click)="retryPasskeys.emit()"
         >
           Try again
         </button>
@@ -79,24 +79,19 @@
     @if (removeMessage(); as text) {
       <p class="account__message" role="alert">{{ text }}</p>
     }
-    <form class="account__block" [formRoot]="addForm">
+    <form class="account__block" [formRoot]="addForm()">
       <asys-text-field
-        [formField]="addForm.name"
+        [formField]="addForm().name"
         label="Name for the new passkey"
         hint="Optional. For example the device it is on."
       />
       <div>
-        <button
-          asys-button
-          type="submit"
-          [variant]="Variant.Secondary"
-          [disabled]="addOptions() === null || adding()"
-        >
+        <button asys-button type="submit" [variant]="Variant.Secondary" [disabled]="!canAdd()">
           Add a passkey
         </button>
       </div>
     </form>
-    @if (shownAddMessage(); as text) {
+    @if (addMessage(); as text) {
       <p class="account__message" role="alert">{{ text }}</p>
     }
     @if (addLoadFailed()) {
@@ -107,7 +102,7 @@
           [variant]="Variant.Quiet"
           [size]="Size.Small"
           [icon]="Icons.RotateRight"
-          (click)="addRef.discard()"
+          (click)="retryAddOptions.emit()"
         >
           Try again
         </button>
@@ -121,7 +116,7 @@
   <section class="account__block">
     <h2 class="account__heading">Recovery codes</h2>
     <p class="account__body">
-      Recovery codes left: <span class="asys-num">{{ session.me()?.recoveryCodesLeft }}</span>
+      Recovery codes left: <span class="asys-num">{{ recoveryCodesLeft() }}</span>
     </p>
     @if (codes().length > 0) {
       <div class="account__block" animate.enter="asys-enter">
@@ -132,10 +127,15 @@
         </ol>
         <p class="account__body">These codes are shown only now. Keep them somewhere safe.</p>
         <div class="account__actions">
-          <button asys-button type="button" [variant]="Variant.Secondary" (click)="copy()">
+          <button
+            asys-button
+            type="button"
+            [variant]="Variant.Secondary"
+            (click)="copyCodes.emit()"
+          >
             Copy
           </button>
-          <button asys-button type="button" [variant]="Variant.Primary" (click)="hideCodes()">
+          <button asys-button type="button" [variant]="Variant.Primary" (click)="hideCodes.emit()">
             Done
           </button>
         </div>
@@ -154,7 +154,7 @@
             type="button"
             [variant]="Variant.Danger"
             [disabled]="regenerating()"
-            (click)="makeCodes()"
+            (click)="makeCodes.emit()"
           >
             Make new codes
           </button>
@@ -193,7 +193,7 @@
         type="button"
         [variant]="Variant.Secondary"
         [disabled]="signingOut()"
-        (click)="signOut()"
+        (click)="signOut.emit()"
       >
         Sign out
       </button>

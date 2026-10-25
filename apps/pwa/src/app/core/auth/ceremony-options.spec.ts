@@ -2,12 +2,7 @@
 import { Component, signal } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 
-import {
-  AuthError,
-  AuthResultTag,
-  type AuthResult,
-  type CeremonyOptions,
-} from '../../core/api/auth-api';
+import { AuthError, AuthResultTag, type AuthResult, type CeremonyOptions } from '../api/auth-api';
 import { ceremonyOptions, OPTIONS_MAX_AGE_MS, type CeremonyOptionsRef } from './ceremony-options';
 
 type Options = { readonly n: number };

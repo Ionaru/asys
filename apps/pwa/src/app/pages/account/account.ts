@@ -3,17 +3,21 @@ import {
   Component,
   computed,
   DestroyRef,
-  ElementRef,
   inject,
   resource,
   signal,
   viewChild,
 } from '@angular/core';
-import { form, FormField, FormRoot, validate } from '@angular/forms/signals';
+import { form, validate } from '@angular/forms/signals';
 import { CeremonyResultTag, PasskeyFailure } from '@ionaru/effect-passkeys/client';
 
 import { AuthApi, AuthError, AuthResultTag, type Passkey } from '../../core/api/auth-api';
 import { PasskeyCeremony } from '../../core/api/passkey-ceremony';
+import { messageForAuthError, type AuthErrorMessages } from '../../core/auth/auth-error-message';
+import { ceremonyOptions } from '../../core/auth/ceremony-options';
+import { nameError } from '../../core/auth/name-rule';
+import { MISCONFIGURED_MESSAGE, TRY_AGAIN_MESSAGE } from '../../core/auth/passkey-messages';
+import { recoveryCodes } from '../../core/auth/recovery-codes';
 import { Session, SignOutReason } from '../../core/auth/session';
 import { CaptureQueue } from '../../core/data/capture-queue';
 import { DataStore } from '../../core/data/data-store';
@@ -21,14 +25,10 @@ import { DoneUndo } from '../../core/data/done-undo';
 import { GENERIC_MESSAGE } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
 import { DeviceZone } from '../../core/platform/device-zone';
-import { Button, ButtonSize, ButtonVariant } from '../../components/atoms/button/button';
-import { IconName } from '../../components/atoms/icon/icon';
-import { TextField } from '../../components/molecules/text-field/text-field';
-import { messageForAuthError, type AuthErrorMessages } from '../auth/auth-error-message';
-import { ceremonyOptions } from '../auth/ceremony-options';
-import { nameError } from '../auth/name-rule';
-import { MISCONFIGURED_MESSAGE, TRY_AGAIN_MESSAGE } from '../auth/passkey-messages';
-import { recoveryCodes } from '../auth/recovery-codes';
+import {
+  AccountTemplate,
+  type PasskeyRow,
+} from '../../components/templates/account-template/account-template';
 
 const messageForFailure = (failure: PasskeyFailure): string | null => {
   switch (failure) {
@@ -58,9 +58,38 @@ const REMOVE_ERROR_MESSAGES: AuthErrorMessages = {
 /** The account screen: passkeys, recovery codes and sign out. */
 @Component({
   selector: 'asys-account',
-  imports: [Button, FormField, FormRoot, TextField],
-  templateUrl: './account.component.html',
-  styleUrl: './account.css',
+  imports: [AccountTemplate],
+  template: `
+    <asys-account-template
+      [name]="session.me()?.name"
+      [passkeysLoaded]="passkeys.hasValue()"
+      [passkeysLoading]="passkeys.isLoading()"
+      [rows]="rows()"
+      [removing]="removing()"
+      [removeMessage]="removeMessage()"
+      [addForm]="addForm"
+      [canAdd]="addOptions() !== null && !adding()"
+      [addMessage]="shownAddMessage()"
+      [addLoadFailed]="addLoadFailed()"
+      [added]="added()"
+      [recoveryCodesLeft]="session.me()?.recoveryCodesLeft"
+      [codes]="codes()"
+      [regenerating]="regenerating()"
+      [copyStatus]="copyStatus()"
+      [codesMessage]="codesMessage()"
+      [signingOut]="signingOut()"
+      [signOutMessage]="signOutMessage()"
+      [(confirmingRemoval)]="confirmingRemoval"
+      [(confirmingCodes)]="confirmingCodes"
+      (retryPasskeys)="reload()"
+      (removePasskey)="remove($event)"
+      (retryAddOptions)="addRef.discard()"
+      (makeCodes)="makeCodes()"
+      (copyCodes)="copy()"
+      (hideCodes)="hideCodes()"
+      (signOut)="signOut()"
+    />
+  `,
 })
 export class Account {
   readonly #authApi = inject(AuthApi);
@@ -81,13 +110,7 @@ export class Account {
 
   protected readonly session = inject(Session);
 
-  protected readonly Variant = ButtonVariant;
-
-  protected readonly Size = ButtonSize;
-
-  protected readonly Icons = IconName;
-
-  private readonly passkeysHeading = viewChild<ElementRef<HTMLElement>>('passkeysHeading');
+  private readonly template = viewChild(AccountTemplate);
 
   protected readonly passkeys = resource({
     loader: async () => {
@@ -105,7 +128,7 @@ export class Account {
     () => this.#dataStore.state()?.settings.timeZone ?? this.#deviceZone.current() ?? 'UTC',
   );
 
-  protected readonly rows = computed(() => {
+  protected readonly rows = computed((): readonly PasskeyRow[] => {
     if (!this.passkeys.hasValue()) {
       return [];
     }
@@ -113,7 +136,8 @@ export class Account {
     const zone = this.#timeZone();
 
     return this.passkeys.value().map((passkey: Passkey) => ({
-      passkey,
+      credentialId: passkey.credentialId,
+      name: passkey.name,
       created: this.#formatDate(passkey.createdAt, zone),
       lastUsed: passkey.lastUsedAt === null ? null : this.#formatDate(passkey.lastUsedAt, zone),
     }));
@@ -204,7 +228,7 @@ export class Account {
       if (result._tag === AuthResultTag.Ok) {
         this.confirmingRemoval.set(null);
         this.reload();
-        this.passkeysHeading()?.nativeElement.focus();
+        this.template()?.focusPasskeys();
 
         return;
       }

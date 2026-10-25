@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: EUPL-1.2
-import { AuthError } from '../../core/api/auth-api';
-import { GENERIC_MESSAGE } from '../../core/data/outcome-message';
+import { AuthError } from '../api/auth-api';
+import { GENERIC_MESSAGE } from '../data/outcome-message';
 import { messageForAuthError, type AuthErrorMessages } from './auth-error-message';
 
 const OTHER_ERRORS = Object.values(AuthError).filter((error) => error !== AuthError.Unauthorized);

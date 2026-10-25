@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: EUPL-1.2
-import { AuthError } from '../../core/api/auth-api';
-import { GENERIC_MESSAGE } from '../../core/data/outcome-message';
+import { AuthError } from '../api/auth-api';
+import { GENERIC_MESSAGE } from '../data/outcome-message';
 
 /** What a screen says for particular errors instead of `GENERIC_MESSAGE`. */
 export type AuthErrorMessages = Partial<Record<Exclude<AuthError, AuthError.Unauthorized>, string>>;
