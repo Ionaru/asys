@@ -82,7 +82,7 @@ export const routes: Routes = [
       },
       {
         path: 'account',
-        loadComponent: () => import('./features/account/account').then((m) => m.Account),
+        loadComponent: () => import('./pages/account/account').then((m) => m.Account),
         title: 'Account · ASYS',
         data: { level: 2 },
       },

@@ -20,8 +20,8 @@ import {
   type Me,
 } from '../../core/api/auth-api';
 import { PasskeyCeremony } from '../../core/api/passkey-ceremony';
+import { OPTIONS_MAX_AGE_MS } from '../../core/auth/ceremony-options';
 import { Session } from '../../core/auth/session';
-import { OPTIONS_MAX_AGE_MS } from '../../features/auth/ceremony-options';
 import { SignIn } from './sign-in';
 
 type BeginOptions = CeremonyOptions<PublicKeyCredentialRequestOptionsJSON>;

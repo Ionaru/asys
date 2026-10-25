@@ -5,12 +5,12 @@ import { CeremonyResultTag, PasskeyFailure } from '@ionaru/effect-passkeys/clien
 
 import { AuthApi, AuthError, AuthResultTag } from '../../core/api/auth-api';
 import { PasskeyCeremony } from '../../core/api/passkey-ceremony';
+import { ceremonyOptions } from '../../core/auth/ceremony-options';
+import { MISCONFIGURED_MESSAGE, TRY_AGAIN_MESSAGE } from '../../core/auth/passkey-messages';
 import { safeReturnUrl } from '../../core/auth/safe-return-url';
 import { Session } from '../../core/auth/session';
 import { GENERIC_MESSAGE } from '../../core/data/outcome-message';
 import { SignInTemplate } from '../../components/templates/sign-in-template/sign-in-template';
-import { ceremonyOptions } from '../../features/auth/ceremony-options';
-import { MISCONFIGURED_MESSAGE, TRY_AGAIN_MESSAGE } from '../../features/auth/passkey-messages';
 
 const messageForFailure = (failure: PasskeyFailure): string => {
   switch (failure) {

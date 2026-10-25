@@ -2,7 +2,7 @@
 import { Component } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 
-import { AppUpdate } from '../../core/platform/app-update';
+import { AppUpdate } from '../platform/app-update';
 import { recoveryCodes, type RecoveryCodesRef } from './recovery-codes';
 
 const FIRST = ['aaaa-1111', 'bbbb-2222', 'cccc-3333'];

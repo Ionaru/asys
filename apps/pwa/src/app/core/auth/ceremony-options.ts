@@ -6,7 +6,7 @@ import {
   type AuthError,
   type AuthResult,
   type CeremonyOptions,
-} from '../../core/api/auth-api';
+} from '../api/auth-api';
 
 /** How long begin options are kept before they are refetched (the server keeps them 5 minutes). */
 export const OPTIONS_MAX_AGE_MS = 240_000;
