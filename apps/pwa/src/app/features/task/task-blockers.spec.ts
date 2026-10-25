@@ -19,6 +19,7 @@ import { CommandAttempts } from '../../core/data/command-attempts';
 import { DataStore, SyncStatus } from '../../core/data/data-store';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { Ids } from '../../core/platform/ids';
+import { ThemeName } from '../../core/platform/theme';
 import { TaskBlockers } from './task-blockers';
 
 const APPLIED: CommandOutcome = { _tag: CommandOutcomeTag.Applied, seq: 1 };
@@ -718,6 +719,21 @@ describe('TaskBlockers', () => {
         ['/tasks/t2', 'Water form'],
       ]);
       expect(text(dialog())).not.toContain('No Task waits for this one.');
+    });
+
+    it('makes each link a Voice tap target', async () => {
+      document.documentElement.setAttribute('data-theme', ThemeName.Drive);
+      onTestFinished(() => document.documentElement.removeAttribute('data-theme'));
+
+      const { openSheet, dialog } = await setup({
+        state: domainState([CALL, WATER], { links: [link('l1', 't2', 't1')] }),
+      });
+
+      await openSheet();
+
+      const anchor = must(dialog().querySelector<HTMLAnchorElement>('a'));
+
+      expect(getComputedStyle(anchor).minHeight).toBe('var(--tap-target-drive)');
     });
 
     it('closes the sheet when a link is followed', async () => {

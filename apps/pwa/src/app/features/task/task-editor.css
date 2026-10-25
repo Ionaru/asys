@@ -149,8 +149,9 @@
   display: inline-flex;
   align-items: center;
   min-height: var(--tap-target);
+}
 
-  [data-theme='drive'] & {
-    min-height: var(--tap-target-drive);
-  }
+/* The theme sits on <html>, outside the component, so only :host-context reaches it. */
+:host-context([data-theme='drive']) .task-editor__link {
+  min-height: var(--tap-target-drive);
 }
