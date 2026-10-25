@@ -36,7 +36,7 @@
   white-space: pre-wrap;
 }
 
-.asys-triage .asys-segmented,
+.asys-triage .asys-segmented-control,
 .asys-triage .asys-estimate,
 .asys-triage asys-select-field {
   display: block;

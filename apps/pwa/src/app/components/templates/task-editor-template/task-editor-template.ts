@@ -29,7 +29,7 @@ import { StatusBadge, StatusBadgeStatus } from '../../atoms/status-badge/status-
 import { SyncNote } from '../../atoms/sync-note/sync-note';
 import { InlineConfirm } from '../../molecules/inline-confirm/inline-confirm';
 import { LoadState } from '../../molecules/load-state/load-state';
-import { Segmented } from '../../molecules/segmented/segmented';
+import { SegmentedControl } from '../../molecules/segmented-control/segmented-control';
 import { areaSelectOptions } from '../../molecules/select-field/area-options';
 import { ChoiceRow } from '../../organisms/choice-row/choice-row';
 import { DateSpecRow } from '../../organisms/date-spec-row/date-spec-row';
@@ -63,7 +63,7 @@ let nextId = 0;
     NgTemplateOutlet,
     QuadrantLabel,
     RouterLink,
-    Segmented,
+    SegmentedControl,
     Sheet,
     SingleLine,
     StatusBadge,

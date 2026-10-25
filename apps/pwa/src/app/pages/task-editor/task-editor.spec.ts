@@ -390,13 +390,15 @@ const setup = async (options: SetupOptions = {}) => {
   const importanceButton = (label: string): HTMLButtonElement =>
     must(
       Array.from(
-        root().querySelectorAll<HTMLButtonElement>('asys-segmented .asys-segmented__option'),
+        root().querySelectorAll<HTMLButtonElement>(
+          'asys-segmented-control .asys-segmented-control__option',
+        ),
       ).find((b) => text(b) === label),
       `the ${label} option`,
     );
   const pressedImportance = (): string | null => {
     const pressed = Array.from(
-      root().querySelectorAll('asys-segmented .asys-segmented__option'),
+      root().querySelectorAll('asys-segmented-control .asys-segmented-control__option'),
     ).find((b) => b.getAttribute('aria-pressed') === 'true');
 
     return pressed === undefined ? null : text(pressed);
@@ -437,7 +439,7 @@ const setup = async (options: SetupOptions = {}) => {
           'textarea[aria-label="Title"]',
           'textarea[aria-label="Notes"]',
           'button.task-editor__add-notes',
-          '.asys-segmented__option',
+          '.asys-segmented-control__option',
           '.asys-estimate__cell',
           '.asys-estimate__other-toggle',
           'button.asys-choice-row__open',

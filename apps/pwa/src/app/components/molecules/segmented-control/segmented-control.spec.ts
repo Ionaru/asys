@@ -3,12 +3,12 @@ import { Component, signal, viewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { form, FormField, validate, type ValidationError } from '@angular/forms/signals';
 
-import { Segmented } from './segmented';
+import { SegmentedControl } from './segmented-control';
 
 @Component({
-  imports: [Segmented],
+  imports: [SegmentedControl],
   template: `
-    <asys-segmented
+    <asys-segmented-control
       legend="Importance"
       trueLabel="Important"
       falseLabel="Not important"
@@ -23,7 +23,7 @@ import { Segmented } from './segmented';
   `,
 })
 class Host {
-  readonly field = viewChild.required(Segmented);
+  readonly field = viewChild.required(SegmentedControl);
 
   readonly value = signal<boolean | null>(null);
 
@@ -39,18 +39,18 @@ class Host {
 }
 
 @Component({
-  imports: [Segmented],
+  imports: [SegmentedControl],
   template: `
-    <asys-segmented legend="A" trueLabel="Yes" falseLabel="No" />
-    <asys-segmented legend="B" trueLabel="Yes" falseLabel="No" hint="Some hint" />
+    <asys-segmented-control legend="A" trueLabel="Yes" falseLabel="No" />
+    <asys-segmented-control legend="B" trueLabel="Yes" falseLabel="No" hint="Some hint" />
   `,
 })
 class Pair {}
 
 @Component({
-  imports: [Segmented, FormField],
+  imports: [SegmentedControl, FormField],
   template: `
-    <asys-segmented
+    <asys-segmented-control
       [formField]="f.important"
       legend="Importance"
       trueLabel="Important"
@@ -75,24 +75,24 @@ const setup = async () => {
   const host = fixture.componentInstance;
   const root = (): HTMLElement => fixture.nativeElement;
   const options = (): HTMLButtonElement[] =>
-    Array.from(root().querySelectorAll<HTMLButtonElement>('button.asys-segmented__option'));
+    Array.from(root().querySelectorAll<HTMLButtonElement>('button.asys-segmented-control__option'));
   const pressed = (): (string | null)[] => options().map((b) => b.getAttribute('aria-pressed'));
 
   return { fixture, host, root, options, pressed };
 };
 
-describe('Segmented', () => {
+describe('SegmentedControl', () => {
   it('renders a fieldset with the legend and the true option before the false option', async () => {
     const { root, options } = await setup();
 
-    expect(root().querySelector('fieldset.asys-segmented')).not.toBeNull();
+    expect(root().querySelector('fieldset.asys-segmented-control')).not.toBeNull();
     expect(
-      root().querySelector('fieldset > legend.asys-segmented__legend')?.textContent?.trim(),
+      root().querySelector('fieldset > legend.asys-segmented-control__legend')?.textContent?.trim(),
     ).toBe('Importance');
-    expect(root().querySelector('legend.asys-segmented__legend.asys-label')).not.toBeNull();
-    expect(root().querySelectorAll('fieldset > div.asys-segmented__options > button').length).toBe(
-      2,
-    );
+    expect(root().querySelector('legend.asys-segmented-control__legend.asys-label')).not.toBeNull();
+    expect(
+      root().querySelectorAll('fieldset > div.asys-segmented-control__options > button').length,
+    ).toBe(2);
     expect(options().map((b) => b.textContent?.trim())).toEqual(['Important', 'Not important']);
     expect(options().every((b) => b.getAttribute('type') === 'button')).toBe(true);
   });
@@ -275,8 +275,8 @@ describe('Segmented', () => {
 
       const root: HTMLElement = fixture.nativeElement;
       const hint = root.querySelector('p.asys-field__hint') as HTMLElement;
-      const second = root.querySelectorAll('asys-segmented')[1];
-      const first = root.querySelectorAll('asys-segmented')[0];
+      const second = root.querySelectorAll('asys-segmented-control')[1];
+      const first = root.querySelectorAll('asys-segmented-control')[0];
 
       expect(hint.id).not.toBe('');
       expect(first.querySelector(`[aria-describedby="${hint.id}"]`)).toBeNull();
@@ -300,7 +300,9 @@ describe('Segmented', () => {
 
       const root: HTMLElement = fixture.nativeElement;
       const options = (): HTMLButtonElement[] =>
-        Array.from(root.querySelectorAll<HTMLButtonElement>('button.asys-segmented__option'));
+        Array.from(
+          root.querySelectorAll<HTMLButtonElement>('button.asys-segmented-control__option'),
+        );
       const error = (): HTMLElement | null => root.querySelector('p.asys-field__error');
 
       return { fixture, host: fixture.componentInstance, root, options, error };

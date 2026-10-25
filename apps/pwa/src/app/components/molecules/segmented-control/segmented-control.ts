@@ -10,17 +10,17 @@ let nextId = 0;
 
 /** A two-way choice shown as two buttons, usable as a Signal Forms custom control. */
 @Component({
-  selector: 'asys-segmented',
+  selector: 'asys-segmented-control',
   imports: [FieldError, Label],
   encapsulation: ViewEncapsulation.None,
   template: `
-    <fieldset class="asys-fieldset-reset asys-segmented">
-      <legend asys-label class="asys-segmented__legend">{{ legend() }}</legend>
-      <div class="asys-segmented__options">
+    <fieldset class="asys-fieldset-reset asys-segmented-control">
+      <legend asys-label class="asys-segmented-control__legend">{{ legend() }}</legend>
+      <div class="asys-segmented-control__options">
         <button
           #first
           type="button"
-          class="asys-segmented__option"
+          class="asys-segmented-control__option"
           [disabled]="disabled()"
           [attr.aria-pressed]="value() === true ? 'true' : 'false'"
           [attr.aria-describedby]="messageId()"
@@ -31,7 +31,7 @@ let nextId = 0;
         </button>
         <button
           type="button"
-          class="asys-segmented__option"
+          class="asys-segmented-control__option"
           [disabled]="disabled()"
           [attr.aria-pressed]="value() === false ? 'true' : 'false'"
           [attr.aria-describedby]="messageId()"
@@ -48,9 +48,9 @@ let nextId = 0;
       }
     </fieldset>
   `,
-  styleUrl: './segmented.css',
+  styleUrl: './segmented-control.css',
 })
-export class Segmented extends FieldControl implements FormValueControl<boolean | null> {
+export class SegmentedControl extends FieldControl implements FormValueControl<boolean | null> {
   readonly value = model<boolean | null>(null);
 
   readonly legend = input.required<string>();
@@ -59,7 +59,7 @@ export class Segmented extends FieldControl implements FormValueControl<boolean 
 
   readonly falseLabel = input.required<string>();
 
-  protected override readonly messageParagraphId = `asys-segmented-${nextId++}-message`;
+  protected override readonly messageParagraphId = `asys-segmented-control-${nextId++}-message`;
 
   private readonly first = viewChild<ElementRef<HTMLButtonElement>>('first');
 
