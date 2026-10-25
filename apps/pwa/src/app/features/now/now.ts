@@ -55,7 +55,7 @@ import { SectionHeader } from '../../components/organisms/section-header/section
 import { SwipeActions } from '../../components/organisms/swipe-actions/swipe-actions';
 import { SyncNote } from '../../components/atoms/sync-note/sync-note';
 import { TopPick } from '../../components/organisms/top-pick/top-pick';
-import { byAreaName } from '../areas/area-order';
+import { byAreaName } from '../../core/data/area-order';
 import {
   areaNamesText,
   BACK_TO_AUTOMATIC,

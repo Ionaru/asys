@@ -5,14 +5,14 @@ import {
   computed,
   DestroyRef,
   effect,
-  ElementRef,
   inject,
   Injector,
   input,
   signal,
   untracked,
+  viewChild,
 } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import {
   type ActiveHours,
   type Area,
@@ -23,7 +23,7 @@ import {
   isLocalTime,
   IsoWeekday,
   type MinuteInterval,
-  Palette,
+  type Palette,
   timeInputValue,
 } from '@asys/domain';
 
@@ -33,17 +33,10 @@ import { DataStore, SyncStatus } from '../../core/data/data-store';
 import { type DraftFields, followStore, settleSaved } from '../../core/data/draft-follow';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { Ids } from '../../core/platform/ids';
-import { Button, ButtonSize, ButtonVariant } from '../../components/atoms/button/button';
-import { FieldError } from '../../components/atoms/field-error/field-error';
-import { Input } from '../../components/atoms/input/input';
-import { Label } from '../../components/atoms/label/label';
-import { LoadState } from '../../components/molecules/load-state/load-state';
 import {
-  type SelectOption,
-  SelectField,
-} from '../../components/molecules/select-field/select-field';
-import { SyncNote } from '../../components/atoms/sync-note/sync-note';
-import { TextField } from '../../components/molecules/text-field/text-field';
+  type AreaEditorTimeChange,
+  AreaEditorTemplate,
+} from '../../components/templates/area-editor-template/area-editor-template';
 
 /** One row of Active hours as the time inputs hold it. */
 interface TimeRow {
@@ -57,18 +50,6 @@ interface AreaDraft {
   readonly palette: Palette | null;
   readonly days: readonly (readonly TimeRow[])[];
 }
-
-/** Which time of a row an input edits. */
-enum RowEdge {
-  Start = 'start',
-  End = 'end',
-}
-
-/** A row's two time inputs, in order. */
-const EDGES = [
-  { edge: RowEdge.Start, label: 'From' },
-  { edge: RowEdge.End, label: 'To' },
-] as const;
 
 const WEEKDAYS = [
   { weekday: IsoWeekday.Monday, name: 'Monday' },
@@ -84,18 +65,7 @@ const NEW_ROW: TimeRow = { start: '09:00', end: '17:00' };
 
 const TIME_LENGTH = 5;
 
-/** The Palette select's choices; the empty value is the default look (null). */
-const PALETTE_OPTIONS: readonly SelectOption[] = [
-  { value: '', label: 'Default look (Evergreen)' },
-  { value: Palette.Evergreen, label: 'Evergreen' },
-  { value: Palette.Harbour, label: 'Harbour' },
-  { value: Palette.Moss, label: 'Moss' },
-  { value: Palette.Graphite, label: 'Graphite' },
-];
-
 const EMPTY_DRAFT: AreaDraft = { name: '', palette: null, days: WEEKDAYS.map(() => []) };
-
-let nextId = 0;
 
 const sortIntervals = (intervals: readonly MinuteInterval[]): readonly MinuteInterval[] =>
   [...intervals].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
@@ -223,20 +193,32 @@ const buildAreaPatch = (baseline: AreaDraft, draft: AreaDraft): AreaPatch => {
 /** Edits an Area's name, palette and Active hours per weekday, or creates a new Area. */
 @Component({
   selector: 'asys-area-editor',
-  imports: [
-    Button,
-    FieldError,
-    Input,
-    Label,
-    LoadState,
-    RouterLink,
-    SelectField,
-    SyncNote,
-    TextField,
-  ],
+  imports: [AreaEditorTemplate],
   providers: [CommandAttempts],
-  templateUrl: './area-editor.component.html',
-  styleUrl: './area-editor.css',
+  template: `
+    <asys-area-editor-template
+      [heading]="heading()"
+      [statusLine]="statusLine()"
+      [loaded]="dataStore.state() !== null"
+      [loadFailed]="dataStore.status() === Status.Failed"
+      [found]="areaId() === null || area() !== undefined"
+      [isNew]="areaId() === null"
+      [name]="draft().name"
+      [palette]="draft().palette"
+      [days]="dayViews()"
+      [noHours]="noHours()"
+      [needsName]="needsName()"
+      [canSubmit]="canSubmit()"
+      [awaiting]="awaiting()"
+      (retry)="dataStore.refresh()"
+      (nameChange)="setName($event)"
+      (paletteChange)="setPalette($event)"
+      (timeChange)="setTime($event)"
+      (addRow)="addRow($event)"
+      (removeRow)="removeRow($event.day, $event.row)"
+      (save)="submit()"
+    />
+  `,
 })
 export class AreaEditor {
   /** The Area's id; null means a new Area. */
@@ -254,19 +236,9 @@ export class AreaEditor {
 
   readonly #destroyRef = inject(DestroyRef);
 
-  readonly #host = inject<ElementRef<HTMLElement>>(ElementRef);
-
   protected readonly Status = SyncStatus;
 
-  protected readonly Variant = ButtonVariant;
-
-  protected readonly Size = ButtonSize;
-
-  protected readonly edges = EDGES;
-
-  protected readonly paletteOptions = PALETTE_OPTIONS;
-
-  readonly #idPrefix = `asys-area-editor-${nextId++}`;
+  private readonly template = viewChild(AreaEditorTemplate);
 
   protected readonly statusLine = signal('');
 
@@ -349,60 +321,15 @@ export class AreaEditor {
     });
   }
 
-  /** The id of a row's time input. */
-  protected inputId(day: number, row: number, edge: RowEdge): string {
-    return `${this.#idPrefix}-${day}-${row}-${edge}`;
-  }
-
-  /** The id of a row's error line. */
-  protected errorId(day: number, row: number): string {
-    return `${this.#idPrefix}-${day}-${row}-error`;
-  }
-
-  /** The id of a day's overlap line. */
-  protected overlapId(day: number): string {
-    return `${this.#idPrefix}-${day}-overlap`;
-  }
-
-  /** The id of a row's Remove button. */
-  protected removeId(day: number, row: number): string {
-    return `${this.#idPrefix}-${day}-${row}-remove`;
-  }
-
-  /** The id of a day's Add hours button. */
-  protected addId(day: number): string {
-    return `${this.#idPrefix}-${day}-add`;
-  }
-
-  /** The error lines that describe a row's inputs, or null when there are none. */
-  protected describedBy(
-    day: number,
-    row: number,
-    rowError: boolean,
-    overlap: boolean,
-  ): string | null {
-    const ids = [
-      ...(rowError ? [this.errorId(day, row)] : []),
-      ...(overlap ? [this.overlapId(day)] : []),
-    ];
-
-    return ids.length === 0 ? null : ids.join(' ');
-  }
-
   protected setName(name: string): void {
     this.draft.update((draft) => ({ ...draft, name }));
   }
 
-  protected setPalette(value: string): void {
-    const palette = Object.values<string>(Palette).find((candidate) => candidate === value);
-
-    this.draft.update((draft) => ({
-      ...draft,
-      palette: palette === undefined ? null : (palette as Palette),
-    }));
+  protected setPalette(palette: Palette | null): void {
+    this.draft.update((draft) => ({ ...draft, palette }));
   }
 
-  protected setTime(day: number, row: number, edge: RowEdge, value: string): void {
+  protected setTime({ day, row, edge, value }: AreaEditorTimeChange): void {
     const time = value.slice(0, TIME_LENGTH);
 
     this.#updateDay(day, (rows) =>
@@ -420,12 +347,11 @@ export class AreaEditor {
     this.#updateDay(day, (rows) => rows.filter((_, index) => index !== row));
     afterNextRender(
       () => {
-        const target =
-          remaining === 0
-            ? this.addId(day)
-            : this.removeId(day, row < remaining ? row : remaining - 1);
-
-        this.#host.nativeElement.querySelector<HTMLElement>(`#${target}`)?.focus();
+        if (remaining === 0) {
+          this.template()?.focusAdd(day);
+        } else {
+          this.template()?.focusRemove(day, row < remaining ? row : remaining - 1);
+        }
       },
       { injector: this.#injector },
     );

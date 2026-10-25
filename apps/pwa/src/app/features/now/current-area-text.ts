@@ -7,7 +7,7 @@ import {
   toLocalDateTime,
 } from '@asys/domain';
 
-import { byAreaName } from '../areas/area-order';
+import { byAreaName } from '../../core/data/area-order';
 
 /** The text for no Area at all. */
 export const NO_AREA_IN_USE = 'No Area in use';
