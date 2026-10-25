@@ -45,6 +45,27 @@
   color: var(--on-danger);
 }
 
+/* Capture is the signal pill that captures a Task from anywhere. */
+.asys-button--capture {
+  min-height: var(--tap-target-large);
+  padding: var(--space-2) var(--space-5) var(--space-2) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--signal);
+  color: var(--on-signal);
+  white-space: nowrap;
+  font-weight: 700;
+
+  & .asys-icon {
+    font-size: 1.125em;
+  }
+}
+
+.asys-button__count {
+  background: var(--on-signal);
+  color: var(--signal);
+}
+
 /* Large is the one decision on a card. */
 .asys-button--large {
   min-height: var(--tap-target-large);
@@ -107,7 +128,8 @@
 }
 
 .asys-button--primary:active:not(:disabled):not(.is-disabled),
-.asys-button--danger:active:not(:disabled):not(.is-disabled) {
+.asys-button--danger:active:not(:disabled):not(.is-disabled),
+.asys-button--capture:active:not(:disabled):not(.is-disabled) {
   opacity: 0.85;
 }
 

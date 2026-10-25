@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: EUPL-1.2
-import { Component, input, ViewEncapsulation } from '@angular/core';
+import { Component, computed, input, ViewEncapsulation } from '@angular/core';
 
 import { Icon, IconName } from '../icon/icon';
 
@@ -18,23 +18,36 @@ export enum ButtonSize {
   Large = 'large',
 }
 
-/** The design system button, applied to a `button` or an `a` as `asys-button`. */
+/**
+ * The design system button, applied to a `button` or an `a` as `asys-button`. With `capture` it is the Capture
+ * pill: a plus, the word and, when some failed, how many.
+ */
 @Component({
   selector: 'button[asys-button], a[asys-button]',
   imports: [Icon],
   template: `
-    @if (icon(); as name) {
-      <asys-icon [name]="name" />
+    @if (capture()) {
+      <asys-icon [name]="IconName.Plus" /><span class="asys-button__label">Capture</span>
+      @if (waiting() > 0) {
+        &ngsp;<span class="asys-num asys-count asys-button__count"
+          >{{ waiting() }}<span class="asys-visually-hidden"> not captured</span></span
+        >
+      }
+    } @else {
+      @if (icon(); as name) {
+        <asys-icon [name]="name" />
+      }
+      <ng-content />
     }
-    <ng-content />
   `,
   encapsulation: ViewEncapsulation.None,
   host: {
     class: 'asys-button',
-    '[class.asys-button--primary]': 'variant() === Variant.Primary',
-    '[class.asys-button--secondary]': 'variant() === Variant.Secondary',
-    '[class.asys-button--quiet]': 'variant() === Variant.Quiet',
-    '[class.asys-button--danger]': 'variant() === Variant.Danger',
+    '[class.asys-button--primary]': 'drawnVariant() === Variant.Primary',
+    '[class.asys-button--secondary]': 'drawnVariant() === Variant.Secondary',
+    '[class.asys-button--quiet]': 'drawnVariant() === Variant.Quiet',
+    '[class.asys-button--danger]': 'drawnVariant() === Variant.Danger',
+    '[class.asys-button--capture]': 'capture()',
     '[class.asys-button--small]': 'size() === Size.Small',
     '[class.asys-button--large]': 'size() === Size.Large',
     '[class.asys-button--icon]': 'iconOnly()',
@@ -47,6 +60,8 @@ export class Button {
 
   protected readonly Size = ButtonSize;
 
+  protected readonly IconName = IconName;
+
   readonly variant = input<ButtonVariant>(ButtonVariant.Secondary);
 
   readonly size = input<ButtonSize>(ButtonSize.Default);
@@ -58,4 +73,13 @@ export class Button {
 
   /** A square button holding one icon. The consumer gives the host an `aria-label`. */
   readonly iconOnly = input<boolean>(false);
+
+  /** The Capture pill, which draws its own plus and word and ignores `variant`, `icon` and the content. */
+  readonly capture = input<boolean>(false);
+
+  /** How many captures are not yet sent, shown on the Capture pill when above 0. */
+  readonly waiting = input<number>(0);
+
+  /** The variant whose class the host carries; Capture carries none, so no variant's colours or pressed state apply. */
+  protected readonly drawnVariant = computed(() => (this.capture() ? null : this.variant()));
 }

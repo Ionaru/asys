@@ -48,9 +48,11 @@
   >
     @if (onCapturePath()) {
       <button
-        asys-capture-button
+        asys-button
+        type="button"
+        [capture]="true"
         #pill
-        [count]="captureQueue.failed().length"
+        [waiting]="captureQueue.failed().length"
         [attr.aria-expanded]="open() ? 'true' : 'false'"
         (click)="toggleQuickAdd()"
       ></button>

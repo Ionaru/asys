@@ -58,7 +58,7 @@ const watchMotion = (page: Page): Promise<void> =>
       // Only a rendered frame counts: a removal that follows in the same task is not a lingering leave.
       if (
         frame &&
-        document.querySelector('button.asys-capture[aria-expanded="false"]') !== null &&
+        document.querySelector('button.asys-button--capture[aria-expanded="false"]') !== null &&
         document.querySelector('asys-quick-add') !== null
       )
         watch.peak.overlap = true;

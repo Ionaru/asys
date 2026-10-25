@@ -236,10 +236,10 @@ const setup = async (url = '/now', { motion }: SetupOptions = {}) => {
   const nav = (): HTMLElement | null => root().querySelector('nav[aria-label="Primary"]');
   /** Capture, found where the contract puts it: inside the Primary nav. */
   const capture = (): HTMLButtonElement | null =>
-    root().querySelector('nav[aria-label="Primary"] button.asys-capture');
+    root().querySelector('nav[aria-label="Primary"] button.asys-button--capture');
   /** Every Capture button anywhere in the shell, however it got there. */
   const captures = (): HTMLButtonElement[] =>
-    Array.from(root().querySelectorAll<HTMLButtonElement>('button.asys-capture'));
+    Array.from(root().querySelectorAll<HTMLButtonElement>('button.asys-button--capture'));
   const page = (): HTMLElement | null => root().querySelector('main');
   const bar = (): HTMLElement | null => root().querySelector('asys-quick-add');
   const input = (): HTMLTextAreaElement | null =>
@@ -259,7 +259,7 @@ const setup = async (url = '/now', { motion }: SetupOptions = {}) => {
       (b) => b.textContent?.trim() === label,
     );
   const badge = (): string | null =>
-    capture()?.querySelector('.asys-capture__count')?.firstChild?.textContent?.trim() ?? null;
+    capture()?.querySelector('.asys-button__count')?.firstChild?.textContent?.trim() ?? null;
   /** The accessible name of Capture: its text, whitespace collapsed. */
   const captureName = (): string | null =>
     capture()?.textContent?.replace(/\s+/g, ' ').trim() ?? null;
@@ -1061,8 +1061,8 @@ describe('ShellLayout', () => {
       await settle();
       await escape();
 
-      expect(capture()?.querySelector('.asys-capture__count')).toBeNull();
-      expect(capture()?.querySelector('.asys-capture__badge')).toBeNull();
+      expect(capture()?.querySelector('.asys-button__count')).toBeNull();
+      expect(capture()?.querySelector('.asys-button__badge')).toBeNull();
       expect(badge()).toBeNull();
       expect(captureName()).toBe('Capture');
     });

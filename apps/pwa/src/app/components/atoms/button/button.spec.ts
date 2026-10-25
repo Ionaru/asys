@@ -296,3 +296,108 @@ describe('Button', () => {
     expect(el('b').hasAttribute('disabled')).toBe(false);
   });
 });
+
+@Component({
+  imports: [Button],
+  template: `
+    <button
+      asys-button
+      type="button"
+      [capture]="true"
+      [variant]="Variant.Primary"
+      [icon]="IconName.Check"
+      [waiting]="waiting()"
+    ></button>
+  `,
+})
+class CaptureHost {
+  protected readonly Variant = ButtonVariant;
+
+  protected readonly IconName = IconName;
+
+  readonly waiting = signal(0);
+}
+
+/** The text a screen reader reads: whitespace collapsed and trimmed. */
+const textOf = (button: HTMLElement): string =>
+  (button.textContent ?? '').replace(/\s+/g, ' ').trim();
+
+const setupCapture = async (waiting = 0) => {
+  const fixture = TestBed.createComponent(CaptureHost);
+
+  fixture.componentInstance.waiting.set(waiting);
+  await fixture.whenStable();
+
+  const button = fixture.nativeElement.querySelector('button') as HTMLButtonElement;
+
+  return { fixture, button, count: () => button.querySelector('.asys-button__count') };
+};
+
+describe('Button with capture', () => {
+  it('carries asys-button and --capture and no variant class', async () => {
+    const { button } = await setupCapture();
+
+    expect(Array.from(button.classList).sort()).toEqual(['asys-button', 'asys-button--capture']);
+  });
+
+  it('draws the plus icon in Regular, then the word in __label, ignoring the icon input', async () => {
+    const { button } = await setupCapture();
+    const icon = button.firstElementChild;
+
+    expect(icon?.matches('asys-icon')).toBe(true);
+    expect(icon?.querySelector('svg')?.getAttribute('data-icon')).toBe('plus');
+    expect(icon?.querySelector('svg')?.getAttribute('data-prefix')).toBe('far');
+    expect(button.querySelectorAll('asys-icon')).toHaveLength(1);
+    expect(icon?.nextElementSibling?.classList.contains('asys-button__label')).toBe(true);
+    expect(button.querySelector('.asys-button__label')?.textContent?.trim()).toBe('Capture');
+  });
+
+  it('has no count and reads exactly Capture at 0 waiting', async () => {
+    const { button, count } = await setupCapture(0);
+
+    expect(count()).toBeNull();
+    expect(textOf(button)).toBe('Capture');
+  });
+
+  it('shows the waiting count with a visually hidden "not captured"', async () => {
+    const { button, count } = await setupCapture(3);
+
+    expect(count()?.firstChild?.textContent).toBe('3');
+    expect(count()?.querySelector('.asys-visually-hidden')?.textContent).toBe(' not captured');
+    expect(textOf(button)).toBe('Capture 3 not captured');
+  });
+
+  it('puts the icon, the label and the count in that order', async () => {
+    const { button } = await setupCapture(2);
+    const children = Array.from(button.children);
+
+    expect(children).toHaveLength(3);
+    expect(children[0].matches('asys-icon')).toBe(true);
+    expect(children[1].classList.contains('asys-button__label')).toBe(true);
+    expect(children[2].classList.contains('asys-button__count')).toBe(true);
+  });
+
+  it('reads "Capture 1 not captured" as one phrase at 1 waiting', async () => {
+    const { button } = await setupCapture(1);
+
+    expect(textOf(button)).toBe('Capture 1 not captured');
+  });
+
+  it('updates the count when it changes and removes it again at 0', async () => {
+    const { fixture, button, count } = await setupCapture(1);
+
+    expect(count()?.firstChild?.textContent).toBe('1');
+
+    fixture.componentInstance.waiting.set(2);
+    await fixture.whenStable();
+
+    expect(count()?.firstChild?.textContent).toBe('2');
+    expect(textOf(button)).toBe('Capture 2 not captured');
+
+    fixture.componentInstance.waiting.set(0);
+    await fixture.whenStable();
+
+    expect(count()).toBeNull();
+    expect(textOf(button)).toBe('Capture');
+  });
+});
