@@ -61,11 +61,6 @@
   }
 }
 
-.asys-button__count {
-  background: var(--on-signal);
-  color: var(--signal);
-}
-
 /* Large is the one decision on a card. */
 .asys-button--large {
   min-height: var(--tap-target-large);

@@ -362,6 +362,13 @@ describe('Button with capture', () => {
   it('shows the waiting count with a visually hidden "not captured"', async () => {
     const { button, count } = await setupCapture(3);
 
+    expect(count()?.tagName).toBe('SPAN');
+    expect(count()?.hasAttribute('asys-count')).toBe(true);
+    expect(count()?.classList.contains('asys-count')).toBe(true);
+    expect(count()?.classList.contains('asys-count--on-signal')).toBe(true);
+    expect(count()?.classList.contains('asys-count--quiet')).toBe(false);
+    expect(count()?.hasAttribute('aria-hidden')).toBe(false);
+    expect(count()?.firstChild?.nodeType).toBe(Node.TEXT_NODE);
     expect(count()?.firstChild?.textContent).toBe('3');
     expect(count()?.querySelector('.asys-visually-hidden')?.textContent).toBe(' not captured');
     expect(textOf(button)).toBe('Capture 3 not captured');
@@ -399,5 +406,33 @@ describe('Button with capture', () => {
 
     expect(count()).toBeNull();
     expect(textOf(button)).toBe('Capture');
+  });
+
+  it('caps the count at 99+ above 99 waiting', async () => {
+    const { button, count } = await setupCapture(120);
+
+    expect(count()?.firstChild?.textContent).toBe('99+');
+    expect(textOf(button)).toBe('Capture 99+ not captured');
+  });
+});
+
+@Component({
+  imports: [Button],
+  template: `
+    <button asys-button type="button" [variant]="Variant.Primary" [waiting]="5">Save</button>
+  `,
+})
+class PlainHost {
+  protected readonly Variant = ButtonVariant;
+}
+
+describe('Button without capture', () => {
+  it('never renders a count, whatever waiting is', async () => {
+    const fixture = TestBed.createComponent(PlainHost);
+
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.querySelector('.asys-count')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.asys-button__count')).toBeNull();
   });
 });
