@@ -38,15 +38,15 @@ const setup = async (today = '2026-10-13', value: string | null = null) => {
 
   const root = (): HTMLElement => fixture.nativeElement;
   const chips = (): HTMLButtonElement[] =>
-    Array.from(root().querySelectorAll<HTMLButtonElement>('.asys-date-pick__chips > button'));
+    Array.from(root().querySelectorAll<HTMLButtonElement>('.asys-date-picker__chips > button'));
   const calendar = (): HTMLElement =>
-    root().querySelector('.asys-date-pick__calendar') as HTMLElement;
+    root().querySelector('.asys-date-picker__calendar') as HTMLElement;
   const days = (): HTMLButtonElement[] =>
-    Array.from(root().querySelectorAll<HTMLButtonElement>('button.asys-date-pick__day'));
+    Array.from(root().querySelectorAll<HTMLButtonElement>('button.asys-date-picker__day'));
   const input = (): HTMLInputElement =>
-    root().querySelector('.asys-date-pick__other input') as HTMLInputElement;
+    root().querySelector('.asys-date-picker__other input') as HTMLInputElement;
   const remove = (): HTMLButtonElement | null =>
-    root().querySelector<HTMLButtonElement>('button.asys-date-pick__remove');
+    root().querySelector<HTMLButtonElement>('button.asys-date-picker__remove');
   // A pointer press: `click()` has detail 0, which counts as a keyboard activation.
   const press = async (el: HTMLElement): Promise<void> => {
     el.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
@@ -77,8 +77,8 @@ describe('DatePicker', () => {
     it('labels the group and shows three chips', async () => {
       const { root, chips } = await setup();
 
-      expect(root().querySelector('.asys-date-pick__chips')?.getAttribute('role')).toBe('group');
-      expect(root().querySelector('.asys-date-pick__chips')?.getAttribute('aria-label')).toBe(
+      expect(root().querySelector('.asys-date-picker__chips')?.getAttribute('role')).toBe('group');
+      expect(root().querySelector('.asys-date-picker__chips')?.getAttribute('aria-label')).toBe(
         'Quick dates',
       );
       expect(chips().every((b) => b.getAttribute('type') === 'button')).toBe(true);
@@ -133,7 +133,7 @@ describe('DatePicker', () => {
   describe('calendar', () => {
     it('is a labelled group of seven weekday headers and 14 days', async () => {
       const { calendar, days } = await setup();
-      const dow = Array.from(calendar().querySelectorAll('span.asys-date-pick__dow'));
+      const dow = Array.from(calendar().querySelectorAll('span.asys-date-picker__dow'));
 
       expect(calendar().getAttribute('role')).toBe('group');
       expect(calendar().getAttribute('aria-label')).toBe('Days from Mon 12 Oct to Sun 25 Oct');
@@ -191,7 +191,7 @@ describe('DatePicker', () => {
       const { days } = await setup();
 
       expect(days().filter((b) => b.getAttribute('aria-current') === 'date')).toEqual([days()[1]]);
-      expect(days().filter((b) => b.classList.contains('asys-date-pick__day--today'))).toEqual([
+      expect(days().filter((b) => b.classList.contains('asys-date-picker__day--today'))).toEqual([
         days()[1],
       ]);
     });

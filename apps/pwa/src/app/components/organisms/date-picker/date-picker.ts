@@ -27,9 +27,9 @@ export class DatePicker {
 
   protected readonly weekdays = WEEKDAY_HEADERS;
 
-  protected readonly otherId = `asys-date-pick-${nextId++}-other`;
+  protected readonly otherId = `asys-date-picker-${nextId++}-other`;
 
-  protected readonly errorId = `asys-date-pick-${nextId - 1}-error`;
+  protected readonly errorId = `asys-date-picker-${nextId - 1}-error`;
 
   /** Whether the last typed date was before today. */
   protected readonly pastTyped = signal(false);

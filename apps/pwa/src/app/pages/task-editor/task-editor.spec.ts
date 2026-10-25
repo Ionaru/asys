@@ -844,7 +844,7 @@ describe('TaskEditor', () => {
       await press(rowButton('Due'));
 
       const day = Array.from(
-        dialog('Due').querySelectorAll<HTMLButtonElement>('button.asys-date-pick__day'),
+        dialog('Due').querySelectorAll<HTMLButtonElement>('button.asys-date-picker__day'),
       ).find((b) => (b.textContent ?? '').trim() === '9');
 
       await press(day);
@@ -861,7 +861,7 @@ describe('TaskEditor', () => {
       expect(time.open).toBe(true);
 
       await press(
-        Array.from(time.querySelectorAll<HTMLButtonElement>('button.asys-time-pick__chip')).find(
+        Array.from(time.querySelectorAll<HTMLButtonElement>('button.asys-time-picker__chip')).find(
           (b) => (b.textContent ?? '').trim() === '17:00',
         ),
       );
@@ -890,7 +890,9 @@ describe('TaskEditor', () => {
       await press(rowButton('Available from'));
 
       const day = Array.from(
-        dialog('Available from').querySelectorAll<HTMLButtonElement>('button.asys-date-pick__day'),
+        dialog('Available from').querySelectorAll<HTMLButtonElement>(
+          'button.asys-date-picker__day',
+        ),
       ).find((b) => (b.textContent ?? '').trim() === '9');
 
       await press(day);

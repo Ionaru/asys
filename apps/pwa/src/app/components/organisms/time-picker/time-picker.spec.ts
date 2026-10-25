@@ -37,10 +37,10 @@ const setup = async (value: string | null = null, context = '') => {
 
   const root = (): HTMLElement => fixture.nativeElement;
   const chips = (): HTMLButtonElement[] =>
-    Array.from(root().querySelectorAll<HTMLButtonElement>('.asys-time-pick__chips > button'));
+    Array.from(root().querySelectorAll<HTMLButtonElement>('.asys-time-picker__chips > button'));
   const input = (): HTMLInputElement =>
     root().querySelector('input[type="time"]') as HTMLInputElement;
-  const contextLine = (): HTMLElement | null => root().querySelector('p.asys-time-pick__context');
+  const contextLine = (): HTMLElement | null => root().querySelector('p.asys-time-picker__context');
   const remove = (): HTMLButtonElement | null =>
     Array.from(root().querySelectorAll<HTMLButtonElement>('button')).find(
       (b) => squash(b.textContent) === 'Remove time',
@@ -74,8 +74,8 @@ describe('TimePicker', () => {
     it('renders the six times in order in a labelled group', async () => {
       const { root, chips } = await setup();
 
-      expect(root().querySelector('.asys-time-pick__chips')?.getAttribute('role')).toBe('group');
-      expect(root().querySelector('.asys-time-pick__chips')?.getAttribute('aria-label')).toBe(
+      expect(root().querySelector('.asys-time-picker__chips')?.getAttribute('role')).toBe('group');
+      expect(root().querySelector('.asys-time-picker__chips')?.getAttribute('aria-label')).toBe(
         'Times',
       );
       expect(chips().every((b) => b.getAttribute('type') === 'button')).toBe(true);

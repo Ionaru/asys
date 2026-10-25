@@ -137,18 +137,18 @@ const setup = async (value: DateSpec | null = null) => {
   const f = finders(root);
   const { press, change } = actions(fixture);
   const dateChips = (): HTMLButtonElement[] =>
-    Array.from(f.dateDialog().querySelectorAll<HTMLButtonElement>('.asys-date-pick__chip'));
+    Array.from(f.dateDialog().querySelectorAll<HTMLButtonElement>('.asys-date-picker__chip'));
   const dayButton = (label: string): HTMLButtonElement =>
     f
       .dateDialog()
-      .querySelector(`button.asys-date-pick__day[aria-label="${label}"]`) as HTMLButtonElement;
+      .querySelector(`button.asys-date-picker__day[aria-label="${label}"]`) as HTMLButtonElement;
   const dateRemove = (): HTMLButtonElement | null =>
-    f.dateDialog().querySelector<HTMLButtonElement>('button.asys-date-pick__remove');
+    f.dateDialog().querySelector<HTMLButtonElement>('button.asys-date-picker__remove');
   const dateInput = (): HTMLInputElement =>
     f.dateDialog().querySelector('input[type="date"]') as HTMLInputElement;
   const timeChip = (text: string): HTMLButtonElement =>
     Array.from(
-      f.timeDialog().querySelectorAll<HTMLButtonElement>('button.asys-time-pick__chip'),
+      f.timeDialog().querySelectorAll<HTMLButtonElement>('button.asys-time-picker__chip'),
     ).find((b) => squash(b.textContent) === text) as HTMLButtonElement;
   const timeInput = (): HTMLInputElement =>
     f.timeDialog().querySelector('input[type="time"]') as HTMLInputElement;
@@ -418,7 +418,7 @@ describe('DateRow', () => {
       expect(timeDialog().open).toBe(true);
       expect(dateDialog().open).toBe(false);
       expect(timeDialog().querySelector('asys-time-picker')).not.toBeNull();
-      expect(squash(timeDialog().querySelector('.asys-time-pick__context')?.textContent)).toBe(
+      expect(squash(timeDialog().querySelector('.asys-time-picker__context')?.textContent)).toBe(
         'Due tomorrow',
       );
     });
@@ -435,7 +435,7 @@ describe('DateRow', () => {
       await fixture.whenStable();
 
       expect(
-        squash(fixture.nativeElement.querySelector('.asys-time-pick__context')?.textContent),
+        squash(fixture.nativeElement.querySelector('.asys-time-picker__context')?.textContent),
       ).toBe('Available from Mon 19 Oct');
     });
 
@@ -638,7 +638,7 @@ describe('DateRow', () => {
 
       await press(row());
 
-      const chip = dateDialog().querySelectorAll<HTMLButtonElement>('.asys-date-pick__chip')[1];
+      const chip = dateDialog().querySelectorAll<HTMLButtonElement>('.asys-date-picker__chip')[1];
 
       await press(chip);
 
@@ -651,7 +651,7 @@ describe('DateRow', () => {
       host.model.set({ due: { date: '2026-10-14' } });
       await fixture.whenStable();
       await press(row());
-      await press(dateDialog().querySelector('button.asys-date-pick__remove') as HTMLElement);
+      await press(dateDialog().querySelector('button.asys-date-picker__remove') as HTMLElement);
 
       expect(host.model().due).toBeNull();
     });

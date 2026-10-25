@@ -17,13 +17,13 @@ const TIMES: readonly LocalTime[] = ['09:00', '10:00', '12:00', '14:00', '17:00'
   encapsulation: ViewEncapsulation.None,
   template: `
     @if (context()) {
-      <p class="asys-time-pick__context">{{ context() }}</p>
+      <p class="asys-time-picker__context">{{ context() }}</p>
     }
-    <div class="asys-time-pick__chips" role="group" aria-label="Times">
+    <div class="asys-time-picker__chips" role="group" aria-label="Times">
       @for (time of times; track time) {
         <button
           type="button"
-          class="asys-num asys-time-pick__chip"
+          class="asys-num asys-time-picker__chip"
           [attr.aria-pressed]="value() === time ? 'true' : 'false'"
           (click)="pick.emit(time)"
         >
@@ -31,7 +31,7 @@ const TIMES: readonly LocalTime[] = ['09:00', '10:00', '12:00', '14:00', '17:00'
         </button>
       }
     </div>
-    <div class="asys-field asys-time-pick__other">
+    <div class="asys-field asys-time-picker__other">
       <label asys-label [for]="otherId">Other time</label>
       <input
         #otherInput
@@ -62,7 +62,7 @@ export class TimePicker {
 
   protected readonly times = TIMES;
 
-  protected readonly otherId = `asys-time-pick-${nextId++}-other`;
+  protected readonly otherId = `asys-time-picker-${nextId++}-other`;
 
   readonly value = input<LocalTime | null>(null);
 
