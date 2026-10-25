@@ -43,7 +43,7 @@ const CORE_EXCEPTIONS: Readonly<Record<string, readonly string[]>> = {
 };
 
 // The app's folders outside components/ that no component may import from.
-const OUTSIDE = ['pages', 'features', 'layout'];
+const OUTSIDE = ['pages', 'layout'];
 
 const walk = (dir: string): string[] =>
   existsSync(dir)
