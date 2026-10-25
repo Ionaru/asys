@@ -6,7 +6,7 @@ import { QuadrantLabel } from '../../atoms/quadrant-label/quadrant-label';
 import { StatusBadge, StatusBadgeStatus } from '../../atoms/status-badge/status-badge';
 
 /** The kind of row a picker list shows. */
-export enum PickerRowVariant {
+export enum TaskRowVariant {
   Ranked = 'ranked',
   UrgentElsewhere = 'urgent-elsewhere',
   Waiting = 'waiting',
@@ -17,41 +17,41 @@ export enum PickerRowVariant {
  * Used as a link.
  */
 @Component({
-  selector: 'a[asys-picker-row]',
+  selector: 'a[asys-task-row]',
   imports: [QuadrantLabel, StatusBadge],
   encapsulation: ViewEncapsulation.None,
   host: {
-    class: 'asys-picker-row',
-    '[class.asys-picker-row--waiting]': 'variant() === Variants.Waiting',
-    '[class.asys-picker-row--urgent-elsewhere]': 'variant() === Variants.UrgentElsewhere',
+    class: 'asys-task-row',
+    '[class.asys-task-row--waiting]': 'variant() === Variants.Waiting',
+    '[class.asys-task-row--urgent-elsewhere]': 'variant() === Variants.UrgentElsewhere',
   },
   template: `
-    <span class="asys-picker-row__main">
+    <span class="asys-task-row__main">
       <span
-        class="asys-picker-row__title"
+        class="asys-task-row__title"
         [attr.data-task-id]="taskId()"
         [attr.data-focus-title]="taskId() === null ? null : ''"
         [attr.data-morph]="morph() ? '' : null"
         ><ng-content
       /></span>
-      <span class="asys-picker-row__reason">
+      <span class="asys-task-row__reason">
         @if (quadrant(); as q) {
           <asys-quadrant-label [quadrant]="q" [compact]="true" />
         }
         @if (overdue()) {
           <asys-status-badge [status]="Statuses.Overdue" />
         }
-        <span class="asys-picker-row__reason-text">{{ reason() }}</span>
+        <span class="asys-task-row__reason-text">{{ reason() }}</span>
       </span>
     </span>
-    <span class="asys-picker-row__side">
-      <span class="asys-num asys-picker-row__estimate">{{ estimate() }}</span>
+    <span class="asys-task-row__side">
+      <span class="asys-num asys-task-row__estimate">{{ estimate() }}</span>
     </span>
   `,
-  styleUrl: './picker-row.css',
+  styleUrl: './task-row.css',
 })
-export class PickerRow {
-  protected readonly Variants = PickerRowVariant;
+export class TaskRow {
+  protected readonly Variants = TaskRowVariant;
 
   protected readonly Statuses = StatusBadgeStatus;
 
@@ -67,5 +67,5 @@ export class PickerRow {
 
   readonly overdue = input<boolean>(false);
 
-  readonly variant = input<PickerRowVariant>(PickerRowVariant.Ranked);
+  readonly variant = input<TaskRowVariant>(TaskRowVariant.Ranked);
 }

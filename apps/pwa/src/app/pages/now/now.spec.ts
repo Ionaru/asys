@@ -407,7 +407,7 @@ const setup = async (options: SetupOptions = {}) => {
   const rows = (): HTMLAnchorElement[] =>
     Array.from(
       root().querySelectorAll<HTMLAnchorElement>(
-        'ul.now__list:not(.now__list--waiting) a.asys-picker-row',
+        'ul.now__list:not(.now__list--waiting) a.asys-task-row',
       ),
     );
   const waitingSection = (): HTMLElement | null =>
@@ -418,9 +418,7 @@ const setup = async (options: SetupOptions = {}) => {
     root().querySelector('asys-section-header .asys-section__body');
   const waitingList = (): HTMLElement | null => root().querySelector('ul.now__list--waiting');
   const waitingRows = (): HTMLAnchorElement[] =>
-    Array.from(
-      root().querySelectorAll<HTMLAnchorElement>('ul.now__list--waiting a.asys-picker-row'),
-    );
+    Array.from(root().querySelectorAll<HTMLAnchorElement>('ul.now__list--waiting a.asys-task-row'));
   const waitingSummaryText = (): string | undefined =>
     root().querySelector('asys-section-header .asys-section-header__summary')?.textContent?.trim();
   const swipes = (): DebugElement[] => fixture.debugElement.queryAll(By.directive(SwipeActions));
@@ -1014,7 +1012,7 @@ describe('Now', () => {
         '/tasks/plants',
       ]);
       expect(
-        rows().map((a) => a.querySelector('.asys-picker-row__title')?.textContent?.trim()),
+        rows().map((a) => a.querySelector('.asys-task-row__title')?.textContent?.trim()),
       ).toEqual(['Call the dentist', 'Water the plants']);
     });
 
@@ -1022,18 +1020,18 @@ describe('Now', () => {
       const { rows, now } = await setup();
       const [dentist, plants] = now().ranked.slice(1);
       const chipOf = (row: HTMLAnchorElement | undefined): Element | null | undefined =>
-        row?.querySelector('.asys-picker-row__reason asys-quadrant-label');
+        row?.querySelector('.asys-task-row__reason asys-quadrant-label');
 
       expect(
-        must(rows()[0]).querySelector('.asys-picker-row__reason-text')?.textContent?.trim(),
+        must(rows()[0]).querySelector('.asys-task-row__reason-text')?.textContent?.trim(),
       ).toBe(must(dentist).reasonText);
       expect(
-        must(rows()[1]).querySelector('.asys-picker-row__reason-text')?.textContent?.trim(),
+        must(rows()[1]).querySelector('.asys-task-row__reason-text')?.textContent?.trim(),
       ).toBe(must(plants).reasonText);
-      expect(must(rows()[0]).querySelector('.asys-picker-row__estimate')?.textContent?.trim()).toBe(
+      expect(must(rows()[0]).querySelector('.asys-task-row__estimate')?.textContent?.trim()).toBe(
         '20 min',
       );
-      expect(must(rows()[1]).querySelector('.asys-picker-row__estimate')?.textContent?.trim()).toBe(
+      expect(must(rows()[1]).querySelector('.asys-task-row__estimate')?.textContent?.trim()).toBe(
         '1 min',
       );
       expect(chipOf(rows()[0])?.textContent?.replace(/\s+/g, ' ').trim().toLowerCase()).toBe(
@@ -1047,7 +1045,7 @@ describe('Now', () => {
         true,
       );
       expect(
-        rows().some((a) => a.querySelector('.asys-picker-row__side asys-quadrant-label') !== null),
+        rows().some((a) => a.querySelector('.asys-task-row__side asys-quadrant-label') !== null),
       ).toBe(false);
     });
 
@@ -1188,21 +1186,21 @@ describe('Now', () => {
       const rows = waitingRows();
       const [flights, report] = now().waiting;
 
-      expect(rows.every((a) => a.classList.contains('asys-picker-row--waiting'))).toBe(true);
+      expect(rows.every((a) => a.classList.contains('asys-task-row--waiting'))).toBe(true);
       expect(rows.map((a) => a.getAttribute('href'))).toEqual(['/tasks/flights', '/tasks/report']);
       expect(
-        rows.map((a) => a.querySelector('.asys-picker-row__title')?.textContent?.trim()),
+        rows.map((a) => a.querySelector('.asys-task-row__title')?.textContent?.trim()),
       ).toEqual(['Book flights', 'Send the report']);
-      expect(
-        must(rows[0]).querySelector('.asys-picker-row__reason-text')?.textContent?.trim(),
-      ).toBe(must(flights).reasonText);
+      expect(must(rows[0]).querySelector('.asys-task-row__reason-text')?.textContent?.trim()).toBe(
+        must(flights).reasonText,
+      );
       expect(must(flights).reasonText).toContain('Available from');
-      expect(
-        must(rows[1]).querySelector('.asys-picker-row__reason-text')?.textContent?.trim(),
-      ).toBe(must(report).reasonText);
+      expect(must(rows[1]).querySelector('.asys-task-row__reason-text')?.textContent?.trim()).toBe(
+        must(report).reasonText,
+      );
       expect(must(report).reasonText).toContain('Blocked by Call the dentist');
       expect(
-        rows.map((a) => a.querySelector('.asys-picker-row__estimate')?.textContent?.trim()),
+        rows.map((a) => a.querySelector('.asys-task-row__estimate')?.textContent?.trim()),
       ).toEqual(['10 min', '45 min']);
     });
 
@@ -1213,7 +1211,7 @@ describe('Now', () => {
 
       const rows = waitingRows();
       const reasonKinds = (row: HTMLAnchorElement | undefined): string[] =>
-        Array.from(must(row).querySelector('.asys-picker-row__reason')?.children ?? [], (c) =>
+        Array.from(must(row).querySelector('.asys-task-row__reason')?.children ?? [], (c) =>
           c.tagName === 'ASYS-STATUS-BADGE' ? 'badge' : 'text',
         );
 
@@ -1275,9 +1273,7 @@ describe('Now', () => {
         await click(must(waitingHeader()));
 
         expect(
-          must(waitingRows()[0])
-            .querySelector('.asys-picker-row__reason-text')
-            ?.textContent?.trim(),
+          must(waitingRows()[0]).querySelector('.asys-task-row__reason-text')?.textContent?.trim(),
         ).toBe('Available from tomorrow 09:00');
       });
 
@@ -2238,9 +2234,9 @@ describe('Now', () => {
       expect(items).toHaveLength(2);
       expect(items.map((li) => li.querySelectorAll('asys-swipe-actions').length)).toEqual([1, 1]);
       expect(
-        items.map((li) => li.querySelectorAll('asys-swipe-actions a.asys-picker-row').length),
+        items.map((li) => li.querySelectorAll('asys-swipe-actions a.asys-task-row').length),
       ).toEqual([1, 1]);
-      expect(items.map((li) => li.querySelectorAll('a.asys-picker-row').length)).toEqual([1, 1]);
+      expect(items.map((li) => li.querySelectorAll('a.asys-task-row').length)).toEqual([1, 1]);
       expect(root().querySelectorAll('asys-swipe-actions')).toHaveLength(3);
       expect(rows().map((a) => a.getAttribute('href'))).toEqual([
         '/tasks/dentist',
@@ -2357,7 +2353,7 @@ describe('Now', () => {
         expect(form()).toBeNull();
         expect(statusLine().textContent?.trim()).toBe('Estimate is now 15 min.');
         expect(
-          rowLink('dentist').querySelector('.asys-picker-row__estimate')?.textContent?.trim(),
+          rowLink('dentist').querySelector('.asys-task-row__estimate')?.textContent?.trim(),
         ).toBe('15 min');
         expect(document.activeElement).toBe(rowLink('dentist'));
       });
@@ -2625,7 +2621,7 @@ describe('Now', () => {
 
   describe('the task title hooks', () => {
     const titleIdOf = (row: Element): string | null | undefined =>
-      row.querySelector('.asys-picker-row__title')?.getAttribute('data-task-id');
+      row.querySelector('.asys-task-row__title')?.getAttribute('data-task-id');
     const marked = (root: () => HTMLElement): Element[] =>
       Array.from(root().querySelectorAll('[data-morph]'));
 
@@ -2665,7 +2661,7 @@ describe('Now', () => {
 
       expect(secondId).toBe('dentist');
       expect(elements).toHaveLength(1);
-      expect(elements[0]).toBe(root().querySelector('.asys-picker-row__title'));
+      expect(elements[0]).toBe(root().querySelector('.asys-task-row__title'));
       expect(elements[0]?.getAttribute('data-task-id')).toBe(secondId);
       expect(elements[0]?.getAttribute('data-morph')).toBe('');
     });
@@ -2726,7 +2722,7 @@ describe('Now', () => {
       const elements = marked(root);
 
       expect(elements).toHaveLength(1);
-      expect(elements[0]).toBe(must(waitingRows()[1]).querySelector('.asys-picker-row__title'));
+      expect(elements[0]).toBe(must(waitingRows()[1]).querySelector('.asys-task-row__title'));
       expect(elements[0]?.getAttribute('data-task-id')).toBe('report');
     });
   });

@@ -94,7 +94,7 @@
             (commitStart)="logProgress.emit($event)"
           >
             <a
-              asys-picker-row
+              asys-task-row
               [routerLink]="['/tasks', item.id]"
               [reason]="item.reason"
               [estimate]="item.estimate"
@@ -146,7 +146,7 @@
           @for (item of waiting(); track item.id) {
             <li>
               <a
-                asys-picker-row
+                asys-task-row
                 [routerLink]="['/tasks', item.id]"
                 [reason]="item.reason"
                 [estimate]="item.estimate"

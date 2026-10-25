@@ -85,7 +85,7 @@ test('No sideways scroll on the Task screens at phone width', async ({ page }) =
   const urlTaskId = await seedPhoneTasks(page);
   const heading = (name: string): Locator => page.getByRole('heading', { level: 1, name });
   const screens: readonly (readonly [string, Locator])[] = [
-    ['/now', page.locator('a.asys-picker-row').filter({ hasText: TRIAGED_URL_TITLE })],
+    ['/now', page.locator('a.asys-task-row').filter({ hasText: TRIAGED_URL_TITLE })],
     ['/today', heading('Today')],
     ['/inbox', page.locator('article.asys-triage .asys-triage__title')],
     ['/capture', heading('Capture')],

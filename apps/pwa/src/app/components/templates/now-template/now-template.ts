@@ -18,7 +18,7 @@ import { IconName } from '../../atoms/icon/icon';
 import { SyncNote } from '../../atoms/sync-note/sync-note';
 import { AreaPickControl, type AreaChoice } from '../../molecules/area-pick/area-pick';
 import { LoadState } from '../../molecules/load-state/load-state';
-import { PickerRow, PickerRowVariant } from '../../molecules/picker-row/picker-row';
+import { TaskRow, TaskRowVariant } from '../../molecules/task-row/task-row';
 import { LogProgressForm } from '../../organisms/log-progress-form/log-progress-form';
 import { NowHeader } from '../../organisms/now-header/now-header';
 import { SectionHeader } from '../../organisms/section-header/section-header';
@@ -117,7 +117,7 @@ export interface NowRowEnter {
     LoadState,
     LogProgressForm,
     NowHeader,
-    PickerRow,
+    TaskRow,
     RouterLink,
     SectionHeader,
     SwipeActions,
@@ -221,7 +221,7 @@ export class NowTemplate {
 
   protected readonly Icons = IconName;
 
-  protected readonly Rows = PickerRowVariant;
+  protected readonly Rows = TaskRowVariant;
 
   /** Moves focus to the top pick's title link, or to the heading when no card shows. */
   focusTop(): void {

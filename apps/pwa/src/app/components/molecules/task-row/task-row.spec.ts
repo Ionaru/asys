@@ -4,13 +4,13 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, RouterLink } from '@angular/router';
 import { Quadrant } from '@asys/domain';
 
-import { PickerRow, PickerRowVariant } from './picker-row';
+import { TaskRow, TaskRowVariant } from './task-row';
 
 @Component({
-  imports: [PickerRow, RouterLink],
+  imports: [TaskRow, RouterLink],
   template: `
     <a
-      asys-picker-row
+      asys-task-row
       routerLink="/tasks/42"
       [reason]="reason()"
       [estimate]="estimate()"
@@ -30,7 +30,7 @@ class Host {
 
   readonly overdue = signal(false);
 
-  readonly variant = signal(PickerRowVariant.Ranked);
+  readonly variant = signal(TaskRowVariant.Ranked);
 }
 
 const setup = async () => {
@@ -43,7 +43,7 @@ const setup = async () => {
   const q = (selector: string): HTMLElement | null => row().querySelector(selector);
   // The children of the reason line, named by what they are, in document order.
   const reasonKinds = (): string[] =>
-    Array.from(q('.asys-picker-row__reason')?.children ?? [], (child) => {
+    Array.from(q('.asys-task-row__reason')?.children ?? [], (child) => {
       if (child.tagName === 'ASYS-QUADRANT-LABEL') {
         return 'chip';
       }
@@ -52,13 +52,13 @@ const setup = async () => {
         return 'badge';
       }
 
-      return child.classList.contains('asys-picker-row__reason-text') ? 'text' : child.tagName;
+      return child.classList.contains('asys-task-row__reason-text') ? 'text' : child.tagName;
     });
 
   return { fixture, host: fixture.componentInstance, row, q, reasonKinds };
 };
 
-describe('PickerRow', () => {
+describe('TaskRow', () => {
   it('is an anchor with an href from routerLink', async () => {
     const { row } = await setup();
 
@@ -69,9 +69,9 @@ describe('PickerRow', () => {
   it('projects the title and renders reason and estimate', async () => {
     const { q } = await setup();
 
-    expect(q('.asys-picker-row__title')?.textContent?.trim()).toBe('Call Marit');
-    expect(q('.asys-picker-row__reason-text')?.textContent?.trim()).toBe('Due today');
-    expect(q('.asys-picker-row__estimate')?.textContent?.trim()).toBe('25 min');
+    expect(q('.asys-task-row__title')?.textContent?.trim()).toBe('Call Marit');
+    expect(q('.asys-task-row__reason-text')?.textContent?.trim()).toBe('Due today');
+    expect(q('.asys-task-row__estimate')?.textContent?.trim()).toBe('25 min');
   });
 
   it('shows the Overdue badge only when overdue', async () => {
@@ -83,7 +83,7 @@ describe('PickerRow', () => {
     await fixture.whenStable();
 
     expect(q('asys-status-badge')?.textContent?.trim()).toBe('Overdue');
-    expect(q('.asys-picker-row__reason asys-status-badge')).not.toBeNull();
+    expect(q('.asys-task-row__reason asys-status-badge')).not.toBeNull();
 
     host.overdue.set(false);
     await fixture.whenStable();
@@ -93,14 +93,14 @@ describe('PickerRow', () => {
 
   it('puts a compact quadrant chip in the reason, and none in the side', async () => {
     const { q } = await setup();
-    const chip = q('.asys-picker-row__reason asys-quadrant-label');
+    const chip = q('.asys-task-row__reason asys-quadrant-label');
 
     expect(chip).not.toBeNull();
     expect(chip?.classList.contains('asys-quadrant--compact')).toBe(true);
     expect(chip?.classList.contains('asys-quadrant--do')).toBe(true);
     expect(chip?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Quadrant: Do.');
-    expect(q('.asys-picker-row__side asys-quadrant-label')).toBeNull();
-    expect(q('.asys-picker-row__side .asys-quadrant')).toBeNull();
+    expect(q('.asys-task-row__side asys-quadrant-label')).toBeNull();
+    expect(q('.asys-task-row__side .asys-quadrant')).toBeNull();
     expect(q('asys-quadrant-label')).toBe(chip);
   });
 
@@ -110,7 +110,7 @@ describe('PickerRow', () => {
     host.quadrant.set(Quadrant.Plan);
     await fixture.whenStable();
 
-    const chip = q('.asys-picker-row__reason asys-quadrant-label');
+    const chip = q('.asys-task-row__reason asys-quadrant-label');
 
     expect(chip?.classList.contains('asys-quadrant--plan')).toBe(true);
     expect(chip?.classList.contains('asys-quadrant--do')).toBe(false);
@@ -133,7 +133,7 @@ describe('PickerRow', () => {
     await fixture.whenStable();
 
     expect(
-      q('.asys-picker-row__reason asys-quadrant-label')?.textContent?.replace(/\s+/g, ' ').trim(),
+      q('.asys-task-row__reason asys-quadrant-label')?.textContent?.replace(/\s+/g, ' ').trim(),
     ).toBe('Quadrant: Delegate.');
   });
 
@@ -158,35 +158,35 @@ describe('PickerRow', () => {
   it('puts the title and then the reason in the main part', async () => {
     const { q } = await setup();
 
-    expect(Array.from(q('.asys-picker-row__main')?.children ?? [], (c) => c.className)).toEqual([
-      'asys-picker-row__title',
-      'asys-picker-row__reason',
+    expect(Array.from(q('.asys-task-row__main')?.children ?? [], (c) => c.className)).toEqual([
+      'asys-task-row__title',
+      'asys-task-row__reason',
     ]);
   });
 
   it('holds only the Estimate in the side, whatever the quadrant and the badge', async () => {
     const { fixture, host, q } = await setup();
     const sideClasses = (): string[] =>
-      Array.from(q('.asys-picker-row__side')?.children ?? [], (c) => c.className);
+      Array.from(q('.asys-task-row__side')?.children ?? [], (c) => c.className);
 
-    expect(sideClasses()).toEqual(['asys-num asys-picker-row__estimate']);
+    expect(sideClasses()).toEqual(['asys-num asys-task-row__estimate']);
 
     host.overdue.set(true);
     await fixture.whenStable();
 
-    expect(sideClasses()).toEqual(['asys-num asys-picker-row__estimate']);
+    expect(sideClasses()).toEqual(['asys-num asys-task-row__estimate']);
 
     host.quadrant.set(undefined);
     await fixture.whenStable();
 
-    expect(sideClasses()).toEqual(['asys-num asys-picker-row__estimate']);
-    expect(q('.asys-picker-row__side')?.textContent?.trim()).toBe('25 min');
+    expect(sideClasses()).toEqual(['asys-num asys-task-row__estimate']);
+    expect(q('.asys-task-row__side')?.textContent?.trim()).toBe('25 min');
   });
 
   it('shows no quadrant chip for a Waiting row without a quadrant', async () => {
     const { fixture, host, q, reasonKinds } = await setup();
 
-    host.variant.set(PickerRowVariant.Waiting);
+    host.variant.set(TaskRowVariant.Waiting);
     host.quadrant.set(undefined);
     await fixture.whenStable();
 
@@ -203,39 +203,39 @@ describe('PickerRow', () => {
   it('has only the base class for the ranked variant', async () => {
     const { row } = await setup();
 
-    expect(row().classList.contains('asys-picker-row')).toBe(true);
-    expect(row().classList.contains('asys-picker-row--waiting')).toBe(false);
-    expect(row().classList.contains('asys-picker-row--urgent-elsewhere')).toBe(false);
+    expect(row().classList.contains('asys-task-row')).toBe(true);
+    expect(row().classList.contains('asys-task-row--waiting')).toBe(false);
+    expect(row().classList.contains('asys-task-row--urgent-elsewhere')).toBe(false);
   });
 
   it('adds the waiting class for the waiting variant', async () => {
     const { fixture, host, row } = await setup();
 
-    host.variant.set(PickerRowVariant.Waiting);
+    host.variant.set(TaskRowVariant.Waiting);
     await fixture.whenStable();
 
-    expect(row().classList.contains('asys-picker-row')).toBe(true);
-    expect(row().classList.contains('asys-picker-row--waiting')).toBe(true);
-    expect(row().classList.contains('asys-picker-row--urgent-elsewhere')).toBe(false);
+    expect(row().classList.contains('asys-task-row')).toBe(true);
+    expect(row().classList.contains('asys-task-row--waiting')).toBe(true);
+    expect(row().classList.contains('asys-task-row--urgent-elsewhere')).toBe(false);
   });
 
   it('adds the urgent-elsewhere class for the urgent-elsewhere variant', async () => {
     const { fixture, host, row } = await setup();
 
-    host.variant.set(PickerRowVariant.UrgentElsewhere);
+    host.variant.set(TaskRowVariant.UrgentElsewhere);
     await fixture.whenStable();
 
-    expect(row().classList.contains('asys-picker-row')).toBe(true);
-    expect(row().classList.contains('asys-picker-row--urgent-elsewhere')).toBe(true);
-    expect(row().classList.contains('asys-picker-row--waiting')).toBe(false);
+    expect(row().classList.contains('asys-task-row')).toBe(true);
+    expect(row().classList.contains('asys-task-row--urgent-elsewhere')).toBe(true);
+    expect(row().classList.contains('asys-task-row--waiting')).toBe(false);
   });
 });
 
 @Component({
-  imports: [PickerRow, RouterLink],
+  imports: [TaskRow, RouterLink],
   template: `
     <a
-      asys-picker-row
+      asys-task-row
       routerLink="/tasks/42"
       reason="Due today"
       estimate="25 min"
@@ -258,14 +258,14 @@ const setupHooks = async () => {
   await fixture.whenStable();
 
   const row = (): HTMLAnchorElement => fixture.nativeElement.querySelector('a');
-  const title = (): HTMLElement => row().querySelector('.asys-picker-row__title') as HTMLElement;
+  const title = (): HTMLElement => row().querySelector('.asys-task-row__title') as HTMLElement;
   const withAttribute = (name: string): Element[] =>
     Array.from(fixture.nativeElement.querySelectorAll(`[${name}]`));
 
   return { fixture, host: fixture.componentInstance, row, title, withAttribute };
 };
 
-describe('PickerRow task hooks', () => {
+describe('TaskRow task hooks', () => {
   it('puts data-task-id and data-morph on the title only, and leaves the host anchor alone', async () => {
     const { fixture, host, row, title, withAttribute } = await setupHooks();
     const classesBefore = Array.from(row().classList);
@@ -291,7 +291,7 @@ describe('PickerRow task hooks', () => {
     expect(row().hasAttribute('data-task-id')).toBe(false);
     expect(row().hasAttribute('data-morph')).toBe(false);
     expect(row().hasAttribute('data-focus-title')).toBe(false);
-    expect(classesBefore).toContain('asys-picker-row');
+    expect(classesBefore).toContain('asys-task-row');
     expect(Array.from(row().classList)).toEqual(classesBefore);
   });
 
@@ -318,11 +318,11 @@ describe('PickerRow task hooks', () => {
   it('has neither attribute while neither input is bound', async () => {
     const { q } = await setup();
 
-    expect(q('.asys-picker-row__title')?.hasAttribute('data-task-id')).toBe(false);
-    expect(q('.asys-picker-row__title')?.hasAttribute('data-morph')).toBe(false);
+    expect(q('.asys-task-row__title')?.hasAttribute('data-task-id')).toBe(false);
+    expect(q('.asys-task-row__title')?.hasAttribute('data-morph')).toBe(false);
     expect(q('[data-task-id]')).toBeNull();
     expect(q('[data-morph]')).toBeNull();
-    expect(q('.asys-picker-row__title')?.hasAttribute('data-focus-title')).toBe(false);
+    expect(q('.asys-task-row__title')?.hasAttribute('data-focus-title')).toBe(false);
     expect(q('[data-focus-title]')).toBeNull();
   });
 });
