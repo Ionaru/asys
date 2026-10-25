@@ -7,7 +7,7 @@ import {
   type AreaListRow,
 } from '../../components/templates/area-list-template/area-list-template';
 import { DataStore, SyncStatus } from '../../core/data/data-store';
-import { byAreaName } from '../../features/areas/area-order';
+import { byAreaName } from '../../core/data/area-order';
 
 /** Lists the Areas by name, each with its Active hours, and links to a new Area. */
 @Component({

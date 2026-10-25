@@ -15,6 +15,7 @@ The PWA's presentational components move from `apps/pwa/src/app/ui/` into the At
 - **Swipe.** `swipe-actions` keeps its `core/platform` seams (`Motion`, `Haptics`, `theme`), as the only component that may import `core` at runtime.
 - **Enforcement.** `scripts/check-architecture.mts` checks every import under `components/` and `pages/` against the level rules, and runs in the `lint` CI job. A script was chosen over oxlint overrides, because overrides replace rather than merge, so the PWA's shared import bans would be copied once per level.
 - **One template per screen.** Every page gets a template of its own, also where the design system draws none (Recovered, the Areas list and editor, the auth screens, Capture, Settings, Account). Those templates follow what the screen shows today, and the design system is left as it is (decided 2026-10-22).
+- **Area order.** `byAreaName` moves from `features/areas/` to `core/data/area-order.ts` with the Area editor, because Now, the Task editor, the Inbox and the Areas list all sort by it and no one page owns it (decided 2026-10-25).
 - **The shell stays outside.** `layout/` (the shell with the router outlet) and `app.ts` are not a template with inputs and outputs only. They are looked at once the screens are done.
 
 ## Pull requests

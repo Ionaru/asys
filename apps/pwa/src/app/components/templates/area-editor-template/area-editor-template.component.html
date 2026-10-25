@@ -1,19 +1,19 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
 <h1 class="asys-page__title area-editor__title">{{ heading() }}</h1>
 <p class="asys-page__status area-editor__status" role="status">{{ statusLine() }}</p>
-@if (dataStore.state() === null) {
-  <asys-load-state [failed]="dataStore.status() === Status.Failed" (retry)="dataStore.refresh()" />
-} @else if (areaId() === null || area() !== undefined) {
+@if (!loaded()) {
+  <asys-load-state [failed]="loadFailed()" (retry)="retry.emit()" />
+} @else if (found()) {
   <div class="area-editor__form">
-    <asys-text-field label="Name" [value]="draft().name" (valueChange)="setName($event)" />
+    <asys-text-field label="Name" [value]="name()" (valueChange)="nameChange.emit($event)" />
     <asys-select-field
       label="Palette"
       [options]="paletteOptions"
-      [value]="draft().palette ?? ''"
+      [value]="palette() ?? ''"
       (valueChange)="setPalette($event)"
     />
     <p class="area-editor__hint">An end of 00:00 means the end of the day.</p>
-    @for (day of dayViews(); track day.index) {
+    @for (day of days(); track day.index) {
       <fieldset class="asys-fieldset-reset area-editor__day">
         <legend asys-label>{{ day.name }}</legend>
         @for (row of day.rows; track $index; let rowIndex = $index) {
@@ -33,7 +33,14 @@
                   [attr.aria-describedby]="
                     describedBy(day.index, rowIndex, row.error !== null, day.overlap)
                   "
-                  (input)="setTime(day.index, rowIndex, time.edge, timeInput.value)"
+                  (input)="
+                    timeChange.emit({
+                      day: day.index,
+                      row: rowIndex,
+                      edge: time.edge,
+                      value: timeInput.value,
+                    })
+                  "
                 />
               </div>
             }
@@ -43,7 +50,7 @@
               [id]="removeId(day.index, rowIndex)"
               [variant]="Variant.Quiet"
               [size]="Size.Small"
-              (click)="removeRow(day.index, rowIndex)"
+              (click)="removeRow.emit({ day: day.index, row: rowIndex })"
             >
               Remove
             </button>
@@ -62,7 +69,7 @@
             [id]="addId(day.index)"
             [variant]="Variant.Quiet"
             [size]="Size.Small"
-            (click)="addRow(day.index)"
+            (click)="addRow.emit(day.index)"
           >
             Add hours
           </button>
@@ -80,9 +87,9 @@
         type="button"
         [variant]="Variant.Primary"
         [disabled]="!canSubmit()"
-        (click)="submit()"
+        (click)="save.emit()"
       >
-        {{ areaId() === null ? 'Create' : 'Save' }}
+        {{ isNew() ? 'Create' : 'Save' }}
       </button>
       @if (needsName()) {
         <p class="area-editor__reason">Needs a name</p>

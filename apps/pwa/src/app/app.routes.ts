@@ -69,14 +69,14 @@ export const routes: Routes = [
       {
         path: 'settings/areas/new',
         loadComponent: () =>
-          import('./features/areas/area-editor-route').then((m) => m.AreaEditorRoute),
+          import('./pages/area-editor/area-editor-route').then((m) => m.AreaEditorRoute),
         title: 'New Area · ASYS',
         data: { level: 3 },
       },
       {
         path: 'settings/areas/:areaId',
         loadComponent: () =>
-          import('./features/areas/area-editor-route').then((m) => m.AreaEditorRoute),
+          import('./pages/area-editor/area-editor-route').then((m) => m.AreaEditorRoute),
         title: 'Area · ASYS',
         data: { level: 3 },
       },

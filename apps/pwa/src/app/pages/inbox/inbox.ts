@@ -32,7 +32,7 @@ import {
   type InboxReview,
 } from '../../components/templates/inbox-template/inbox-template';
 import type { AreaChoice, TriageDraft } from '../../components/organisms/triage-card/triage-card';
-import { byAreaName } from '../../features/areas/area-order';
+import { byAreaName } from '../../core/data/area-order';
 import { reviewCopy } from './review-copy';
 
 const NO_IDS: ReadonlySet<string> = new Set();

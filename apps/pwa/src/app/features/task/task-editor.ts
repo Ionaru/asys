@@ -63,7 +63,7 @@ import { Sheet } from '../../components/organisms/sheet/sheet';
 import { SingleLine } from '../../components/atoms/input/single-line';
 import { StatusBadge, StatusBadgeStatus } from '../../components/atoms/status-badge/status-badge';
 import { SyncNote } from '../../components/atoms/sync-note/sync-note';
-import { byAreaName } from '../areas/area-order';
+import { byAreaName } from '../../core/data/area-order';
 import { SaveState, TaskDraftSaver } from './task-draft-saver';
 import { TaskBlockers } from './task-blockers';
 import { previewTask } from './task-preview';
