@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 
 // Checks the PWA's Atomic Design levels (apps/pwa/src/app/components/README.md): every relative import under
-// components/ and pages/ must point at a level the importing file may hold.
+// components/, pages/, layout/ and in app.ts must point at a level the importing file may hold.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 
@@ -52,6 +52,12 @@ const walk = (dir: string): string[] =>
         return statSync(path).isDirectory() ? walk(path) : [path];
       })
     : [];
+
+// The shell's files: the .ts files of layout/ (specs included) and app.ts.
+const shellFiles = (): string[] => [
+  ...walk(resolve(app, 'layout')).filter((path) => path.endsWith('.ts')),
+  resolve(app, 'app.ts'),
+];
 
 const appPath = (file: string): string => relative(app, file).split('\\').join('/');
 
@@ -155,7 +161,12 @@ const checkPage = (folder: string): void => {
   for (const file of files.filter((path) => path.endsWith('.ts') && !path.endsWith('.spec.ts'))) {
     for (const { specifier, typeOnly, line } of references(readFileSync(file, 'utf8'))) {
       if (!specifier.startsWith('.')) continue;
-      const component = componentOf(appPath(resolve(dirname(file), specifier)));
+      const target = appPath(resolve(dirname(file), specifier));
+      if (target === 'layout' || target.startsWith('layout/')) {
+        fail(file, line, `a page may not import layout/ (${specifier})`);
+        continue;
+      }
+      const component = componentOf(target);
       if (component === undefined || typeOnly) continue;
       const [level, componentFolder] = component;
       if (level === Level.Template) {
@@ -167,6 +178,19 @@ const checkPage = (folder: string): void => {
   }
   if (templates.size !== 1) {
     fail(page, 1, `a page imports exactly one template, found ${templates.size}`);
+  }
+};
+
+const checkShell = (file: string): void => {
+  for (const { specifier, line } of references(readFileSync(file, 'utf8'))) {
+    if (!specifier.startsWith('.')) continue;
+    const target = appPath(resolve(dirname(file), specifier));
+    if (target.startsWith('..')) continue;
+    if (target === 'pages' || target.startsWith('pages/')) {
+      fail(file, line, `the shell may not import pages/ (${specifier})`);
+    } else if (componentOf(target)?.[0] === Level.Template) {
+      fail(file, line, `the shell may not import a template (${specifier})`);
+    }
   }
 };
 
@@ -195,11 +219,15 @@ for (const file of pageEntries.filter((path) => !statSync(path).isDirectory())) 
 
 for (const folder of pageFolders) checkPage(folder);
 
+const shell = shellFiles();
+
+for (const file of shell) checkShell(file);
+
 if (failures.length > 0) {
   console.log(failures.join('\n'));
   process.exit(1);
 }
 
 console.log(
-  `OK: ${componentFiles.length} component files and ${pageFolders.length} pages follow the levels`,
+  `OK: ${componentFiles.length} component files, ${pageFolders.length} pages and ${shell.length} shell files follow the levels`,
 );

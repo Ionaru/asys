@@ -84,3 +84,9 @@ Pages are specific instances of templates that inject data and content into the 
 - **Support code.** Helpers that several levels share, such as `activation.ts` and `field-control.ts`, live in `./support`. Every level may import them, and they import nothing from `components/`. A helper that one component owns stays in that component's folder.
 - **Services.** No component injects a service from `core/`. The one exception is `organisms/swipe-actions`, which uses the `core/platform` seams `Motion`, `Haptics` and `theme`.
 - **Upwards and sideways.** Nothing in `components/` imports from `pages/` or `layout/`.
+
+## The shell
+
+`layout/` and `app.ts` hold the shell: the router outlet, the bottom nav, the Undo bar and quick add. They stay outside the levels for good (decided 2026-10-26). The shell persists across routes, provides `CommandAttempts`, `CaptureQueue` and `DoneUndo` to the signed-in screens, owns the focus rules, the capture flight and the view-transition anchors, and injects `Router`, `Motion`, `DataStore` and `DOCUMENT`, which no component may. The design system's templates repeat the footer per screen, and doing that here would remount the nav and lose Undo on every navigation.
+
+The shell may import `core/` and `components/` except `templates/`, and never `pages/`. Nothing in `components/` or `pages/` imports `layout/`. `scripts/check-architecture.mts` checks these rules.
