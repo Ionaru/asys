@@ -20,7 +20,7 @@ import { AreaPickControl, type AreaChoice } from '../../molecules/area-pick/area
 import { LoadState } from '../../molecules/load-state/load-state';
 import { TaskRow, TaskRowVariant } from '../../molecules/task-row/task-row';
 import { LogProgressForm } from '../../organisms/log-progress-form/log-progress-form';
-import { NowHeader } from '../../organisms/now-header/now-header';
+import { ScreenHeader } from '../../organisms/screen-header/screen-header';
 import { SectionHeader } from '../../organisms/section-header/section-header';
 import { SwipeActions } from '../../organisms/swipe-actions/swipe-actions';
 import { TopPick } from '../../organisms/top-pick/top-pick';
@@ -116,7 +116,7 @@ export interface NowRowEnter {
     Button,
     LoadState,
     LogProgressForm,
-    NowHeader,
+    ScreenHeader,
     TaskRow,
     RouterLink,
     SectionHeader,
@@ -207,7 +207,7 @@ export class NowTemplate {
   /** A row is entering the list. */
   readonly rowEnter = output<NowRowEnter>();
 
-  private readonly nowHeader = viewChild(NowHeader);
+  private readonly screenHeader = viewChild(ScreenHeader);
 
   private readonly areaPickControl = viewChild(AreaPickControl);
 
@@ -228,7 +228,7 @@ export class NowTemplate {
     const topPick = this.topPick();
 
     if (topPick === undefined) {
-      this.nowHeader()?.focusHeading();
+      this.screenHeader()?.focusHeading();
     } else {
       topPick.focusTitle();
     }

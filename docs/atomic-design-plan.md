@@ -7,7 +7,7 @@ The PWA's presentational components move from `apps/pwa/src/app/ui/` into the At
 ## Decisions
 
 - **Layout.** A component lives at `components/<level>/<name>/<name>.ts`, with its spec, `.component.html` and `.css` beside it. A template is `components/templates/<screen>-template/`, a page `pages/<screen>/`, and a screen's pure helpers and route wrapper move into its page folder.
-- **Names stay in the move PRs.** Folders, selectors and host classes keep their current names, so git records each move as a rename and no e2e selector or `styles.css` rule changes. The design-system renames (QuadrantChip to QuadrantLabel, PickerRow to TaskRow, NowHeader to ScreenHeader, and so on) come later, each in its own PR.
+- **Names stay in the move PRs.** Folders, selectors and host classes keep their current names, so git records each move as a rename and no e2e selector or `styles.css` rule changes. The design-system renames (QuadrantChip to QuadrantLabel, PickerRow to TaskRow, NowHeader to ScreenHeader, and so on) come after the moves, one commit each on one branch (decided 2026-10-25).
 - **One atom, several files.** The Input atom is `input.ts`, `input-box.ts` and `single-line.ts` in `atoms/input/`, because together they are the design system's Input. That removes the one place where an atom imported another.
 - **Icon inside an atom.** The README says atoms import no other atom. The design system allows an Icon inside a Button as part of its label, and lists StatusBadge, which has an icon, as an atom. So an atom may hold the Icon atom, and nothing else from another atom folder.
 - **Support code.** Helpers that several levels share (`activation.ts`, `field-control.ts`) go to `components/support/`, which every level may import and which imports nothing from `components/`. Helpers that one component owns stay beside it (`area-options.ts`, `day-label.ts`, `swipe-decision.ts`).
@@ -40,11 +40,11 @@ Each lands on `main` with every check green and no visual change unless it says 
 
 ## Later, out of scope for the moves
 
-- The design-system renames, which change selectors, classes, e2e specs and `styles.css`.
+- The design-system renames landed after the moves, one commit each: QuadrantChip to QuadrantLabel, PickerRow to TaskRow, Segmented to SegmentedControl, DatePick to DatePicker, TimePick to TimePicker, EstimateField to EstimatePicker, DateSpecRow to DateRow and NowHeader to ScreenHeader. They changed selectors, classes, e2e specs and `styles.css`.
 - Folding CaptureButton into Button `--capture`.
 - The splits: SectionHeader into SectionHeader and CollapsibleSection, DateRow and ChoiceRow into FieldRow with a Sheet and OptionList, and the Calendar molecule.
 - New atoms and molecules: Count, Segment, Countdown, Text, Link, ButtonGroup, NavItem, GapSummary.
 
 ## Open questions
 
-- SyncNote may be the design system's SaveStatus. It moves as SyncNote until that is settled.
+- Settled on 2026-10-25: SyncNote stays SyncNote. It is the "Saved. Waiting for the server." note, which the design system's SaveStatus leaves to `reason` text; the Task editor's inline Saved status is the SaveStatus.

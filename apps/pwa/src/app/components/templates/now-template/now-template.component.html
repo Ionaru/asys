@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
-<asys-now-header [moment]="moment()" [datetime]="datetime()">
+<asys-screen-header [moment]="moment()" [datetime]="datetime()">
   <div class="now__header-actions">
     @if (areaControl(); as control) {
       <asys-area-pick
@@ -19,7 +19,7 @@
       aria-label="More: Settings"
     ></a>
   </div>
-</asys-now-header>
+</asys-screen-header>
 <p class="asys-page__status now__status" role="status">{{ statusLine() }}</p>
 @if (loaded()) {
   @if (card(); as top) {

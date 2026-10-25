@@ -448,7 +448,7 @@ describe('NowTemplate', () => {
     await update('card', null);
     fixture.componentInstance.focusTop();
 
-    expect(document.activeElement).toBe(host.querySelector('asys-now-header h1'));
+    expect(document.activeElement).toBe(host.querySelector('asys-screen-header h1'));
   });
 
   it('B12 focusLogProgress focuses the card Log progress button, and does nothing without a card', async () => {
@@ -520,7 +520,7 @@ describe('NowTemplate', () => {
 
   it('B15 shows the status line and the moment with its datetime', async () => {
     const { host, update } = await setup({ statusLine: '3 Tasks available' });
-    const time = must(host.querySelector('asys-now-header time'));
+    const time = must(host.querySelector('asys-screen-header time'));
 
     expect(host.querySelector('p[role="status"]')?.textContent?.trim()).toBe('3 Tasks available');
     expect(time.textContent?.trim()).toBe('Monday morning');

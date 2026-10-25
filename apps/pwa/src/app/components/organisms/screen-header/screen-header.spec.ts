@@ -2,18 +2,18 @@
 import { Component, signal, viewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
-import { NowHeader } from './now-header';
+import { ScreenHeader } from './screen-header';
 
 @Component({
-  imports: [NowHeader],
+  imports: [ScreenHeader],
   template: `
-    <asys-now-header [moment]="moment()" [datetime]="datetime()">
+    <asys-screen-header [moment]="moment()" [datetime]="datetime()">
       <a id="more" href="/settings" aria-label="More: Settings">More</a>
-    </asys-now-header>
+    </asys-screen-header>
   `,
 })
 class Host {
-  readonly header = viewChild.required(NowHeader);
+  readonly header = viewChild.required(ScreenHeader);
 
   readonly moment = signal('Fri 9 Oct · 14:05');
 
@@ -21,8 +21,8 @@ class Host {
 }
 
 @Component({
-  imports: [NowHeader],
-  template: `<asys-now-header moment="Fri 9 Oct · 14:05" datetime="2026-10-09T14:05" />`,
+  imports: [ScreenHeader],
+  template: `<asys-screen-header moment="Fri 9 Oct · 14:05" datetime="2026-10-09T14:05" />`,
 })
 class BareHost {}
 
@@ -44,12 +44,12 @@ const setup = async () => {
 
   const q = (selector: string): HTMLElement | null => fixture.nativeElement.querySelector(selector);
   const heading = (): HTMLElement => must(q('h1'), 'the heading');
-  const top = (): HTMLElement => must(q('.asys-now-header__top'), 'the top row');
+  const top = (): HTMLElement => must(q('.asys-screen-header__top'), 'the top row');
 
   return { fixture, host: fixture.componentInstance, q, heading, top };
 };
 
-describe('NowHeader', () => {
+describe('ScreenHeader', () => {
   afterEach(() => {
     document.body.innerHTML = '';
   });
@@ -59,10 +59,10 @@ describe('NowHeader', () => {
 
     expect(
       q(
-        'asys-now-header > header.asys-now-header > div.asys-now-header__top > h1.asys-now-header__moment',
+        'asys-screen-header > header.asys-screen-header > div.asys-screen-header__top > h1.asys-screen-header__moment',
       ),
     ).not.toBeNull();
-    expect(document.querySelectorAll('asys-now-header h1')).toHaveLength(1);
+    expect(document.querySelectorAll('asys-screen-header h1')).toHaveLength(1);
   });
 
   it('makes the heading focusable by script only', async () => {
@@ -121,7 +121,7 @@ describe('NowHeader', () => {
 
   it('keeps the top row as the only child of the header', async () => {
     const { q, top } = await setup();
-    const header = must(q('header.asys-now-header'));
+    const header = must(q('header.asys-screen-header'));
 
     expect(header.children).toHaveLength(1);
     expect(header.children[0]).toBe(top());
@@ -132,7 +132,7 @@ describe('NowHeader', () => {
     document.body.appendChild(fixture.nativeElement);
     await fixture.whenStable();
 
-    const top = must<HTMLElement>(fixture.nativeElement.querySelector('.asys-now-header__top'));
+    const top = must<HTMLElement>(fixture.nativeElement.querySelector('.asys-screen-header__top'));
 
     expect(Array.from(top.children, (el) => el.tagName)).toEqual(['H1']);
   });

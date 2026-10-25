@@ -7,12 +7,12 @@ import { Component, ElementRef, input, viewChild, ViewEncapsulation } from '@ang
  * wraps when it does not fit, so that content drops under the moment. Gaps arrive in slice 2.
  */
 @Component({
-  selector: 'asys-now-header',
+  selector: 'asys-screen-header',
   encapsulation: ViewEncapsulation.None,
   template: `
-    <header class="asys-now-header">
-      <div class="asys-now-header__top">
-        <h1 #heading class="asys-now-header__moment" tabindex="-1">
+    <header class="asys-screen-header">
+      <div class="asys-screen-header__top">
+        <h1 #heading class="asys-screen-header__moment" tabindex="-1">
           <span class="asys-visually-hidden">Now, </span>
           <time [attr.datetime]="datetime()">{{ moment() }}</time>
         </h1>
@@ -21,14 +21,14 @@ import { Component, ElementRef, input, viewChild, ViewEncapsulation } from '@ang
     </header>
   `,
   styles: `
-    .asys-now-header {
+    .asys-screen-header {
       display: flex;
       flex-direction: column;
       gap: var(--space-1);
       color: var(--ink);
     }
 
-    .asys-now-header__top {
+    .asys-screen-header__top {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
@@ -37,7 +37,7 @@ import { Component, ElementRef, input, viewChild, ViewEncapsulation } from '@ang
       min-height: var(--tap-target);
     }
 
-    .asys-now-header__moment {
+    .asys-screen-header__moment {
       flex: none;
       margin: 0;
       color: var(--ink-muted);
@@ -46,12 +46,12 @@ import { Component, ElementRef, input, viewChild, ViewEncapsulation } from '@ang
       font-weight: 400;
     }
 
-    .asys-now-header__top .asys-button--icon:last-child {
+    .asys-screen-header__top .asys-button--icon:last-child {
       margin-inline-end: calc(var(--space-3) * -1);
     }
   `,
 })
-export class NowHeader {
+export class ScreenHeader {
   private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
 
   /** The moment as text, such as `Fri 9 Oct · 14:05`. */

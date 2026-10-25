@@ -364,9 +364,9 @@ const setup = async (options: SetupOptions = {}) => {
     fixture.detectChanges();
     await fixture.whenStable();
   };
-  const nowHeader = (): HTMLElement => must(root().querySelector('asys-now-header'));
-  const heading = (): HTMLElement => must(root().querySelector('asys-now-header h1'));
-  const moreLink = (): HTMLAnchorElement => must(root().querySelector('asys-now-header a'));
+  const screenHeader = (): HTMLElement => must(root().querySelector('asys-screen-header'));
+  const heading = (): HTMLElement => must(root().querySelector('asys-screen-header h1'));
+  const moreLink = (): HTMLAnchorElement => must(root().querySelector('asys-screen-header a'));
   const statusLine = (): HTMLElement => must(root().querySelector('p.now__status'));
   const topPick = (): HTMLElement | null => root().querySelector('asys-top-pick');
   // The title text carries the Task id and morph hooks; the link around it takes focus.
@@ -468,7 +468,7 @@ const setup = async (options: SetupOptions = {}) => {
     root,
     text,
     settle,
-    nowHeader,
+    screenHeader,
     heading,
     moreLink,
     statusLine,
@@ -572,15 +572,15 @@ describe('Now', () => {
     ];
 
     it.each(STATES)(
-      'is the NowHeader, first in the template, in the %s state',
+      'is the ScreenHeader, first in the template, in the %s state',
       async (_, options) => {
-        const { root, nowHeader, heading, statusLine } = await setup(options);
+        const { root, screenHeader, heading, statusLine } = await setup(options);
 
-        expect(root().querySelector('asys-now-template')?.firstElementChild).toBe(nowHeader());
-        expect(root().querySelectorAll('asys-now-header')).toHaveLength(1);
+        expect(root().querySelector('asys-now-template')?.firstElementChild).toBe(screenHeader());
+        expect(root().querySelectorAll('asys-screen-header')).toHaveLength(1);
         expect(root().querySelectorAll('h1')).toHaveLength(1);
-        expect(heading().closest('asys-now-header')).toBe(nowHeader());
-        expect(nowHeader().nextElementSibling).toBe(statusLine());
+        expect(heading().closest('asys-screen-header')).toBe(screenHeader());
+        expect(screenHeader().nextElementSibling).toBe(statusLine());
       },
     );
 
@@ -674,9 +674,9 @@ describe('Now', () => {
 
   describe('the status line', () => {
     it('follows the header when there is state', async () => {
-      const { nowHeader, statusLine } = await setup();
+      const { screenHeader, statusLine } = await setup();
 
-      expect(nowHeader().nextElementSibling).toBe(statusLine());
+      expect(screenHeader().nextElementSibling).toBe(statusLine());
       expect(statusLine().textContent?.trim()).toBe('');
     });
 
@@ -688,9 +688,9 @@ describe('Now', () => {
     });
 
     it('follows the header without state', async () => {
-      const { nowHeader, statusLine } = await setup({ state: null });
+      const { screenHeader, statusLine } = await setup({ state: null });
 
-      expect(nowHeader().nextElementSibling).toBe(statusLine());
+      expect(screenHeader().nextElementSibling).toBe(statusLine());
     });
   });
 
@@ -2854,7 +2854,7 @@ describe('Now', () => {
       });
 
       it('puts the control in the header, before the More link', async () => {
-        const { nowHeader, control, moreLink } = await view({
+        const { screenHeader, control, moreLink } = await view({
           state: stateOf([P, W]),
           now: SATURDAY,
         });
@@ -2862,7 +2862,9 @@ describe('Now', () => {
         const actions = must(control()?.parentElement);
 
         expect(actions.classList.contains('now__header-actions')).toBe(true);
-        expect(actions.parentElement).toBe(nowHeader().querySelector('.asys-now-header__top'));
+        expect(actions.parentElement).toBe(
+          screenHeader().querySelector('.asys-screen-header__top'),
+        );
         expect(control()?.nextElementSibling).toBe(moreLink());
       });
 
