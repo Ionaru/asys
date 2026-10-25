@@ -24,7 +24,7 @@ import { FieldError } from '../../atoms/field-error/field-error';
 import { Icon, IconName } from '../../atoms/icon/icon';
 import { Input, InputVariant } from '../../atoms/input/input';
 import { SingleLine } from '../../atoms/input/single-line';
-import { QuadrantChip } from '../../atoms/quadrant-chip/quadrant-chip';
+import { QuadrantLabel } from '../../atoms/quadrant-label/quadrant-label';
 import { StatusBadge, StatusBadgeStatus } from '../../atoms/status-badge/status-badge';
 import { SyncNote } from '../../atoms/sync-note/sync-note';
 import { InlineConfirm } from '../../molecules/inline-confirm/inline-confirm';
@@ -61,7 +61,7 @@ let nextId = 0;
     LoadState,
     LogProgressForm,
     NgTemplateOutlet,
-    QuadrantChip,
+    QuadrantLabel,
     RouterLink,
     Segmented,
     Sheet,

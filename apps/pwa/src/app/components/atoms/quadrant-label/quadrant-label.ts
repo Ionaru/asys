@@ -26,7 +26,7 @@ const GLYPH_CELLS: readonly {
  * shows the glyph alone and keeps the word for screen readers.
  */
 @Component({
-  selector: 'asys-quadrant-chip, li[asys-quadrant-chip]',
+  selector: 'asys-quadrant-label, li[asys-quadrant-label]',
   template: `
     <svg class="asys-quadrant__glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
       @for (cell of cells; track cell.quadrant) {
@@ -56,9 +56,9 @@ const GLYPH_CELLS: readonly {
     '[class.asys-quadrant--compact]': 'compact()',
     '[class.asys-quadrant--strong]': 'strong()',
   },
-  styleUrl: './quadrant-chip.css',
+  styleUrl: './quadrant-label.css',
 })
-export class QuadrantChip {
+export class QuadrantLabel {
   protected readonly Quadrants = Quadrant;
 
   protected readonly cells = GLYPH_CELLS;

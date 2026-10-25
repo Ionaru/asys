@@ -239,7 +239,7 @@
         </div>
       } @else if (e._tag === Tags.Available || e._tag === Tags.Waiting) {
         <div class="task-editor__reason">
-          <asys-quadrant-chip [quadrant]="e.reason.quadrant" [strong]="true" />
+          <asys-quadrant-label [quadrant]="e.reason.quadrant" [strong]="true" />
           <ng-container [ngTemplateOutlet]="badges" />
           <span class="task-editor__reason-text">{{ e.reasonText }}</span>
         </div>

@@ -1022,7 +1022,7 @@ describe('Now', () => {
       const { rows, now } = await setup();
       const [dentist, plants] = now().ranked.slice(1);
       const chipOf = (row: HTMLAnchorElement | undefined): Element | null | undefined =>
-        row?.querySelector('.asys-picker-row__reason asys-quadrant-chip');
+        row?.querySelector('.asys-picker-row__reason asys-quadrant-label');
 
       expect(
         must(rows()[0]).querySelector('.asys-picker-row__reason-text')?.textContent?.trim(),
@@ -1047,7 +1047,7 @@ describe('Now', () => {
         true,
       );
       expect(
-        rows().some((a) => a.querySelector('.asys-picker-row__side asys-quadrant-chip') !== null),
+        rows().some((a) => a.querySelector('.asys-picker-row__side asys-quadrant-label') !== null),
       ).toBe(false);
     });
 
@@ -1218,7 +1218,7 @@ describe('Now', () => {
         );
 
       expect(rows).toHaveLength(2);
-      expect(rows.every((a) => a.querySelector('asys-quadrant-chip') === null)).toBe(true);
+      expect(rows.every((a) => a.querySelector('asys-quadrant-label') === null)).toBe(true);
       expect(
         rows.map((a) => a.querySelector('asys-status-badge')?.textContent?.trim() ?? null),
       ).toEqual([null, 'Overdue']);

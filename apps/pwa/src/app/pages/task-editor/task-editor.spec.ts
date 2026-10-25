@@ -427,7 +427,7 @@ const setup = async (options: SetupOptions = {}) => {
   const reasonText = (): string => text(reason()?.querySelector('.task-editor__reason-text'));
   const badges = (): string[] =>
     Array.from(reason()?.querySelectorAll('asys-status-badge') ?? []).map((b) => text(b));
-  const chip = (): HTMLElement | null => reason()?.querySelector('asys-quadrant-chip') ?? null;
+  const chip = (): HTMLElement | null => reason()?.querySelector('asys-quadrant-label') ?? null;
 
   // The controls of the card, for a read-only check.
   const cardControls = (): (HTMLButtonElement | HTMLTextAreaElement | HTMLInputElement)[] =>

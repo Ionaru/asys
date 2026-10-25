@@ -34,7 +34,7 @@ Lint bans runtime imports of `@asys/contract`, `effect` and `@ionaru/effect-pass
 - Derive Task state on screen (Blocked, Overdue, Available, the reason line) from the `@asys/domain` rules, such as `blockedReasons`, `isBlocked`, `isOverdue` and `explainTask`, so a `RULES_VERSION` change reaches every screen.
 - **Components** (`components/`):
   - Use the selector `asys-<name>` and `ViewEncapsulation.None`.
-  - The host class has the `asys-` prefix, with BEM elements and `--modifier` classes. Bind them in `host: {}` (see `components/atoms/quadrant-chip`).
+  - The host class has the `asys-` prefix, with BEM elements and `--modifier` classes. Bind them in `host: {}` (see `components/atoms/quadrant-label`).
   - Closed sets are exported `enum`s, exposed to the template as `protected readonly Variant = ButtonVariant`.
 - **Features** keep the default encapsulation, with classes such as `now__title`.
 - **Styling:**
@@ -70,7 +70,7 @@ Lint bans runtime imports of `@asys/contract`, `effect` and `@ionaru/effect-pass
 **UI component:**
 
 1. Create `components/<level>/<name>/<name>.ts` and `<name>.spec.ts`, at the level the design system's table gives it. There is no barrel and nothing to register.
-2. Model it on `quadrant-chip` (display), `button` (attribute selector), `input` (an atom on a native element) or `text-field` (form control).
+2. Model it on `quadrant-label` (display), `button` (attribute selector), `input` (an atom on a native element) or `text-field` (form control).
 3. Write the spec with a `Host` component that drives signals, and await `fixture.whenStable()`.
 
 **Screen and route:**

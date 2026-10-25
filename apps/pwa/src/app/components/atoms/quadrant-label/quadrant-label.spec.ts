@@ -3,14 +3,14 @@ import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Quadrant } from '@asys/domain';
 
-import { QuadrantChip } from './quadrant-chip';
+import { QuadrantLabel } from './quadrant-label';
 
 @Component({
-  imports: [QuadrantChip],
+  imports: [QuadrantLabel],
   template: `
-    <asys-quadrant-chip [quadrant]="quadrant()" [compact]="compact()" [strong]="strong()" />
+    <asys-quadrant-label [quadrant]="quadrant()" [compact]="compact()" [strong]="strong()" />
     <ul>
-      <li asys-quadrant-chip id="in-list" [quadrant]="Quadrant.Delegate"></li>
+      <li asys-quadrant-label id="in-list" [quadrant]="Quadrant.Delegate"></li>
     </ul>
   `,
 })
@@ -66,14 +66,14 @@ const setup = async () => {
   const fixture = TestBed.createComponent(Host);
   await fixture.whenStable();
 
-  const chip = (): HTMLElement => fixture.nativeElement.querySelector('asys-quadrant-chip');
+  const chip = (): HTMLElement => fixture.nativeElement.querySelector('asys-quadrant-label');
   const listed = (): HTMLElement =>
-    fixture.nativeElement.querySelector('ul li[asys-quadrant-chip]');
+    fixture.nativeElement.querySelector('ul li[asys-quadrant-label]');
 
   return { fixture, host: fixture.componentInstance, chip, listed };
 };
 
-describe('QuadrantChip', () => {
+describe('QuadrantLabel', () => {
   it.each(WORDS)(
     'renders %s with exactly the classes asys-quadrant and %s and the text Quadrant: %s',
     async (quadrant, modifier, word) => {
@@ -252,7 +252,7 @@ describe('QuadrantChip', () => {
     expect(collapsed(chip())).toBe('Quadrant: Do');
   });
 
-  it('works on a list item through the li[asys-quadrant-chip] selector', async () => {
+  it('works on a list item through the li[asys-quadrant-label] selector', async () => {
     const { listed } = await setup();
 
     expect(listed().tagName).toBe('LI');

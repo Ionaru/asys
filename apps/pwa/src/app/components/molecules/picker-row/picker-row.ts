@@ -2,7 +2,7 @@
 import { Component, input, ViewEncapsulation } from '@angular/core';
 import { Quadrant } from '@asys/domain';
 
-import { QuadrantChip } from '../../atoms/quadrant-chip/quadrant-chip';
+import { QuadrantLabel } from '../../atoms/quadrant-label/quadrant-label';
 import { StatusBadge, StatusBadgeStatus } from '../../atoms/status-badge/status-badge';
 
 /** The kind of row a picker list shows. */
@@ -18,7 +18,7 @@ export enum PickerRowVariant {
  */
 @Component({
   selector: 'a[asys-picker-row]',
-  imports: [QuadrantChip, StatusBadge],
+  imports: [QuadrantLabel, StatusBadge],
   encapsulation: ViewEncapsulation.None,
   host: {
     class: 'asys-picker-row',
@@ -36,7 +36,7 @@ export enum PickerRowVariant {
       /></span>
       <span class="asys-picker-row__reason">
         @if (quadrant(); as q) {
-          <asys-quadrant-chip [quadrant]="q" [compact]="true" />
+          <asys-quadrant-label [quadrant]="q" [compact]="true" />
         }
         @if (overdue()) {
           <asys-status-badge [status]="Statuses.Overdue" />

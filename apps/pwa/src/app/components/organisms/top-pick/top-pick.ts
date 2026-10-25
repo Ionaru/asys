@@ -15,7 +15,7 @@ import { type Activation, activationOf } from '../../support/activation';
 import { Button, ButtonSize, ButtonVariant } from '../../atoms/button/button';
 import { Fact } from '../../molecules/fact/fact';
 import { Icon, IconName } from '../../atoms/icon/icon';
-import { QuadrantChip } from '../../atoms/quadrant-chip/quadrant-chip';
+import { QuadrantLabel } from '../../atoms/quadrant-label/quadrant-label';
 import { StatusBadge, StatusBadgeStatus } from '../../atoms/status-badge/status-badge';
 
 /**
@@ -24,7 +24,7 @@ import { StatusBadge, StatusBadgeStatus } from '../../atoms/status-badge/status-
  */
 @Component({
   selector: 'asys-top-pick',
-  imports: [Button, Fact, Icon, QuadrantChip, RouterLink, StatusBadge],
+  imports: [Button, Fact, Icon, QuadrantLabel, RouterLink, StatusBadge],
   encapsulation: ViewEncapsulation.None,
   templateUrl: './top-pick.component.html',
   styleUrl: './top-pick.css',
