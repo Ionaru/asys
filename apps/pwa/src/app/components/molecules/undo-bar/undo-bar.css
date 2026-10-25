@@ -68,52 +68,9 @@
   flex: none;
 }
 
-.asys-undo__timer {
-  display: block;
-  flex: none;
-  inline-size: 1.25em;
-  block-size: 1.25em;
-  color: var(--signal);
-
-  & svg {
-    display: block;
-    inline-size: 100%;
-    block-size: 100%;
-    overflow: visible;
-  }
-}
-
-.asys-undo__ring {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-}
-
-.asys-undo__fill {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 6.5;
-  stroke-dasharray: 100 100;
-  stroke-dashoffset: 100;
-  /* linear on purpose: the disc is a clock that must agree with the timer, not motion. */
-  animation: asys-undo-fill var(--asys-undo-duration, 5s) linear var(--asys-undo-delay, 0ms)
-    forwards;
-
-  .asys-undo.is-paused &,
-  .asys-undo:focus-within &,
-  .asys-undo:active & {
-    animation-play-state: paused;
-  }
-}
-
-@keyframes asys-undo-fill {
-  from {
-    stroke-dashoffset: 100;
-  }
-
-  to {
-    stroke-dashoffset: 0;
-  }
+.asys-undo:focus-within .asys-countdown__fill,
+.asys-undo:active .asys-countdown__fill {
+  animation-play-state: paused;
 }
 
 [data-theme='drive'] .asys-undo {

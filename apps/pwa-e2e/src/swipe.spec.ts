@@ -104,8 +104,7 @@ const settle = async (page: Page): Promise<void> => {
           document.getAnimations().filter((animation) => {
             const target =
               animation.effect instanceof KeyframeEffect ? animation.effect.target : null;
-            const isClock =
-              target instanceof Element && target.closest('.asys-undo__timer') !== null;
+            const isClock = target instanceof Element && target.closest('.asys-countdown') !== null;
             return animation.playState === 'running' && !isClock;
           }).length,
       ),

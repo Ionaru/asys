@@ -15,6 +15,7 @@ import {
 
 import { type Activation, activationOf } from '../../support/activation';
 import { Button, ButtonVariant } from '../../atoms/button/button';
+import { Countdown } from '../../atoms/countdown/countdown';
 import { Icon, IconName } from '../../atoms/icon/icon';
 
 /** Which layout the Undo bar shows. */
@@ -27,7 +28,7 @@ export enum UndoBarVariant {
 /** The bar above the bottom navigation: Undo for a held Done, or a Done that was not applied. */
 @Component({
   selector: 'asys-undo-bar',
-  imports: [Button, Icon],
+  imports: [Button, Countdown, Icon],
   encapsulation: ViewEncapsulation.None,
   host: {
     class: 'asys-undo',
@@ -89,7 +90,9 @@ export class UndoBar {
 
   readonly focusInside = output<boolean>();
 
-  private readonly fill = viewChild<ElementRef<SVGCircleElement>>('fill');
+  private readonly countdown = viewChild<Countdown, ElementRef<HTMLElement>>(Countdown, {
+    read: ElementRef,
+  });
 
   protected readonly duration = computed(() => `${this.windowMs()}ms`);
 
@@ -107,10 +110,12 @@ export class UndoBar {
     effect(() => {
       this.windowKey();
       this.remainingMs();
-      const fill = this.fill()?.nativeElement;
+      const countdown = this.countdown()?.nativeElement;
 
       untracked(() => {
-        if (fill !== undefined && typeof fill.getAnimations === 'function') {
+        const fill = countdown?.querySelector<SVGCircleElement>('.asys-countdown__fill');
+
+        if (fill && typeof fill.getAnimations === 'function') {
           fill.getAnimations().forEach((animation) => (animation.currentTime = 0));
         }
       });

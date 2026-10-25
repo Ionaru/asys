@@ -1352,14 +1352,14 @@ describe('ShellLayout', () => {
       doneUndo.pending.set(PENDING);
       await settle();
 
-      const fill = must(undoBar()?.querySelector('.asys-undo__fill'));
+      const fill = must(undoBar()?.querySelector('.asys-countdown__fill'));
       const animation = { currentTime: 2_400 } as unknown as Animation;
 
       fill.getAnimations = () => [animation];
       doneUndo.pending.set({ ...PENDING, taskId: 'b', title: 'Water the plants' });
       await settle();
 
-      expect(undoBar()?.querySelector('.asys-undo__fill')).toBe(fill);
+      expect(undoBar()?.querySelector('.asys-countdown__fill')).toBe(fill);
       expect(animation.currentTime).toBe(0);
     });
 
