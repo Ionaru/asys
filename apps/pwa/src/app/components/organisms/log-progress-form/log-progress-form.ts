@@ -11,24 +11,12 @@ import {
   viewChild,
   ViewEncapsulation,
 } from '@angular/core';
-import { CommandTag, formatMinutes, type LogProgress, TaskStatus } from '@asys/domain';
+import { formatMinutes } from '@asys/domain';
 
 import { Button, ButtonVariant } from '../../atoms/button/button';
 import { TextField } from '../../molecules/text-field/text-field';
 
 const WHOLE_MINUTES = /^\d+$/;
-
-/** The Command that lowers an Open Task's Estimate to the time still needed. */
-export const logProgressCommand = (taskId: string, minutes: number): LogProgress => ({
-  _tag: CommandTag.LogProgress,
-  taskId,
-  remainingMinutes: minutes,
-  expect: { status: TaskStatus.Open },
-});
-
-/** The confirmation that follows a saved Log progress. */
-export const estimateNowText = (minutes: number): string =>
-  `Estimate is now ${formatMinutes(minutes)}.`;
 
 /** The inline form that lowers a Task's Estimate to the time still needed. */
 @Component({

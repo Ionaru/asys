@@ -1,0 +1,168 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
+<asys-now-header [moment]="moment()" [datetime]="datetime()">
+  <div class="now__header-actions">
+    @if (areaControl(); as control) {
+      <asys-area-pick
+        [label]="control.label"
+        [pickedId]="control.pickedId"
+        [automaticLabel]="control.automaticLabel"
+        [areas]="control.areas"
+        (areaPicked)="areaPicked.emit($event)"
+      />
+    }
+    <a
+      asys-button
+      routerLink="/settings"
+      [variant]="Variants.Quiet"
+      [iconOnly]="true"
+      [icon]="Icons.Ellipsis"
+      aria-label="More: Settings"
+    ></a>
+  </div>
+</asys-now-header>
+<p class="asys-page__status now__status" role="status">{{ statusLine() }}</p>
+@if (loaded()) {
+  @if (card(); as top) {
+    <asys-swipe-actions
+      class="now__top-swipe"
+      [taskId]="top.id"
+      [disabled]="top.busy || leaving()"
+      [startEnabled]="top.canLogProgress"
+      (commitEnd)="swipeDone.emit({ taskId: $event, hadFocus: false })"
+      (commitStart)="logProgress.emit($event)"
+    >
+      <asys-top-pick
+        [attr.inert]="leaving() ? '' : null"
+        [attr.data-leaving]="leaving() ? '' : null"
+        [completed]="leaving()"
+        [title]="top.title"
+        [reason]="top.reason"
+        [quadrant]="top.quadrant"
+        [overdue]="top.overdue"
+        [dueFact]="top.dueFact"
+        [estimate]="top.estimate"
+        [area]="top.area"
+        [taskId]="top.id"
+        [morph]="top.morph"
+        [canLogProgress]="top.canLogProgress"
+        [actionsDisabled]="top.busy"
+        (done)="done.emit({ taskId: top.id, keyboard: $event.keyboard })"
+        (logProgress)="logProgress.emit(top.id)"
+      >
+        @if (top.awaitingSync) {
+          <p asys-sync-note></p>
+        }
+        @if (top.formEstimate; as estimate) {
+          <asys-log-progress-form
+            [estimateMinutes]="estimate"
+            [busy]="top.busy"
+            (save)="saveProgress.emit($event)"
+            (cancel)="cancelForm.emit()"
+            (focusin)="formFocus.emit(true)"
+            (focusout)="formFocus.emit(false)"
+          />
+        }
+      </asys-top-pick>
+    </asys-swipe-actions>
+  } @else {
+    <p class="now__text">Nothing to do right now.</p>
+    @if (inboxTaskCount() > 0) {
+      <p class="now__text">
+        <a routerLink="/inbox">
+          {{
+            inboxTaskCount() === 1
+              ? '1 Task waits for Triage.'
+              : inboxTaskCount() + ' Tasks wait for Triage.'
+          }}
+        </a>
+      </p>
+    }
+  }
+  @if (rows().length > 0) {
+    <ul class="now__list">
+      @for (item of rows(); track item.id) {
+        <li
+          #row
+          (animate.leave)="rowLeave.emit($event)"
+          (animate.enter)="rowEnter.emit({ event: $event, taskId: item.id })"
+        >
+          <asys-swipe-actions
+            [taskId]="item.id"
+            [disabled]="item.busy"
+            [startEnabled]="item.canLogProgress"
+            (commitEnd)="swipeDone.emit({ taskId: $event, hadFocus: hadFocus(row) })"
+            (commitStart)="logProgress.emit($event)"
+          >
+            <a
+              asys-picker-row
+              [routerLink]="['/tasks', item.id]"
+              [reason]="item.reason"
+              [estimate]="item.estimate"
+              [quadrant]="item.quadrant"
+              [taskId]="item.id"
+              [morph]="item.morph"
+              [overdue]="item.overdue"
+              [variant]="Rows.Ranked"
+            >
+              {{ item.title }}
+            </a>
+          </asys-swipe-actions>
+          @if (item.formEstimate; as estimate) {
+            <div class="now__row-form">
+              <asys-log-progress-form
+                [estimateMinutes]="estimate"
+                [busy]="item.busy"
+                (save)="saveProgress.emit($event)"
+                (cancel)="cancelForm.emit()"
+                (focusin)="formFocus.emit(true)"
+                (focusout)="formFocus.emit(false)"
+              />
+            </div>
+          }
+        </li>
+      }
+    </ul>
+  }
+  @if (otherAreas().length > 0) {
+    <div class="now__other-areas" role="group" aria-label="Other Areas">
+      <span class="now__other-areas-label" aria-hidden="true">Other Areas:</span>
+      @for (other of otherAreas(); track other.areaId) {
+        <button type="button" class="now__other-area" (click)="otherAreaPicked.emit(other.areaId)">
+          {{ other.text }}
+        </button>
+      }
+    </div>
+  }
+  @if (waiting().length > 0) {
+    <asys-section-header
+      [icon]="Icons.HourglassHalf"
+      [title]="'Waiting'"
+      [count]="waiting().length"
+      [summary]="waitingSummary()"
+      [(expanded)]="waitingExpanded"
+    >
+      @if (waitingExpanded()) {
+        <ul class="now__list now__list--waiting">
+          @for (item of waiting(); track item.id) {
+            <li>
+              <a
+                asys-picker-row
+                [routerLink]="['/tasks', item.id]"
+                [reason]="item.reason"
+                [estimate]="item.estimate"
+                [taskId]="item.id"
+                [morph]="item.morph"
+                [overdue]="item.overdue"
+                [variant]="Rows.Waiting"
+              >
+                {{ item.title }}
+              </a>
+            </li>
+          }
+        </ul>
+      }
+    </asys-section-header>
+  }
+} @else {
+  <asys-load-state [failed]="loadFailed()" (retry)="retry.emit()" />
+}
