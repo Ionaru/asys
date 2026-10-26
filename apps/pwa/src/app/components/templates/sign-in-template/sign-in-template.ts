@@ -4,11 +4,12 @@ import { RouterLink } from '@angular/router';
 
 import { Button, ButtonVariant } from '../../atoms/button/button';
 import { IconName } from '../../atoms/icon/icon';
+import { Text } from '../../atoms/text/text';
 
 /** Lays out signing in with a passkey, with a way to use a recovery code instead. */
 @Component({
   selector: 'asys-sign-in-template',
-  imports: [Button, RouterLink],
+  imports: [Text, Button, RouterLink],
   templateUrl: './sign-in-template.component.html',
   styleUrl: './sign-in-template.css',
 })

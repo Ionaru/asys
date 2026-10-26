@@ -65,9 +65,9 @@
       </asys-top-pick>
     </asys-swipe-actions>
   } @else {
-    <p class="now__text">Nothing to do right now.</p>
+    <p asys-text class="now__text">Nothing to do right now.</p>
     @if (inboxTaskCount() > 0) {
-      <p class="now__text">
+      <p asys-text class="now__text">
         <a asys-link routerLink="/inbox">
           {{
             inboxTaskCount() === 1

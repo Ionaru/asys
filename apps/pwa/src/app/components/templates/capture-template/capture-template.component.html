@@ -5,13 +5,13 @@
   <button asys-button type="submit" [variant]="Variant.Primary" [disabled]="!canAdd()">Add</button>
 </form>
 <div class="capture__status" role="status">
-  @if (confirmation(); as captured) {
-    <p class="capture__text">Captured “{{ captured }}”. It waits in the Inbox until Triage.</p>
+  @if (confirmationText(); as captured) {
+    <p asys-text class="capture__text">{{ captured }}</p>
     <p class="capture__links">
       <a asys-link [block]="true" routerLink="/inbox">Open the Inbox</a>
       <a asys-link [block]="true" routerLink="/now">Go to Now</a>
     </p>
   } @else if (message(); as text) {
-    <p class="capture__text">{{ text }}</p>
+    <p asys-text class="capture__text">{{ text }}</p>
   }
 </div>

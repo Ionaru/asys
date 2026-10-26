@@ -95,8 +95,10 @@
 } @else if (!loaded()) {
   <asys-load-state [failed]="loadFailed()" (retry)="retry.emit()" />
 } @else if (!leaving()) {
-  <p class="task-editor__missing">This Task is no longer open.</p>
-  <p class="task-editor__text"><a asys-link [block]="true" routerLink="/now">Go to Now</a></p>
+  <p asys-text class="task-editor__missing">This Task is no longer open.</p>
+  <p asys-text class="task-editor__text">
+    <a asys-link [block]="true" routerLink="/now">Go to Now</a>
+  </p>
   @if (dirty()) {
     <ng-container [ngTemplateOutlet]="card" />
   }
@@ -104,7 +106,7 @@
 
 <asys-sheet heading="Log progress" [(open)]="logOpen">
   <ng-template>
-    <p class="task-editor__message" role="status">{{ logMessage() }}</p>
+    <p asys-text class="task-editor__message" role="status">{{ logMessage() }}</p>
     @if (logEstimate(); as estimate) {
       <asys-log-progress-form
         [estimateMinutes]="estimate"
@@ -138,7 +140,7 @@
         Drop
       </button>
     }
-    <p class="task-editor__message" role="status">{{ dropMessage() }}</p>
+    <p asys-text class="task-editor__message" role="status">{{ dropMessage() }}</p>
   </ng-template>
 </asys-sheet>
 

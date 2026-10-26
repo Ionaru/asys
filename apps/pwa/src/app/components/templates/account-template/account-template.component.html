@@ -2,23 +2,33 @@
 <div class="account">
   <header class="account__block">
     <h1 class="asys-page__title asys-page__title--flush account__title">Account</h1>
-    <p class="account__reason">{{ name() }}</p>
+    <p asys-text [textStyle]="TextStyle.Reason" class="account__reason">{{ name() }}</p>
   </header>
 
   <section class="account__block">
-    <h2 #passkeysHeading class="account__heading" tabindex="-1">Passkeys</h2>
+    <h2
+      #passkeysHeading
+      asys-text
+      [textStyle]="TextStyle.Heading"
+      class="account__heading"
+      tabindex="-1"
+    >
+      Passkeys
+    </h2>
     @if (passkeysLoaded()) {
       <ul class="account__list">
         @for (row of rows(); track row.credentialId) {
           <li class="account__row">
-            <span class="account__strong">{{ row.name }}</span>
-            <span class="account__reason">Created {{ row.created }}</span>
-            <span class="account__reason">
+            <span asys-text [textStyle]="TextStyle.BodyStrong">{{ row.name }}</span>
+            <span asys-text [textStyle]="TextStyle.Reason" class="account__reason"
+              >Created {{ row.created }}</span
+            >
+            <span asys-text [textStyle]="TextStyle.Reason" class="account__reason">
               {{ row.lastUsed === null ? 'Never used' : 'Last used ' + row.lastUsed }}
             </span>
             @if (confirmingRemoval() === row.credentialId) {
               <div class="account__confirm" animate.enter="asys-enter">
-                <p class="account__body">
+                <p asys-text class="account__body">
                   Remove {{ row.name }}? You cannot sign in with it afterwards.
                 </p>
                 <div class="account__actions">
@@ -60,9 +70,11 @@
         }
       </ul>
     } @else if (passkeysLoading()) {
-      <p class="account__reason">Loading your passkeys…</p>
+      <p asys-text [textStyle]="TextStyle.Reason" class="account__reason">Loading your passkeys…</p>
     } @else {
-      <p class="account__reason">Could not load your passkeys.</p>
+      <p asys-text [textStyle]="TextStyle.Reason" class="account__reason">
+        Could not load your passkeys.
+      </p>
       <div>
         <button
           asys-button
@@ -77,7 +89,7 @@
       </div>
     }
     @if (removeMessage(); as text) {
-      <p class="account__message" role="alert">{{ text }}</p>
+      <p asys-text class="account__message" role="alert">{{ text }}</p>
     }
     <form class="account__block" [formRoot]="addForm()">
       <asys-text-field
@@ -92,7 +104,7 @@
       </div>
     </form>
     @if (addMessage(); as text) {
-      <p class="account__message" role="alert">{{ text }}</p>
+      <p asys-text class="account__message" role="alert">{{ text }}</p>
     }
     @if (addLoadFailed()) {
       <div>
@@ -109,13 +121,13 @@
       </div>
     }
     @if (added()) {
-      <p class="account__body" role="status">Passkey added.</p>
+      <p asys-text class="account__body" role="status">Passkey added.</p>
     }
   </section>
 
   <section class="account__block">
-    <h2 class="account__heading">Recovery codes</h2>
-    <p class="account__body">
+    <h2 asys-text [textStyle]="TextStyle.Heading" class="account__heading">Recovery codes</h2>
+    <p asys-text class="account__body">
       Recovery codes left: <span class="asys-num">{{ recoveryCodesLeft() }}</span>
     </p>
     @if (codes().length > 0) {
@@ -125,7 +137,9 @@
             <li>{{ code }}</li>
           }
         </ol>
-        <p class="account__body">These codes are shown only now. Keep them somewhere safe.</p>
+        <p asys-text class="account__body">
+          These codes are shown only now. Keep them somewhere safe.
+        </p>
         <div class="account__actions">
           <button
             asys-button
@@ -140,12 +154,12 @@
           </button>
         </div>
         @if (copyStatus(); as text) {
-          <p class="account__body" role="status">{{ text }}</p>
+          <p asys-text class="account__body" role="status">{{ text }}</p>
         }
       </div>
     } @else if (confirmingCodes()) {
       <div class="account__block" animate.enter="asys-enter">
-        <p class="account__body">
+        <p asys-text class="account__body">
           New codes replace all your current codes and sign you out on your other devices.
         </p>
         <div class="account__actions">
@@ -181,12 +195,12 @@
       </div>
     }
     @if (codesMessage(); as text) {
-      <p class="account__message" role="alert">{{ text }}</p>
+      <p asys-text class="account__message" role="alert">{{ text }}</p>
     }
   </section>
 
   <section class="account__block">
-    <h2 class="account__heading">Sign out</h2>
+    <h2 asys-text [textStyle]="TextStyle.Heading" class="account__heading">Sign out</h2>
     <div>
       <button
         asys-button
@@ -199,7 +213,7 @@
       </button>
     </div>
     @if (signOutMessage(); as text) {
-      <p class="account__message" role="alert">{{ text }}</p>
+      <p asys-text class="account__message" role="alert">{{ text }}</p>
     }
   </section>
 </div>

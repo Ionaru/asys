@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 import { Button, ButtonSize, ButtonVariant } from '../../atoms/button/button';
 import { IconName } from '../../atoms/icon/icon';
 import { Link } from '../../atoms/link/link';
+import { Text, TextStyle } from '../../atoms/text/text';
 import { TextField } from '../../molecules/text-field/text-field';
 import { SectionHeader, SectionHeaderAction } from '../section-header/section-header';
 import { Sheet } from '../sheet/sheet';
@@ -25,7 +26,7 @@ export interface TaskBlockerTask {
 /** The Blocked by section of the Task editor: a header with a one-line summary that opens a sheet. */
 @Component({
   selector: 'asys-task-blockers',
-  imports: [Button, Link, RouterLink, SectionHeader, Sheet, TextField],
+  imports: [Text, Button, Link, RouterLink, SectionHeader, Sheet, TextField],
   templateUrl: './task-blockers.component.html',
   styleUrl: './task-blockers.css',
 })
@@ -61,6 +62,8 @@ export class TaskBlockers {
   readonly remove = output<string>();
 
   readonly #host = inject<ElementRef<HTMLElement>>(ElementRef);
+
+  protected readonly TextStyle = TextStyle;
 
   protected readonly Variant = ButtonVariant;
 

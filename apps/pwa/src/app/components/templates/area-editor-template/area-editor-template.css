@@ -28,13 +28,8 @@
 .area-editor__note,
 .area-editor__reason {
   margin: 0;
-  font-size: var(--font-size-reason);
-  line-height: var(--line-height-reason);
-  color: var(--ink-muted);
 }
 
 .area-editor__text {
   margin: 0 0 var(--space-3);
-  font-size: var(--font-size-body);
-  line-height: var(--line-height-body);
 }

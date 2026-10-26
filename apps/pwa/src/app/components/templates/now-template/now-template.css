@@ -41,8 +41,6 @@ asys-section-header {
 
 .now__text {
   margin: 0 0 var(--space-3);
-  font-size: var(--font-size-body);
-  line-height: var(--line-height-body);
 }
 
 .now__other-areas {
@@ -51,8 +49,6 @@ asys-section-header {
   align-items: center;
   gap: var(--space-1) var(--space-3);
   margin: var(--space-3) 0 0;
-  font-size: var(--font-size-body);
-  line-height: var(--line-height-body);
 }
 
 .now__other-areas-label {

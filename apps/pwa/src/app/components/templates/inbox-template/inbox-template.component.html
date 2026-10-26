@@ -51,7 +51,7 @@
     }
   }
   @if (empty()) {
-    <p class="inbox__text">Nothing waits here.</p>
+    <p asys-text class="inbox__text">Nothing waits here.</p>
   }
 } @else {
   <asys-load-state [failed]="loadFailed()" (retry)="retry.emit()" />

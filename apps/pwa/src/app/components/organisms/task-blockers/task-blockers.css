@@ -52,14 +52,6 @@
 .task-blockers__text,
 .task-blockers__message {
   margin: 0;
-  font-size: var(--font-size-body);
-  line-height: var(--line-height-body);
-}
-
-.task-blockers__message {
-  color: var(--ink-muted);
-  font-size: var(--font-size-reason);
-  line-height: var(--line-height-reason);
 }
 
 /* An empty status stays in place as the live region and takes no room, not even the body's gap. */

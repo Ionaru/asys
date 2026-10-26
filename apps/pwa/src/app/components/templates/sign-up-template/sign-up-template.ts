@@ -13,6 +13,7 @@ import { RouterLink } from '@angular/router';
 
 import { Button, ButtonVariant } from '../../atoms/button/button';
 import { IconName } from '../../atoms/icon/icon';
+import { Text } from '../../atoms/text/text';
 import { TextField } from '../../molecules/text-field/text-field';
 
 /** The screens of the sign-up flow. */
@@ -27,7 +28,7 @@ export enum SignUpStep {
 /** Lays out the sign-up flow, one step at a time, and moves focus to the heading on each new step. */
 @Component({
   selector: 'asys-sign-up-template',
-  imports: [Button, FormField, FormRoot, RouterLink, TextField],
+  imports: [Text, Button, FormField, FormRoot, RouterLink, TextField],
   templateUrl: './sign-up-template.component.html',
   styleUrl: './sign-up-template.css',
 })

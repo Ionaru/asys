@@ -67,10 +67,6 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.asys-muted {
-  color: var(--ink-muted);
-}
-
 .asys-danger-text {
   color: var(--danger);
 }

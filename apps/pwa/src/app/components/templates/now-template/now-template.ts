@@ -17,6 +17,7 @@ import { Button, ButtonVariant } from '../../atoms/button/button';
 import { IconName } from '../../atoms/icon/icon';
 import { Link } from '../../atoms/link/link';
 import { SyncNote } from '../../atoms/sync-note/sync-note';
+import { Text } from '../../atoms/text/text';
 import { AreaPickControl, type AreaChoice } from '../../molecules/area-pick/area-pick';
 import { LoadState } from '../../molecules/load-state/load-state';
 import { TaskRow, TaskRowVariant } from '../../molecules/task-row/task-row';
@@ -113,6 +114,7 @@ export interface NowRowEnter {
 @Component({
   selector: 'asys-now-template',
   imports: [
+    Text,
     AreaPickControl,
     Button,
     Link,

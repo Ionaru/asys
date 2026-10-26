@@ -28,6 +28,7 @@ import { Link } from '../../atoms/link/link';
 import { QuadrantLabel } from '../../atoms/quadrant-label/quadrant-label';
 import { StatusBadge, StatusBadgeStatus } from '../../atoms/status-badge/status-badge';
 import { SyncNote } from '../../atoms/sync-note/sync-note';
+import { Text } from '../../atoms/text/text';
 import { InlineConfirm } from '../../molecules/inline-confirm/inline-confirm';
 import { LoadState } from '../../molecules/load-state/load-state';
 import { SegmentedControl } from '../../molecules/segmented-control/segmented-control';
@@ -50,6 +51,7 @@ let nextId = 0;
 @Component({
   selector: 'asys-task-editor-template',
   imports: [
+    Text,
     Button,
     ChoiceRow,
     DateRow,

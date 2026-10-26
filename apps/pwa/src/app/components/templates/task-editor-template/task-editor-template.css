@@ -141,6 +141,4 @@
 .task-editor__text,
 .task-editor__message {
   margin: 0 0 var(--space-3);
-  font-size: var(--font-size-body);
-  line-height: var(--line-height-body);
 }

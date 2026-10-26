@@ -31,7 +31,7 @@
           }
         </ul>
       } @else {
-        <p class="task-blockers__text">Waits for no other Task.</p>
+        <p asys-text class="task-blockers__text">Waits for no other Task.</p>
       }
       <asys-text-field
         label="Find a Task"
@@ -56,9 +56,11 @@
           }
         </ul>
       } @else {
-        <p class="task-blockers__text">No Task matches.</p>
+        <p asys-text class="task-blockers__text">No Task matches.</p>
       }
-      <p class="task-blockers__message" role="status">{{ message() }}</p>
+      <p asys-text [textStyle]="TextStyle.Reason" class="task-blockers__message" role="status">
+        {{ message() }}
+      </p>
       <h3 class="task-blockers__subtitle">Blocks</h3>
       @if (blocks().length > 0) {
         <ul class="task-blockers__list">
@@ -76,7 +78,7 @@
           }
         </ul>
       } @else {
-        <p class="task-blockers__text">No Task waits for this one.</p>
+        <p asys-text class="task-blockers__text">No Task waits for this one.</p>
       }
     </div>
   </ng-template>

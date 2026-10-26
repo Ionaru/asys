@@ -3,15 +3,16 @@ import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { Button, ButtonVariant } from '../../atoms/button/button';
+import { Text } from '../../atoms/text/text';
 
 /** Lays out the screen shown after a recovery code sign-in, which nudges the Owner to replace lost passkeys. */
 @Component({
   selector: 'asys-recovered-template',
-  imports: [Button, RouterLink],
+  imports: [Text, Button, RouterLink],
   template: `
     <main class="asys-page recovered">
       <h1 class="asys-page__title asys-page__title--flush recovered__title">You are signed in</h1>
-      <p class="recovered__body">
+      <p asys-text class="recovered__body">
         You signed in with a recovery code. Add a passkey now, and remove any you lost.
       </p>
       <a asys-button routerLink="/account" [variant]="Variant.Primary">Go to your account</a>

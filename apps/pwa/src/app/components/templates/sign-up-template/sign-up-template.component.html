@@ -20,7 +20,7 @@
     }
     @case (Step.Passkey) {
       <div class="sign-up__block" animate.enter="asys-enter">
-        <p class="sign-up__body">Next, create a passkey for {{ name() }}.</p>
+        <p asys-text class="sign-up__body">Next, create a passkey for {{ name() }}.</p>
         <button
           asys-button
           type="button"
@@ -41,7 +41,7 @@
           Change name
         </button>
         @if (message(); as text) {
-          <p class="sign-up__message" role="alert">{{ text }}</p>
+          <p asys-text class="sign-up__message" role="alert">{{ text }}</p>
         }
         @if (loadFailed()) {
           <button
@@ -63,12 +63,14 @@
             <li>{{ code }}</li>
           }
         </ol>
-        <p class="sign-up__body">These codes are shown only now. Keep them somewhere safe.</p>
+        <p asys-text class="sign-up__body">
+          These codes are shown only now. Keep them somewhere safe.
+        </p>
         <button asys-button type="button" [variant]="Variant.Secondary" (click)="copyCodes.emit()">
           Copy
         </button>
         @if (copyStatus(); as text) {
-          <p class="sign-up__body" role="status">{{ text }}</p>
+          <p asys-text class="sign-up__body" role="status">{{ text }}</p>
         }
         <button
           asys-button
@@ -83,13 +85,13 @@
     }
     @case (Step.LinkInvalid) {
       <div class="sign-up__block" animate.enter="asys-enter">
-        <p class="sign-up__body">Open the Sign-up link again.</p>
+        <p asys-text class="sign-up__body">Open the Sign-up link again.</p>
         <a asys-button routerLink="/signin" [variant]="Variant.Quiet">Sign in instead</a>
       </div>
     }
     @case (Step.AlreadySignedIn) {
       <div class="sign-up__block" animate.enter="asys-enter">
-        <p class="sign-up__body">You are already signed in.</p>
+        <p asys-text class="sign-up__body">You are already signed in.</p>
         <a asys-button routerLink="/now" [variant]="Variant.Quiet">Go to Now</a>
       </div>
     }

@@ -11,6 +11,4 @@
 
 .inbox__text {
   margin: 0 0 var(--space-2);
-  font-size: var(--font-size-body);
-  line-height: var(--line-height-body);
 }
