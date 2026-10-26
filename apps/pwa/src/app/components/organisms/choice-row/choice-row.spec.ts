@@ -83,11 +83,13 @@ const setup = async (value = '', icon: IconName | null = null) => {
   const root = (): HTMLElement => fixture.nativeElement;
   const row = (): HTMLButtonElement =>
     root().querySelector('button.asys-choice-row__open') as HTMLButtonElement;
-  const rowValue = (): HTMLElement => row().querySelector('.asys-row__value') as HTMLElement;
+  const rowValue = (): HTMLElement => row().querySelector('.asys-field-row__value') as HTMLElement;
   const dialog = (): HTMLDialogElement =>
     root().querySelector('dialog.asys-sheet') as HTMLDialogElement;
   const optionButtons = (): HTMLButtonElement[] =>
-    Array.from(dialog().querySelectorAll<HTMLButtonElement>('button.asys-choice-row__option'));
+    Array.from(
+      dialog().querySelectorAll<HTMLButtonElement>('ul.asys-option-list button.asys-field-row'),
+    );
   const error = (): HTMLElement | null => root().querySelector('p[asys-field-error]');
   // A pointer press: `click()` has detail 0, which counts as a keyboard activation.
   const press = async (el: HTMLElement): Promise<void> => {
@@ -105,29 +107,29 @@ describe('ChoiceRow', () => {
 
       expect(row().getAttribute('type')).toBe('button');
       expect(row().getAttribute('aria-haspopup')).toBe('dialog');
-      expect(squash(row().querySelector('.asys-row__label')?.textContent)).toBe('Area');
+      expect(squash(row().querySelector('.asys-field-row__label')?.textContent)).toBe('Area');
       expect(squash(rowValue().textContent)).toBe('Work');
-      expect(row().querySelector('asys-icon.asys-row__chevron')).not.toBeNull();
+      expect(row().querySelector('asys-icon.asys-field-row__chevron')).not.toBeNull();
     });
 
     it('marks the value as set when it is not empty', async () => {
       const { rowValue } = await setup('home');
 
-      expect(rowValue().classList.contains('asys-row__value--set')).toBe(true);
+      expect(rowValue().classList.contains('asys-field-row__value--set')).toBe(true);
     });
 
     it('shows the label of the empty option, unmarked, for the empty value', async () => {
       const { rowValue } = await setup('');
 
       expect(squash(rowValue().textContent)).toBe('No Area');
-      expect(rowValue().classList.contains('asys-row__value--set')).toBe(false);
+      expect(rowValue().classList.contains('asys-field-row__value--set')).toBe(false);
     });
 
     it('shows nothing when no option matches', async () => {
       const { rowValue } = await setup('missing');
 
       expect(squash(rowValue().textContent)).toBe('');
-      expect(rowValue().classList.contains('asys-row__value--set')).toBe(true);
+      expect(rowValue().classList.contains('asys-field-row__value--set')).toBe(true);
     });
 
     it('follows the value', async () => {
@@ -142,7 +144,7 @@ describe('ChoiceRow', () => {
       await fixture.whenStable();
 
       expect(squash(rowValue().textContent)).toBe('No Area');
-      expect(rowValue().classList.contains('asys-row__value--set')).toBe(false);
+      expect(rowValue().classList.contains('asys-field-row__value--set')).toBe(false);
     });
 
     it('shows no icon in the value without an icon input', async () => {
@@ -176,11 +178,11 @@ describe('ChoiceRow', () => {
       await press(row());
 
       expect(dialog().open).toBe(true);
-      expect(dialog().querySelectorAll('ul.asys-choice-row__options > li')).toHaveLength(3);
+      expect(dialog().querySelectorAll('ul.asys-option-list > li')).toHaveLength(3);
       expect(
         optionButtons().map((b) => [
           b.getAttribute('type'),
-          squash(b.querySelector('.asys-row__label')?.textContent),
+          squash(b.querySelector('.asys-field-row__label')?.textContent),
         ]),
       ).toEqual([
         ['button', 'No Area'],
@@ -213,23 +215,21 @@ describe('ChoiceRow', () => {
       ]);
     });
 
-    it('gives every option a check, and the icon only when one is given', async () => {
-      const { row, press, optionButtons } = await setup('home');
-
-      await press(row());
-
-      expect(
-        optionButtons().every((b) => b.querySelector('asys-icon.asys-choice-row__check') !== null),
-      ).toBe(true);
-      expect(optionButtons().every((b) => b.querySelectorAll('asys-icon').length === 1)).toBe(true);
-    });
-
     it('shows the icon in each option when an icon is given', async () => {
       const { row, press, optionButtons } = await setup('home', IconName.Folder);
 
       await press(row());
 
-      expect(optionButtons().every((b) => b.querySelectorAll('asys-icon').length === 2)).toBe(true);
+      expect(optionButtons()).toHaveLength(3);
+      expect(
+        optionButtons().map((b) =>
+          Array.from(b.querySelectorAll('svg[data-icon]'), (i) => i.getAttribute('data-icon')),
+        ),
+      ).toEqual([
+        expect.arrayContaining(['folder']),
+        expect.arrayContaining(['folder']),
+        expect.arrayContaining(['folder']),
+      ]);
     });
 
     it('sets the value of the picked option, closes the sheet and emits touch', async () => {
@@ -371,14 +371,16 @@ describe('ChoiceRow', () => {
       host.model.set({ areaId: 'work' });
       await fixture.whenStable();
 
-      expect(squash(row().querySelector('.asys-row__value')?.textContent)).toBe('Work');
+      expect(squash(row().querySelector('.asys-field-row__value')?.textContent)).toBe('Work');
     });
 
     it('writes a picked option into the form model', async () => {
       const { root, host, row, press } = await setupForm();
 
       await press(row());
-      await press(root().querySelectorAll<HTMLElement>('button.asys-choice-row__option')[1]);
+      await press(
+        root().querySelectorAll<HTMLElement>('ul.asys-option-list button.asys-field-row')[1],
+      );
 
       expect(host.model().areaId).toBe('home');
     });

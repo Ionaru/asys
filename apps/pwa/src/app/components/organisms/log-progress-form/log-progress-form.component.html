@@ -9,7 +9,7 @@
     [errors]="errors()"
     [touched]="error()"
   />
-  <div class="asys-button-group">
+  <div asys-button-group>
     <button asys-button type="submit" [variant]="Variants.Primary" [disabled]="busy()">Save</button>
     <button asys-button type="button" [variant]="Variants.Quiet" (click)="cancel.emit()">
       Cancel

@@ -1,15 +1,4 @@
 /* SPDX-License-Identifier: EUPL-1.2 */
-asys-section-header {
-  display: block;
-}
-
-.asys-section {
-  background: var(--sunken);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  color: var(--ink);
-}
-
 .asys-section-header {
   appearance: none;
   display: flex;
@@ -27,10 +16,6 @@ asys-section-header {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: background-color var(--duration-quick) var(--ease-out);
-
-  .asys-section & {
-    border-radius: 0;
-  }
 
   &:active {
     background: var(--signal-soft);
@@ -58,13 +43,6 @@ asys-section-header {
   font-weight: 700;
 }
 
-.asys-section-header__count {
-  font-size: var(--font-size-time);
-  line-height: var(--line-height-time);
-  font-weight: 500;
-  color: var(--ink-muted);
-}
-
 .asys-section-header__summary {
   color: var(--ink-muted);
   font-size: var(--font-size-reason);
@@ -84,10 +62,6 @@ asys-section-header {
   .asys-section-header[aria-expanded='true'] & svg {
     transform: rotate(180deg);
   }
-}
-
-.asys-section__body {
-  border-top: 1px solid var(--line);
 }
 
 [data-theme='drive'] .asys-section-header {

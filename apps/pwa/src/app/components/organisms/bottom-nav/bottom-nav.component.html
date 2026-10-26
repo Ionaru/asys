@@ -1,68 +1,42 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
-@let popKey = pop();
 <nav class="asys-bottomnav" aria-label="Primary">
   <a
-    class="asys-bottomnav__item"
+    asys-nav-item
     routerLink="/now"
     routerLinkActive="is-current"
-    ariaCurrentWhenActive="page"
     #now="routerLinkActive"
-    [class.is-pressed]="pressed() === '/now'"
+    [icon]="IconName.Bullseye"
+    [label]="'Now'"
+    [current]="now.isActive"
+    [pressed]="pressed() === '/now'"
     (pointerdown)="press($event, '/now')"
     (isActiveChange)="release()"
-  >
-    <span class="asys-bottomnav__icon">
-      <asys-icon [name]="IconName.Bullseye" [solid]="now.isActive" />
-    </span>
-    <span class="asys-bottomnav__label">Now</span>
-  </a>
+  ></a>
   <a
-    class="asys-bottomnav__item"
+    asys-nav-item
     routerLink="/today"
     routerLinkActive="is-current"
-    ariaCurrentWhenActive="page"
     #today="routerLinkActive"
-    [class.is-pressed]="pressed() === '/today'"
+    [icon]="IconName.CalendarDay"
+    [label]="'Today'"
+    [current]="today.isActive"
+    [pressed]="pressed() === '/today'"
     (pointerdown)="press($event, '/today')"
     (isActiveChange)="release()"
-  >
-    <span class="asys-bottomnav__icon">
-      <asys-icon [name]="IconName.CalendarDay" [solid]="today.isActive" />
-    </span>
-    <span class="asys-bottomnav__label">Today</span>
-  </a>
+  ></a>
   <a
+    asys-nav-item
     #inbox
-    class="asys-bottomnav__item"
     routerLink="/inbox"
     routerLinkActive="is-current"
-    ariaCurrentWhenActive="page"
     #inboxActive="routerLinkActive"
-    [attr.aria-label]="inboxLabel()"
-    [class.is-pressed]="pressed() === '/inbox'"
+    [icon]="IconName.Inbox"
+    [label]="'Inbox'"
+    [current]="inboxActive.isActive"
+    [count]="inboxCount()"
+    [pressed]="pressed() === '/inbox'"
     (pointerdown)="press($event, '/inbox')"
     (isActiveChange)="release()"
-  >
-    <span class="asys-bottomnav__icon">
-      <asys-icon [name]="IconName.Inbox" [solid]="inboxActive.isActive" />
-      @if ((inboxCount() ?? 0) > 0) {
-        @for (key of [popKey]; track key) {
-          @if (popKey > 0) {
-            <span
-              class="asys-num asys-count asys-bottomnav__badge"
-              aria-hidden="true"
-              animate.enter="asys-pop"
-              >{{ inboxCount() }}</span
-            >
-          } @else {
-            <span class="asys-num asys-count asys-bottomnav__badge" aria-hidden="true">{{
-              inboxCount()
-            }}</span>
-          }
-        }
-      }
-    </span>
-    <span class="asys-bottomnav__label">Inbox</span>
-  </a>
+  ></a>
   <ng-content />
 </nav>

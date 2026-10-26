@@ -23,33 +23,13 @@
   margin: 0;
 }
 
-.account__heading {
-  font-size: var(--font-size-heading);
-  line-height: var(--line-height-heading);
-}
-
-.account__body,
 .account__codes {
   font-size: var(--font-size-body);
   line-height: var(--line-height-body);
 }
 
-.account__strong {
-  font-size: var(--font-size-body-strong);
-  line-height: var(--line-height-body-strong);
-  font-weight: 600;
-}
-
-.account__reason {
-  color: var(--ink-muted);
-  font-size: var(--font-size-reason);
-  line-height: var(--line-height-reason);
-}
-
 .account__message {
   color: var(--danger);
-  font-size: var(--font-size-body);
-  line-height: var(--line-height-body);
 }
 
 .account__list,

@@ -9,8 +9,6 @@
 .sign-in__body,
 .sign-in__message {
   margin: 0;
-  font-size: var(--font-size-body);
-  line-height: var(--line-height-body);
 }
 
 .sign-in__message {

@@ -72,7 +72,12 @@ describe('InboxTemplate', () => {
     const h1 = host.querySelector('h1');
     const status = host.querySelector('p.asys-page__status.inbox__status');
 
-    expect(h1?.className).toBe('asys-page__title inbox__title');
+    for (const name of ['asys-page__title', 'inbox__title', 'asys-text', 'asys-text--title']) {
+      expect(h1?.classList.contains(name), name).toBe(true);
+    }
+    for (const name of ['asys-page__status', 'inbox__status', 'asys-text', 'asys-text--body']) {
+      expect(status?.classList.contains(name), name).toBe(true);
+    }
     expect(h1?.getAttribute('tabindex')).toBe('-1');
     expect(h1?.textContent?.trim()).toBe('Inbox');
     expect(h1?.nextElementSibling).toBe(status);

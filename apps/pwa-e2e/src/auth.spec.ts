@@ -18,7 +18,9 @@ test('The session cookie travels with API requests', async ({ page }) => {
 test('A seeded Capture is Applied', async ({ page }) => {
   await captureTask(page, { title: 'Smoke Task' });
   await page.reload();
-  const badge = page.getByRole('navigation', { name: 'Primary' }).locator('.asys-bottomnav__badge');
+  const badge = page
+    .getByRole('navigation', { name: 'Primary' })
+    .locator('.asys-nav-item__icon > .asys-count');
   await expect(badge).toHaveText('1');
 });
 

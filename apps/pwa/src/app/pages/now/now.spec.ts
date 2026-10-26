@@ -411,16 +411,18 @@ const setup = async (options: SetupOptions = {}) => {
       ),
     );
   const waitingSection = (): HTMLElement | null =>
-    root().querySelector('asys-section-header section.asys-section');
+    root().querySelector('section.asys-collapsible-section');
   const waitingHeader = (): HTMLButtonElement | null =>
-    root().querySelector('asys-section-header button');
+    root().querySelector('section.asys-collapsible-section > button.asys-section-header');
   const waitingBody = (): HTMLElement | null =>
-    root().querySelector('asys-section-header .asys-section__body');
+    root().querySelector('.asys-collapsible-section__body');
   const waitingList = (): HTMLElement | null => root().querySelector('ul.now__list--waiting');
   const waitingRows = (): HTMLAnchorElement[] =>
     Array.from(root().querySelectorAll<HTMLAnchorElement>('ul.now__list--waiting a.asys-task-row'));
   const waitingSummaryText = (): string | undefined =>
-    root().querySelector('asys-section-header .asys-section-header__summary')?.textContent?.trim();
+    root()
+      .querySelector('.asys-collapsible-section .asys-section-header__summary')
+      ?.textContent?.trim();
   const swipes = (): DebugElement[] => fixture.debugElement.queryAll(By.directive(SwipeActions));
   const swipe = (id: string): DebugElement =>
     must(
@@ -1111,7 +1113,7 @@ describe('Now', () => {
 
       expect(waitingHeader()).toBeNull();
       expect(waitingSection()).toBeNull();
-      expect(root().querySelector('asys-section-header')).toBeNull();
+      expect(root().querySelector('section.asys-collapsible-section')).toBeNull();
     });
 
     it('shows a collapsed section card with the hourglass, the title and the count', async () => {
@@ -1148,10 +1150,10 @@ describe('Now', () => {
 
       expect(must(waitingHeader()).getAttribute('aria-expanded')).toBe('true');
       expect(body.hidden).toBe(false);
-      expect(body.closest('section.asys-section')).toBe(waitingSection());
+      expect(body.closest('section.asys-collapsible-section')).toBe(waitingSection());
       expect(list.classList.contains('now__list')).toBe(true);
       expect(list.classList.contains('now__list--waiting')).toBe(true);
-      expect(list.closest('.asys-section__body')).toBe(body);
+      expect(list.closest('.asys-collapsible-section__body')).toBe(body);
       expect(waitingRows()).toHaveLength(2);
       expect(waitingRows().every((a) => body.contains(a))).toBe(true);
       expect(rows().some((a) => body.contains(a))).toBe(false);
@@ -1172,7 +1174,7 @@ describe('Now', () => {
       ]);
       expect(
         must(root().querySelector('ul.now__list:not(.now__list--waiting)')).closest(
-          'asys-section-header',
+          'section.asys-collapsible-section',
         ),
       ).toBeNull();
       expect(rows().some((a) => must(waitingSection()).contains(a))).toBe(false);

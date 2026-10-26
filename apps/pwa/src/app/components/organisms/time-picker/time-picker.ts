@@ -5,6 +5,7 @@ import { isLocalTime, type LocalTime } from '@asys/domain';
 import { Button, ButtonVariant } from '../../atoms/button/button';
 import { Input } from '../../atoms/input/input';
 import { Label } from '../../atoms/label/label';
+import { Segment } from '../../atoms/segment/segment';
 
 let nextId = 0;
 
@@ -13,7 +14,7 @@ const TIMES: readonly LocalTime[] = ['09:00', '10:00', '12:00', '14:00', '17:00'
 /** The body of a time sheet: six common times and a native time input. It emits, it never stores. */
 @Component({
   selector: 'asys-time-picker',
-  imports: [Button, Input, Label],
+  imports: [Button, Input, Label, Segment],
   encapsulation: ViewEncapsulation.None,
   template: `
     @if (context()) {
@@ -21,12 +22,7 @@ const TIMES: readonly LocalTime[] = ['09:00', '10:00', '12:00', '14:00', '17:00'
     }
     <div class="asys-time-picker__chips" role="group" aria-label="Times">
       @for (time of times; track time) {
-        <button
-          type="button"
-          class="asys-num asys-time-picker__chip"
-          [attr.aria-pressed]="value() === time ? 'true' : 'false'"
-          (click)="pick.emit(time)"
-        >
+        <button asys-segment [num]="true" [pressed]="value() === time" (click)="pick.emit(time)">
           {{ time }}
         </button>
       }

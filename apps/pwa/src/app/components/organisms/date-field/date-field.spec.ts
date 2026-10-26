@@ -4,14 +4,14 @@ import { TestBed } from '@angular/core/testing';
 import { disabled, form, FormField, validate, type ValidationError } from '@angular/forms/signals';
 import type { DateSpec } from '@asys/domain';
 
-import { DateRow } from './date-row';
+import { DateField } from './date-field';
 
 const TODAY = '2026-10-13';
 
 @Component({
-  imports: [DateRow],
+  imports: [DateField],
   template: `
-    <asys-date-row
+    <asys-date-field
       label="Due"
       noneLabel="None"
       removeLabel="Remove Due"
@@ -28,7 +28,7 @@ const TODAY = '2026-10-13';
   `,
 })
 class Host {
-  readonly field = viewChild.required(DateRow);
+  readonly field = viewChild.required(DateField);
 
   readonly today = TODAY;
 
@@ -46,9 +46,9 @@ class Host {
 }
 
 @Component({
-  imports: [DateRow, FormField],
+  imports: [DateField, FormField],
   template: `
-    <asys-date-row
+    <asys-date-field
       [formField]="f.due"
       label="Due"
       noneLabel="None"
@@ -74,9 +74,9 @@ class FormHost {
 }
 
 @Component({
-  imports: [DateRow],
+  imports: [DateField],
   template: `
-    <asys-date-row
+    <asys-date-field
       label="Available from"
       noneLabel="Any time"
       removeLabel="Remove Available from"
@@ -137,18 +137,24 @@ const setup = async (value: DateSpec | null = null) => {
   const f = finders(root);
   const { press, change } = actions(fixture);
   const dateChips = (): HTMLButtonElement[] =>
-    Array.from(f.dateDialog().querySelectorAll<HTMLButtonElement>('.asys-date-picker__chip'));
+    Array.from(
+      f
+        .dateDialog()
+        .querySelectorAll<HTMLButtonElement>('.asys-date-picker__chips > .asys-segment'),
+    );
   const dayButton = (label: string): HTMLButtonElement =>
     f
       .dateDialog()
-      .querySelector(`button.asys-date-picker__day[aria-label="${label}"]`) as HTMLButtonElement;
+      .querySelector(`button.asys-calendar__day[aria-label="${label}"]`) as HTMLButtonElement;
   const dateRemove = (): HTMLButtonElement | null =>
     f.dateDialog().querySelector<HTMLButtonElement>('button.asys-date-picker__remove');
   const dateInput = (): HTMLInputElement =>
     f.dateDialog().querySelector('input[type="date"]') as HTMLInputElement;
   const timeChip = (text: string): HTMLButtonElement =>
     Array.from(
-      f.timeDialog().querySelectorAll<HTMLButtonElement>('button.asys-time-picker__chip'),
+      f
+        .timeDialog()
+        .querySelectorAll<HTMLButtonElement>('.asys-time-picker__chips > button.asys-segment'),
     ).find((b) => squash(b.textContent) === text) as HTMLButtonElement;
   const timeInput = (): HTMLInputElement =>
     f.timeDialog().querySelector('input[type="time"]') as HTMLInputElement;
@@ -174,109 +180,7 @@ const setup = async (value: DateSpec | null = null) => {
   };
 };
 
-describe('DateRow', () => {
-  describe('the row', () => {
-    it('shows the label and the none label while there is no value', async () => {
-      const { row } = await setup();
-
-      expect(squash(row().querySelector('.asys-row__label')?.textContent)).toBe('Due');
-
-      const value = row().querySelector('.asys-row__value') as HTMLElement;
-
-      expect(squash(value.textContent)).toBe('None');
-      expect(value.classList.contains('asys-row__value--set')).toBe(false);
-      expect(row().getAttribute('type')).toBe('button');
-    });
-
-    it.each([
-      ['2026-10-14', 'Tomorrow'],
-      ['2026-10-19', 'Mon 19 Oct'],
-      ['2026-10-13', 'Today'],
-    ])('shows %s as %s and marks the value as set', async (date, text) => {
-      const { row } = await setup({ date });
-      const value = row().querySelector('.asys-row__value') as HTMLElement;
-
-      expect(squash(value.textContent)).toBe(text);
-      expect(value.classList.contains('asys-row__value--set')).toBe(true);
-    });
-
-    it('updates the text when the value changes', async () => {
-      const { fixture, host, row } = await setup({ date: '2026-10-14' });
-
-      host.value.set(null);
-      await fixture.whenStable();
-
-      expect(squash(row().querySelector('.asys-row__value')?.textContent)).toBe('None');
-    });
-
-    it('uses the none label it is given', async () => {
-      const fixture = TestBed.createComponent(AvailableHost);
-
-      fixture.componentInstance.value.set(null);
-      await fixture.whenStable();
-
-      expect(squash(fixture.nativeElement.querySelector('.asys-row__value')?.textContent)).toBe(
-        'Any time',
-      );
-    });
-
-    it('has a popup on the row button', async () => {
-      const { row } = await setup();
-
-      expect(row().getAttribute('aria-haspopup')).toBe('dialog');
-    });
-  });
-
-  describe('the time button', () => {
-    it('is absent without a value', async () => {
-      const { timeButton } = await setup();
-
-      expect(timeButton()).toBeNull();
-    });
-
-    it('offers to add a time when the value has a date only', async () => {
-      const { timeButton } = await setup({ date: '2026-10-14' });
-      const button = timeButton() as HTMLButtonElement;
-
-      expect(button.getAttribute('type')).toBe('button');
-      expect(button.getAttribute('aria-label')).toBe('Add a time to Due');
-      expect(button.getAttribute('aria-haspopup')).toBe('dialog');
-      expect(button.querySelector('asys-icon')).not.toBeNull();
-      expect(squash(button.textContent)).toBe('');
-      expect(button.classList.contains('asys-date-row__time--set')).toBe(false);
-    });
-
-    it('shows the time and names it when the value has one', async () => {
-      const { timeButton } = await setup({ date: '2026-10-14', time: '17:00' });
-      const button = timeButton() as HTMLButtonElement;
-
-      expect(button.getAttribute('aria-label')).toBe('Due at 17:00, change time');
-      expect(squash(button.textContent)).toBe('17:00');
-      expect(button.classList.contains('asys-date-row__time--set')).toBe(true);
-      expect(button.classList.contains('asys-num')).toBe(true);
-    });
-
-    it('uses the time prefix it is given', async () => {
-      const fixture = TestBed.createComponent(AvailableHost);
-      await fixture.whenStable();
-
-      const button = fixture.nativeElement.querySelector(
-        'button.asys-date-row__time',
-      ) as HTMLButtonElement;
-
-      expect(button.getAttribute('aria-label')).toBe('Available from 09:00, change time');
-    });
-
-    it('disappears when the value becomes null', async () => {
-      const { fixture, host, timeButton } = await setup({ date: '2026-10-14' });
-
-      host.value.set(null);
-      await fixture.whenStable();
-
-      expect(timeButton()).toBeNull();
-    });
-  });
-
+describe('DateField', () => {
   describe('the date sheet', () => {
     it('is closed at first and holds a date pick once the row is pressed', async () => {
       const { fixture, row, press, dateDialog } = await setup();
@@ -630,7 +534,7 @@ describe('DateRow', () => {
       host.model.set({ due: { date: '2026-10-14', time: '17:00' } });
       await fixture.whenStable();
 
-      expect(squash(row().querySelector('.asys-row__value')?.textContent)).toBe('Tomorrow');
+      expect(squash(row().querySelector('.asys-field-row__value')?.textContent)).toBe('Tomorrow');
     });
 
     it('writes a picked date into the form model', async () => {
@@ -638,7 +542,9 @@ describe('DateRow', () => {
 
       await press(row());
 
-      const chip = dateDialog().querySelectorAll<HTMLButtonElement>('.asys-date-picker__chip')[1];
+      const chip = dateDialog().querySelectorAll<HTMLButtonElement>(
+        '.asys-date-picker__chips > .asys-segment',
+      )[1];
 
       await press(chip);
 

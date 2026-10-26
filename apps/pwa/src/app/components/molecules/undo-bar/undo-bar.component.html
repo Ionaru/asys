@@ -14,20 +14,7 @@
       [attr.aria-label]="'Undo Done: ' + title()"
       (click)="undo.emit()"
     >
-      <span class="asys-undo__timer" aria-hidden="true">
-        <svg viewBox="0 0 20 20">
-          <circle class="asys-undo__ring" cx="10" cy="10" r="9" />
-          <circle
-            #fill
-            class="asys-undo__fill"
-            cx="10"
-            cy="10"
-            r="3.25"
-            pathLength="100"
-            transform="rotate(-90 10 10)"
-          />
-        </svg>
-      </span>
+      <span asys-countdown [paused]="paused()"></span>
       Undo
     </button>
   }

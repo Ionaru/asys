@@ -61,11 +61,6 @@
   }
 }
 
-.asys-button__count {
-  background: var(--on-signal);
-  color: var(--signal);
-}
-
 /* Large is the one decision on a card. */
 .asys-button--large {
   min-height: var(--tap-target-large);
@@ -105,21 +100,6 @@
   & .asys-icon {
     font-size: 1.25em;
   }
-}
-
-.asys-button-group {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-/* Fill shares the row in equal widths, never narrower than the words, and stacks when they no longer fit. */
-.asys-button-group--fill > .asys-button {
-  flex: 1 1 0;
-  min-width: min-content;
-  padding-inline: var(--space-2);
-  white-space: nowrap;
 }
 
 .asys-button--block {

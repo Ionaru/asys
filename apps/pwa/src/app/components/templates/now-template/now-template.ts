@@ -15,13 +15,15 @@ import type { Quadrant } from '@asys/domain';
 
 import { Button, ButtonVariant } from '../../atoms/button/button';
 import { IconName } from '../../atoms/icon/icon';
+import { Link } from '../../atoms/link/link';
 import { SyncNote } from '../../atoms/sync-note/sync-note';
+import { Text } from '../../atoms/text/text';
 import { AreaPickControl, type AreaChoice } from '../../molecules/area-pick/area-pick';
 import { LoadState } from '../../molecules/load-state/load-state';
 import { TaskRow, TaskRowVariant } from '../../molecules/task-row/task-row';
+import { CollapsibleSection } from '../../organisms/collapsible-section/collapsible-section';
 import { LogProgressForm } from '../../organisms/log-progress-form/log-progress-form';
 import { ScreenHeader } from '../../organisms/screen-header/screen-header';
-import { SectionHeader } from '../../organisms/section-header/section-header';
 import { SwipeActions } from '../../organisms/swipe-actions/swipe-actions';
 import { TopPick } from '../../organisms/top-pick/top-pick';
 
@@ -112,14 +114,16 @@ export interface NowRowEnter {
 @Component({
   selector: 'asys-now-template',
   imports: [
+    Text,
     AreaPickControl,
     Button,
+    Link,
     LoadState,
     LogProgressForm,
     ScreenHeader,
     TaskRow,
     RouterLink,
-    SectionHeader,
+    CollapsibleSection,
     SwipeActions,
     SyncNote,
     TopPick,

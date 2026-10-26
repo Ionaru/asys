@@ -32,7 +32,7 @@
 <h1 #headingRef class="asys-visually-hidden task-editor__heading" tabindex="-1">
   {{ heading() }}
 </h1>
-<p class="asys-page__status task-editor__status" role="status">{{ statusText() }}</p>
+<p asys-text class="asys-page__status task-editor__status" role="status">{{ statusText() }}</p>
 @if (saveFailed()) {
   <button
     asys-button
@@ -95,8 +95,10 @@
 } @else if (!loaded()) {
   <asys-load-state [failed]="loadFailed()" (retry)="retry.emit()" />
 } @else if (!leaving()) {
-  <p class="task-editor__missing">This Task is no longer open.</p>
-  <p class="task-editor__text"><a class="task-editor__link" routerLink="/now">Go to Now</a></p>
+  <p asys-text class="task-editor__missing">This Task is no longer open.</p>
+  <p asys-text class="task-editor__text">
+    <a asys-link [block]="true" routerLink="/now">Go to Now</a>
+  </p>
   @if (dirty()) {
     <ng-container [ngTemplateOutlet]="card" />
   }
@@ -104,7 +106,7 @@
 
 <asys-sheet heading="Log progress" [(open)]="logOpen">
   <ng-template>
-    <p class="task-editor__message" role="status">{{ logMessage() }}</p>
+    <p asys-text class="task-editor__message" role="status">{{ logMessage() }}</p>
     @if (logEstimate(); as estimate) {
       <asys-log-progress-form
         [estimateMinutes]="estimate"
@@ -138,7 +140,7 @@
         Drop
       </button>
     }
-    <p class="task-editor__message" role="status">{{ dropMessage() }}</p>
+    <p asys-text class="task-editor__message" role="status">{{ dropMessage() }}</p>
   </ng-template>
 </asys-sheet>
 
@@ -203,8 +205,8 @@
     <asys-segmented-control
       [formField]="importantField()"
       legend="Importance"
-      trueLabel="Important"
-      falseLabel="Not important"
+      [options]="importanceOptions"
+      [layout]="SegmentLayout.Fill"
     />
     <asys-estimate-picker [formField]="estimateField()" [layout]="Layout.Ruler" />
     <div class="task-editor__rows">
@@ -214,7 +216,7 @@
         [options]="areaOptions()"
         [icon]="Icons.Folder"
       />
-      <asys-date-row
+      <asys-date-field
         [formField]="availableFromField()"
         label="Available from"
         noneLabel="Any time"
@@ -222,7 +224,7 @@
         timePrefix="Available from"
         [today]="today()"
       />
-      <asys-date-row
+      <asys-date-field
         [formField]="dueField()"
         label="Due"
         noneLabel="None"

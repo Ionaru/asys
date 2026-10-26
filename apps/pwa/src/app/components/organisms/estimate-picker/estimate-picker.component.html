@@ -20,17 +20,18 @@
       @for (chip of chips; track chip.minutes) {
         <button
           #chipButton
-          type="button"
-          class="asys-estimate__cell"
+          asys-segment
+          [stacked]="true"
+          [num]="true"
+          [pressed]="value() === chip.minutes"
           [attr.aria-label]="chip.label"
           [disabled]="disabled()"
-          [attr.aria-pressed]="value() === chip.minutes ? 'true' : 'false'"
           [attr.aria-describedby]="messageId()"
           (click)="pick(chip.minutes)"
           (blur)="touch.emit()"
         >
-          <span class="asys-num asys-estimate__num">{{ chip.amount }}</span>
-          <span class="asys-estimate__unit">{{ chip.unit }}</span>
+          <span class="asys-segment__value">{{ chip.amount }}</span>
+          <span class="asys-segment__unit">{{ chip.unit }}</span>
         </button>
       }
     </div>
@@ -43,10 +44,10 @@
       @for (chip of chips; track chip.minutes) {
         <button
           #chipButton
-          type="button"
-          class="asys-num asys-estimate__chip asys-estimate__chip--num"
+          asys-segment
+          [num]="true"
+          [pressed]="value() === chip.minutes"
           [disabled]="disabled()"
-          [attr.aria-pressed]="value() === chip.minutes ? 'true' : 'false'"
           [attr.aria-describedby]="messageId()"
           (click)="pick(chip.minutes)"
           (blur)="touch.emit()"
@@ -55,10 +56,9 @@
         </button>
       }
       <button
-        type="button"
-        class="asys-estimate__chip"
+        asys-segment
+        [pressed]="otherShown()"
         [disabled]="disabled()"
-        [attr.aria-pressed]="otherShown() ? 'true' : 'false'"
         [attr.aria-describedby]="messageId()"
         (click)="openOther()"
         (blur)="touch.emit()"

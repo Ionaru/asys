@@ -43,14 +43,15 @@ const setup = async (initial: number | null = 0, component: Type<Host> = Host) =
   await fixture.whenStable();
 
   const links = (): HTMLAnchorElement[] =>
-    Array.from(fixture.nativeElement.querySelectorAll('nav.asys-bottomnav a.asys-bottomnav__item'));
+    Array.from(fixture.nativeElement.querySelectorAll('nav.asys-bottomnav a.asys-nav-item'));
 
   const go = async (url: string): Promise<void> => {
     await TestBed.inject(Router).navigateByUrl(url);
     await fixture.whenStable();
   };
 
-  const badge = (): Element | null => fixture.nativeElement.querySelector('.asys-bottomnav__badge');
+  const badge = (): Element | null =>
+    fixture.nativeElement.querySelector('.asys-nav-item__icon > .asys-count');
 
   const nav = (): BottomNav =>
     fixture.debugElement.query(By.directive(BottomNav)).componentInstance as BottomNav;
@@ -67,7 +68,7 @@ describe('BottomNav', () => {
     ).toBe('Primary');
     expect(links().map((a) => a.getAttribute('href'))).toEqual(['/now', '/today', '/inbox']);
     expect(
-      links().map((a) => a.querySelector('.asys-bottomnav__label')?.textContent?.trim()),
+      links().map((a) => a.querySelector('.asys-nav-item__label')?.textContent?.trim()),
     ).toEqual(['Now', 'Today', 'Inbox']);
   });
 
@@ -78,24 +79,24 @@ describe('BottomNav', () => {
     await fixture.whenStable();
 
     expect(
-      links().map((a) => a.querySelector('.asys-bottomnav__label')?.textContent?.trim()),
+      links().map((a) => a.querySelector('.asys-nav-item__label')?.textContent?.trim()),
     ).toEqual(['Now', 'Today', 'Inbox']);
   });
 
   it('has no pill', async () => {
     const { fixture, links, go } = await setup();
 
-    expect(fixture.nativeElement.querySelector('.asys-bottomnav__pill')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.asys-nav-item__pill')).toBeNull();
 
     await go('/now');
 
-    expect(fixture.nativeElement.querySelector('.asys-bottomnav__pill')).toBeNull();
-    expect(links().every((a) => a.querySelector('.asys-bottomnav__pill') === null)).toBe(true);
+    expect(fixture.nativeElement.querySelector('.asys-nav-item__pill')).toBeNull();
+    expect(links().every((a) => a.querySelector('.asys-nav-item__pill') === null)).toBe(true);
   });
 
   describe('the icons', () => {
     const glyph = (link: HTMLAnchorElement | undefined): SVGElement | null =>
-      link?.querySelector('.asys-bottomnav__icon svg[data-icon]') ?? null;
+      link?.querySelector('.asys-nav-item__icon svg[data-icon]') ?? null;
 
     it('gives each link an icon holding its glyph, in Regular before any route is active', async () => {
       const { links } = await setup();
@@ -116,8 +117,8 @@ describe('BottomNav', () => {
       const { links } = await setup();
 
       for (const link of links()) {
-        const icon = link.querySelector('.asys-bottomnav__icon');
-        const label = link.querySelector('.asys-bottomnav__label');
+        const icon = link.querySelector('.asys-nav-item__icon');
+        const label = link.querySelector('.asys-nav-item__label');
 
         expect(icon?.tagName).toBe('SPAN');
         expect(icon?.querySelector('asys-icon')).not.toBeNull();
@@ -276,7 +277,7 @@ describe('BottomNav', () => {
   it('shows no badge at 0', async () => {
     const { fixture } = await setup();
 
-    expect(fixture.nativeElement.querySelector('.asys-bottomnav__badge')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.asys-nav-item__icon > .asys-count')).toBeNull();
   });
 
   it('shows the count in an aria-hidden badge inside the Inbox icon, after the glyph, when above 0', async () => {
@@ -285,8 +286,8 @@ describe('BottomNav', () => {
     host.count.set(4);
     await fixture.whenStable();
 
-    const badges = fixture.nativeElement.querySelectorAll('.asys-bottomnav__badge');
-    const icon = links()[2].querySelector('.asys-bottomnav__icon');
+    const badges = fixture.nativeElement.querySelectorAll('.asys-nav-item__icon > .asys-count');
+    const icon = links()[2].querySelector('.asys-nav-item__icon');
 
     expect(badges.length).toBe(1);
     expect(badges[0].textContent?.trim()).toBe('4');
@@ -294,13 +295,45 @@ describe('BottomNav', () => {
     expect(badges[0].parentElement).toBe(icon);
     expect(icon?.firstElementChild?.matches('asys-icon')).toBe(true);
     expect(icon?.lastElementChild).toBe(badges[0]);
-    expect(links()[2].querySelector('.asys-bottomnav__label .asys-bottomnav__badge')).toBeNull();
-    expect(links()[2].querySelector('.asys-bottomnav__label')?.textContent?.trim()).toBe('Inbox');
+    expect(links()[2].querySelector('.asys-nav-item__label .asys-count')).toBeNull();
+    expect(links()[2].querySelector('.asys-nav-item__label')?.textContent?.trim()).toBe('Inbox');
 
     host.count.set(0);
     await fixture.whenStable();
 
-    expect(fixture.nativeElement.querySelector('.asys-bottomnav__badge')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.asys-nav-item__icon > .asys-count')).toBeNull();
+  });
+
+  it('draws the badge with the Count atom, as the last child of the Inbox icon', async () => {
+    const { fixture, host, links } = await setup();
+
+    host.count.set(4);
+    await fixture.whenStable();
+
+    const icon = links()[2].querySelector('.asys-nav-item__icon');
+    const badge = fixture.nativeElement.querySelector(
+      '.asys-nav-item__icon > .asys-count',
+    ) as HTMLElement;
+
+    expect(badge.tagName).toBe('SPAN');
+    expect(badge.classList.contains('asys-count')).toBe(true);
+    expect(badge.classList.contains('asys-count--on-signal')).toBe(false);
+    expect(badge.classList.contains('asys-count--quiet')).toBe(false);
+    expect(badge.getAttribute('aria-hidden')).toBe('true');
+    expect(badge.textContent).toBe('4');
+    expect(icon?.lastElementChild).toBe(badge);
+  });
+
+  it('caps the badge at 99+ while the Inbox link still says the real number', async () => {
+    const { fixture, host, links } = await setup();
+
+    host.count.set(150);
+    await fixture.whenStable();
+
+    expect(
+      fixture.nativeElement.querySelector('.asys-nav-item__icon > .asys-count')?.textContent,
+    ).toBe('99+');
+    expect(links()[2].getAttribute('aria-label')).toBe('Inbox, 150 waiting');
   });
 
   it('keeps the badge out of the Now and Today icons', async () => {
@@ -309,8 +342,8 @@ describe('BottomNav', () => {
     host.count.set(4);
     await fixture.whenStable();
 
-    expect(links()[0].querySelector('.asys-bottomnav__badge')).toBeNull();
-    expect(links()[1].querySelector('.asys-bottomnav__badge')).toBeNull();
+    expect(links()[0].querySelector('.asys-nav-item__icon > .asys-count')).toBeNull();
+    expect(links()[1].querySelector('.asys-nav-item__icon > .asys-count')).toBeNull();
   });
 
   describe('the Inbox name', () => {
@@ -541,9 +574,16 @@ describe('BottomNav', () => {
       await fixture.whenStable();
 
       expect(links().map((a) => a.getAttribute('href'))).toEqual(['/now', '/today', '/inbox']);
-      expect(
-        links()[2].querySelector('.asys-bottomnav__icon .asys-bottomnav__badge'),
-      ).not.toBeNull();
+      expect(links()[2].querySelector('.asys-nav-item__icon > .asys-count')).not.toBeNull();
+    });
+
+    it('makes each link an a.asys-nav-item directly under the nav, before the projected button', async () => {
+      const { fixture, links } = await setup(0, ProjectingHost);
+      const nav = fixture.nativeElement.querySelector('nav.asys-bottomnav') as HTMLElement;
+
+      expect(links().length).toBe(3);
+      expect(links().every((a) => a.parentElement === nav)).toBe(true);
+      expect(Array.from(nav.children).indexOf(nav.querySelector('button.projected')!)).toBe(3);
     });
 
     it('renders nothing after the links when nothing is projected', async () => {

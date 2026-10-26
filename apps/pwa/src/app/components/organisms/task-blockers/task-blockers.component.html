@@ -1,12 +1,13 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
-<asys-section-header
+<button
+  asys-section-header
   [action]="SectionHeaderAction.Open"
   [icon]="Icons.Ban"
   [trailingIcon]="Icons.Plus"
   [title]="'Blocked by'"
   [summary]="summary()"
-  (activate)="open.set(true)"
-/>
+  (click)="open.set(true)"
+></button>
 <asys-sheet heading="Blocked by" [(open)]="open">
   <ng-template>
     <div class="task-blockers__body">
@@ -31,7 +32,7 @@
           }
         </ul>
       } @else {
-        <p class="task-blockers__text">Waits for no other Task.</p>
+        <p asys-text class="task-blockers__text">Waits for no other Task.</p>
       }
       <asys-text-field
         label="Find a Task"
@@ -56,15 +57,23 @@
           }
         </ul>
       } @else {
-        <p class="task-blockers__text">No Task matches.</p>
+        <p asys-text class="task-blockers__text">No Task matches.</p>
       }
-      <p class="task-blockers__message" role="status">{{ message() }}</p>
+      <p
+        asys-text
+        [textStyle]="TextStyle.Reason"
+        class="task-blockers__message"
+        role="status"
+        [textContent]="message()"
+      ></p>
       <h3 class="task-blockers__subtitle">Blocks</h3>
       @if (blocks().length > 0) {
         <ul class="task-blockers__list">
           @for (dependant of blocks(); track dependant.id) {
             <li>
               <a
+                asys-link
+                [block]="true"
                 class="task-blockers__link"
                 [routerLink]="['/tasks', dependant.id]"
                 (click)="open.set(false)"
@@ -74,7 +83,7 @@
           }
         </ul>
       } @else {
-        <p class="task-blockers__text">No Task waits for this one.</p>
+        <p asys-text class="task-blockers__text">No Task waits for this one.</p>
       }
     </div>
   </ng-template>

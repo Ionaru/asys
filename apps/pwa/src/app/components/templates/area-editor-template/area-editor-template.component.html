@@ -1,6 +1,8 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
-<h1 class="asys-page__title area-editor__title">{{ heading() }}</h1>
-<p class="asys-page__status area-editor__status" role="status">{{ statusLine() }}</p>
+<h1 asys-text [textStyle]="TextStyle.Title" class="asys-page__title area-editor__title">
+  {{ heading() }}
+</h1>
+<p asys-text class="asys-page__status area-editor__status" role="status">{{ statusLine() }}</p>
 @if (!loaded()) {
   <asys-load-state [failed]="loadFailed()" (retry)="retry.emit()" />
 } @else if (found()) {
@@ -12,7 +14,9 @@
       [value]="palette() ?? ''"
       (valueChange)="setPalette($event)"
     />
-    <p class="area-editor__hint">An end of 00:00 means the end of the day.</p>
+    <p asys-text [textStyle]="TextStyle.Reason" class="area-editor__hint">
+      An end of 00:00 means the end of the day.
+    </p>
     @for (day of days(); track day.index) {
       <fieldset class="asys-fieldset-reset area-editor__day">
         <legend asys-label>{{ day.name }}</legend>
@@ -62,7 +66,7 @@
         @if (day.overlap) {
           <p asys-field-error [id]="overlapId(day.index)">Hours overlap</p>
         }
-        <div class="asys-button-group">
+        <div asys-button-group>
           <button
             asys-button
             type="button"
@@ -77,11 +81,11 @@
       </fieldset>
     }
     @if (noHours()) {
-      <p class="area-editor__note">
+      <p asys-text [textStyle]="TextStyle.Reason" class="area-editor__note">
         Tasks in this Area never show in Now unless you pick it there.
       </p>
     }
-    <div class="asys-button-group">
+    <div asys-button-group>
       <button
         asys-button
         type="button"
@@ -92,7 +96,7 @@
         {{ isNew() ? 'Create' : 'Save' }}
       </button>
       @if (needsName()) {
-        <p class="area-editor__reason">Needs a name</p>
+        <p asys-text [textStyle]="TextStyle.Reason" class="area-editor__reason">Needs a name</p>
       }
     </div>
     @if (awaiting()) {
@@ -102,8 +106,8 @@
 } @else if (awaiting()) {
   <p asys-sync-note></p>
 } @else {
-  <p class="area-editor__text">This Area no longer exists.</p>
-  <p class="area-editor__text">
-    <a class="area-editor__link" routerLink="/settings/areas">Go to Areas</a>
+  <p asys-text class="area-editor__text">This Area no longer exists.</p>
+  <p asys-text class="area-editor__text">
+    <a asys-link [block]="true" routerLink="/settings/areas">Go to Areas</a>
   </p>
 }

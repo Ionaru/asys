@@ -13,8 +13,6 @@
 .sign-up__body,
 .sign-up__message {
   margin: 0;
-  font-size: var(--font-size-body);
-  line-height: var(--line-height-body);
 }
 
 .sign-up__message {
@@ -24,6 +22,4 @@
 .sign-up__codes {
   margin: 0;
   padding-inline-start: var(--space-6);
-  font-size: var(--font-size-body);
-  line-height: var(--line-height-body);
 }

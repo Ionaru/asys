@@ -67,10 +67,6 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.asys-muted {
-  color: var(--ink-muted);
-}
-
 .asys-danger-text {
   color: var(--danger);
 }
@@ -294,12 +290,9 @@ textarea.asys-input {
   padding-block-start: var(--space-6);
 }
 
-/* A screen's title. The flush modifier drops the space below it, for screens that space their blocks with a gap. */
+/* The margin under a screen's title. The flush modifier drops the space below it, for screens that space their blocks with a gap. */
 .asys-page__title {
   margin: 0 0 var(--space-3);
-  font-size: var(--font-size-title);
-  line-height: var(--line-height-title);
-  font-weight: 700;
 }
 
 .asys-page__title--flush {
@@ -309,23 +302,10 @@ textarea.asys-input {
 /* The status line under a title. It takes no room while it is empty. */
 .asys-page__status {
   margin: 0 0 var(--space-3);
-  font-size: var(--font-size-body);
-  line-height: var(--line-height-body);
 
   &:empty {
     margin: 0;
   }
-}
-
-/* The pill that holds a count. Use it with asys-num, and set the colours in the component. */
-.asys-count {
-  min-width: calc(var(--line-height-label) + var(--space-1));
-  padding: 0 var(--space-1);
-  border-radius: var(--radius-pill);
-  text-align: center;
-  font-size: var(--font-size-label);
-  line-height: var(--line-height-label);
-  font-weight: 700;
 }
 
 /* Takes the browser's border, padding and margin off a fieldset. */
@@ -336,8 +316,8 @@ textarea.asys-input {
   min-width: 0;
 }
 
-/* The row of a bottom-sheet control: a label, its value and a chevron. Used by asys-date-row and asys-choice-row. */
-.asys-row {
+/* FieldRow (components/molecules/field-row): a label, its value and a chevron to the sheet that changes it. A sheet's option rows (OptionList) reuse the class. */
+.asys-field-row {
   appearance: none;
   margin: 0;
   display: flex;
@@ -355,7 +335,8 @@ textarea.asys-input {
   font-family: var(--font-sans);
   font-size: var(--font-size-body);
   line-height: var(--line-height-body);
-  transition: background var(--duration-quick) var(--ease-out);
+  font-weight: 400;
+  transition: background-color var(--duration-quick) var(--ease-out);
 
   &:active {
     background: var(--signal-soft);
@@ -367,12 +348,12 @@ textarea.asys-input {
   }
 }
 
-.asys-row__label {
+.asys-field-row__label {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.asys-row__value {
+.asys-field-row__value {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
@@ -381,17 +362,17 @@ textarea.asys-input {
   text-align: right;
 }
 
-.asys-row__value--set {
+.asys-field-row__value--set {
   color: var(--ink);
   font-weight: 600;
 }
 
-.asys-row__chevron {
+.asys-field-row__chevron {
   color: var(--ink-muted);
   font-size: 0.875em;
 }
 
-[data-theme='drive'] .asys-row {
+[data-theme='drive'] .asys-field-row {
   min-height: var(--tap-target-drive);
 }
 
@@ -500,25 +481,25 @@ textarea.asys-input {
   view-transition-name: shell-nav;
 }
 
-.asys-bottomnav__item[aria-current='page'] .asys-bottomnav__icon {
+.asys-nav-item[aria-current='page'] .asys-nav-item__icon {
   view-transition-name: nav-mark;
 }
 
 /* Each glyph and the Inbox count have their own names, so the mark's snapshot holds only its pill and they stay
    in place while it moves. */
-.asys-bottomnav__item:nth-child(1) .asys-bottomnav__icon svg {
+.asys-nav-item:nth-child(1) .asys-nav-item__icon svg {
   view-transition-name: nav-glyph-1;
 }
 
-.asys-bottomnav__item:nth-child(2) .asys-bottomnav__icon svg {
+.asys-nav-item:nth-child(2) .asys-nav-item__icon svg {
   view-transition-name: nav-glyph-2;
 }
 
-.asys-bottomnav__item:nth-child(3) .asys-bottomnav__icon svg {
+.asys-nav-item:nth-child(3) .asys-nav-item__icon svg {
   view-transition-name: nav-glyph-3;
 }
 
-.asys-bottomnav__badge {
+.asys-nav-item__icon > .asys-count {
   view-transition-name: nav-badge;
 }
 

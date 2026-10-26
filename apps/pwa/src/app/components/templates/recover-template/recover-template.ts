@@ -4,12 +4,13 @@ import { FormField, FormRoot, type FieldTree } from '@angular/forms/signals';
 import { RouterLink } from '@angular/router';
 
 import { Button, ButtonVariant } from '../../atoms/button/button';
+import { Text, TextStyle } from '../../atoms/text/text';
 import { TextField } from '../../molecules/text-field/text-field';
 
 /** Lays out signing in with a recovery code, with a way back to the passkey. */
 @Component({
   selector: 'asys-recover-template',
-  imports: [Button, FormField, FormRoot, RouterLink, TextField],
+  imports: [Text, Button, FormField, FormRoot, RouterLink, TextField],
   templateUrl: './recover-template.component.html',
   styles: `
     .recover {
@@ -27,6 +28,8 @@ import { TextField } from '../../molecules/text-field/text-field';
   `,
 })
 export class RecoverTemplate {
+  protected readonly TextStyle = TextStyle;
+
   /** The recovery code form, which submits the sign-in. */
   readonly codeForm = input.required<FieldTree<{ code: string }>>();
 

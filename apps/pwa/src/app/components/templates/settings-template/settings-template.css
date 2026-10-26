@@ -8,8 +8,6 @@
 
 .settings__text {
   margin: 0;
-  font-size: var(--font-size-body);
-  line-height: var(--line-height-body);
 }
 
 .settings__sync {

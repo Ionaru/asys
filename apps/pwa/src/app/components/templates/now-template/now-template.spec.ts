@@ -364,7 +364,7 @@ describe('NowTemplate', () => {
   it('B10 renders no section header for an empty Waiting list', async () => {
     const { host } = await setup({ waiting: [] });
 
-    expect(host.querySelector('asys-section-header')).toBeNull();
+    expect(host.querySelector('section.asys-collapsible-section')).toBeNull();
   });
 
   it('B10 shows the Waiting count and summary, rows only when expanded, and toggles the model', async () => {
@@ -372,7 +372,7 @@ describe('NowTemplate', () => {
       waiting: [waitingRow('w1'), waitingRow('w2')],
       waitingSummary: 'Next: tomorrow',
     });
-    const header = must(host.querySelector('asys-section-header'));
+    const header = must(host.querySelector('section.asys-collapsible-section'));
 
     expect(header.querySelector('.asys-section-header__count')?.textContent?.trim()).toBe('2');
     expect(header.querySelector('.asys-section-header__summary')?.textContent?.trim()).toBe(
@@ -399,7 +399,7 @@ describe('NowTemplate', () => {
 
     await update('waiting', []);
 
-    expect(host.querySelector('asys-section-header')).toBeNull();
+    expect(host.querySelector('section.asys-collapsible-section')).toBeNull();
   });
 
   it('B11 shows the Area control only when areaControl is set, and picking emits areaPicked', async () => {

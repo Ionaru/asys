@@ -17,7 +17,7 @@ test('Triage defers, drops and triages Inbox Tasks while the badge counts down',
   await page.reload();
 
   const nav = page.getByRole('navigation', { name: 'Primary' });
-  const badge = nav.locator('.asys-bottomnav__badge');
+  const badge = nav.locator('.asys-nav-item__icon > .asys-count');
   await expect(badge).toHaveText('3');
   await nav.getByRole('link', { name: /^Inbox/ }).click();
 

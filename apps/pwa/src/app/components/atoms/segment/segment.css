@@ -1,0 +1,84 @@
+/* SPDX-License-Identifier: EUPL-1.2 */
+.asys-segment {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--tap-target);
+  min-width: var(--tap-target);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: center;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-body-strong);
+  line-height: var(--line-height-body-strong);
+  font-weight: 600;
+  transition: background-color var(--duration-quick) var(--ease-out);
+
+  &[aria-pressed='true'] {
+    background: var(--signal-soft);
+    color: var(--on-signal-soft);
+    border-color: var(--signal);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+}
+
+.asys-segment--num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-size-time);
+  line-height: var(--line-height-time);
+  font-weight: 500;
+}
+
+.asys-segment--stacked {
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-1);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-label);
+  line-height: var(--line-height-label);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.asys-segment--stacked.asys-segment--num {
+  min-height: var(--tap-target-large);
+  gap: 0;
+  padding: 0;
+}
+
+.asys-segment__value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-size-time);
+  line-height: var(--line-height-time);
+  font-weight: 600;
+}
+
+.asys-segment__unit {
+  color: var(--ink-muted);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-label);
+  line-height: var(--line-height-label);
+  font-weight: 700;
+}
+
+.asys-segment[aria-pressed='true'] .asys-segment__unit {
+  color: inherit;
+}
+
+[data-theme='drive'] .asys-segment {
+  min-height: var(--tap-target-drive);
+  transition: none;
+}

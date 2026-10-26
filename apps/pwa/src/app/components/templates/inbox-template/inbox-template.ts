@@ -13,6 +13,7 @@ import { RouterLink } from '@angular/router';
 
 import { Button, ButtonSize, ButtonVariant } from '../../atoms/button/button';
 import { SyncNote } from '../../atoms/sync-note/sync-note';
+import { Text, TextStyle } from '../../atoms/text/text';
 import { LoadState } from '../../molecules/load-state/load-state';
 import { ReviewItem, ReviewItemActionKind } from '../../molecules/review-item/review-item';
 import {
@@ -47,11 +48,13 @@ export interface InboxCard {
 /** Lays out the Review items and the Triage card of the Inbox. */
 @Component({
   selector: 'asys-inbox-template',
-  imports: [Button, LoadState, ReviewItem, RouterLink, SyncNote, TriageCard],
+  imports: [Text, Button, LoadState, ReviewItem, RouterLink, SyncNote, TriageCard],
   templateUrl: './inbox-template.component.html',
   styleUrl: './inbox-template.css',
 })
 export class InboxTemplate {
+  protected readonly TextStyle = TextStyle;
+
   /** Whether the state has loaded. */
   readonly loaded = input.required<boolean>();
 
@@ -106,7 +109,7 @@ export class InboxTemplate {
   /** Asks to edit the Task with this id. */
   readonly edit = output<string>();
 
-  private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
+  private readonly heading = viewChild('heading', { read: ElementRef<HTMLElement> });
 
   private readonly triageCard = viewChild(TriageCard);
 

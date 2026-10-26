@@ -390,39 +390,41 @@ const setup = async (options: SetupOptions = {}) => {
   const importanceButton = (label: string): HTMLButtonElement =>
     must(
       Array.from(
-        root().querySelectorAll<HTMLButtonElement>(
-          'asys-segmented-control .asys-segmented-control__option',
-        ),
+        root().querySelectorAll<HTMLButtonElement>('asys-segmented-control .asys-segment'),
       ).find((b) => text(b) === label),
       `the ${label} option`,
     );
   const pressedImportance = (): string | null => {
     const pressed = Array.from(
-      root().querySelectorAll('asys-segmented-control .asys-segmented-control__option'),
+      root().querySelectorAll('asys-segmented-control .asys-segment'),
     ).find((b) => b.getAttribute('aria-pressed') === 'true');
 
     return pressed === undefined ? null : text(pressed);
   };
   const cell = (label: string): HTMLButtonElement =>
     must(
-      root().querySelector<HTMLButtonElement>(`.asys-estimate__cell[aria-label="${label}"]`),
+      root().querySelector<HTMLButtonElement>(
+        `.asys-estimate__ruler > .asys-segment[aria-label="${label}"]`,
+      ),
       `the ${label} cell`,
     );
   const pressedCell = (): string | null =>
-    root().querySelector('.asys-estimate__cell[aria-pressed="true"]')?.getAttribute('aria-label') ??
-    null;
+    root()
+      .querySelector('.asys-estimate__ruler > .asys-segment[aria-pressed="true"]')
+      ?.getAttribute('aria-label') ?? null;
 
   // The Area, Available from and Due rows.
   const row = (label: string): HTMLElement =>
     must(
-      Array.from(root().querySelectorAll<HTMLElement>('asys-choice-row, asys-date-row')).find(
-        (r) => text(r.querySelector('.asys-row__label')) === label,
+      Array.from(root().querySelectorAll<HTMLElement>('asys-choice-row, asys-date-field')).find(
+        (r) => text(r.querySelector('.asys-field-row__label')) === label,
       ),
       `the ${label} row`,
     );
   const rowButton = (label: string): HTMLButtonElement =>
-    must(row(label).querySelector<HTMLButtonElement>('button.asys-row'));
-  const rowValue = (label: string): string => text(row(label).querySelector('.asys-row__value'));
+    must(row(label).querySelector<HTMLButtonElement>('button.asys-field-row'));
+  const rowValue = (label: string): string =>
+    text(row(label).querySelector('.asys-field-row__value'));
 
   // The reason line.
   const reason = (): HTMLElement | null => root().querySelector('.task-editor__reason');
@@ -439,8 +441,8 @@ const setup = async (options: SetupOptions = {}) => {
           'textarea[aria-label="Title"]',
           'textarea[aria-label="Notes"]',
           'button.task-editor__add-notes',
-          '.asys-segmented-control__option',
-          '.asys-estimate__cell',
+          'asys-segmented-control .asys-segment',
+          '.asys-estimate__ruler > .asys-segment',
           '.asys-estimate__other-toggle',
           'button.asys-choice-row__open',
           'button.asys-date-row__open',
@@ -771,7 +773,9 @@ describe('TaskEditor', () => {
       await click(rowButton('Area'));
 
       expect(
-        Array.from(dialog('Area').querySelectorAll('.asys-choice-row__option')).map((o) => text(o)),
+        Array.from(dialog('Area').querySelectorAll('.asys-option-list .asys-field-row')).map((o) =>
+          text(o),
+        ),
       ).toEqual(['No Area', 'Alpha', 'Mid', 'Zeta']);
     });
 
@@ -844,7 +848,7 @@ describe('TaskEditor', () => {
       await press(rowButton('Due'));
 
       const day = Array.from(
-        dialog('Due').querySelectorAll<HTMLButtonElement>('button.asys-date-picker__day'),
+        dialog('Due').querySelectorAll<HTMLButtonElement>('button.asys-calendar__day'),
       ).find((b) => (b.textContent ?? '').trim() === '9');
 
       await press(day);
@@ -861,9 +865,11 @@ describe('TaskEditor', () => {
       expect(time.open).toBe(true);
 
       await press(
-        Array.from(time.querySelectorAll<HTMLButtonElement>('button.asys-time-picker__chip')).find(
-          (b) => (b.textContent ?? '').trim() === '17:00',
-        ),
+        Array.from(
+          time.querySelectorAll<HTMLButtonElement>(
+            '.asys-time-picker__chips > button.asys-segment',
+          ),
+        ).find((b) => (b.textContent ?? '').trim() === '17:00'),
       );
 
       expect(send).toHaveBeenCalledTimes(2);
@@ -890,9 +896,7 @@ describe('TaskEditor', () => {
       await press(rowButton('Available from'));
 
       const day = Array.from(
-        dialog('Available from').querySelectorAll<HTMLButtonElement>(
-          'button.asys-date-picker__day',
-        ),
+        dialog('Available from').querySelectorAll<HTMLButtonElement>('button.asys-calendar__day'),
       ).find((b) => (b.textContent ?? '').trim() === '9');
 
       await press(day);
@@ -2660,7 +2664,11 @@ describe('TaskEditor through the route', () => {
     expect(titleField().value).toBe('Water form');
     expect(titleField().getAttribute('data-task-id')).toBe('t2');
 
-    must(root().querySelector<HTMLElement>('.asys-estimate__cell[aria-label="45 min"]')).click();
+    must(
+      root().querySelector<HTMLElement>(
+        '.asys-estimate__ruler > .asys-segment[aria-label="45 min"]',
+      ),
+    ).click();
     await flush();
 
     // Leaving the first editor saved what was typed there; the second sends only its own change.

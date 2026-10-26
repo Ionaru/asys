@@ -20,7 +20,7 @@
     ></a>
   </div>
 </asys-screen-header>
-<p class="asys-page__status now__status" role="status">{{ statusLine() }}</p>
+<p asys-text class="asys-page__status now__status" role="status">{{ statusLine() }}</p>
 @if (loaded()) {
   @if (card(); as top) {
     <asys-swipe-actions
@@ -65,10 +65,10 @@
       </asys-top-pick>
     </asys-swipe-actions>
   } @else {
-    <p class="now__text">Nothing to do right now.</p>
+    <p asys-text class="now__text">Nothing to do right now.</p>
     @if (inboxTaskCount() > 0) {
-      <p class="now__text">
-        <a routerLink="/inbox">
+      <p asys-text class="now__text">
+        <a asys-link routerLink="/inbox">
           {{
             inboxTaskCount() === 1
               ? '1 Task waits for Triage.'
@@ -134,7 +134,8 @@
     </div>
   }
   @if (waiting().length > 0) {
-    <asys-section-header
+    <section
+      asys-collapsible-section
       [icon]="Icons.HourglassHalf"
       [title]="'Waiting'"
       [count]="waiting().length"
@@ -161,7 +162,7 @@
           }
         </ul>
       }
-    </asys-section-header>
+    </section>
   }
 } @else {
   <asys-load-state [failed]="loadFailed()" (retry)="retry.emit()" />

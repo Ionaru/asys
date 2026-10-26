@@ -144,7 +144,7 @@ test.describe('under reduced motion', () => {
     page,
   }, testInfo) => {
     const nav = page.getByRole('navigation', { name: 'Primary' });
-    const badge = nav.locator('.asys-bottomnav__badge');
+    const badge = nav.locator('.asys-nav-item__icon > .asys-count');
 
     const kind = await page.evaluate(
       () => typeof (document as Document & { activeViewTransition?: unknown }).activeViewTransition,

@@ -1,18 +1,22 @@
 // SPDX-License-Identifier: EUPL-1.2
-import { Component, input, model, output, viewChild } from '@angular/core';
+import { Component, computed, input, model, output, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { Button, ButtonVariant } from '../../atoms/button/button';
+import { Link } from '../../atoms/link/link';
+import { Text, TextStyle } from '../../atoms/text/text';
 import { TextField } from '../../molecules/text-field/text-field';
 
 /** Lays out the share target: a Title to capture, and what the last capture did. */
 @Component({
   selector: 'asys-capture-template',
-  imports: [RouterLink, Button, TextField],
+  imports: [Text, RouterLink, Button, Link, TextField],
   templateUrl: './capture-template.component.html',
   styleUrl: './capture-template.css',
 })
 export class CaptureTemplate {
+  protected readonly TextStyle = TextStyle;
+
   /** The Title being captured. */
   readonly title = model.required<string>();
 
@@ -21,6 +25,12 @@ export class CaptureTemplate {
 
   /** The Title just captured, if the last capture was applied. */
   readonly confirmation = input.required<string | null>();
+
+  /** The sentence that confirms the capture, if the last capture was applied. */
+  protected readonly confirmationText = computed(() => {
+    const captured = this.confirmation();
+    return captured === null ? null : `Captured “${captured}”. It waits in the Inbox until Triage.`;
+  });
 
   /** What went wrong with the last capture, if anything. */
   readonly message = input.required<string | null>();

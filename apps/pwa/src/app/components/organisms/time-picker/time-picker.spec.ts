@@ -89,6 +89,30 @@ describe('TimePicker', () => {
       ]);
     });
 
+    it('renders the chips as number Segments', async () => {
+      const { chips } = await setup();
+
+      expect(chips()).toHaveLength(6);
+      expect(
+        chips().every(
+          (b) => b.classList.contains('asys-segment') && b.classList.contains('asys-segment--num'),
+        ),
+      ).toBe(true);
+    });
+
+    it('presses only 17:00 for the value 17:00', async () => {
+      const { chips } = await setup('17:00');
+
+      expect(chips().map((b) => b.getAttribute('aria-pressed'))).toEqual([
+        'false',
+        'false',
+        'false',
+        'false',
+        'true',
+        'false',
+      ]);
+    });
+
     it('presses the chip equal to the value only', async () => {
       const { chips } = await setup('14:00');
 

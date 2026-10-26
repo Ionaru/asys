@@ -83,8 +83,8 @@ const setup = async (draft?: TriageDraft) => {
       (b) => b.textContent?.trim() === label,
     );
   const footerButton = (label: string) => find('.asys-triage__footer button', label);
-  const segment = (label: string) => find('.asys-segmented-control__option', label);
-  const chip = (label: string) => find('.asys-estimate__chip', label);
+  const segment = (label: string) => find('asys-segmented-control .asys-segment', label);
+  const chip = (label: string) => find('asys-estimate-picker .asys-segment', label);
   const changeButton = () => find('.asys-triage__area button', 'Change');
   const select = () => q<HTMLSelectElement>('asys-select-field select');
   const settle = () => fixture.whenStable();
@@ -198,7 +198,7 @@ describe('TriageCard', () => {
     it('labels the importance and estimate controls', async () => {
       const { q, segment } = await setup();
 
-      expect(q('.asys-segmented-control__legend')?.textContent?.trim()).toBe('Importance');
+      expect(q('.asys-segmented-control > legend')?.textContent?.trim()).toBe('Importance');
       expect(segment('Important')).toBeDefined();
       expect(segment('Not important')).toBeDefined();
       expect(q('.asys-estimate__legend')?.textContent?.trim()).toBe('Estimate');
@@ -585,7 +585,7 @@ describe('TriageCard', () => {
       expect(footerButton('Later')?.disabled).toBe(false);
       expect(footerButton('Edit')?.disabled).toBe(false);
       for (const control of root.querySelectorAll<HTMLButtonElement>(
-        '.asys-segmented-control__option, .asys-estimate__chip',
+        'asys-segmented-control .asys-segment, asys-estimate-picker .asys-segment',
       )) {
         expect(control.disabled).toBe(true);
       }

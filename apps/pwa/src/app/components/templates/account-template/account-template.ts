@@ -4,6 +4,7 @@ import { type FieldTree, FormField, FormRoot } from '@angular/forms/signals';
 
 import { Button, ButtonSize, ButtonVariant } from '../../atoms/button/button';
 import { IconName } from '../../atoms/icon/icon';
+import { Text, TextStyle } from '../../atoms/text/text';
 import { TextField } from '../../molecules/text-field/text-field';
 
 /** One passkey as the Account screen lists it, with its dates already formatted. */
@@ -18,7 +19,7 @@ export interface PasskeyRow {
 /** Lays out the passkeys, recovery codes and sign out. */
 @Component({
   selector: 'asys-account-template',
-  imports: [Button, FormField, FormRoot, TextField],
+  imports: [Text, Button, FormField, FormRoot, TextField],
   templateUrl: './account-template.component.html',
   styleUrl: './account-template.css',
 })
@@ -104,7 +105,11 @@ export class AccountTemplate {
   /** Asks to sign out. */
   readonly signOut = output();
 
-  private readonly passkeysHeading = viewChild<ElementRef<HTMLElement>>('passkeysHeading');
+  private readonly passkeysHeading = viewChild('passkeysHeading', {
+    read: ElementRef<HTMLElement>,
+  });
+
+  protected readonly TextStyle = TextStyle;
 
   protected readonly Variant = ButtonVariant;
 

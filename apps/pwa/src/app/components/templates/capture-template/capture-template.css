@@ -9,8 +9,6 @@
 
 .capture__text {
   margin: 0 0 var(--space-2);
-  font-size: var(--font-size-body);
-  line-height: var(--line-height-body);
 }
 
 .capture__links {
@@ -18,12 +16,4 @@
   flex-wrap: wrap;
   gap: var(--space-4);
   margin: 0;
-  font-size: var(--font-size-body);
-  line-height: var(--line-height-body);
-
-  & a {
-    display: inline-flex;
-    align-items: center;
-    min-height: var(--tap-target);
-  }
 }

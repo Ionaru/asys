@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { Component, computed, input, ViewEncapsulation } from '@angular/core';
 
+import { Count, CountVariant } from '../count/count';
 import { Icon, IconName } from '../icon/icon';
 
 /** The visual weight of a button. */
@@ -24,13 +25,17 @@ export enum ButtonSize {
  */
 @Component({
   selector: 'button[asys-button], a[asys-button]',
-  imports: [Icon],
+  imports: [Icon, Count],
   template: `
     @if (capture()) {
       <asys-icon [name]="IconName.Plus" /><span class="asys-button__label">Capture</span>
       @if (waiting() > 0) {
-        &ngsp;<span class="asys-num asys-count asys-button__count"
-          >{{ waiting() }}<span class="asys-visually-hidden"> not captured</span></span
+        &ngsp;<span
+          asys-count
+          class="asys-button__count"
+          [variant]="CountVariant.OnSignal"
+          [value]="waiting()"
+          ><span class="asys-visually-hidden"> not captured</span></span
         >
       }
     } @else {
@@ -61,6 +66,8 @@ export class Button {
   protected readonly Size = ButtonSize;
 
   protected readonly IconName = IconName;
+
+  protected readonly CountVariant = CountVariant;
 
   readonly variant = input<ButtonVariant>(ButtonVariant.Secondary);
 

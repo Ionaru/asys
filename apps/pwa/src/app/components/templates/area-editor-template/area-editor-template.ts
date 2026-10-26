@@ -4,10 +4,13 @@ import { RouterLink } from '@angular/router';
 import { Palette } from '@asys/domain';
 
 import { Button, ButtonSize, ButtonVariant } from '../../atoms/button/button';
+import { ButtonGroup } from '../../molecules/button-group/button-group';
 import { FieldError } from '../../atoms/field-error/field-error';
 import { Input } from '../../atoms/input/input';
+import { Link } from '../../atoms/link/link';
 import { Label } from '../../atoms/label/label';
 import { SyncNote } from '../../atoms/sync-note/sync-note';
+import { Text, TextStyle } from '../../atoms/text/text';
 import { LoadState } from '../../molecules/load-state/load-state';
 import { type SelectOption, SelectField } from '../../molecules/select-field/select-field';
 import { TextField } from '../../molecules/text-field/text-field';
@@ -68,10 +71,13 @@ let nextId = 0;
 @Component({
   selector: 'asys-area-editor-template',
   imports: [
+    Text,
     Button,
+    ButtonGroup,
     FieldError,
     Input,
     Label,
+    Link,
     LoadState,
     RouterLink,
     SelectField,
@@ -145,6 +151,8 @@ export class AreaEditorTemplate {
   readonly #host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   readonly #idPrefix = `asys-area-editor-${nextId++}`;
+
+  protected readonly TextStyle = TextStyle;
 
   protected readonly Variant = ButtonVariant;
 

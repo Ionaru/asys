@@ -13,6 +13,7 @@ import { RouterLink } from '@angular/router';
 
 import { Button, ButtonVariant } from '../../atoms/button/button';
 import { IconName } from '../../atoms/icon/icon';
+import { Text, TextStyle } from '../../atoms/text/text';
 import { TextField } from '../../molecules/text-field/text-field';
 
 /** The screens of the sign-up flow. */
@@ -27,11 +28,13 @@ export enum SignUpStep {
 /** Lays out the sign-up flow, one step at a time, and moves focus to the heading on each new step. */
 @Component({
   selector: 'asys-sign-up-template',
-  imports: [Button, FormField, FormRoot, RouterLink, TextField],
+  imports: [Text, Button, FormField, FormRoot, RouterLink, TextField],
   templateUrl: './sign-up-template.component.html',
   styleUrl: './sign-up-template.css',
 })
 export class SignUpTemplate {
+  protected readonly TextStyle = TextStyle;
+
   /** The step to show. */
   readonly step = input.required<SignUpStep>();
 
@@ -80,7 +83,7 @@ export class SignUpTemplate {
 
   protected readonly Step = SignUpStep;
 
-  private readonly title = viewChild<ElementRef<HTMLElement>>('title');
+  private readonly title = viewChild('title', { read: ElementRef<HTMLElement> });
 
   protected readonly heading = computed(() => {
     switch (this.step()) {

@@ -24,15 +24,20 @@ import { FieldError } from '../../atoms/field-error/field-error';
 import { Icon, IconName } from '../../atoms/icon/icon';
 import { Input, InputVariant } from '../../atoms/input/input';
 import { SingleLine } from '../../atoms/input/single-line';
+import { Link } from '../../atoms/link/link';
 import { QuadrantLabel } from '../../atoms/quadrant-label/quadrant-label';
 import { StatusBadge, StatusBadgeStatus } from '../../atoms/status-badge/status-badge';
 import { SyncNote } from '../../atoms/sync-note/sync-note';
+import { Text } from '../../atoms/text/text';
 import { InlineConfirm } from '../../molecules/inline-confirm/inline-confirm';
 import { LoadState } from '../../molecules/load-state/load-state';
-import { SegmentedControl } from '../../molecules/segmented-control/segmented-control';
+import {
+  SegmentedControl,
+  SegmentedControlLayout,
+} from '../../molecules/segmented-control/segmented-control';
 import { areaSelectOptions } from '../../molecules/select-field/area-options';
 import { ChoiceRow } from '../../organisms/choice-row/choice-row';
-import { DateRow } from '../../organisms/date-row/date-row';
+import { DateField } from '../../organisms/date-field/date-field';
 import { EstimatePicker, EstimateLayout } from '../../organisms/estimate-picker/estimate-picker';
 import { LogProgressForm } from '../../organisms/log-progress-form/log-progress-form';
 import { Sheet } from '../../organisms/sheet/sheet';
@@ -42,6 +47,7 @@ import {
   type TaskBlockerTask,
 } from '../../organisms/task-blockers/task-blockers';
 import { activationOf } from '../../support/activation';
+import { IMPORTANCE_OPTIONS } from '../../support/importance-options';
 
 let nextId = 0;
 
@@ -49,15 +55,17 @@ let nextId = 0;
 @Component({
   selector: 'asys-task-editor-template',
   imports: [
+    Text,
     Button,
     ChoiceRow,
-    DateRow,
+    DateField,
     EstimatePicker,
     FieldError,
     FormField,
     Icon,
     InlineConfirm,
     Input,
+    Link,
     LoadState,
     LogProgressForm,
     NgTemplateOutlet,
@@ -273,6 +281,10 @@ export class TaskEditorTemplate {
   protected readonly Tags = TaskExplanationTag;
 
   protected readonly Layout = EstimateLayout;
+
+  protected readonly SegmentLayout = SegmentedControlLayout;
+
+  protected readonly importanceOptions = IMPORTANCE_OPTIONS;
 
   protected readonly activationOf = activationOf;
 

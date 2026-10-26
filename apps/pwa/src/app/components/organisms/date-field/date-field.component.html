@@ -1,0 +1,40 @@
+<!-- SPDX-License-Identifier: EUPL-1.2 -->
+<div
+  asys-date-row
+  [label]="label()"
+  [noneLabel]="noneLabel()"
+  [value]="value()"
+  [today]="today()"
+  [timePrefix]="timePrefix()"
+  [disabled]="disabled()"
+  [describedBy]="messageId()"
+  (openDate)="dateOpen.set(true)"
+  (openTime)="timeOpen.set(true)"
+  (dayBlur)="touch.emit()"
+></div>
+@if (showError()) {
+  <p asys-field-error [id]="messageParagraphId">{{ message() }}</p>
+} @else if (hint()) {
+  <p class="asys-field__hint" [id]="messageParagraphId">{{ hint() }}</p>
+}
+<asys-sheet [heading]="label()" [(open)]="dateOpen">
+  <ng-template>
+    <asys-date-picker
+      [today]="today()"
+      [value]="value()?.date ?? null"
+      [removeLabel]="removeLabel()"
+      (pick)="pickDate($event)"
+      (remove)="removeDate()"
+    />
+  </ng-template>
+</asys-sheet>
+<asys-sheet heading="Time" [(open)]="timeOpen">
+  <ng-template>
+    <asys-time-picker
+      [value]="value()?.time ?? null"
+      [context]="timeContext()"
+      (pick)="pickTime($event)"
+      (remove)="removeTime()"
+    />
+  </ng-template>
+</asys-sheet>

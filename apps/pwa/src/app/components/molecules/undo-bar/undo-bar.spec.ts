@@ -214,10 +214,10 @@ describe('UndoBar', () => {
     it('draws the timer inside the button, hidden from screen readers, as a ring and a fill', async () => {
       const { q, button } = await setup();
 
-      const timer = q('span.asys-undo__timer');
+      const timer = q('span.asys-countdown');
       const svg = timer?.querySelector('svg');
-      const ring = timer?.querySelector('circle.asys-undo__ring');
-      const fill = timer?.querySelector('circle.asys-undo__fill');
+      const ring = timer?.querySelector('circle.asys-countdown__ring');
+      const fill = timer?.querySelector('circle.asys-countdown__fill');
 
       expect(timer).not.toBeNull();
       expect(timer?.getAttribute('aria-hidden')).toBe('true');
@@ -229,6 +229,17 @@ describe('UndoBar', () => {
       expect(fill?.getAttribute('r')).toBe('3.25');
       expect(fill?.getAttribute('pathLength')).toBe('100');
       expect(timer?.querySelectorAll('circle')).toHaveLength(2);
+    });
+
+    it('puts the countdown before the word Undo and leaves its duration to the bar', async () => {
+      const { q, button } = await setup();
+
+      const timer = must(q<HTMLElement>('span.asys-countdown'), 'countdown');
+      const undo = must(button('Undo'), 'Undo button');
+
+      expect(undo.firstElementChild).toBe(timer);
+      expect(undo.textContent?.trim()).toBe('Undo');
+      expect(timer.style.getPropertyValue('--asys-countdown-duration')).toBe('');
     });
 
     it('shows no failure text, detail or Try again icon', async () => {
@@ -273,7 +284,7 @@ describe('UndoBar', () => {
     it('emits undo when the press lands on the timer inside the button', async () => {
       const { host, q, fixture } = await setup();
 
-      pointerClick(must(q('.asys-undo__timer')));
+      pointerClick(must(q('.asys-countdown')));
       await fixture.whenStable();
 
       expect(host.undos).toBe(1);
@@ -359,7 +370,10 @@ describe('UndoBar', () => {
 
     it('starts the running fill again when the window key changes, as when a second Done follows', async () => {
       const { host, q, update } = await setup();
-      const fill = must(q<HTMLElement>('.asys-undo__fill'), 'fill') as unknown as SVGCircleElement;
+      const fill = must(
+        q<HTMLElement>('.asys-countdown__fill'),
+        'fill',
+      ) as unknown as SVGCircleElement;
       const animation = { currentTime: 2400 } as unknown as Animation;
 
       fill.getAnimations = () => [animation];
@@ -371,7 +385,10 @@ describe('UndoBar', () => {
 
     it('starts the running fill again when the time left changes', async () => {
       const { host, q, update } = await setup();
-      const fill = must(q<HTMLElement>('.asys-undo__fill'), 'fill') as unknown as SVGCircleElement;
+      const fill = must(
+        q<HTMLElement>('.asys-countdown__fill'),
+        'fill',
+      ) as unknown as SVGCircleElement;
       const animation = { currentTime: 1200 } as unknown as Animation;
 
       fill.getAnimations = () => [animation];
@@ -383,7 +400,10 @@ describe('UndoBar', () => {
 
     it('leaves the running fill alone when only the title changes', async () => {
       const { host, q, update } = await setup();
-      const fill = must(q<HTMLElement>('.asys-undo__fill'), 'fill') as unknown as SVGCircleElement;
+      const fill = must(
+        q<HTMLElement>('.asys-countdown__fill'),
+        'fill',
+      ) as unknown as SVGCircleElement;
       const animation = { currentTime: 2400 } as unknown as Animation;
 
       fill.getAnimations = () => [animation];
@@ -400,26 +420,29 @@ describe('UndoBar', () => {
     });
 
     it('pauses while the pointer is inside the bar and runs again when it leaves', async () => {
-      const { bar, fixture } = await setup();
+      const { bar, fixture, q } = await setup();
 
       bar().dispatchEvent(new Event('pointerenter'));
       await fixture.whenStable();
 
       expect(bar().classList.contains('is-paused')).toBe(true);
+      expect(must(q('.asys-countdown')).classList.contains('is-paused')).toBe(true);
 
       bar().dispatchEvent(new Event('pointerleave'));
       await fixture.whenStable();
 
       expect(bar().classList.contains('is-paused')).toBe(false);
+      expect(must(q('.asys-countdown')).classList.contains('is-paused')).toBe(false);
     });
 
     it('is not marked paused by focus alone, because :focus-within pauses the fill in CSS', async () => {
-      const { bar, button, fixture } = await setup();
+      const { bar, button, fixture, q } = await setup();
 
       must(button('Undo')).dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
       await fixture.whenStable();
 
       expect(bar().classList.contains('is-paused')).toBe(false);
+      expect(must(q('.asys-countdown')).classList.contains('is-paused')).toBe(false);
     });
   });
 
@@ -450,7 +473,7 @@ describe('UndoBar', () => {
       expect(q('.asys-undo__check')).toBeNull();
       expect(q('.asys-undo__status')).toBeNull();
       expect(q('.asys-undo__title')).toBeNull();
-      expect(q('.asys-undo__timer')).toBeNull();
+      expect(q('.asys-countdown')).toBeNull();
       expect(q('.asys-undo__button')).toBeNull();
     });
 
@@ -559,7 +582,7 @@ describe('UndoBar', () => {
       expect(q('.asys-undo__check')).toBeNull();
       expect(q('.asys-undo__status')).toBeNull();
       expect(q('.asys-undo__title')).toBeNull();
-      expect(q('.asys-undo__timer')).toBeNull();
+      expect(q('.asys-countdown')).toBeNull();
       expect(q('.asys-undo__text--failed')).toBeNull();
     });
 

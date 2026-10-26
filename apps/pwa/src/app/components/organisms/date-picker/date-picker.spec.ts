@@ -39,10 +39,9 @@ const setup = async (today = '2026-10-13', value: string | null = null) => {
   const root = (): HTMLElement => fixture.nativeElement;
   const chips = (): HTMLButtonElement[] =>
     Array.from(root().querySelectorAll<HTMLButtonElement>('.asys-date-picker__chips > button'));
-  const calendar = (): HTMLElement =>
-    root().querySelector('.asys-date-picker__calendar') as HTMLElement;
+  const calendar = (): HTMLElement => root().querySelector('.asys-calendar') as HTMLElement;
   const days = (): HTMLButtonElement[] =>
-    Array.from(root().querySelectorAll<HTMLButtonElement>('button.asys-date-picker__day'));
+    Array.from(root().querySelectorAll<HTMLButtonElement>('button.asys-calendar__day'));
   const input = (): HTMLInputElement =>
     root().querySelector('.asys-date-picker__other input') as HTMLInputElement;
   const remove = (): HTMLButtonElement | null =>
@@ -83,6 +82,19 @@ describe('DatePicker', () => {
       );
       expect(chips().every((b) => b.getAttribute('type') === 'button')).toBe(true);
       expect(chips()).toHaveLength(3);
+    });
+
+    it('renders the chips as Segments, not number Segments, and the calendar days as plain buttons', async () => {
+      const { chips, days } = await setup('2026-10-13', '2026-10-14');
+
+      expect(chips().every((b) => b.classList.contains('asys-segment'))).toBe(true);
+      expect(chips().some((b) => b.classList.contains('asys-segment--num'))).toBe(false);
+      expect(chips().map((b) => b.getAttribute('aria-pressed'))).toEqual([
+        'false',
+        'true',
+        'false',
+      ]);
+      expect(days().some((b) => b.classList.contains('asys-segment'))).toBe(false);
     });
 
     it.each([
@@ -130,160 +142,35 @@ describe('DatePicker', () => {
     });
   });
 
-  describe('calendar', () => {
-    it('is a labelled group of seven weekday headers and 14 days', async () => {
-      const { calendar, days } = await setup();
-      const dow = Array.from(calendar().querySelectorAll('span.asys-date-picker__dow'));
+  describe('layout', () => {
+    it('stacks the quick days, the calendar, the Other date and the Remove button in order', async () => {
+      const { root, calendar } = await setup('2026-10-13', '2026-10-15');
+      const children = Array.from(root().querySelector('asys-date-picker')?.children ?? []);
 
-      expect(calendar().getAttribute('role')).toBe('group');
-      expect(calendar().getAttribute('aria-label')).toBe('Days from Mon 12 Oct to Sun 25 Oct');
-      expect(dow.map((s) => s.textContent?.trim())).toEqual([
-        'Mon',
-        'Tue',
-        'Wed',
-        'Thu',
-        'Fri',
-        'Sat',
-        'Sun',
-      ]);
-      expect(dow.every((s) => s.getAttribute('aria-hidden') === 'true')).toBe(true);
-      expect(days()).toHaveLength(14);
-      expect(days().every((b) => b.getAttribute('type') === 'button')).toBe(true);
+      expect(children).toHaveLength(4);
+      expect(children[0].classList.contains('asys-date-picker__chips')).toBe(true);
+      expect(children[0].getAttribute('role')).toBe('group');
+      expect(children[1]).toBe(calendar());
+      expect(children[1].tagName).toBe('DIV');
+      expect(children[1].classList.contains('asys-calendar')).toBe(true);
+      expect(children[2].classList.contains('asys-date-picker__other')).toBe(true);
+      expect(children[3].classList.contains('asys-date-picker__remove')).toBe(true);
     });
 
-    it('runs from the Monday of the week, showing the day of the month', async () => {
-      const { days } = await setup();
+    it('omits the Remove button without a value', async () => {
+      const { root } = await setup();
 
-      expect(days().map((b) => squash(b.textContent))).toEqual([
-        '12',
-        '13',
-        '14',
-        '15',
-        '16',
-        '17',
-        '18',
-        '19',
-        '20',
-        '21',
-        '22',
-        '23',
-        '24',
-        '25',
-      ]);
+      expect(root().querySelector('asys-date-picker')?.children).toHaveLength(3);
     });
 
-    it('starts on the Monday when today is a Sunday', async () => {
-      const { calendar, days } = await setup('2026-10-18');
+    it('runs the quick days into the next month and year', async () => {
+      const { chips } = await setup('2026-12-30');
 
-      expect(squash(days()[0].textContent)).toBe('12');
-      expect(calendar().getAttribute('aria-label')).toBe('Days from Mon 12 Oct to Sun 25 Oct');
-    });
-
-    it('labels each day, with Today prefixed for today', async () => {
-      const { days } = await setup();
-
-      expect(days()[0].getAttribute('aria-label')).toBe('Mon 12 Oct');
-      expect(days()[1].getAttribute('aria-label')).toBe('Today, Tue 13 Oct');
-      expect(days()[3].getAttribute('aria-label')).toBe('Thu 15 Oct');
-    });
-
-    it('marks today alone as the current date', async () => {
-      const { days } = await setup();
-
-      expect(days().filter((b) => b.getAttribute('aria-current') === 'date')).toEqual([days()[1]]);
-      expect(days().filter((b) => b.classList.contains('asys-date-picker__day--today'))).toEqual([
-        days()[1],
-      ]);
-    });
-
-    it('disables the days before today only', async () => {
-      const { days } = await setup();
-
-      expect(days().map((b) => b.disabled)).toEqual([
-        true,
-        ...Array.from({ length: 13 }, () => false),
-      ]);
-    });
-
-    it('disables the whole first week up to today when today is a Sunday', async () => {
-      const { days } = await setup('2026-10-18');
-
-      expect(days().map((b) => b.disabled)).toEqual([
-        ...Array.from({ length: 6 }, () => true),
-        ...Array.from({ length: 8 }, () => false),
-      ]);
-    });
-
-    it('emits the date of an enabled day, today included', async () => {
-      const { days, press, host } = await setup();
-
-      await press(days()[3]);
-      await press(days()[1]);
-
-      expect(host.picks).toEqual(['2026-10-15', '2026-10-13']);
-    });
-
-    it('emits nothing for a disabled day', async () => {
-      const { fixture, days, host } = await setup();
-
-      days()[0].click();
-      await fixture.whenStable();
-
-      expect(host.picks).toEqual([]);
-    });
-
-    it('presses the day equal to the value only', async () => {
-      const { days } = await setup('2026-10-13', '2026-10-15');
-
-      expect(days().map((b) => b.getAttribute('aria-pressed'))).toEqual(
-        Array.from({ length: 14 }, (_, i) => (i === 3 ? 'true' : 'false')),
-      );
-    });
-
-    it('follows the value when it changes', async () => {
-      const { fixture, host, days } = await setup('2026-10-13', '2026-10-15');
-
-      host.value.set('2026-10-20');
-      await fixture.whenStable();
-
-      expect(days().filter((b) => b.getAttribute('aria-pressed') === 'true')).toEqual([days()[8]]);
-    });
-
-    it('runs into the next month and year, with the year where it differs', async () => {
-      const { calendar, days, chips } = await setup('2026-12-30');
-
-      expect(calendar().getAttribute('aria-label')).toBe('Days from Mon 28 Dec to Sun 10 Jan 2027');
-      expect(days().map((b) => squash(b.textContent))).toEqual([
-        '28',
-        '29',
-        '30',
-        '31',
-        '1',
-        '2',
-        '3',
-        '4',
-        '5',
-        '6',
-        '7',
-        '8',
-        '9',
-        '10',
-      ]);
-      expect(days()[2].getAttribute('aria-label')).toBe('Today, Wed 30 Dec');
-      expect(days()[4].getAttribute('aria-label')).toBe('Fri 1 Jan 2027');
       expect(chips().map((b) => squash(b.textContent))).toEqual([
         'Today',
         'Tomorrow',
         'Mon 4 Jan 2027',
       ]);
-    });
-
-    it('emits a date in the next year', async () => {
-      const { days, press, host } = await setup('2026-12-30');
-
-      await press(days()[4]);
-
-      expect(host.picks).toEqual(['2027-01-01']);
     });
   });
 
@@ -399,12 +286,32 @@ describe('DatePicker', () => {
     });
 
     it('clears the error on a later valid day', async () => {
-      const { root, change, days, press } = await setup();
+      const { root, change, days, press, host } = await setup();
 
       await change('2026-10-12');
       await press(days()[3]);
 
       expect(root().querySelector('p[asys-field-error]')).toBeNull();
+      expect(host.picks).toEqual(['2026-10-15']);
+    });
+
+    it('presses the Calendar day equal to the value only', async () => {
+      const { days } = await setup('2026-10-13', '2026-10-15');
+
+      expect(days().map((b) => b.getAttribute('aria-pressed'))).toEqual(
+        Array.from({ length: 14 }, (_, i) => (i === 3 ? 'true' : 'false')),
+      );
+    });
+
+    it('moves the pressed Calendar day when the value changes', async () => {
+      const { fixture, host, days } = await setup('2026-10-13', '2026-10-15');
+
+      host.value.set('2026-10-20');
+      await fixture.whenStable();
+
+      expect(days().map((b) => b.getAttribute('aria-pressed'))).toEqual(
+        Array.from({ length: 14 }, (_, i) => (i === 8 ? 'true' : 'false')),
+      );
     });
 
     it('clears the error on a later valid Other date', async () => {

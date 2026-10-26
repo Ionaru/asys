@@ -14,6 +14,7 @@ import {
 import { formatMinutes } from '@asys/domain';
 
 import { Button, ButtonVariant } from '../../atoms/button/button';
+import { ButtonGroup } from '../../molecules/button-group/button-group';
 import { TextField } from '../../molecules/text-field/text-field';
 
 const WHOLE_MINUTES = /^\d+$/;
@@ -21,7 +22,7 @@ const WHOLE_MINUTES = /^\d+$/;
 /** The inline form that lowers a Task's Estimate to the time still needed. */
 @Component({
   selector: 'asys-log-progress-form',
-  imports: [Button, TextField],
+  imports: [Button, ButtonGroup, TextField],
   encapsulation: ViewEncapsulation.None,
   templateUrl: './log-progress-form.component.html',
   styleUrl: './log-progress-form.css',

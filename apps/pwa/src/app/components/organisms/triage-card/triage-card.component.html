@@ -7,8 +7,8 @@
   }
   <asys-segmented-control
     legend="Importance"
-    trueLabel="Important"
-    falseLabel="Not important"
+    [options]="importanceOptions"
+    [layout]="SegmentLayout.Fill"
     [disabled]="busy()"
     [value]="draft().important"
     (valueChange)="draft.set({ ...draft(), important: $event })"

@@ -94,7 +94,7 @@
 }
 
 /* Inside a section card the rows sit on the card's ground, with no line under the last one. */
-.asys-section__body .asys-task-row {
+.asys-collapsible-section__body .asys-task-row {
   background: transparent;
 
   &:active {
@@ -102,8 +102,8 @@
   }
 }
 
-.asys-section__body li:last-child > .asys-task-row,
-.asys-section__body > .asys-task-row:last-child {
+.asys-collapsible-section__body li:last-child > .asys-task-row,
+.asys-collapsible-section__body > .asys-task-row:last-child {
   border-bottom: 0;
 }
 

@@ -65,9 +65,11 @@ const squash = (text: string | null | undefined): string =>
 
 const finders = (root: () => HTMLElement) => {
   const chips = (): HTMLButtonElement[] =>
-    Array.from(root().querySelectorAll<HTMLButtonElement>('button.asys-estimate__chip'));
+    Array.from(
+      root().querySelectorAll<HTMLButtonElement>('div.asys-estimate__chips > button.asys-segment'),
+    );
   const numberChips = (): HTMLButtonElement[] =>
-    chips().filter((b) => b.classList.contains('asys-estimate__chip--num'));
+    chips().filter((b) => b.classList.contains('asys-segment--num'));
   const other = (): HTMLButtonElement => chips()[6];
   const otherInput = (): HTMLTextAreaElement | null =>
     root().querySelector<HTMLTextAreaElement>('textarea.asys-input-box__control');
@@ -122,6 +124,8 @@ describe('EstimatePicker', () => {
       const { root, chips, numberChips, other } = await setup();
 
       expect(root().querySelectorAll('div.asys-estimate__chips > button').length).toBe(7);
+      expect(chips().every((b) => b.classList.contains('asys-segment'))).toBe(true);
+      expect(numberChips()).toHaveLength(6);
       expect(chips().every((b) => b.getAttribute('type') === 'button')).toBe(true);
       expect(numberChips().map((b) => squash(b.textContent))).toEqual([
         '5 min',
@@ -132,7 +136,7 @@ describe('EstimatePicker', () => {
         '2 h',
       ]);
       expect(squash(other().textContent)).toBe('Other');
-      expect(other().classList.contains('asys-estimate__chip--num')).toBe(false);
+      expect(other().classList.contains('asys-segment--num')).toBe(false);
     });
 
     it('shows no Other input initially', async () => {
@@ -655,7 +659,9 @@ const setupRuler = async () => {
     root().querySelector('[role="group"].asys-estimate') as HTMLElement;
   const legend = (): HTMLElement | null => root().querySelector('.asys-estimate__legend');
   const cells = (): HTMLButtonElement[] =>
-    Array.from(root().querySelectorAll<HTMLButtonElement>('button.asys-estimate__cell'));
+    Array.from(
+      root().querySelectorAll<HTMLButtonElement>('div.asys-estimate__ruler > button.asys-segment'),
+    );
   const toggle = (): HTMLButtonElement =>
     root().querySelector('button.asys-estimate__other-toggle') as HTMLButtonElement;
   const otherInput = (): HTMLTextAreaElement | null =>
@@ -678,7 +684,7 @@ describe('EstimatePicker Ruler layout', () => {
 
     expect(group().classList.contains('asys-estimate--ruler')).toBe(true);
     expect(root().querySelector('fieldset')).toBeNull();
-    expect(root().querySelector('button.asys-estimate__chip')).toBeNull();
+    expect(root().querySelector('div.asys-estimate__chips')).toBeNull();
     expect(legend()?.textContent?.trim()).toBe('Estimate');
     expect(legend()?.tagName).toBe('SPAN');
     expect(legend()?.classList.contains('asys-label')).toBe(true);
@@ -690,10 +696,18 @@ describe('EstimatePicker Ruler layout', () => {
     const { cells } = await setupRuler();
 
     expect(cells().every((b) => b.getAttribute('type') === 'button')).toBe(true);
+    expect(cells()).toHaveLength(6);
+    expect(
+      cells().every(
+        (b) =>
+          b.classList.contains('asys-segment--stacked') &&
+          b.classList.contains('asys-segment--num'),
+      ),
+    ).toBe(true);
     expect(
       cells().map((b) => [
-        b.querySelector('.asys-estimate__num')?.textContent?.trim(),
-        b.querySelector('.asys-estimate__unit')?.textContent?.trim(),
+        b.querySelector('.asys-segment__value')?.textContent?.trim(),
+        b.querySelector('.asys-segment__unit')?.textContent?.trim(),
         b.getAttribute('aria-label'),
       ]),
     ).toEqual([

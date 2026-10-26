@@ -141,17 +141,4 @@
 .task-editor__text,
 .task-editor__message {
   margin: 0 0 var(--space-3);
-  font-size: var(--font-size-body);
-  line-height: var(--line-height-body);
-}
-
-.task-editor__link {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--tap-target);
-}
-
-/* The theme sits on <html>, outside the component, so only :host-context reaches it. */
-:host-context([data-theme='drive']) .task-editor__link {
-  min-height: var(--tap-target-drive);
 }
