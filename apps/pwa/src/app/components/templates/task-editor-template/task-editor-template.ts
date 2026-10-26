@@ -37,7 +37,7 @@ import {
 } from '../../molecules/segmented-control/segmented-control';
 import { areaSelectOptions } from '../../molecules/select-field/area-options';
 import { ChoiceRow } from '../../organisms/choice-row/choice-row';
-import { DateRow } from '../../organisms/date-row/date-row';
+import { DateField } from '../../organisms/date-field/date-field';
 import { EstimatePicker, EstimateLayout } from '../../organisms/estimate-picker/estimate-picker';
 import { LogProgressForm } from '../../organisms/log-progress-form/log-progress-form';
 import { Sheet } from '../../organisms/sheet/sheet';
@@ -58,7 +58,7 @@ let nextId = 0;
     Text,
     Button,
     ChoiceRow,
-    DateRow,
+    DateField,
     EstimatePicker,
     FieldError,
     FormField,

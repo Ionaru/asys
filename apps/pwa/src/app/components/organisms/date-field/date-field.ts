@@ -24,13 +24,13 @@ let nextId = 0;
 
 /** A Due or Available from as a row: the date opens a sheet, a split button beside it opens the time sheet. */
 @Component({
-  selector: 'asys-date-row',
+  selector: 'asys-date-field',
   imports: [FieldRow, DatePicker, FieldError, Icon, Sheet, TimePicker],
   encapsulation: ViewEncapsulation.None,
-  templateUrl: './date-row.component.html',
-  styleUrl: './date-row.css',
+  templateUrl: './date-field.component.html',
+  styleUrl: './date-field.css',
 })
-export class DateRow extends FieldControl implements FormValueControl<DateSpec | null> {
+export class DateField extends FieldControl implements FormValueControl<DateSpec | null> {
   protected readonly Clock = IconName.Clock;
 
   readonly value = model<DateSpec | null>(null);
@@ -45,7 +45,7 @@ export class DateRow extends FieldControl implements FormValueControl<DateSpec |
 
   readonly today = input.required<LocalDate>();
 
-  protected override readonly messageParagraphId = `asys-date-row-${nextId++}-message`;
+  protected override readonly messageParagraphId = `asys-date-field-${nextId++}-message`;
 
   protected readonly dateOpen = signal(false);
 

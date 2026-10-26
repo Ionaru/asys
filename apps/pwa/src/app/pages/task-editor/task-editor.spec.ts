@@ -416,7 +416,7 @@ const setup = async (options: SetupOptions = {}) => {
   // The Area, Available from and Due rows.
   const row = (label: string): HTMLElement =>
     must(
-      Array.from(root().querySelectorAll<HTMLElement>('asys-choice-row, asys-date-row')).find(
+      Array.from(root().querySelectorAll<HTMLElement>('asys-choice-row, asys-date-field')).find(
         (r) => text(r.querySelector('.asys-field-row__label')) === label,
       ),
       `the ${label} row`,
