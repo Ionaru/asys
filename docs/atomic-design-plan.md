@@ -20,7 +20,7 @@ The PWA's presentational components move from `apps/pwa/src/app/ui/` into the At
 - **Now's motion.** A component may not use `Motion`, so NowTemplate hands the page its card through `cardElement()` for the Done exit and rise, and emits each row's `animate.leave` and `animate.enter` events for the page to collapse and expand the row (decided 2026-10-25).
 - **Task editor blockers.** The Blocked by section becomes the TaskBlockers organism, which only shows its rows and emits Add and Remove, and the page-provided `TaskBlockerActions` in `pages/task-editor/` sends the Commands. The organism keeps emulated encapsulation, unlike the other organisms, so its stylesheet renders as before (decided 2026-10-25).
 - **Task editor chrome.** TaskEditorTemplate hands the page its sticky bar and footer as the signals `barElement` and `footerElement`, because the page measures them with `observeBlockSize` from `core/`, and the footer comes and goes (decided 2026-10-25).
-- **The shell stays outside.** `layout/` (the shell with the router outlet) and `app.ts` are not a template with inputs and outputs only. They stay outside the levels for good (decided 2026-10-26), because they persist across routes and inject services no component may; `scripts/check-architecture.mts` fences their imports.
+- **The shell stays outside.** `layout/` (the shell with the router outlet) and `app.ts` are not a template with inputs and outputs only. They stay outside the levels for good (decided 2026-10-26), because they persist across routes, provide the services the signed-in screens share and inject `Router` and `DataStore`, which no component does; `scripts/check-architecture.mts` fences their imports.
 
 ## Pull requests
 

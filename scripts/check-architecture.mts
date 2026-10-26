@@ -56,10 +56,11 @@ const walk = (dir: string): string[] =>
       })
     : [];
 
-// The shell's files: the .ts files of layout/ (specs included) and app.ts.
+// The shell's files: the .ts files of layout/ and app.ts, specs included.
 const shellFiles = (): string[] => [
   ...walk(resolve(app, 'layout')).filter((path) => path.endsWith('.ts')),
   resolve(app, 'app.ts'),
+  ...[resolve(app, 'app.spec.ts')].filter((path) => existsSync(path)),
 ];
 
 const appPath = (file: string): string => relative(app, file).split('\\').join('/');
@@ -161,7 +162,8 @@ const checkPage = (folder: string): void => {
     return;
   }
   const templates = new Set<string>();
-  for (const file of files.filter((path) => path.endsWith('.ts') && !path.endsWith('.spec.ts'))) {
+  for (const file of files.filter((path) => path.endsWith('.ts'))) {
+    const spec = file.endsWith('.spec.ts');
     for (const { specifier, typeOnly, line } of references(readFileSync(file, 'utf8'))) {
       if (!specifier.startsWith('.')) continue;
       const target = appPath(resolve(dirname(file), specifier));
@@ -169,6 +171,8 @@ const checkPage = (folder: string): void => {
         fail(file, line, `a page may not import layout/ (${specifier})`);
         continue;
       }
+      // Specs may render any level to test the page; only the layout/ ban applies to them.
+      if (spec) continue;
       const component = componentOf(target);
       if (component === undefined || typeOnly) continue;
       const [level, componentFolder] = component;

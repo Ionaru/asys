@@ -87,6 +87,6 @@ Pages are specific instances of templates that inject data and content into the 
 
 ## The shell
 
-`layout/` and `app.ts` hold the shell: the router outlet, the bottom nav, the Undo bar and quick add. They stay outside the levels for good (decided 2026-10-26). The shell persists across routes, provides `CommandAttempts`, `CaptureQueue` and `DoneUndo` to the signed-in screens, owns the focus rules, the capture flight and the view-transition anchors, and injects `Router`, `Motion`, `DataStore` and `DOCUMENT`, which no component may. The design system's templates repeat the footer per screen, and doing that here would remount the nav and lose Undo on every navigation.
+`layout/` and `app.ts` hold the shell: the router outlet, the bottom nav, the Undo bar and quick add. They stay outside the levels for good (decided 2026-10-26). The shell persists across routes, provides `CommandAttempts`, `CaptureQueue` and `DoneUndo` to the signed-in screens, owns the focus rules, the capture flight and the view-transition anchors, and injects `Router` and `DataStore`, which no component does, and `Motion`, which only `swipe-actions` may. The design system's templates repeat the footer per screen, and doing that here would remount the nav and lose Undo on every navigation.
 
 The shell may import `core/` and `components/` except `templates/`, and never `pages/`. Nothing in `components/` or `pages/` imports `layout/`. `scripts/check-architecture.mts` checks these rules.
