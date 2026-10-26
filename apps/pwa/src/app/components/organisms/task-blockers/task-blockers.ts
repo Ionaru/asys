@@ -6,8 +6,8 @@ import { Button, ButtonSize, ButtonVariant } from '../../atoms/button/button';
 import { IconName } from '../../atoms/icon/icon';
 import { Link } from '../../atoms/link/link';
 import { Text, TextStyle } from '../../atoms/text/text';
+import { SectionHeader, SectionHeaderAction } from '../../molecules/section-header/section-header';
 import { TextField } from '../../molecules/text-field/text-field';
-import { SectionHeader, SectionHeaderAction } from '../section-header/section-header';
 import { Sheet } from '../sheet/sheet';
 
 /** One Task this Task waits for: its link, the blocker's title and whether its Remove send is in flight. */
