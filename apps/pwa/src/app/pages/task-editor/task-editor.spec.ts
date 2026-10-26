@@ -403,12 +403,15 @@ const setup = async (options: SetupOptions = {}) => {
   };
   const cell = (label: string): HTMLButtonElement =>
     must(
-      root().querySelector<HTMLButtonElement>(`.asys-estimate__cell[aria-label="${label}"]`),
+      root().querySelector<HTMLButtonElement>(
+        `.asys-estimate__ruler > .asys-segment[aria-label="${label}"]`,
+      ),
       `the ${label} cell`,
     );
   const pressedCell = (): string | null =>
-    root().querySelector('.asys-estimate__cell[aria-pressed="true"]')?.getAttribute('aria-label') ??
-    null;
+    root()
+      .querySelector('.asys-estimate__ruler > .asys-segment[aria-pressed="true"]')
+      ?.getAttribute('aria-label') ?? null;
 
   // The Area, Available from and Due rows.
   const row = (label: string): HTMLElement =>
@@ -438,7 +441,7 @@ const setup = async (options: SetupOptions = {}) => {
           'textarea[aria-label="Notes"]',
           'button.task-editor__add-notes',
           'asys-segmented-control .asys-segment',
-          '.asys-estimate__cell',
+          '.asys-estimate__ruler > .asys-segment',
           '.asys-estimate__other-toggle',
           'button.asys-choice-row__open',
           'button.asys-date-row__open',
@@ -859,9 +862,11 @@ describe('TaskEditor', () => {
       expect(time.open).toBe(true);
 
       await press(
-        Array.from(time.querySelectorAll<HTMLButtonElement>('button.asys-time-picker__chip')).find(
-          (b) => (b.textContent ?? '').trim() === '17:00',
-        ),
+        Array.from(
+          time.querySelectorAll<HTMLButtonElement>(
+            '.asys-time-picker__chips > button.asys-segment',
+          ),
+        ).find((b) => (b.textContent ?? '').trim() === '17:00'),
       );
 
       expect(send).toHaveBeenCalledTimes(2);
@@ -2658,7 +2663,11 @@ describe('TaskEditor through the route', () => {
     expect(titleField().value).toBe('Water form');
     expect(titleField().getAttribute('data-task-id')).toBe('t2');
 
-    must(root().querySelector<HTMLElement>('.asys-estimate__cell[aria-label="45 min"]')).click();
+    must(
+      root().querySelector<HTMLElement>(
+        '.asys-estimate__ruler > .asys-segment[aria-label="45 min"]',
+      ),
+    ).click();
     await flush();
 
     // Leaving the first editor saved what was typed there; the second sends only its own change.

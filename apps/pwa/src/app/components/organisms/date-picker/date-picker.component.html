@@ -1,12 +1,7 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
 <div class="asys-date-picker__chips" role="group" aria-label="Quick dates">
   @for (chip of chips(); track $index) {
-    <button
-      type="button"
-      class="asys-date-picker__chip"
-      [attr.aria-pressed]="value() === chip.date ? 'true' : 'false'"
-      (click)="choose(chip.date)"
-    >
+    <button asys-segment [pressed]="value() === chip.date" (click)="choose(chip.date)">
       {{ chip.label }}
     </button>
   }

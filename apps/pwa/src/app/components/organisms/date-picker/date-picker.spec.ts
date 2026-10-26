@@ -85,6 +85,19 @@ describe('DatePicker', () => {
       expect(chips()).toHaveLength(3);
     });
 
+    it('renders the chips as Segments, not number Segments, and the calendar days as plain buttons', async () => {
+      const { chips, days } = await setup('2026-10-13', '2026-10-14');
+
+      expect(chips().every((b) => b.classList.contains('asys-segment'))).toBe(true);
+      expect(chips().some((b) => b.classList.contains('asys-segment--num'))).toBe(false);
+      expect(chips().map((b) => b.getAttribute('aria-pressed'))).toEqual([
+        'false',
+        'true',
+        'false',
+      ]);
+      expect(days().some((b) => b.classList.contains('asys-segment'))).toBe(false);
+    });
+
     it.each([
       ['2026-10-13', 'a Tuesday', ['Today', 'Tomorrow', 'Mon 19 Oct'], '2026-10-19'],
       ['2026-10-17', 'a Saturday', ['Today', 'Tomorrow', 'Mon 19 Oct'], '2026-10-19'],

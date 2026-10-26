@@ -206,7 +206,9 @@ const setup = async (options: SetupOptions = {}) => {
   };
   // The chips are 5, 15, 25, 45, 60 and 120 minutes.
   const chip = async (index: number): Promise<void> => {
-    await click(root().querySelectorAll<HTMLElement>('.asys-estimate__chip--num')[index]);
+    await click(
+      root().querySelectorAll<HTMLElement>('asys-estimate-picker .asys-segment--num')[index],
+    );
   };
   // The pressed Importance option and Estimate chip, as 'importance:<index>' and 'chip:<index>'.
   const pressed = (): string[] => {
@@ -217,7 +219,7 @@ const setup = async (options: SetupOptions = {}) => {
 
     return [
       ...mark('asys-segmented-control .asys-segment', 'importance'),
-      ...mark('.asys-estimate__chip--num', 'chip'),
+      ...mark('asys-estimate-picker .asys-segment--num', 'chip'),
     ];
   };
   const chooseArea = async (value: string): Promise<void> => {

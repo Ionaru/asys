@@ -21,6 +21,7 @@ import { FieldControl } from '../../support/field-control';
 import { FieldError } from '../../atoms/field-error/field-error';
 import { InputBox } from '../../atoms/input/input-box';
 import { Label } from '../../atoms/label/label';
+import { Segment } from '../../atoms/segment/segment';
 import { SingleLine } from '../../atoms/input/single-line';
 
 /** How the Estimate choices are drawn: wrapping chips, or a single ruler under a head with the Other button. */
@@ -40,7 +41,7 @@ const OTHER_ERROR = 'Use whole minutes from 1 to 100000.';
 /** Estimate chips plus an Other input, usable as a Signal Forms custom control. */
 @Component({
   selector: 'asys-estimate-picker',
-  imports: [Button, FieldError, InputBox, Label, NgTemplateOutlet, SingleLine],
+  imports: [Button, FieldError, InputBox, Label, NgTemplateOutlet, Segment, SingleLine],
   encapsulation: ViewEncapsulation.None,
   templateUrl: './estimate-picker.component.html',
   styleUrl: './estimate-picker.css',
@@ -72,7 +73,7 @@ export class EstimatePicker extends FieldControl implements FormValueControl<num
 
   readonly #injector = inject(Injector);
 
-  private readonly chipButtons = viewChild<ElementRef<HTMLButtonElement>>('chipButton');
+  private readonly chipButtons = viewChild('chipButton', { read: ElementRef<HTMLButtonElement> });
 
   private readonly otherInput = viewChild<ElementRef<HTMLTextAreaElement>>('otherInput');
 

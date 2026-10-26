@@ -137,7 +137,11 @@ const setup = async (value: DateSpec | null = null) => {
   const f = finders(root);
   const { press, change } = actions(fixture);
   const dateChips = (): HTMLButtonElement[] =>
-    Array.from(f.dateDialog().querySelectorAll<HTMLButtonElement>('.asys-date-picker__chip'));
+    Array.from(
+      f
+        .dateDialog()
+        .querySelectorAll<HTMLButtonElement>('.asys-date-picker__chips > .asys-segment'),
+    );
   const dayButton = (label: string): HTMLButtonElement =>
     f
       .dateDialog()
@@ -148,7 +152,9 @@ const setup = async (value: DateSpec | null = null) => {
     f.dateDialog().querySelector('input[type="date"]') as HTMLInputElement;
   const timeChip = (text: string): HTMLButtonElement =>
     Array.from(
-      f.timeDialog().querySelectorAll<HTMLButtonElement>('button.asys-time-picker__chip'),
+      f
+        .timeDialog()
+        .querySelectorAll<HTMLButtonElement>('.asys-time-picker__chips > button.asys-segment'),
     ).find((b) => squash(b.textContent) === text) as HTMLButtonElement;
   const timeInput = (): HTMLInputElement =>
     f.timeDialog().querySelector('input[type="time"]') as HTMLInputElement;
@@ -638,7 +644,9 @@ describe('DateRow', () => {
 
       await press(row());
 
-      const chip = dateDialog().querySelectorAll<HTMLButtonElement>('.asys-date-picker__chip')[1];
+      const chip = dateDialog().querySelectorAll<HTMLButtonElement>(
+        '.asys-date-picker__chips > .asys-segment',
+      )[1];
 
       await press(chip);
 

@@ -6,6 +6,7 @@ import { Button, ButtonVariant } from '../../atoms/button/button';
 import { FieldError } from '../../atoms/field-error/field-error';
 import { Input } from '../../atoms/input/input';
 import { Label } from '../../atoms/label/label';
+import { Segment } from '../../atoms/segment/segment';
 import { dayLabel } from './day-label';
 
 let nextId = 0;
@@ -17,7 +18,7 @@ const CALENDAR_DAYS = 14;
 /** The body of a date sheet: quick dates, a two-week calendar and a native date input. It emits, it never stores. */
 @Component({
   selector: 'asys-date-picker',
-  imports: [Button, FieldError, Input, Label],
+  imports: [Button, FieldError, Input, Label, Segment],
   encapsulation: ViewEncapsulation.None,
   templateUrl: './date-picker.component.html',
   styleUrl: './date-picker.css',
