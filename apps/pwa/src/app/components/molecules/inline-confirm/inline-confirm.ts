@@ -11,11 +11,12 @@ import {
 } from '@angular/core';
 
 import { Button, ButtonVariant } from '../../atoms/button/button';
+import { ButtonGroup } from '../button-group/button-group';
 
 /** An inline confirmation of a destructive action. Focus starts on Cancel, Escape cancels. */
 @Component({
   selector: 'asys-inline-confirm',
-  imports: [Button],
+  imports: [Button, ButtonGroup],
   encapsulation: ViewEncapsulation.None,
   template: `
     <div
@@ -25,7 +26,7 @@ import { Button, ButtonVariant } from '../../atoms/button/button';
       (keydown.escape)="cancel.emit()"
     >
       <p class="asys-confirm__message">{{ message() }}</p>
-      <div class="asys-button-group">
+      <div asys-button-group>
         <button
           asys-button
           type="button"

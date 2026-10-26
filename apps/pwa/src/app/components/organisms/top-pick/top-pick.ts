@@ -13,6 +13,7 @@ import { Quadrant } from '@asys/domain';
 
 import { type Activation, activationOf } from '../../support/activation';
 import { Button, ButtonSize, ButtonVariant } from '../../atoms/button/button';
+import { ButtonGroup } from '../../molecules/button-group/button-group';
 import { Fact } from '../../molecules/fact/fact';
 import { Icon, IconName } from '../../atoms/icon/icon';
 import { QuadrantLabel } from '../../atoms/quadrant-label/quadrant-label';
@@ -24,7 +25,7 @@ import { StatusBadge, StatusBadgeStatus } from '../../atoms/status-badge/status-
  */
 @Component({
   selector: 'asys-top-pick',
-  imports: [Button, Fact, Icon, QuadrantLabel, RouterLink, StatusBadge],
+  imports: [Button, ButtonGroup, Fact, Icon, QuadrantLabel, RouterLink, StatusBadge],
   encapsulation: ViewEncapsulation.None,
   templateUrl: './top-pick.component.html',
   styleUrl: './top-pick.css',

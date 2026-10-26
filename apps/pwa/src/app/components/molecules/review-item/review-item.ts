@@ -2,6 +2,7 @@
 import { Component, ElementRef, inject, input, output, ViewEncapsulation } from '@angular/core';
 
 import { Button, ButtonVariant } from '../../atoms/button/button';
+import { ButtonGroup } from '../button-group/button-group';
 import { Icon, IconName } from '../../atoms/icon/icon';
 
 /** The weight of a review action button. */
@@ -19,7 +20,7 @@ export interface ReviewItemAction {
 /** A question about one item, with the decisions that answer it. A projected link sits after the buttons. */
 @Component({
   selector: 'asys-review-item',
-  imports: [Button, Icon],
+  imports: [Button, ButtonGroup, Icon],
   encapsulation: ViewEncapsulation.None,
   template: `
     <div class="asys-review">
@@ -28,7 +29,7 @@ export interface ReviewItemAction {
       @if (reason() !== '') {
         <p class="asys-review__reason">{{ reason() }}</p>
       }
-      <div class="asys-button-group asys-review__actions">
+      <div asys-button-group class="asys-review__actions">
         @for (action of actions(); track $index) {
           <button
             asys-button

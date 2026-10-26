@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { Palette } from '@asys/domain';
 
 import { Button, ButtonSize, ButtonVariant } from '../../atoms/button/button';
+import { ButtonGroup } from '../../molecules/button-group/button-group';
 import { FieldError } from '../../atoms/field-error/field-error';
 import { Input } from '../../atoms/input/input';
 import { Label } from '../../atoms/label/label';
@@ -69,6 +70,7 @@ let nextId = 0;
   selector: 'asys-area-editor-template',
   imports: [
     Button,
+    ButtonGroup,
     FieldError,
     Input,
     Label,

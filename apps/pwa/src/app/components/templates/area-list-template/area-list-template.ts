@@ -3,6 +3,7 @@ import { Component, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { Button, ButtonVariant } from '../../atoms/button/button';
+import { ButtonGroup } from '../../molecules/button-group/button-group';
 import { LoadState } from '../../molecules/load-state/load-state';
 
 /** One Area in the list: its name and its Active hours summary. */
@@ -15,7 +16,7 @@ export interface AreaListRow {
 /** Lays out the Areas, each with its Active hours, and a link to a new Area. */
 @Component({
   selector: 'asys-area-list-template',
-  imports: [Button, LoadState, RouterLink],
+  imports: [Button, ButtonGroup, LoadState, RouterLink],
   template: `
     <h1 class="asys-page__title area-list__title">Areas</h1>
     <p class="area-list__status" role="status"></p>
@@ -34,7 +35,7 @@ export interface AreaListRow {
       } @else {
         <p class="area-list__text">No Areas yet.</p>
       }
-      <div class="asys-button-group">
+      <div asys-button-group>
         <a asys-button [variant]="Variant.Primary" routerLink="/settings/areas/new">New Area</a>
       </div>
     } @else {

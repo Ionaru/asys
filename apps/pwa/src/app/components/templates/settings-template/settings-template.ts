@@ -3,6 +3,7 @@ import { Component, input, model, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { Button, ButtonVariant } from '../../atoms/button/button';
+import { ButtonGroup } from '../../molecules/button-group/button-group';
 import { SyncNote } from '../../atoms/sync-note/sync-note';
 import { LoadState } from '../../molecules/load-state/load-state';
 import { type SelectOption, SelectField } from '../../molecules/select-field/select-field';
@@ -10,7 +11,7 @@ import { type SelectOption, SelectField } from '../../molecules/select-field/sel
 /** Lays out the Urgency window and time zone choices, and the links to Areas and Account. */
 @Component({
   selector: 'asys-settings-template',
-  imports: [Button, LoadState, RouterLink, SelectField, SyncNote],
+  imports: [Button, ButtonGroup, LoadState, RouterLink, SelectField, SyncNote],
   templateUrl: './settings-template.component.html',
   styleUrl: './settings-template.css',
 })
