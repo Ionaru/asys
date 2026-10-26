@@ -3,12 +3,13 @@ import { Component, input, model, output, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { Button, ButtonVariant } from '../../atoms/button/button';
+import { Link } from '../../atoms/link/link';
 import { TextField } from '../../molecules/text-field/text-field';
 
 /** Lays out the share target: a Title to capture, and what the last capture did. */
 @Component({
   selector: 'asys-capture-template',
-  imports: [RouterLink, Button, TextField],
+  imports: [RouterLink, Button, Link, TextField],
   templateUrl: './capture-template.component.html',
   styleUrl: './capture-template.css',
 })

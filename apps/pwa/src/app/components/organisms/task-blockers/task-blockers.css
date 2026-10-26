@@ -67,17 +67,6 @@
   margin: 0 0 calc(var(--space-3) * -1);
 }
 
-.task-blockers__link {
-  display: flex;
-  align-items: center;
-  min-height: var(--tap-target);
-}
-
-/* The theme sits on <html>, outside the component, so only :host-context reaches it. */
-:host-context([data-theme='drive']) .task-blockers__link {
-  min-height: var(--tap-target-drive);
-}
-
 .task-blockers__body {
   display: flex;
   flex-direction: column;

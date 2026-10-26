@@ -7,6 +7,7 @@ import { Button, ButtonSize, ButtonVariant } from '../../atoms/button/button';
 import { ButtonGroup } from '../../molecules/button-group/button-group';
 import { FieldError } from '../../atoms/field-error/field-error';
 import { Input } from '../../atoms/input/input';
+import { Link } from '../../atoms/link/link';
 import { Label } from '../../atoms/label/label';
 import { SyncNote } from '../../atoms/sync-note/sync-note';
 import { LoadState } from '../../molecules/load-state/load-state';
@@ -74,6 +75,7 @@ let nextId = 0;
     FieldError,
     Input,
     Label,
+    Link,
     LoadState,
     RouterLink,
     SelectField,

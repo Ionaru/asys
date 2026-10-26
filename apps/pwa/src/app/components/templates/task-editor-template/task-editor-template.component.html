@@ -96,7 +96,7 @@
   <asys-load-state [failed]="loadFailed()" (retry)="retry.emit()" />
 } @else if (!leaving()) {
   <p class="task-editor__missing">This Task is no longer open.</p>
-  <p class="task-editor__text"><a class="task-editor__link" routerLink="/now">Go to Now</a></p>
+  <p class="task-editor__text"><a asys-link [block]="true" routerLink="/now">Go to Now</a></p>
   @if (dirty()) {
     <ng-container [ngTemplateOutlet]="card" />
   }

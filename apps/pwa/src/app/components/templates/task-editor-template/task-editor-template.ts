@@ -24,6 +24,7 @@ import { FieldError } from '../../atoms/field-error/field-error';
 import { Icon, IconName } from '../../atoms/icon/icon';
 import { Input, InputVariant } from '../../atoms/input/input';
 import { SingleLine } from '../../atoms/input/single-line';
+import { Link } from '../../atoms/link/link';
 import { QuadrantLabel } from '../../atoms/quadrant-label/quadrant-label';
 import { StatusBadge, StatusBadgeStatus } from '../../atoms/status-badge/status-badge';
 import { SyncNote } from '../../atoms/sync-note/sync-note';
@@ -58,6 +59,7 @@ let nextId = 0;
     Icon,
     InlineConfirm,
     Input,
+    Link,
     LoadState,
     LogProgressForm,
     NgTemplateOutlet,

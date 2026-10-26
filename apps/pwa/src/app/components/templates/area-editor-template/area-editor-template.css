@@ -33,12 +33,6 @@
   color: var(--ink-muted);
 }
 
-.area-editor__link {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--tap-target);
-}
-
 .area-editor__text {
   margin: 0 0 var(--space-3);
   font-size: var(--font-size-body);

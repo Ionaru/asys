@@ -15,6 +15,7 @@ import type { Quadrant } from '@asys/domain';
 
 import { Button, ButtonVariant } from '../../atoms/button/button';
 import { IconName } from '../../atoms/icon/icon';
+import { Link } from '../../atoms/link/link';
 import { SyncNote } from '../../atoms/sync-note/sync-note';
 import { AreaPickControl, type AreaChoice } from '../../molecules/area-pick/area-pick';
 import { LoadState } from '../../molecules/load-state/load-state';
@@ -114,6 +115,7 @@ export interface NowRowEnter {
   imports: [
     AreaPickControl,
     Button,
+    Link,
     LoadState,
     LogProgressForm,
     ScreenHeader,

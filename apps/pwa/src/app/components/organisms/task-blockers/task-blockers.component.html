@@ -65,6 +65,8 @@
           @for (dependant of blocks(); track dependant.id) {
             <li>
               <a
+                asys-link
+                [block]="true"
                 class="task-blockers__link"
                 [routerLink]="['/tasks', dependant.id]"
                 (click)="open.set(false)"

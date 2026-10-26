@@ -68,7 +68,7 @@
     <p class="now__text">Nothing to do right now.</p>
     @if (inboxTaskCount() > 0) {
       <p class="now__text">
-        <a routerLink="/inbox">
+        <a asys-link routerLink="/inbox">
           {{
             inboxTaskCount() === 1
               ? '1 Task waits for Triage.'
