@@ -480,25 +480,25 @@ textarea.asys-input {
   view-transition-name: shell-nav;
 }
 
-.asys-bottomnav__item[aria-current='page'] .asys-bottomnav__icon {
+.asys-nav-item[aria-current='page'] .asys-nav-item__icon {
   view-transition-name: nav-mark;
 }
 
 /* Each glyph and the Inbox count have their own names, so the mark's snapshot holds only its pill and they stay
    in place while it moves. */
-.asys-bottomnav__item:nth-child(1) .asys-bottomnav__icon svg {
+.asys-nav-item:nth-child(1) .asys-nav-item__icon svg {
   view-transition-name: nav-glyph-1;
 }
 
-.asys-bottomnav__item:nth-child(2) .asys-bottomnav__icon svg {
+.asys-nav-item:nth-child(2) .asys-nav-item__icon svg {
   view-transition-name: nav-glyph-2;
 }
 
-.asys-bottomnav__item:nth-child(3) .asys-bottomnav__icon svg {
+.asys-nav-item:nth-child(3) .asys-nav-item__icon svg {
   view-transition-name: nav-glyph-3;
 }
 
-.asys-bottomnav__badge {
+.asys-nav-item__icon > .asys-count {
   view-transition-name: nav-badge;
 }
 

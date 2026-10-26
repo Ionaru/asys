@@ -1,30 +1,21 @@
 // SPDX-License-Identifier: EUPL-1.2
-import {
-  Component,
-  computed,
-  ElementRef,
-  input,
-  linkedSignal,
-  signal,
-  viewChild,
-  ViewEncapsulation,
-} from '@angular/core';
+import { Component, ElementRef, input, signal, viewChild, ViewEncapsulation } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 
-import { Count } from '../../atoms/count/count';
-import { Icon, IconName } from '../../atoms/icon/icon';
+import { IconName } from '../../atoms/icon/icon';
+import { NavItem } from '../../molecules/nav-item/nav-item';
 
 /**
- * The primary navigation bar with Now, Today and Inbox, each an icon over its word, and room at its end for
- * the Capture button (projected). Without Capture, the destinations sit in the middle. Routing owns the
- * current item (`routerLinkActive` sets `aria-current="page"` and the Solid icon), which departs on purpose
- * from the design system README's `current` input and `(navigate)` output. A pressed destination shows its pill
- * from the pointer (`is-pressed`), not from the design system's `:active`: a phone can leave `:active` on a
- * destination after the press, which then looked as current as the real one.
+ * The primary navigation bar with Now, Today and Inbox, each a NavItem (an icon over its word), and room at its
+ * end for the Capture button (projected). Without Capture, the destinations sit in the middle. Routing stays
+ * here: `routerLink` navigates and `routerLinkActive` feeds each NavItem's `current`, which departs on purpose
+ * from the design system README's `current` input and `(navigate)` output on the bar. A pressed destination
+ * shows its pill from the pointer (`is-pressed`), not from the design system's `:active`: a phone can leave
+ * `:active` on a destination after the press, which then looked as current as the real one.
  */
 @Component({
   selector: 'asys-bottom-nav',
-  imports: [RouterLink, RouterLinkActive, Icon, Count],
+  imports: [RouterLink, RouterLinkActive, NavItem],
   encapsulation: ViewEncapsulation.None,
   host: {
     '(document:pointerup)': 'release()',
@@ -40,29 +31,7 @@ export class BottomNav {
 
   protected readonly IconName = IconName;
 
-  private readonly inbox = viewChild<ElementRef<HTMLElement>>('inbox');
-
-  /** What the Inbox link says aloud: its count, which the badge hides from screen readers. */
-  protected readonly inboxLabel = computed(() => {
-    const count = this.inboxCount() ?? 0;
-
-    return count > 0 ? `Inbox, ${count} waiting` : null;
-  });
-
-  /**
-   * Bumps when the count rises from one known number to a larger one, so the badge is re-created and
-   * pops. A count that first appears after load (from null) does not bump.
-   */
-  protected readonly pop = linkedSignal<number | null, number>({
-    source: this.inboxCount,
-    computation: (count, previous) =>
-      previous !== undefined &&
-      previous.source !== null &&
-      count !== null &&
-      count > previous.source
-        ? previous.value + 1
-        : (previous?.value ?? 0),
-  });
+  private readonly inbox = viewChild('inbox', { read: ElementRef<HTMLElement> });
 
   /** The path of the destination under a press, whose icon shows the pill until the press ends; null when none. */
   protected readonly pressed = signal<string | null>(null);

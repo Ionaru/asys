@@ -4,7 +4,9 @@ import { expect, test } from './support/fixtures.ts';
 import { captureTask } from './support/seed.ts';
 
 test('Capture adds Tasks to the Inbox from Now and from the share route', async ({ page }) => {
-  const badge = page.getByRole('navigation', { name: 'Primary' }).locator('.asys-bottomnav__badge');
+  const badge = page
+    .getByRole('navigation', { name: 'Primary' })
+    .locator('.asys-nav-item__icon > .asys-count');
   const input = page.getByLabel('Capture a Task');
   const titles = ['Water the plants', 'Call the plumber', 'Renew the passport'];
 
@@ -69,7 +71,9 @@ test('Quick add keeps focus in the field when Add is clicked with the mouse', as
 
 // The field is a textarea, which keeps Chrome's autofill bar off the Android keyboard, so it keeps to one line itself.
 test('Enter in quick add captures the Task, and the field keeps to one line', async ({ page }) => {
-  const badge = page.getByRole('navigation', { name: 'Primary' }).locator('.asys-bottomnav__badge');
+  const badge = page
+    .getByRole('navigation', { name: 'Primary' })
+    .locator('.asys-nav-item__icon > .asys-count');
   const input = page.getByLabel('Capture a Task');
 
   await page.getByRole('button', { name: 'Capture' }).click();
@@ -87,7 +91,9 @@ test('Enter in quick add captures the Task, and the field keeps to one line', as
 });
 
 test('A failed capture stays as a row until Try again sends it', async ({ page }) => {
-  const badge = page.getByRole('navigation', { name: 'Primary' }).locator('.asys-bottomnav__badge');
+  const badge = page
+    .getByRole('navigation', { name: 'Primary' })
+    .locator('.asys-nav-item__icon > .asys-count');
   const input = page.getByLabel('Capture a Task');
   const row = page.locator('.asys-quickadd__failure');
 
@@ -130,9 +136,9 @@ test('The Inbox badge pops when a capture lands, not when the page loads', async
           if (!(node instanceof Element)) {
             continue;
           }
-          const badges = node.matches('.asys-bottomnav__badge')
+          const badges = node.matches('.asys-nav-item__icon > .asys-count')
             ? [node]
-            : Array.from(node.querySelectorAll('.asys-bottomnav__badge'));
+            : Array.from(node.querySelectorAll('.asys-nav-item__icon > .asys-count'));
           for (const badge of badges) {
             if (recordedBadges.has(badge)) {
               continue;
@@ -146,7 +152,9 @@ test('The Inbox badge pops when a capture lands, not when the page loads', async
   });
   const recorded = () =>
     page.evaluate(() => (window as unknown as { badgeAnimations: number[] }).badgeAnimations);
-  const badge = page.getByRole('navigation', { name: 'Primary' }).locator('.asys-bottomnav__badge');
+  const badge = page
+    .getByRole('navigation', { name: 'Primary' })
+    .locator('.asys-nav-item__icon > .asys-count');
 
   await captureTask(page, { title: 'Water the plants' });
   await page.reload();

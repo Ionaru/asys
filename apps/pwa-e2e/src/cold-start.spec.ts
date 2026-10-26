@@ -24,7 +24,7 @@ const countRequests = (page: Page, path: string): { readonly count: () => number
 };
 
 const inboxBadge = (page: Page) =>
-  page.getByRole('navigation', { name: 'Primary' }).locator('.asys-bottomnav__badge');
+  page.getByRole('navigation', { name: 'Primary' }).locator('.asys-nav-item__icon > .asys-count');
 
 test('A signed-in launch requests the snapshot while GET /v1/auth/me is unanswered, and uses it', async ({
   page,

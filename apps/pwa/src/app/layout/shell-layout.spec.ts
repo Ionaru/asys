@@ -314,7 +314,7 @@ const setup = async (url = '/now', { motion }: SetupOptions = {}) => {
   await go(url);
 
   const inboxBadge = (): string | null =>
-    root().querySelector('.asys-bottomnav__badge')?.textContent?.trim() ?? null;
+    root().querySelector('.asys-nav-item__icon > .asys-count')?.textContent?.trim() ?? null;
 
   return {
     fixture,
