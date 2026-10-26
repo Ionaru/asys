@@ -1,32 +1,27 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { Component, computed, input, output, signal, ViewEncapsulation } from '@angular/core';
-import { addDays, formatDate, isLocalDate, isoWeekdayOf, type LocalDate } from '@asys/domain';
+import { addDays, isLocalDate, isoWeekdayOf, type LocalDate } from '@asys/domain';
 
 import { Button, ButtonVariant } from '../../atoms/button/button';
 import { FieldError } from '../../atoms/field-error/field-error';
 import { Input } from '../../atoms/input/input';
 import { Label } from '../../atoms/label/label';
 import { Segment } from '../../atoms/segment/segment';
+import { Calendar } from '../../molecules/calendar/calendar';
 import { dayLabel } from '../../support/day-label';
 
 let nextId = 0;
 
-const WEEKDAY_HEADERS: readonly string[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-const CALENDAR_DAYS = 14;
-
 /** The body of a date sheet: quick dates, a two-week calendar and a native date input. It emits, it never stores. */
 @Component({
   selector: 'asys-date-picker',
-  imports: [Button, FieldError, Input, Label, Segment],
+  imports: [Button, Calendar, FieldError, Input, Label, Segment],
   encapsulation: ViewEncapsulation.None,
   templateUrl: './date-picker.component.html',
   styleUrl: './date-picker.css',
 })
 export class DatePicker {
   protected readonly Variant = ButtonVariant;
-
-  protected readonly weekdays = WEEKDAY_HEADERS;
 
   protected readonly otherId = `asys-date-picker-${nextId++}-other`;
 
@@ -55,31 +50,6 @@ export class DatePicker {
       label: dayLabel(date, today),
     }));
   });
-
-  protected readonly calendarLabel = computed(() => {
-    const today = this.today();
-    const first = this.#first();
-    return `Days from ${formatDate(first, today)} to ${formatDate(addDays(first, CALENDAR_DAYS - 1), today)}`;
-  });
-
-  protected readonly days = computed(() => {
-    const today = this.today();
-    const first = this.#first();
-    return Array.from({ length: CALENDAR_DAYS }, (_, index) => {
-      const date = addDays(first, index);
-      const isToday = date === today;
-      const label = formatDate(date, today);
-      return {
-        date,
-        number: String(Number(date.slice(8, 10))),
-        label: isToday ? `Today, ${label}` : label,
-        isToday,
-        past: date < today,
-      };
-    });
-  });
-
-  readonly #first = computed(() => addDays(this.today(), 1 - isoWeekdayOf(this.today())));
 
   protected choose(date: LocalDate): void {
     this.pastTyped.set(false);

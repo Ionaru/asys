@@ -145,7 +145,7 @@ const setup = async (value: DateSpec | null = null) => {
   const dayButton = (label: string): HTMLButtonElement =>
     f
       .dateDialog()
-      .querySelector(`button.asys-date-picker__day[aria-label="${label}"]`) as HTMLButtonElement;
+      .querySelector(`button.asys-calendar__day[aria-label="${label}"]`) as HTMLButtonElement;
   const dateRemove = (): HTMLButtonElement | null =>
     f.dateDialog().querySelector<HTMLButtonElement>('button.asys-date-picker__remove');
   const dateInput = (): HTMLInputElement =>
