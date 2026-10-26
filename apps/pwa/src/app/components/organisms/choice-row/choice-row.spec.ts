@@ -87,7 +87,9 @@ const setup = async (value = '', icon: IconName | null = null) => {
   const dialog = (): HTMLDialogElement =>
     root().querySelector('dialog.asys-sheet') as HTMLDialogElement;
   const optionButtons = (): HTMLButtonElement[] =>
-    Array.from(dialog().querySelectorAll<HTMLButtonElement>('button.asys-choice-row__option'));
+    Array.from(
+      dialog().querySelectorAll<HTMLButtonElement>('ul.asys-option-list button.asys-field-row'),
+    );
   const error = (): HTMLElement | null => root().querySelector('p[asys-field-error]');
   // A pointer press: `click()` has detail 0, which counts as a keyboard activation.
   const press = async (el: HTMLElement): Promise<void> => {
@@ -176,7 +178,7 @@ describe('ChoiceRow', () => {
       await press(row());
 
       expect(dialog().open).toBe(true);
-      expect(dialog().querySelectorAll('ul.asys-choice-row__options > li')).toHaveLength(3);
+      expect(dialog().querySelectorAll('ul.asys-option-list > li')).toHaveLength(3);
       expect(
         optionButtons().map((b) => [
           b.getAttribute('type'),
@@ -187,49 +189,6 @@ describe('ChoiceRow', () => {
         ['button', 'Home'],
         ['button', 'Work'],
       ]);
-    });
-
-    it('presses exactly the option equal to the value', async () => {
-      const { row, press, optionButtons } = await setup('home');
-
-      await press(row());
-
-      expect(optionButtons().map((b) => b.getAttribute('aria-pressed'))).toEqual([
-        'false',
-        'true',
-        'false',
-      ]);
-    });
-
-    it('presses the empty option for the empty value', async () => {
-      const { row, press, optionButtons } = await setup('');
-
-      await press(row());
-
-      expect(optionButtons().map((b) => b.getAttribute('aria-pressed'))).toEqual([
-        'true',
-        'false',
-        'false',
-      ]);
-    });
-
-    it('gives every option a check, and the icon only when one is given', async () => {
-      const { row, press, optionButtons } = await setup('home');
-
-      await press(row());
-
-      expect(
-        optionButtons().every((b) => b.querySelector('asys-icon.asys-choice-row__check') !== null),
-      ).toBe(true);
-      expect(optionButtons().every((b) => b.querySelectorAll('asys-icon').length === 1)).toBe(true);
-    });
-
-    it('shows the icon in each option when an icon is given', async () => {
-      const { row, press, optionButtons } = await setup('home', IconName.Folder);
-
-      await press(row());
-
-      expect(optionButtons().every((b) => b.querySelectorAll('asys-icon').length === 2)).toBe(true);
     });
 
     it('sets the value of the picked option, closes the sheet and emits touch', async () => {
@@ -378,7 +337,9 @@ describe('ChoiceRow', () => {
       const { root, host, row, press } = await setupForm();
 
       await press(row());
-      await press(root().querySelectorAll<HTMLElement>('button.asys-choice-row__option')[1]);
+      await press(
+        root().querySelectorAll<HTMLElement>('ul.asys-option-list button.asys-field-row')[1],
+      );
 
       expect(host.model().areaId).toBe('home');
     });

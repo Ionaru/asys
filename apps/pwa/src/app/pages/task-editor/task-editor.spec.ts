@@ -773,7 +773,9 @@ describe('TaskEditor', () => {
       await click(rowButton('Area'));
 
       expect(
-        Array.from(dialog('Area').querySelectorAll('.asys-choice-row__option')).map((o) => text(o)),
+        Array.from(dialog('Area').querySelectorAll('.asys-option-list .asys-field-row')).map((o) =>
+          text(o),
+        ),
       ).toEqual(['No Area', 'Alpha', 'Mid', 'Zeta']);
     });
 
