@@ -54,7 +54,25 @@ const setup = async () => {
   return { fixture, host: fixture.componentInstance, button, part, icon, title };
 };
 
+@Component({
+  imports: [SectionHeader],
+  template: `<button asys-section-header [icon]="icon" [title]="'Waiting'"></button>`,
+})
+class DefaultsHost {
+  readonly icon = IconName.HourglassHalf;
+}
+
 describe('SectionHeader', () => {
+  it('draws a chevron-down at the end when no trailing icon is given', async () => {
+    const fixture = TestBed.createComponent(DefaultsHost);
+    await fixture.whenStable();
+    const chevron = fixture.nativeElement.querySelector('.asys-section-header__chevron');
+
+    expect(chevron?.querySelector('svg[data-icon]')?.getAttribute('data-icon')).toBe(
+      'chevron-down',
+    );
+  });
+
   it('is the button itself, with type=button, no title attribute and its parts in order', async () => {
     const { button } = await setup();
     const parts = [

@@ -286,12 +286,32 @@ describe('DatePicker', () => {
     });
 
     it('clears the error on a later valid day', async () => {
-      const { root, change, days, press } = await setup();
+      const { root, change, days, press, host } = await setup();
 
       await change('2026-10-12');
       await press(days()[3]);
 
       expect(root().querySelector('p[asys-field-error]')).toBeNull();
+      expect(host.picks).toEqual(['2026-10-15']);
+    });
+
+    it('presses the Calendar day equal to the value only', async () => {
+      const { days } = await setup('2026-10-13', '2026-10-15');
+
+      expect(days().map((b) => b.getAttribute('aria-pressed'))).toEqual(
+        Array.from({ length: 14 }, (_, i) => (i === 3 ? 'true' : 'false')),
+      );
+    });
+
+    it('moves the pressed Calendar day when the value changes', async () => {
+      const { fixture, host, days } = await setup('2026-10-13', '2026-10-15');
+
+      host.value.set('2026-10-20');
+      await fixture.whenStable();
+
+      expect(days().map((b) => b.getAttribute('aria-pressed'))).toEqual(
+        Array.from({ length: 14 }, (_, i) => (i === 8 ? 'true' : 'false')),
+      );
     });
 
     it('clears the error on a later valid Other date', async () => {

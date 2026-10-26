@@ -191,6 +191,47 @@ describe('ChoiceRow', () => {
       ]);
     });
 
+    it('presses exactly the option equal to the value', async () => {
+      const { row, press, optionButtons } = await setup('home');
+
+      await press(row());
+
+      expect(optionButtons().map((b) => b.getAttribute('aria-pressed'))).toEqual([
+        'false',
+        'true',
+        'false',
+      ]);
+    });
+
+    it('presses the empty option for the empty value', async () => {
+      const { row, press, optionButtons } = await setup('');
+
+      await press(row());
+
+      expect(optionButtons().map((b) => b.getAttribute('aria-pressed'))).toEqual([
+        'true',
+        'false',
+        'false',
+      ]);
+    });
+
+    it('shows the icon in each option when an icon is given', async () => {
+      const { row, press, optionButtons } = await setup('home', IconName.Folder);
+
+      await press(row());
+
+      expect(optionButtons()).toHaveLength(3);
+      expect(
+        optionButtons().map((b) =>
+          Array.from(b.querySelectorAll('svg[data-icon]'), (i) => i.getAttribute('data-icon')),
+        ),
+      ).toEqual([
+        expect.arrayContaining(['folder']),
+        expect.arrayContaining(['folder']),
+        expect.arrayContaining(['folder']),
+      ]);
+    });
+
     it('sets the value of the picked option, closes the sheet and emits touch', async () => {
       const { host, row, press, dialog, optionButtons } = await setup('home');
 
