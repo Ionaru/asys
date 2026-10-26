@@ -1,13 +1,18 @@
 /* SPDX-License-Identifier: EUPL-1.2 */
-.asys-segmented-control__legend {
-  margin: 0 0 var(--space-2);
+.asys-segmented-control > .asys-label {
+  margin-bottom: var(--space-2);
 }
 
 .asys-segmented-control__options {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
+}
 
-  & > .asys-segment {
-    flex: 1 1 0;
-  }
+.asys-segmented-control--fill .asys-segmented-control__options {
+  flex-wrap: nowrap;
+}
+
+.asys-segmented-control--fill .asys-segment {
+  flex: 1 1 0;
 }

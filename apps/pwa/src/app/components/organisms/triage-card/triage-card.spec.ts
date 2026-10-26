@@ -198,7 +198,7 @@ describe('TriageCard', () => {
     it('labels the importance and estimate controls', async () => {
       const { q, segment } = await setup();
 
-      expect(q('.asys-segmented-control__legend')?.textContent?.trim()).toBe('Importance');
+      expect(q('.asys-segmented-control > legend')?.textContent?.trim()).toBe('Importance');
       expect(segment('Important')).toBeDefined();
       expect(segment('Not important')).toBeDefined();
       expect(q('.asys-estimate__legend')?.textContent?.trim()).toBe('Estimate');

@@ -205,8 +205,8 @@
     <asys-segmented-control
       [formField]="importantField()"
       legend="Importance"
-      trueLabel="Important"
-      falseLabel="Not important"
+      [options]="importanceOptions"
+      [layout]="SegmentLayout.Fill"
     />
     <asys-estimate-picker [formField]="estimateField()" [layout]="Layout.Ruler" />
     <div class="task-editor__rows">

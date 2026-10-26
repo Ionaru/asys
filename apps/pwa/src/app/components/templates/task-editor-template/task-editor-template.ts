@@ -31,7 +31,10 @@ import { SyncNote } from '../../atoms/sync-note/sync-note';
 import { Text } from '../../atoms/text/text';
 import { InlineConfirm } from '../../molecules/inline-confirm/inline-confirm';
 import { LoadState } from '../../molecules/load-state/load-state';
-import { SegmentedControl } from '../../molecules/segmented-control/segmented-control';
+import {
+  SegmentedControl,
+  SegmentedControlLayout,
+} from '../../molecules/segmented-control/segmented-control';
 import { areaSelectOptions } from '../../molecules/select-field/area-options';
 import { ChoiceRow } from '../../organisms/choice-row/choice-row';
 import { DateRow } from '../../organisms/date-row/date-row';
@@ -44,6 +47,7 @@ import {
   type TaskBlockerTask,
 } from '../../organisms/task-blockers/task-blockers';
 import { activationOf } from '../../support/activation';
+import { IMPORTANCE_OPTIONS } from '../../support/importance-options';
 
 let nextId = 0;
 
@@ -277,6 +281,10 @@ export class TaskEditorTemplate {
   protected readonly Tags = TaskExplanationTag;
 
   protected readonly Layout = EstimateLayout;
+
+  protected readonly SegmentLayout = SegmentedControlLayout;
+
+  protected readonly importanceOptions = IMPORTANCE_OPTIONS;
 
   protected readonly activationOf = activationOf;
 

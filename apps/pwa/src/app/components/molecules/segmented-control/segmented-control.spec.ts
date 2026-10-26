@@ -3,15 +3,22 @@ import { Component, signal, viewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { form, FormField, validate, type ValidationError } from '@angular/forms/signals';
 
-import { SegmentedControl } from './segmented-control';
+import { IMPORTANCE_OPTIONS } from '../../support/importance-options';
+import { SegmentedControl, SegmentedControlLayout, type SegmentOption } from './segmented-control';
+
+const ABC: readonly SegmentOption<string>[] = [
+  { value: 'a', label: 'A' },
+  { value: 'b', label: 'B' },
+  { value: 'c', label: 'C' },
+];
 
 @Component({
   imports: [SegmentedControl],
   template: `
     <asys-segmented-control
-      legend="Importance"
-      trueLabel="Important"
-      falseLabel="Not important"
+      legend="Pick"
+      [options]="options()"
+      [layout]="layout()"
       [value]="value()"
       (valueChange)="value.set($event)"
       [hint]="hint()"
@@ -25,7 +32,11 @@ import { SegmentedControl } from './segmented-control';
 class Host {
   readonly field = viewChild.required(SegmentedControl);
 
-  readonly value = signal<boolean | null>(null);
+  readonly options = signal<readonly SegmentOption<string>[]>(ABC);
+
+  readonly layout = signal<SegmentedControlLayout>(SegmentedControlLayout.Wrap);
+
+  readonly value = signal<string | null>(null);
 
   readonly hint = signal<string | undefined>(undefined);
 
@@ -41,11 +52,13 @@ class Host {
 @Component({
   imports: [SegmentedControl],
   template: `
-    <asys-segmented-control legend="A" trueLabel="Yes" falseLabel="No" />
-    <asys-segmented-control legend="B" trueLabel="Yes" falseLabel="No" hint="Some hint" />
+    <asys-segmented-control legend="A" [options]="options" />
+    <asys-segmented-control legend="B" [options]="options" hint="Some hint" />
   `,
 })
-class Pair {}
+class Pair {
+  readonly options = ABC;
+}
 
 @Component({
   imports: [SegmentedControl, FormField],
@@ -53,12 +66,13 @@ class Pair {}
     <asys-segmented-control
       [formField]="f.important"
       legend="Importance"
-      trueLabel="Important"
-      falseLabel="Not important"
+      [options]="importanceOptions"
     />
   `,
 })
 class FormHost {
+  readonly importanceOptions = IMPORTANCE_OPTIONS;
+
   readonly model = signal<{ important: boolean | null }>({ important: null });
 
   readonly f = form(this.model, (p) => {
@@ -82,77 +96,103 @@ const setup = async () => {
 };
 
 describe('SegmentedControl', () => {
-  it('renders a fieldset with the legend and the true option before the false option', async () => {
+  it('renders a fieldset with the legend and one Segment per option in order', async () => {
     const { root, options } = await setup();
 
-    expect(root().querySelector('fieldset.asys-segmented-control')).not.toBeNull();
     expect(
-      root().querySelector('fieldset > legend.asys-segmented-control__legend')?.textContent?.trim(),
-    ).toBe('Importance');
-    expect(root().querySelector('legend.asys-segmented-control__legend.asys-label')).not.toBeNull();
+      root().querySelector('fieldset.asys-fieldset-reset.asys-segmented-control'),
+    ).not.toBeNull();
+    expect(root().querySelector('fieldset > legend.asys-label')?.textContent?.trim()).toBe('Pick');
     expect(
-      root().querySelectorAll('fieldset > div.asys-segmented-control__options > button').length,
-    ).toBe(2);
-    expect(options().map((b) => b.textContent?.trim())).toEqual(['Important', 'Not important']);
+      root().querySelectorAll(
+        'fieldset > div.asys-segmented-control__options > button.asys-segment',
+      ).length,
+    ).toBe(3);
+    expect(options().map((b) => b.textContent?.trim())).toEqual(['A', 'B', 'C']);
     expect(options().every((b) => b.getAttribute('type') === 'button')).toBe(true);
-    expect(options().every((b) => b.classList.contains('asys-segment'))).toBe(true);
   });
 
   describe('aria-pressed', () => {
-    it('is false on both options when the value is null', async () => {
+    it('is false on every option when the value is null', async () => {
       const { pressed } = await setup();
 
-      expect(pressed()).toEqual(['false', 'false']);
+      expect(pressed()).toEqual(['false', 'false', 'false']);
     });
 
-    it('is true on the true option when the value is true', async () => {
+    it('presses only the option whose value matches', async () => {
       const { fixture, host, pressed } = await setup();
 
-      host.value.set(true);
+      host.value.set('b');
       await fixture.whenStable();
 
-      expect(pressed()).toEqual(['true', 'false']);
+      expect(pressed()).toEqual(['false', 'true', 'false']);
     });
 
-    it('is true on the false option when the value is false', async () => {
+    it('presses nothing for a value that is not an option', async () => {
       const { fixture, host, pressed } = await setup();
 
-      host.value.set(false);
+      host.value.set('z');
       await fixture.whenStable();
 
-      expect(pressed()).toEqual(['false', 'true']);
+      expect(pressed()).toEqual(['false', 'false', 'false']);
     });
   });
 
   describe('clicking', () => {
-    it('sets true from the true option and false from the false option', async () => {
+    it('sets the value of the clicked option', async () => {
       const { fixture, host, options } = await setup();
 
-      options()[0].click();
+      options()[2].click();
       await fixture.whenStable();
 
-      expect(host.value()).toBe(true);
-
-      options()[1].click();
-      await fixture.whenStable();
-
-      expect(host.value()).toBe(false);
+      expect(host.value()).toBe('c');
     });
 
-    it('keeps the pressed option when it is clicked again', async () => {
+    it('keeps the value when the pressed option is clicked again', async () => {
       const { fixture, host, options, pressed } = await setup();
 
-      host.value.set(true);
+      options()[2].click();
       await fixture.whenStable();
-      options()[0].click();
+      options()[2].click();
       await fixture.whenStable();
 
-      expect(host.value()).toBe(true);
-      expect(pressed()).toEqual(['true', 'false']);
+      expect(host.value()).toBe('c');
+      expect(pressed()).toEqual(['false', 'false', 'true']);
     });
   });
 
-  it('disables both buttons while disabled', async () => {
+  describe('layout', () => {
+    it('adds the fill modifier only for the Fill layout', async () => {
+      const { fixture, host, root } = await setup();
+      const fieldset = (): Element | null => root().querySelector('fieldset');
+
+      expect(fieldset()?.classList.contains('asys-segmented-control--fill')).toBe(false);
+
+      host.layout.set(SegmentedControlLayout.Fill);
+      await fixture.whenStable();
+
+      expect(fieldset()?.classList.contains('asys-segmented-control--fill')).toBe(true);
+
+      host.layout.set(SegmentedControlLayout.Wrap);
+      await fixture.whenStable();
+
+      expect(fieldset()?.classList.contains('asys-segmented-control--fill')).toBe(false);
+    });
+  });
+
+  it('re-renders when the options change', async () => {
+    const { fixture, host, options } = await setup();
+
+    host.options.set([
+      { value: 'd', label: 'D' },
+      { value: 'e', label: 'E' },
+    ]);
+    await fixture.whenStable();
+
+    expect(options().map((b) => b.textContent?.trim())).toEqual(['D', 'E']);
+  });
+
+  it('disables every Segment while disabled', async () => {
     const { fixture, host, options } = await setup();
 
     expect(options().some((b) => b.disabled)).toBe(false);
@@ -163,7 +203,7 @@ describe('SegmentedControl', () => {
     expect(options().every((b) => b.disabled)).toBe(true);
   });
 
-  it('emits touch when a button blurs', async () => {
+  it('emits touch when a Segment blurs', async () => {
     const { fixture, host, options } = await setup();
 
     options()[0].dispatchEvent(new Event('blur'));
@@ -171,7 +211,7 @@ describe('SegmentedControl', () => {
 
     expect(host.touches()).toBe(1);
 
-    options()[1].dispatchEvent(new Event('blur'));
+    options()[2].dispatchEvent(new Event('blur'));
     await fixture.whenStable();
 
     expect(host.touches()).toBe(2);
@@ -285,13 +325,24 @@ describe('SegmentedControl', () => {
     });
   });
 
-  it('focuses the true option first', async () => {
-    const { fixture, host, options } = await setup();
+  describe('focus', () => {
+    it('focuses the first option', async () => {
+      const { fixture, host, options } = await setup();
 
-    document.body.appendChild(fixture.nativeElement);
-    host.field().focus();
+      document.body.appendChild(fixture.nativeElement);
+      host.field().focus();
 
-    expect(document.activeElement).toBe(options()[0]);
+      expect(document.activeElement).toBe(options()[0]);
+    });
+
+    it('does nothing without options', async () => {
+      const { fixture, host } = await setup();
+
+      host.options.set([]);
+      await fixture.whenStable();
+
+      expect(() => host.field().focus()).not.toThrow();
+    });
   });
 
   describe('with Signal Forms', () => {
@@ -309,18 +360,15 @@ describe('SegmentedControl', () => {
       return { fixture, host: fixture.componentInstance, root, options, error };
     };
 
-    it('writes a click into the form model', async () => {
+    it('lists Important first and writes a click into the form model', async () => {
       const { fixture, host, options } = await setupForm();
+
+      expect(options().map((b) => b.textContent?.trim())).toEqual(['Important', 'Not important']);
 
       options()[1].click();
       await fixture.whenStable();
 
       expect(host.model().important).toBe(false);
-
-      options()[0].click();
-      await fixture.whenStable();
-
-      expect(host.model().important).toBe(true);
     });
 
     it('shows a value set on the model', async () => {

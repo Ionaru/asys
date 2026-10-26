@@ -17,9 +17,13 @@ import {
 import { Button, ButtonSize, ButtonVariant } from '../../atoms/button/button';
 import { EstimatePicker } from '../estimate-picker/estimate-picker';
 import { InlineConfirm } from '../../molecules/inline-confirm/inline-confirm';
-import { SegmentedControl } from '../../molecules/segmented-control/segmented-control';
+import {
+  SegmentedControl,
+  SegmentedControlLayout,
+} from '../../molecules/segmented-control/segmented-control';
 import { areaSelectOptions, NO_AREA_LABEL } from '../../molecules/select-field/area-options';
 import { SelectField } from '../../molecules/select-field/select-field';
+import { IMPORTANCE_OPTIONS } from '../../support/importance-options';
 
 /** The Triage choices for one Inbox Task. */
 export interface TriageDraft {
@@ -54,6 +58,10 @@ export class TriageCard {
   protected readonly Variants = ButtonVariant;
 
   protected readonly Sizes = ButtonSize;
+
+  protected readonly SegmentLayout = SegmentedControlLayout;
+
+  protected readonly importanceOptions = IMPORTANCE_OPTIONS;
 
   protected readonly reasonId = `asys-triage-${nextId++}-reason`;
 
