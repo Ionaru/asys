@@ -134,7 +134,8 @@
     </div>
   }
   @if (waiting().length > 0) {
-    <asys-section-header
+    <section
+      asys-collapsible-section
       [icon]="Icons.HourglassHalf"
       [title]="'Waiting'"
       [count]="waiting().length"
@@ -161,7 +162,7 @@
           }
         </ul>
       }
-    </asys-section-header>
+    </section>
   }
 } @else {
   <asys-load-state [failed]="loadFailed()" (retry)="retry.emit()" />

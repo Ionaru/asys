@@ -35,7 +35,7 @@ asys-screen-header {
   border-bottom: 1px solid var(--line);
 }
 
-asys-section-header {
+.asys-collapsible-section {
   margin: var(--space-5) 0 0;
 }
 

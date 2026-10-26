@@ -20,8 +20,8 @@ import { SyncNote } from '../../atoms/sync-note/sync-note';
 import { Text } from '../../atoms/text/text';
 import { AreaPickControl, type AreaChoice } from '../../molecules/area-pick/area-pick';
 import { LoadState } from '../../molecules/load-state/load-state';
-import { SectionHeader } from '../../molecules/section-header/section-header';
 import { TaskRow, TaskRowVariant } from '../../molecules/task-row/task-row';
+import { CollapsibleSection } from '../../organisms/collapsible-section/collapsible-section';
 import { LogProgressForm } from '../../organisms/log-progress-form/log-progress-form';
 import { ScreenHeader } from '../../organisms/screen-header/screen-header';
 import { SwipeActions } from '../../organisms/swipe-actions/swipe-actions';
@@ -123,7 +123,7 @@ export interface NowRowEnter {
     ScreenHeader,
     TaskRow,
     RouterLink,
-    SectionHeader,
+    CollapsibleSection,
     SwipeActions,
     SyncNote,
     TopPick,

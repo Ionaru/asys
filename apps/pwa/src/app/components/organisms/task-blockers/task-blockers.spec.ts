@@ -79,6 +79,13 @@ describe('TaskBlockers', () => {
     expect(text(header())).toContain('Waits for Water form. 2 Tasks wait for this.');
   });
 
+  it('renders the header as a bare button, with no section around it', async () => {
+    const { host, header } = await setup();
+
+    expect(host.querySelector('section')).toBeNull();
+    expect(header().parentElement).toBe(host);
+  });
+
   it('shows no rows, candidates or Blocks before it is opened', async () => {
     const { host } = await setup({
       blockedBy: [row('l1', 'Water form')],

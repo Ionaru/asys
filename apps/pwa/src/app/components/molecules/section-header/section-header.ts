@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: EUPL-1.2
-import { Component, computed, input, model, output, ViewEncapsulation } from '@angular/core';
+import { Component, computed, input, ViewEncapsulation } from '@angular/core';
 
 import { Count, CountVariant } from '../../atoms/count/count';
 import { Icon, IconName } from '../../atoms/icon/icon';
@@ -10,59 +10,46 @@ export enum SectionHeaderAction {
   Open = 'open',
 }
 
-let nextId = 0;
-
 /**
- * The muted card of a set-aside list such as Waiting: an icon, the title and count, a line saying what matters
- * next, and a chevron. The rows are projected into the body, which hides when collapsed. Bind the title as a
- * property, not a static attribute, so it does not become the native tooltip of the host.
+ * The header button of a set-aside list such as Waiting: an icon, the title and count, a line saying what matters
+ * next, and a chevron. It is stateless: the parent owns `expanded` and binds the native `(click)`. Bind the title
+ * as a property, never a static attribute, or it becomes the native tooltip of the host.
  */
 @Component({
-  selector: 'asys-section-header',
+  selector: 'button[asys-section-header]',
   imports: [Icon, Count],
   encapsulation: ViewEncapsulation.None,
+  host: {
+    class: 'asys-section-header',
+    type: 'button',
+    '[attr.aria-expanded]': 'isOpen() ? null : expanded() ? "true" : "false"',
+    '[attr.aria-controls]': 'isOpen() ? null : controls()',
+    '[attr.aria-haspopup]': 'isOpen() ? "dialog" : null',
+  },
   template: `
-    <section class="asys-section" [attr.aria-label]="title()">
-      <button
-        class="asys-section-header"
-        type="button"
-        [attr.aria-expanded]="isOpen() ? null : expanded() ? 'true' : 'false'"
-        [attr.aria-controls]="isOpen() ? null : bodyId"
-        [attr.aria-haspopup]="isOpen() ? 'dialog' : null"
-        (click)="click()"
-      >
-        <asys-icon class="asys-section-header__icon" [name]="icon()" />
-        <span class="asys-section-header__text">
-          <span class="asys-section-header__title"
-            >{{ title() }}
-            @if (count() > 0) {
-              <span
-                asys-count
-                class="asys-section-header__count"
-                [variant]="CountVariant.Quiet"
-                [value]="count()"
-              ></span>
-            }
-          </span>
-          @if (summary(); as text) {
-            <span class="asys-section-header__summary">{{ text }}</span>
-          }
-        </span>
-        <asys-icon class="asys-section-header__chevron" [name]="trailingIcon()" />
-      </button>
-      @if (!isOpen()) {
-        <div class="asys-section__body" [id]="bodyId" [hidden]="!expanded()">
-          <ng-content />
-        </div>
+    <asys-icon class="asys-section-header__icon" [name]="icon()" />
+    <span class="asys-section-header__text">
+      <span class="asys-section-header__title"
+        >{{ title() }}
+        @if (count() > 0) {
+          <span
+            asys-count
+            class="asys-section-header__count"
+            [variant]="CountVariant.Quiet"
+            [value]="count()"
+          ></span>
+        }
+      </span>
+      @if (summary(); as text) {
+        <span class="asys-section-header__summary">{{ text }}</span>
       }
-    </section>
+    </span>
+    <asys-icon class="asys-section-header__chevron" [name]="trailingIcon()" />
   `,
   styleUrl: './section-header.css',
 })
 export class SectionHeader {
   protected readonly CountVariant = CountVariant;
-
-  protected readonly bodyId = `asys-section-body-${nextId++}`;
 
   /** The Icon that marks the section, such as the hourglass for Waiting. */
   readonly icon = input.required<IconName>();
@@ -74,20 +61,16 @@ export class SectionHeader {
   /** The one fact that matters while the section is closed; none shows when null or empty. */
   readonly summary = input<string | null>(null);
 
-  readonly expanded = model<boolean>(false);
-
-  /** Expand toggles the body; Open emits `activate` and renders no body. */
+  /** Expand reports aria-expanded and aria-controls; Open reports aria-haspopup instead. */
   readonly action = input<SectionHeaderAction>(SectionHeaderAction.Expand);
 
   /** The Icon at the end of the header. Only an Expand header's chevron turns. */
   readonly trailingIcon = input<IconName>(IconName.ChevronDown);
 
-  readonly activate = output<void>();
+  readonly expanded = input<boolean>(false);
+
+  /** The id of the body the header expands, for `aria-controls`. */
+  readonly controls = input<string | null>(null);
 
   protected readonly isOpen = computed(() => this.action() === SectionHeaderAction.Open);
-
-  protected click(): void {
-    if (this.isOpen()) this.activate.emit();
-    else this.expanded.set(!this.expanded());
-  }
 }
