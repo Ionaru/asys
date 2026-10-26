@@ -58,9 +58,13 @@
       } @else {
         <p asys-text class="task-blockers__text">No Task matches.</p>
       }
-      <p asys-text [textStyle]="TextStyle.Reason" class="task-blockers__message" role="status">
-        {{ message() }}
-      </p>
+      <p
+        asys-text
+        [textStyle]="TextStyle.Reason"
+        class="task-blockers__message"
+        role="status"
+        [textContent]="message()"
+      ></p>
       <h3 class="task-blockers__subtitle">Blocks</h3>
       @if (blocks().length > 0) {
         <ul class="task-blockers__list">

@@ -118,6 +118,14 @@ describe('TaskBlockers', () => {
     expect(text(dialog().querySelector('p.task-blockers__message'))).toBe('Could not add.');
   });
 
+  it('keeps the status element empty without a message, so its :empty rule takes its room away', async () => {
+    const { open, dialog } = await setup();
+
+    await open();
+
+    expect(dialog().querySelector('p.task-blockers__message')?.matches(':empty')).toBe(true);
+  });
+
   it('says so when there are no rows, no candidates and no dependants', async () => {
     const { open, text, dialog } = await setup();
 
