@@ -38,12 +38,19 @@ Each lands on `main` with every check green and no visual change unless it says 
 10. **Now.**
 11. **Task editor.** `features/` is deleted.
 
-## Later, out of scope for the moves
+## After the moves
 
-- The design-system renames landed after the moves, one commit each: QuadrantChip to QuadrantLabel, PickerRow to TaskRow, Segmented to SegmentedControl, DatePick to DatePicker, TimePick to TimePicker, EstimateField to EstimatePicker, DateSpecRow to DateRow and NowHeader to ScreenHeader. They changed selectors, classes, e2e specs and `styles.css`.
-- CaptureButton was folded into Button as `[capture]="true"`, which draws the `asys-button--capture` pill with its `__label` and a `__count` for the `waiting` captures, as the design system's Button does.
-- The splits: DateRow and ChoiceRow into FieldRow with a Sheet and OptionList, and the Calendar molecule.
-- New atoms and molecules: Count, Segment, Countdown, Text, Link, ButtonGroup, NavItem, GapSummary.
+The moves are done. What the plan left for later landed after them:
+
+- The design-system renames, one commit each (PR #53, plus #54 for the classes and ids DatePicker and TimePicker kept): QuadrantChip to QuadrantLabel, PickerRow to TaskRow, Segmented to SegmentedControl, DatePick to DatePicker, TimePick to TimePicker, EstimateField to EstimatePicker, DateSpecRow to DateRow and NowHeader to ScreenHeader. They changed selectors, classes, e2e specs and `styles.css`.
+- CaptureButton folded into Button as `[capture]="true"`, which draws the `asys-button--capture` pill with its `__label` and the count of `waiting` captures, as the design system's Button does (PR #55).
+- On one branch, a commit each (2026-10-26): the shell fenced outside the levels; the Count, Countdown, Link, Text and Segment atoms; the ButtonGroup, NavItem, FieldRow, DateRow and Calendar molecules; SegmentedControl on a list of options; SectionHeader moved to the molecules, with CollapsibleSection split out as an organism; the OptionList organism; and the DateRow organism renamed DateField, freeing the name for the molecule. Where the design system's values differ from the old look, the design system won: the Link underline, the Voice only Link height, the 99+ Count cap and the Estimate ruler's letter-spacing.
+
+## Still to do
+
+- GapSummary and GapBand, with the Gap rule and the screens that show it in slice 2. Building them now would leave unused code (decided 2026-10-26).
+- The pickers on SegmentedControl's Wrap, Grid and Track layouts: the Estimate chips and ruler, DatePicker's quick days and TimePicker. Today they place their Segments themselves.
+- Segment's `now` form and its VoiceLabel, once Voice is built.
 
 ## Open questions
 
