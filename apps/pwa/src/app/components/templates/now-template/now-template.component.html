@@ -20,7 +20,7 @@
     ></a>
   </div>
 </asys-screen-header>
-<p class="asys-page__status now__status" role="status">{{ statusLine() }}</p>
+<p asys-text class="asys-page__status now__status" role="status">{{ statusLine() }}</p>
 @if (loaded()) {
   @if (card(); as top) {
     <asys-swipe-actions

@@ -4,7 +4,7 @@ import { RouterLink } from '@angular/router';
 
 import { Button, ButtonVariant } from '../../atoms/button/button';
 import { IconName } from '../../atoms/icon/icon';
-import { Text } from '../../atoms/text/text';
+import { Text, TextStyle } from '../../atoms/text/text';
 
 /** Lays out signing in with a passkey, with a way to use a recovery code instead. */
 @Component({
@@ -14,6 +14,8 @@ import { Text } from '../../atoms/text/text';
   styleUrl: './sign-in-template.css',
 })
 export class SignInTemplate {
+  protected readonly TextStyle = TextStyle;
+
   /** Whether the passkey options have loaded, so a sign-in can start. */
   readonly ready = input.required<boolean>();
 

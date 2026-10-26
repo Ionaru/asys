@@ -3,7 +3,7 @@ import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { Button, ButtonVariant } from '../../atoms/button/button';
-import { Text } from '../../atoms/text/text';
+import { Text, TextStyle } from '../../atoms/text/text';
 
 /** Lays out the screen shown after a recovery code sign-in, which nudges the Owner to replace lost passkeys. */
 @Component({
@@ -11,7 +11,13 @@ import { Text } from '../../atoms/text/text';
   imports: [Text, Button, RouterLink],
   template: `
     <main class="asys-page recovered">
-      <h1 class="asys-page__title asys-page__title--flush recovered__title">You are signed in</h1>
+      <h1
+        asys-text
+        [textStyle]="TextStyle.Title"
+        class="asys-page__title asys-page__title--flush recovered__title"
+      >
+        You are signed in
+      </h1>
       <p asys-text class="recovered__body">
         You signed in with a recovery code. Add a passkey now, and remove any you lost.
       </p>
@@ -36,5 +42,7 @@ import { Text } from '../../atoms/text/text';
   `,
 })
 export class RecoveredTemplate {
+  protected readonly TextStyle = TextStyle;
+
   protected readonly Variant = ButtonVariant;
 }

@@ -4,7 +4,7 @@ import { RouterLink } from '@angular/router';
 
 import { Button, ButtonVariant } from '../../atoms/button/button';
 import { Link } from '../../atoms/link/link';
-import { Text } from '../../atoms/text/text';
+import { Text, TextStyle } from '../../atoms/text/text';
 import { TextField } from '../../molecules/text-field/text-field';
 
 /** Lays out the share target: a Title to capture, and what the last capture did. */
@@ -15,6 +15,8 @@ import { TextField } from '../../molecules/text-field/text-field';
   styleUrl: './capture-template.css',
 })
 export class CaptureTemplate {
+  protected readonly TextStyle = TextStyle;
+
   /** The Title being captured. */
   readonly title = model.required<string>();
 

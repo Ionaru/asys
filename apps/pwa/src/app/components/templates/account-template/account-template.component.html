@@ -1,7 +1,13 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
 <div class="account">
   <header class="account__block">
-    <h1 class="asys-page__title asys-page__title--flush account__title">Account</h1>
+    <h1
+      asys-text
+      [textStyle]="TextStyle.Title"
+      class="asys-page__title asys-page__title--flush account__title"
+    >
+      Account
+    </h1>
     <p asys-text [textStyle]="TextStyle.Reason" class="account__reason">{{ name() }}</p>
   </header>
 

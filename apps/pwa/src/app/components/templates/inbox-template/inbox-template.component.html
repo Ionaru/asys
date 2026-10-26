@@ -1,6 +1,14 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
-<h1 #heading class="asys-page__title inbox__title" tabindex="-1">Inbox</h1>
-<p class="asys-page__status inbox__status" role="status">{{ statusLine() }}</p>
+<h1
+  #heading
+  asys-text
+  [textStyle]="TextStyle.Title"
+  class="asys-page__title inbox__title"
+  tabindex="-1"
+>
+  Inbox
+</h1>
+<p asys-text class="asys-page__status inbox__status" role="status">{{ statusLine() }}</p>
 @if (loaded()) {
   @if (reviews().length > 0) {
     <ul class="inbox__reviews">

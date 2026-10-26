@@ -32,7 +32,7 @@
 <h1 #headingRef class="asys-visually-hidden task-editor__heading" tabindex="-1">
   {{ heading() }}
 </h1>
-<p class="asys-page__status task-editor__status" role="status">{{ statusText() }}</p>
+<p asys-text class="asys-page__status task-editor__status" role="status">{{ statusText() }}</p>
 @if (saveFailed()) {
   <button
     asys-button

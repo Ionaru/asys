@@ -3,7 +3,7 @@ import { Component, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { Button, ButtonVariant } from '../../atoms/button/button';
-import { Text } from '../../atoms/text/text';
+import { Text, TextStyle } from '../../atoms/text/text';
 import { ButtonGroup } from '../../molecules/button-group/button-group';
 import { LoadState } from '../../molecules/load-state/load-state';
 
@@ -19,7 +19,7 @@ export interface AreaListRow {
   selector: 'asys-area-list-template',
   imports: [Text, Button, ButtonGroup, LoadState, RouterLink],
   template: `
-    <h1 class="asys-page__title area-list__title">Areas</h1>
+    <h1 asys-text [textStyle]="TextStyle.Title" class="asys-page__title area-list__title">Areas</h1>
     <p class="area-list__status" role="status"></p>
     @if (loaded()) {
       @if (rows().length > 0) {
@@ -46,6 +46,8 @@ export interface AreaListRow {
   styleUrl: './area-list-template.css',
 })
 export class AreaListTemplate {
+  protected readonly TextStyle = TextStyle;
+
   /** The Areas in the order to show them. */
   readonly rows = input.required<readonly AreaListRow[]>();
 

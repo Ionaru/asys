@@ -290,12 +290,9 @@ textarea.asys-input {
   padding-block-start: var(--space-6);
 }
 
-/* A screen's title. The flush modifier drops the space below it, for screens that space their blocks with a gap. */
+/* The margin under a screen's title. The flush modifier drops the space below it, for screens that space their blocks with a gap. */
 .asys-page__title {
   margin: 0 0 var(--space-3);
-  font-size: var(--font-size-title);
-  line-height: var(--line-height-title);
-  font-weight: 700;
 }
 
 .asys-page__title--flush {
@@ -305,8 +302,6 @@ textarea.asys-input {
 /* The status line under a title. It takes no room while it is empty. */
 .asys-page__status {
   margin: 0 0 var(--space-3);
-  font-size: var(--font-size-body);
-  line-height: var(--line-height-body);
 
   &:empty {
     margin: 0;
