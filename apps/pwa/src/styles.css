@@ -316,8 +316,8 @@ textarea.asys-input {
   min-width: 0;
 }
 
-/* The row of a bottom-sheet control: a label, its value and a chevron. Used by asys-date-row and asys-choice-row. */
-.asys-row {
+/* FieldRow (components/molecules/field-row): a label, its value and a chevron to the sheet that changes it. A sheet's option rows (OptionList) reuse the class. */
+.asys-field-row {
   appearance: none;
   margin: 0;
   display: flex;
@@ -335,7 +335,8 @@ textarea.asys-input {
   font-family: var(--font-sans);
   font-size: var(--font-size-body);
   line-height: var(--line-height-body);
-  transition: background var(--duration-quick) var(--ease-out);
+  font-weight: 400;
+  transition: background-color var(--duration-quick) var(--ease-out);
 
   &:active {
     background: var(--signal-soft);
@@ -347,12 +348,12 @@ textarea.asys-input {
   }
 }
 
-.asys-row__label {
+.asys-field-row__label {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.asys-row__value {
+.asys-field-row__value {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
@@ -361,17 +362,17 @@ textarea.asys-input {
   text-align: right;
 }
 
-.asys-row__value--set {
+.asys-field-row__value--set {
   color: var(--ink);
   font-weight: 600;
 }
 
-.asys-row__chevron {
+.asys-field-row__chevron {
   color: var(--ink-muted);
   font-size: 0.875em;
 }
 
-[data-theme='drive'] .asys-row {
+[data-theme='drive'] .asys-field-row {
   min-height: var(--tap-target-drive);
 }
 

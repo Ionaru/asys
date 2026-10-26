@@ -185,12 +185,12 @@ describe('DateRow', () => {
     it('shows the label and the none label while there is no value', async () => {
       const { row } = await setup();
 
-      expect(squash(row().querySelector('.asys-row__label')?.textContent)).toBe('Due');
+      expect(squash(row().querySelector('.asys-field-row__label')?.textContent)).toBe('Due');
 
-      const value = row().querySelector('.asys-row__value') as HTMLElement;
+      const value = row().querySelector('.asys-field-row__value') as HTMLElement;
 
       expect(squash(value.textContent)).toBe('None');
-      expect(value.classList.contains('asys-row__value--set')).toBe(false);
+      expect(value.classList.contains('asys-field-row__value--set')).toBe(false);
       expect(row().getAttribute('type')).toBe('button');
     });
 
@@ -200,10 +200,10 @@ describe('DateRow', () => {
       ['2026-10-13', 'Today'],
     ])('shows %s as %s and marks the value as set', async (date, text) => {
       const { row } = await setup({ date });
-      const value = row().querySelector('.asys-row__value') as HTMLElement;
+      const value = row().querySelector('.asys-field-row__value') as HTMLElement;
 
       expect(squash(value.textContent)).toBe(text);
-      expect(value.classList.contains('asys-row__value--set')).toBe(true);
+      expect(value.classList.contains('asys-field-row__value--set')).toBe(true);
     });
 
     it('updates the text when the value changes', async () => {
@@ -212,7 +212,7 @@ describe('DateRow', () => {
       host.value.set(null);
       await fixture.whenStable();
 
-      expect(squash(row().querySelector('.asys-row__value')?.textContent)).toBe('None');
+      expect(squash(row().querySelector('.asys-field-row__value')?.textContent)).toBe('None');
     });
 
     it('uses the none label it is given', async () => {
@@ -221,9 +221,9 @@ describe('DateRow', () => {
       fixture.componentInstance.value.set(null);
       await fixture.whenStable();
 
-      expect(squash(fixture.nativeElement.querySelector('.asys-row__value')?.textContent)).toBe(
-        'Any time',
-      );
+      expect(
+        squash(fixture.nativeElement.querySelector('.asys-field-row__value')?.textContent),
+      ).toBe('Any time');
     });
 
     it('has a popup on the row button', async () => {
@@ -636,7 +636,7 @@ describe('DateRow', () => {
       host.model.set({ due: { date: '2026-10-14', time: '17:00' } });
       await fixture.whenStable();
 
-      expect(squash(row().querySelector('.asys-row__value')?.textContent)).toBe('Tomorrow');
+      expect(squash(row().querySelector('.asys-field-row__value')?.textContent)).toBe('Tomorrow');
     });
 
     it('writes a picked date into the form model', async () => {

@@ -1,21 +1,16 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
 <div class="asys-date-row">
   <button
-    #row
-    type="button"
-    class="asys-row asys-date-row__open"
-    aria-haspopup="dialog"
+    asys-field-row
+    class="asys-date-row__open"
+    [label]="label()"
+    [value]="dateText()"
+    [set]="value() !== null"
     [disabled]="disabled()"
     [attr.aria-describedby]="messageId()"
     (click)="dateOpen.set(true)"
     (blur)="touch.emit()"
-  >
-    <span class="asys-row__label">{{ label() }}</span>
-    <span class="asys-row__value" [class.asys-row__value--set]="value() !== null">{{
-      dateText()
-    }}</span>
-    <asys-icon class="asys-row__chevron" [name]="Chevron" />
-  </button>
+  ></button>
   @if (value(); as spec) {
     <button
       type="button"

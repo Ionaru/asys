@@ -417,13 +417,14 @@ const setup = async (options: SetupOptions = {}) => {
   const row = (label: string): HTMLElement =>
     must(
       Array.from(root().querySelectorAll<HTMLElement>('asys-choice-row, asys-date-row')).find(
-        (r) => text(r.querySelector('.asys-row__label')) === label,
+        (r) => text(r.querySelector('.asys-field-row__label')) === label,
       ),
       `the ${label} row`,
     );
   const rowButton = (label: string): HTMLButtonElement =>
-    must(row(label).querySelector<HTMLButtonElement>('button.asys-row'));
-  const rowValue = (label: string): string => text(row(label).querySelector('.asys-row__value'));
+    must(row(label).querySelector<HTMLButtonElement>('button.asys-field-row'));
+  const rowValue = (label: string): string =>
+    text(row(label).querySelector('.asys-field-row__value'));
 
   // The reason line.
   const reason = (): HTMLElement | null => root().querySelector('.task-editor__reason');

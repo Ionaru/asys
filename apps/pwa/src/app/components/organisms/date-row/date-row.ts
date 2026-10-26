@@ -2,7 +2,6 @@
 import {
   Component,
   computed,
-  ElementRef,
   input,
   model,
   signal,
@@ -17,6 +16,7 @@ import { dayLabel } from '../date-picker/day-label';
 import { FieldControl } from '../../support/field-control';
 import { FieldError } from '../../atoms/field-error/field-error';
 import { Icon, IconName } from '../../atoms/icon/icon';
+import { FieldRow } from '../../molecules/field-row/field-row';
 import { Sheet } from '../sheet/sheet';
 import { TimePicker } from '../time-picker/time-picker';
 
@@ -25,14 +25,12 @@ let nextId = 0;
 /** A Due or Available from as a row: the date opens a sheet, a split button beside it opens the time sheet. */
 @Component({
   selector: 'asys-date-row',
-  imports: [DatePicker, FieldError, Icon, Sheet, TimePicker],
+  imports: [FieldRow, DatePicker, FieldError, Icon, Sheet, TimePicker],
   encapsulation: ViewEncapsulation.None,
   templateUrl: './date-row.component.html',
   styleUrl: './date-row.css',
 })
 export class DateRow extends FieldControl implements FormValueControl<DateSpec | null> {
-  protected readonly Chevron = IconName.ChevronRight;
-
   protected readonly Clock = IconName.Clock;
 
   readonly value = model<DateSpec | null>(null);
@@ -70,11 +68,11 @@ export class DateRow extends FieldControl implements FormValueControl<DateSpec |
     return value === null ? '' : `${this.label()} ${formatDay(value.date, this.today())}`;
   });
 
-  private readonly row = viewChild<ElementRef<HTMLButtonElement>>('row');
+  private readonly row = viewChild(FieldRow);
 
   /** Focuses the row button, called by Signal Forms' `focusBoundControl()`. */
   focus(options?: FocusOptions): void {
-    this.row()?.nativeElement.focus(options);
+    this.row()?.focus(options);
   }
 
   protected pickDate(date: LocalDate): void {

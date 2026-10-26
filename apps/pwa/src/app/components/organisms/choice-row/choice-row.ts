@@ -2,7 +2,6 @@
 import {
   Component,
   computed,
-  ElementRef,
   input,
   model,
   signal,
@@ -14,6 +13,7 @@ import type { FormValueControl } from '@angular/forms/signals';
 import { FieldControl } from '../../support/field-control';
 import { FieldError } from '../../atoms/field-error/field-error';
 import { Icon, IconName } from '../../atoms/icon/icon';
+import { FieldRow } from '../../molecules/field-row/field-row';
 import type { SelectOption } from '../../molecules/select-field/select-field';
 import { Sheet } from '../sheet/sheet';
 
@@ -22,7 +22,7 @@ let nextId = 0;
 /** A single choice as a row: it shows the chosen option and opens a sheet to change it. */
 @Component({
   selector: 'asys-choice-row',
-  imports: [FieldError, Icon, Sheet],
+  imports: [FieldRow, FieldError, Icon, Sheet],
   encapsulation: ViewEncapsulation.None,
   templateUrl: './choice-row.component.html',
   styles: `
@@ -53,8 +53,6 @@ let nextId = 0;
   `,
 })
 export class ChoiceRow extends FieldControl implements FormValueControl<string> {
-  protected readonly Chevron = IconName.ChevronRight;
-
   protected readonly Check = IconName.Check;
 
   readonly value = model<string>('');
@@ -73,11 +71,11 @@ export class ChoiceRow extends FieldControl implements FormValueControl<string> 
     () => this.options().find((option) => option.value === this.value())?.label ?? '',
   );
 
-  private readonly row = viewChild<ElementRef<HTMLButtonElement>>('row');
+  private readonly row = viewChild(FieldRow);
 
   /** Focuses the row button, called by Signal Forms' `focusBoundControl()`. */
   focus(options?: FocusOptions): void {
-    this.row()?.nativeElement.focus(options);
+    this.row()?.focus(options);
   }
 
   protected choose(value: string): void {
