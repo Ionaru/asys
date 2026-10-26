@@ -83,7 +83,7 @@ const setup = async (draft?: TriageDraft) => {
       (b) => b.textContent?.trim() === label,
     );
   const footerButton = (label: string) => find('.asys-triage__footer button', label);
-  const segment = (label: string) => find('.asys-segmented-control__option', label);
+  const segment = (label: string) => find('asys-segmented-control .asys-segment', label);
   const chip = (label: string) => find('.asys-estimate__chip', label);
   const changeButton = () => find('.asys-triage__area button', 'Change');
   const select = () => q<HTMLSelectElement>('asys-select-field select');
@@ -585,7 +585,7 @@ describe('TriageCard', () => {
       expect(footerButton('Later')?.disabled).toBe(false);
       expect(footerButton('Edit')?.disabled).toBe(false);
       for (const control of root.querySelectorAll<HTMLButtonElement>(
-        '.asys-segmented-control__option, .asys-estimate__chip',
+        'asys-segmented-control .asys-segment, .asys-estimate__chip',
       )) {
         expect(control.disabled).toBe(true);
       }

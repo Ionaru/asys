@@ -6,35 +6,8 @@
 .asys-segmented-control__options {
   display: flex;
   gap: var(--space-2);
-}
 
-.asys-segmented-control__option {
-  flex: 1 1 0;
-  min-height: var(--tap-target);
-  padding: var(--space-2) var(--space-3);
-  background: var(--surface);
-  color: var(--ink);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-family: var(--font-sans);
-  font-size: var(--font-size-body-strong);
-  line-height: var(--line-height-body-strong);
-  font-weight: 600;
-  transition: background var(--duration-quick) var(--ease-out);
-
-  &[aria-pressed='true'] {
-    background: var(--signal-soft);
-    color: var(--on-signal-soft);
-    border-color: var(--signal);
-  }
-
-  &:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-
-  [data-theme='drive'] & {
-    min-height: var(--tap-target-drive);
+  & > .asys-segment {
+    flex: 1 1 0;
   }
 }

@@ -75,7 +75,7 @@ const setup = async () => {
   const host = fixture.componentInstance;
   const root = (): HTMLElement => fixture.nativeElement;
   const options = (): HTMLButtonElement[] =>
-    Array.from(root().querySelectorAll<HTMLButtonElement>('button.asys-segmented-control__option'));
+    Array.from(root().querySelectorAll<HTMLButtonElement>('asys-segmented-control .asys-segment'));
   const pressed = (): (string | null)[] => options().map((b) => b.getAttribute('aria-pressed'));
 
   return { fixture, host, root, options, pressed };
@@ -95,6 +95,7 @@ describe('SegmentedControl', () => {
     ).toBe(2);
     expect(options().map((b) => b.textContent?.trim())).toEqual(['Important', 'Not important']);
     expect(options().every((b) => b.getAttribute('type') === 'button')).toBe(true);
+    expect(options().every((b) => b.classList.contains('asys-segment'))).toBe(true);
   });
 
   describe('aria-pressed', () => {
@@ -301,7 +302,7 @@ describe('SegmentedControl', () => {
       const root: HTMLElement = fixture.nativeElement;
       const options = (): HTMLButtonElement[] =>
         Array.from(
-          root.querySelectorAll<HTMLButtonElement>('button.asys-segmented-control__option'),
+          root.querySelectorAll<HTMLButtonElement>('asys-segmented-control .asys-segment'),
         );
       const error = (): HTMLElement | null => root.querySelector('p.asys-field__error');
 

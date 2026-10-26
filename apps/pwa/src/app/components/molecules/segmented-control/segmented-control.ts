@@ -5,24 +5,24 @@ import type { FormValueControl } from '@angular/forms/signals';
 import { FieldControl } from '../../support/field-control';
 import { FieldError } from '../../atoms/field-error/field-error';
 import { Label } from '../../atoms/label/label';
+import { Segment } from '../../atoms/segment/segment';
 
 let nextId = 0;
 
 /** A two-way choice shown as two buttons, usable as a Signal Forms custom control. */
 @Component({
   selector: 'asys-segmented-control',
-  imports: [FieldError, Label],
+  imports: [FieldError, Label, Segment],
   encapsulation: ViewEncapsulation.None,
   template: `
     <fieldset class="asys-fieldset-reset asys-segmented-control">
       <legend asys-label class="asys-segmented-control__legend">{{ legend() }}</legend>
       <div class="asys-segmented-control__options">
         <button
+          asys-segment
           #first
-          type="button"
-          class="asys-segmented-control__option"
+          [pressed]="value() === true"
           [disabled]="disabled()"
-          [attr.aria-pressed]="value() === true ? 'true' : 'false'"
           [attr.aria-describedby]="messageId()"
           (click)="value.set(true)"
           (blur)="touch.emit()"
@@ -30,10 +30,9 @@ let nextId = 0;
           {{ trueLabel() }}
         </button>
         <button
-          type="button"
-          class="asys-segmented-control__option"
+          asys-segment
+          [pressed]="value() === false"
           [disabled]="disabled()"
-          [attr.aria-pressed]="value() === false ? 'true' : 'false'"
           [attr.aria-describedby]="messageId()"
           (click)="value.set(false)"
           (blur)="touch.emit()"
@@ -61,7 +60,7 @@ export class SegmentedControl extends FieldControl implements FormValueControl<b
 
   protected override readonly messageParagraphId = `asys-segmented-control-${nextId++}-message`;
 
-  private readonly first = viewChild<ElementRef<HTMLButtonElement>>('first');
+  private readonly first = viewChild('first', { read: ElementRef<HTMLButtonElement> });
 
   /** Focuses the first option, called by Signal Forms' `focusBoundControl()`. */
   focus(options?: FocusOptions): void {
