@@ -1,33 +1,17 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
-<div class="asys-date-row">
-  <button
-    asys-field-row
-    class="asys-date-row__open"
-    [label]="label()"
-    [value]="dateText()"
-    [set]="value() !== null"
-    [disabled]="disabled()"
-    [attr.aria-describedby]="messageId()"
-    (click)="dateOpen.set(true)"
-    (blur)="touch.emit()"
-  ></button>
-  @if (value(); as spec) {
-    <button
-      type="button"
-      class="asys-num asys-date-row__time"
-      aria-haspopup="dialog"
-      [class.asys-date-row__time--set]="spec.time !== undefined"
-      [disabled]="disabled()"
-      [attr.aria-label]="timeLabel()"
-      (click)="timeOpen.set(true)"
-    >
-      <asys-icon [name]="Clock" />
-      @if (spec.time) {
-        {{ spec.time }}
-      }
-    </button>
-  }
-</div>
+<div
+  asys-date-row
+  [label]="label()"
+  [noneLabel]="noneLabel()"
+  [value]="value()"
+  [today]="today()"
+  [timePrefix]="timePrefix()"
+  [disabled]="disabled()"
+  [describedBy]="messageId()"
+  (openDate)="dateOpen.set(true)"
+  (openTime)="timeOpen.set(true)"
+  (dayBlur)="touch.emit()"
+></div>
 @if (showError()) {
   <p asys-field-error [id]="messageParagraphId">{{ message() }}</p>
 } @else if (hint()) {

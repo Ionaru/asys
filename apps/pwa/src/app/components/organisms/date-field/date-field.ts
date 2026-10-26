@@ -12,11 +12,9 @@ import type { FormValueControl } from '@angular/forms/signals';
 import { formatDay, type DateSpec, type LocalDate, type LocalTime } from '@asys/domain';
 
 import { DatePicker } from '../date-picker/date-picker';
-import { dayLabel } from '../date-picker/day-label';
 import { FieldControl } from '../../support/field-control';
 import { FieldError } from '../../atoms/field-error/field-error';
-import { Icon, IconName } from '../../atoms/icon/icon';
-import { FieldRow } from '../../molecules/field-row/field-row';
+import { DateRow } from '../../molecules/date-row/date-row';
 import { Sheet } from '../sheet/sheet';
 import { TimePicker } from '../time-picker/time-picker';
 
@@ -25,14 +23,11 @@ let nextId = 0;
 /** A Due or Available from as a row: the date opens a sheet, a split button beside it opens the time sheet. */
 @Component({
   selector: 'asys-date-field',
-  imports: [FieldRow, DatePicker, FieldError, Icon, Sheet, TimePicker],
+  imports: [DateRow, DatePicker, FieldError, Sheet, TimePicker],
   encapsulation: ViewEncapsulation.None,
   templateUrl: './date-field.component.html',
-  styleUrl: './date-field.css',
 })
 export class DateField extends FieldControl implements FormValueControl<DateSpec | null> {
-  protected readonly Clock = IconName.Clock;
-
   readonly value = model<DateSpec | null>(null);
 
   readonly label = input.required<string>();
@@ -51,24 +46,12 @@ export class DateField extends FieldControl implements FormValueControl<DateSpec
 
   protected readonly timeOpen = signal(false);
 
-  protected readonly dateText = computed(() => {
-    const value = this.value();
-    return value === null ? this.noneLabel() : dayLabel(value.date, this.today());
-  });
-
-  protected readonly timeLabel = computed(() => {
-    const time = this.value()?.time;
-    return time === undefined
-      ? `Add a time to ${this.label()}`
-      : `${this.timePrefix()} ${time}, change time`;
-  });
-
   protected readonly timeContext = computed(() => {
     const value = this.value();
     return value === null ? '' : `${this.label()} ${formatDay(value.date, this.today())}`;
   });
 
-  private readonly row = viewChild(FieldRow);
+  private readonly row = viewChild(DateRow);
 
   /** Focuses the row button, called by Signal Forms' `focusBoundControl()`. */
   focus(options?: FocusOptions): void {

@@ -7,7 +7,7 @@ import { FieldError } from '../../atoms/field-error/field-error';
 import { Input } from '../../atoms/input/input';
 import { Label } from '../../atoms/label/label';
 import { Segment } from '../../atoms/segment/segment';
-import { dayLabel } from './day-label';
+import { dayLabel } from '../../support/day-label';
 
 let nextId = 0;
 
