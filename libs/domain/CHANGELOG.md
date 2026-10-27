@@ -4,6 +4,18 @@
 
 `RULES_VERSION` in `src/lib/rules-version.ts` names the rules a front-end derives its values with. Any change to a rule is at least a minor version (ADR 0003).
 
+## 0.8.0 (2026-10-27)
+
+Triage may carry the Title, Notes, Available from and Due set while triaging, validated and applied as an edit is.
+
+### Triage
+
+- `TriageTask` takes four optional fields besides Importance, Estimate and Area: `title`, `notes`, `availableFrom` and `due`. A field that is absent leaves the Task's value alone, and `null` clears Available from or Due. This is what the Inbox's Triage card sends: nothing is saved until the person taps Triage, and then the edits and the triage arrive as one change with one version bump.
+- The fields are checked exactly as an edit checks them, and before the Task is looked up: a title that is not a string or is blank after trimming is Rejected `invalid_title`, notes that are not a string `invalid_notes`, and an Available from or Due that is not a valid date, with a valid time if it has one, `invalid_date`. The order is Estimate (`invalid_estimate`), Title, Notes, Available from, Due, and only then `not_found`, the expectation, `not_open` and `unknown_area`. So an invalid title on a Task that does not exist answers `invalid_title`, not `not_found`.
+- The title is stored trimmed and the notes exactly as given, as an edit does.
+- The Due-move counter follows the 0.7.0 rule: from a Due of Mon 19 Oct 17:00, triaging with Tue 20 Oct 17:00 counts one move and triaging with no Due counts one, while Mon 19 Oct 09:00 counts none. A first Due counts none, and a Triage that carries no Due leaves the counter alone.
+- Triage and edit now share one check and one way of applying these four fields, so they cannot drift apart. An edit's results, including its check order, are unchanged.
+
 ## 0.7.0 (2026-10-16)
 
 A Task's own explanation, a calendar's date arithmetic, and a Due move that ignores the time.
@@ -208,7 +220,7 @@ The first rules: the time model, Areas and Active hours, the derived state of a 
 - A new Task or Area starts at version 1, and every applied change to one raises its version by 1.
 - A command that would change nothing is Applied with no changes and no version change. Resolving a Review item twice is such a command.
 - **Capture** stores the title trimmed and the captured text exactly as given. The new Task is Open, with no Area unless one is given.
-- **Triage** needs an Open Task, Importance and an Estimate. **Log progress** needs an Open Task with an Estimate, and sets it to a smaller positive value.
+- **Triage** needs an Open Task, Importance and an Estimate (since 0.8.0 it may also carry a Title, Notes, Available from and Due). **Log progress** needs an Open Task with an Estimate, and sets it to a smaller positive value.
 - Estimates and remaining time are whole minutes from 1 to 100 000.
 - **Edit** works in any status. `null` clears the Area, Available from, Due, Estimate or Importance. The title is trimmed and cannot be empty.
 - The **Due-move counter** counts every change to an existing Due, including clearing it. Setting a first Due or the same Due does not count.

@@ -283,6 +283,201 @@ describe('triageTask', () => {
       changes: [],
     });
   });
+
+  describe('with the Title, Notes, Available from and Due set while triaging', () => {
+    const dated = aTask({
+      id: 't1',
+      title: 'Old',
+      notes: 'old notes',
+      availableFrom: { date: '2026-10-10' },
+      due: { date: '2026-10-19', time: '17:00' },
+      dueMoveCount: 1,
+      important: null,
+      estimateMinutes: null,
+      version: 1,
+    });
+
+    it('trims the title', () => {
+      expect(taskAfter(triage(inbox, { title: '  New title  ' })).title).toBe('New title');
+    });
+
+    it('keeps notes exactly as given', () => {
+      expect(taskAfter(triage(inbox, { notes: ' keep  \n' })).notes).toBe(' keep  \n');
+    });
+
+    it('sets Available from, and clears it with null', () => {
+      const set = taskAfter(
+        triage(inbox, { availableFrom: { date: '2026-10-20', time: '09:00' } }),
+      );
+      expect(set.availableFrom).toEqual({ date: '2026-10-20', time: '09:00' });
+      expect(taskAfter(triage(dated, { availableFrom: null })).availableFrom).toBeNull();
+    });
+
+    it('sets Due, and clears it with null', () => {
+      expect(taskAfter(triage(inbox, { due: { date: '2026-10-21' } })).due).toEqual({
+        date: '2026-10-21',
+      });
+      expect(taskAfter(triage(dated, { due: null })).due).toBeNull();
+    });
+
+    it('applies every field together with Importance, Estimate and Area in one change', () => {
+      const after = taskAfter(
+        triage(
+          inbox,
+          {
+            title: ' Pay rent ',
+            notes: 'Transfer first',
+            availableFrom: { date: '2026-10-15' },
+            due: { date: '2026-10-31', time: '12:00' },
+            areaId: 'work',
+          },
+          [anArea({ id: 'work' })],
+        ),
+      );
+      expect(after).toEqual({
+        ...inbox,
+        title: 'Pay rent',
+        notes: 'Transfer first',
+        availableFrom: { date: '2026-10-15' },
+        due: { date: '2026-10-31', time: '12:00' },
+        areaId: 'work',
+        important: true,
+        estimateMinutes: 15,
+        version: 2,
+      });
+    });
+
+    it('leaves absent fields alone', () => {
+      const after = taskAfter(triage(dated));
+      expect(after).toEqual({ ...dated, important: true, estimateMinutes: 15, version: 2 });
+    });
+
+    it('leaves fields that are explicitly undefined alone', () => {
+      const after = taskAfter(
+        triage(dated, {
+          title: undefined,
+          notes: undefined,
+          availableFrom: undefined,
+          due: undefined,
+        }),
+      );
+      expect(after).toEqual({ ...dated, important: true, estimateMinutes: 15, version: 2 });
+    });
+
+    it('is Applied with no changes when the carried fields equal the current ones', () => {
+      const same = aTask({
+        id: 't1',
+        title: 'Old',
+        notes: 'old notes',
+        due: { date: '2026-10-19' },
+        important: true,
+        estimateMinutes: 15,
+      });
+      expect(
+        triage(same, { title: ' Old ', notes: 'old notes', due: { date: '2026-10-19' } }),
+      ).toEqual({
+        _tag: TransitionResultTag.Applied,
+        changes: [],
+      });
+    });
+
+    it.each([
+      ['a null title', { title: null }],
+      ['a blank title', { title: '  ' }],
+      ['a number as title', { title: 4 }],
+    ])('rejects %s with invalid_title', (_name, extra) => {
+      expect(triage(inbox, extra)).toEqual(rejected(RejectedReason.InvalidTitle));
+    });
+
+    it('rejects a null notes value with invalid_notes', () => {
+      expect(triage(inbox, { notes: null })).toEqual(rejected(RejectedReason.InvalidNotes));
+    });
+
+    it('rejects an impossible Available from date with invalid_date', () => {
+      expect(triage(inbox, { availableFrom: { date: '2026-02-30' } })).toEqual(
+        rejected(RejectedReason.InvalidDate),
+      );
+    });
+
+    it('rejects an invalid Due time with invalid_date', () => {
+      expect(triage(inbox, { due: { date: '2026-10-15', time: '25:00' } })).toEqual(
+        rejected(RejectedReason.InvalidDate),
+      );
+    });
+
+    it('checks Title, then Notes, then Available from, then Due', () => {
+      const badDate = { date: '2026-02-30' };
+      expect(
+        triage(inbox, { title: '', notes: null, availableFrom: badDate, due: badDate }),
+      ).toEqual(rejected(RejectedReason.InvalidTitle));
+      expect(triage(inbox, { notes: null, availableFrom: badDate, due: badDate })).toEqual(
+        rejected(RejectedReason.InvalidNotes),
+      );
+      expect(triage(inbox, { availableFrom: badDate, due: { date: '2026-13-01' } })).toEqual(
+        rejected(RejectedReason.InvalidDate),
+      );
+    });
+
+    it('rejects an invalid estimate before an invalid title', () => {
+      expect(triage(inbox, { estimateMinutes: 0, title: '' })).toEqual(
+        rejected(RejectedReason.InvalidEstimate),
+      );
+    });
+
+    it('rejects an invalid title before looking for the Task', () => {
+      expect(triage(undefined, { title: ' ' })).toEqual(rejected(RejectedReason.InvalidTitle));
+    });
+
+    it('rejects an invalid Due before the expectation and the status precondition', () => {
+      const done = aTask({ id: 't1', status: TaskStatus.Done, closedAt: 1, version: 3 });
+      expect(triage(done, { due: { date: '2026-02-30' }, expect: { version: 99 } })).toEqual(
+        rejected(RejectedReason.InvalidDate),
+      );
+    });
+
+    it('answers not_open for a Done Task even when valid fields are carried', () => {
+      const done = aTask({ id: 't1', status: TaskStatus.Done, closedAt: 1 });
+      expect(triage(done, { title: 'New' })).toEqual(notApplicable(NotApplicableReason.NotOpen));
+    });
+
+    describe('Due move counter', () => {
+      const withDue = aTask({
+        id: 't1',
+        due: { date: '2026-10-19', time: '17:00' },
+        dueMoveCount: 0,
+      });
+
+      it('counts one move when the Due date changes', () => {
+        const after = taskAfter(triage(withDue, { due: { date: '2026-10-20', time: '17:00' } }));
+        expect(after.dueMoveCount).toBe(1);
+      });
+
+      it('counts one move when the Due is cleared', () => {
+        expect(taskAfter(triage(withDue, { due: null })).dueMoveCount).toBe(1);
+      });
+
+      it('counts no move for a first Due', () => {
+        const after = taskAfter(triage(inbox, { due: { date: '2026-10-19' } }));
+        expect(after.dueMoveCount).toBe(0);
+      });
+
+      it('counts no move when only the time changes on the same date', () => {
+        expect(
+          taskAfter(triage(withDue, { due: { date: '2026-10-19', time: '09:00' } })).dueMoveCount,
+        ).toBe(0);
+        expect(taskAfter(triage(withDue, { due: { date: '2026-10-19' } })).dueMoveCount).toBe(0);
+      });
+
+      it('counts no move when the Due is absent', () => {
+        expect(taskAfter(triage(withDue)).dueMoveCount).toBe(0);
+      });
+
+      it('adds to an existing count', () => {
+        const moved = aTask({ id: 't1', due: { date: '2026-10-19' }, dueMoveCount: 2 });
+        expect(taskAfter(triage(moved, { due: { date: '2026-10-25' } })).dueMoveCount).toBe(3);
+      });
+    });
+  });
 });
 
 describe('expect', () => {

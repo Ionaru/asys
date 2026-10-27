@@ -105,6 +105,10 @@ export interface TriageTask {
   readonly important: boolean;
   readonly estimateMinutes: number;
   readonly areaId?: string | null;
+  readonly title?: string;
+  readonly notes?: string;
+  readonly availableFrom?: DateSpec | null;
+  readonly due?: DateSpec | null;
   readonly expect?: Expectation;
 }
 

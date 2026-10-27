@@ -536,6 +536,35 @@ layer(appDatabase())('runCommand, every command once', (it) => {
     }),
   );
 
+  it.effect('TriageTask carrying a title and a Due persists them with the triage', () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(T);
+      const o = yield* newOwner();
+      const c = capture();
+      yield* runCommand(o, c);
+
+      const { before, result, entries, snapshot } = yield* runAndObserve(o, {
+        ...triage(c.taskId, true, 30),
+        title: ' Pay the rent ',
+        due: { date: '2026-12-15', time: '10:00' },
+      });
+      yield* removeOwner(o);
+
+      assert.deepStrictEqual(result, applied(before + 1));
+      const entry = onlyEntry(entries);
+      assert.strictEqual(entry.entity, ChangeEntity.Task);
+      assert.strictEqual(entry.op, ChangeOp.Put);
+      const stored = snapshot.tasks.find((t) => t.id === c.taskId);
+      assert.strictEqual(stored?.title, 'Pay the rent');
+      assert.deepStrictEqual(stored?.due, { date: '2026-12-15', time: '10:00' });
+      assert.strictEqual(stored?.dueMoveCount, 0);
+      assert.strictEqual(stored?.important, true);
+      assert.strictEqual(stored?.estimateMinutes, 30);
+      assert.strictEqual(stored?.version, 2);
+      assert.deepStrictEqual(field(entry, 'after'), stored);
+    }),
+  );
+
   it.effect('EditTask logs a task put', () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(T);
