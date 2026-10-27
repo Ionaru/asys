@@ -3,6 +3,7 @@ import { Component, signal, viewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { form, FormField, validate, type ValidationError } from '@angular/forms/signals';
 
+import { LabelNeed } from '../../atoms/label/label';
 import { EstimatePicker, EstimateLayout } from './estimate-picker';
 
 const RANGE_ERROR = 'Error: Use whole minutes from 1 to 100000.';
@@ -11,6 +12,7 @@ const RANGE_ERROR = 'Error: Use whole minutes from 1 to 100000.';
   imports: [EstimatePicker],
   template: `
     <asys-estimate-picker
+      [need]="need()"
       [value]="value()"
       (valueChange)="value.set($event)"
       [hint]="hint()"
@@ -23,6 +25,8 @@ const RANGE_ERROR = 'Error: Use whole minutes from 1 to 100000.';
 })
 class Host {
   readonly field = viewChild.required(EstimatePicker);
+
+  readonly need = signal<LabelNeed>(LabelNeed.None);
 
   readonly value = signal<number | null>(null);
 
@@ -101,6 +105,18 @@ const setup = async () => {
 
 describe('EstimatePicker', () => {
   describe('markup', () => {
+    it('passes need to its legend', async () => {
+      const { fixture, host, root } = await setup();
+      const legend = (): Element | null => root().querySelector('fieldset > legend.asys-label');
+
+      expect(legend()?.querySelector('.asys-label__need')).toBeNull();
+
+      host.need.set(LabelNeed.Needed);
+      await fixture.whenStable();
+
+      expect(legend()?.querySelector('.asys-label__need')?.textContent?.trim()).toBe('Needed');
+    });
+
     it('renders a fieldset with the default legend', async () => {
       const { root } = await setup();
 
@@ -621,6 +637,7 @@ describe('EstimatePicker', () => {
   template: `
     <asys-estimate-picker
       [layout]="layout"
+      [need]="need()"
       [value]="value()"
       (valueChange)="value.set($event)"
       [hint]="hint()"
@@ -635,6 +652,8 @@ class RulerHost {
   readonly layout = EstimateLayout.Ruler;
 
   readonly field = viewChild.required(EstimatePicker);
+
+  readonly need = signal<LabelNeed>(LabelNeed.None);
 
   readonly value = signal<number | null>(null);
 
@@ -679,6 +698,19 @@ const setupRuler = async () => {
 };
 
 describe('EstimatePicker Ruler layout', () => {
+  it('passes need to its legend span', async () => {
+    const { fixture, host, legend } = await setupRuler();
+
+    expect(legend()?.querySelector('.asys-label__need')).toBeNull();
+
+    host.need.set(LabelNeed.Missing);
+    await fixture.whenStable();
+
+    expect(legend()?.querySelector('.asys-label__need--missing')?.textContent?.trim()).toBe(
+      'Needed',
+    );
+  });
+
   it('is a group named by its legend, not a fieldset or a chip row', async () => {
     const { root, group, legend } = await setupRuler();
 

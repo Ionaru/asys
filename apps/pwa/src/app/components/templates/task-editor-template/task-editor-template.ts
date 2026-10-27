@@ -36,6 +36,7 @@ import {
   SegmentedControlLayout,
 } from '../../molecules/segmented-control/segmented-control';
 import { areaSelectOptions } from '../../molecules/select-field/area-options';
+import { ActionBar } from '../../organisms/action-bar/action-bar';
 import { ChoiceRow } from '../../organisms/choice-row/choice-row';
 import { DateField } from '../../organisms/date-field/date-field';
 import { EstimatePicker, EstimateLayout } from '../../organisms/estimate-picker/estimate-picker';
@@ -55,6 +56,7 @@ let nextId = 0;
 @Component({
   selector: 'asys-task-editor-template',
   imports: [
+    ActionBar,
     Text,
     Button,
     ChoiceRow,
@@ -304,7 +306,7 @@ export class TaskEditorTemplate {
 
   private readonly bar = viewChild<ElementRef<HTMLElement>>('bar');
 
-  private readonly footer = viewChild<ElementRef<HTMLElement>>('footer');
+  private readonly footer = viewChild('footer', { read: ElementRef<HTMLElement> });
 
   private readonly blockers = viewChild(TaskBlockers);
 

@@ -63,7 +63,7 @@
     (remove)="removeBlocker.emit($event)"
   />
   @if (taskOpen()) {
-    <footer #footer class="task-editor__actions">
+    <footer #footer asys-action-bar class="task-editor__actions">
       <!-- Not "Done" and not primary: in an editor a filled Done at the bottom reads as save and close. -->
       <button
         asys-button
