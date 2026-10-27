@@ -19,7 +19,7 @@ import {
 import { CommandOutcomeTag, DataApi, type CommandOutcome } from '../../core/api/data-api';
 import { CommandAttempts } from '../../core/data/command-attempts';
 import { DataStore, SyncStatus } from '../../core/data/data-store';
-import { DoneUndo, type DoneUndone, type PendingDone } from '../../core/data/done-undo';
+import { UndoWindow, type Undone, type PendingUndo } from '../../core/data/undo-window';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
 import { Ids } from '../../core/platform/ids';
@@ -144,11 +144,11 @@ const setup = async (options: SetupOptions = {}) => {
   const runCommand = vi.fn<(command: Command, key: string) => Promise<CommandOutcome>>(() =>
     Promise.resolve(APPLIED),
   );
-  const doneUndo = {
+  const undoWindow = {
     complete: vi.fn<() => void>(),
     requestFocus: vi.fn<() => void>(),
-    pending: signal<PendingDone | null>(null),
-    undone: signal<DoneUndone | null>(null),
+    pending: signal<PendingUndo | null>(null),
+    undone: signal<Undone | null>(null),
   };
 
   TestBed.configureTestingModule({
@@ -159,7 +159,7 @@ const setup = async (options: SetupOptions = {}) => {
         useValue: { state, status: signal(SyncStatus.Ready), awaitingSync, send, refresh },
       },
       { provide: DataApi, useValue: { runCommand } },
-      { provide: DoneUndo, useValue: doneUndo },
+      { provide: UndoWindow, useValue: undoWindow },
       { provide: Clock, useValue: { now: signal(T0) } },
       { provide: Ids, useValue: { next } },
       { provide: ErrorHandler, useValue: { handleError } },

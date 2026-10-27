@@ -19,7 +19,7 @@ import { Router, RouterOutlet } from '@angular/router';
 import { CaptureQueue } from '../core/data/capture-queue';
 import { CommandAttempts } from '../core/data/command-attempts';
 import { DataStore } from '../core/data/data-store';
-import { DoneUndo, PauseReason, UNDO_WINDOW_MS } from '../core/data/done-undo';
+import { PauseReason, UNDO_WINDOW_MS, UndoKind, UndoWindow } from '../core/data/undo-window';
 import { Motion } from '../core/platform/motion';
 import { observeBlockSize } from '../core/platform/observe-block-size';
 import { TAB_PATHS } from '../core/platform/tabs';
@@ -28,6 +28,7 @@ import { leafRoute } from '../core/platform/view-transitions';
 import type { Activation } from '../components/support/activation';
 import { BottomNav } from '../components/organisms/bottom-nav/bottom-nav';
 import { Button } from '../components/atoms/button/button';
+import { IconName } from '../components/atoms/icon/icon';
 import { QuickAdd } from '../components/organisms/quick-add/quick-add';
 import { UndoBar, UndoBarVariant } from '../components/molecules/undo-bar/undo-bar';
 import { flyCapture, tabInView } from './capture-flight';
@@ -37,7 +38,7 @@ import { leaveMarked } from './shell-motion';
 @Component({
   selector: 'app-shell-layout',
   imports: [RouterOutlet, BottomNav, Button, QuickAdd, UndoBar],
-  providers: [CommandAttempts, CaptureQueue, DoneUndo],
+  providers: [CommandAttempts, CaptureQueue, UndoWindow],
   host: { '[class.shell--bare]': 'navHidden()' },
   templateUrl: './shell-layout.component.html',
   styleUrl: './shell-layout.css',
@@ -71,7 +72,7 @@ export class ShellLayout {
 
   protected readonly dataStore = inject(DataStore);
 
-  protected readonly doneUndo = inject(DoneUndo);
+  protected readonly undoWindow = inject(UndoWindow);
 
   protected readonly PauseReason = PauseReason;
 
@@ -113,18 +114,22 @@ export class ShellLayout {
 
   /** The latest notice, keyed by its seq: each notice is a new node, so the live region reads it, even when the text repeats. */
   protected readonly notices = computed(() => {
-    const notice = this.doneUndo.notice();
+    const notice = this.undoWindow.notice();
 
     return notice === null ? [] : [notice];
   });
 
   protected readonly undoView = computed(() => {
-    const failure = this.doneUndo.failure();
+    const failure = this.undoWindow.failure();
 
     if (failure !== null) {
       return {
         variant: failure.closedElsewhere ? UndoBarVariant.Notice : UndoBarVariant.Failed,
         title: failure.title,
+        status: '',
+        statusIcon: IconName.Check,
+        undoLabel: null,
+        failedText: failure.text,
         detail: failure.message,
         canRetry: failure.canRetry,
         remainingMs: null,
@@ -132,12 +137,16 @@ export class ShellLayout {
       };
     }
 
-    const pending = this.doneUndo.pending();
+    const pending = this.undoWindow.pending();
 
     if (pending !== null) {
       return {
-        variant: UndoBarVariant.Done,
+        variant: UndoBarVariant.Pending,
         title: pending.title,
+        status: pending.status,
+        statusIcon: pending.kind === UndoKind.Drop ? IconName.Xmark : IconName.Check,
+        undoLabel: pending.undoLabel,
+        failedText: null,
         detail: null,
         canRetry: false,
         remainingMs: pending.remainingMs,
@@ -150,13 +159,13 @@ export class ShellLayout {
 
   constructor() {
     effect(() => {
-      if (this.doneUndo.focusRequest() > 0) {
+      if (this.undoWindow.focusRequest() > 0) {
         afterNextRender(() => this.undoBar()?.focusAction(), { injector: this.#injector });
       }
     });
 
     effect(() => {
-      const undone = this.doneUndo.undone();
+      const undone = this.undoWindow.undone();
 
       if (undone !== null) {
         afterNextRender(() => this.#focusTitle(undone.taskId), { injector: this.#injector });
@@ -240,9 +249,9 @@ export class ShellLayout {
 
   protected inside(reason: PauseReason, inside: boolean): void {
     if (inside) {
-      this.doneUndo.pause(reason);
+      this.undoWindow.pause(reason);
     } else {
-      this.doneUndo.resume(reason);
+      this.undoWindow.resume(reason);
     }
   }
 
@@ -251,14 +260,14 @@ export class ShellLayout {
     this.inside(PauseReason.Focus, inside);
   }
 
-  protected retryDone(activation: Activation): void {
+  protected retryUndo(activation: Activation): void {
     this.#pointerActivated = !activation.keyboard;
-    this.doneUndo.retry();
+    this.undoWindow.retry();
   }
 
-  protected dismissDone(activation: Activation): void {
+  protected dismissUndo(activation: Activation): void {
     this.#pointerActivated = !activation.keyboard;
-    this.doneUndo.dismiss();
+    this.undoWindow.dismiss();
   }
 
   /** Moves focus to the next title, or to the page heading when there is none (Escape in the bar). */
@@ -278,7 +287,7 @@ export class ShellLayout {
       return;
     }
 
-    this.doneUndo.resume(PauseReason.Focus);
+    this.undoWindow.resume(PauseReason.Focus);
     this.#focusInBar = false;
 
     const lost =
@@ -307,10 +316,13 @@ export class ShellLayout {
       return;
     }
 
-    // Only a title marked data-focus-title is a focus target: data-task-id alone is the morph hook, and the editor's Title textarea carries it.
+    // Only an element marked data-focus-title is a focus target: data-task-id alone is the morph hook, and the
+    // editor's Title textarea carries it. A title names its Task by data-task-id, or an element that is not the
+    // morph hook (the Triage card's section) names it in data-focus-title itself.
     const title = Array.from(main.querySelectorAll<HTMLElement>('[data-focus-title]')).find(
       (element) =>
-        (taskId === null || element.dataset['taskId'] === taskId) &&
+        (taskId === null ||
+          (element.dataset['focusTitle'] || element.dataset['taskId']) === taskId) &&
         element.closest('[data-leaving]') === null,
     );
 

@@ -31,7 +31,7 @@ import {
 import { CommandOutcomeTag } from '../../core/api/data-api';
 import { CommandAttempts } from '../../core/data/command-attempts';
 import { DataStore, SyncStatus, zoneOrUtc } from '../../core/data/data-store';
-import { DoneOrigin, DoneUndo } from '../../core/data/done-undo';
+import { DoneOrigin, UndoWindow } from '../../core/data/undo-window';
 import { estimateNowText, logProgressCommand } from '../../core/data/log-progress';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
@@ -149,7 +149,7 @@ export class TaskEditor {
 
   readonly #attempts = inject(CommandAttempts);
 
-  readonly #doneUndo = inject(DoneUndo);
+  readonly #undoWindow = inject(UndoWindow);
 
   readonly #router = inject(Router);
 
@@ -427,7 +427,7 @@ export class TaskEditor {
     this.#leave();
   }
 
-  /** Saves the draft, holds the Task through DoneUndo and leaves at once; the send waits for its Undo window. */
+  /** Saves the draft, holds the Task through UndoWindow and leaves at once; the send waits for its Undo window. */
   protected done(keyboard: boolean): void {
     const task = this.saver.task();
 
@@ -441,10 +441,10 @@ export class TaskEditor {
 
     const title = this.#savable()?.title.trim() ?? task.title;
 
-    this.#doneUndo.complete({ ...task, title }, DoneOrigin.Button, this.saver.idle());
+    this.#undoWindow.complete({ ...task, title }, DoneOrigin.Button, this.saver.idle());
 
     if (keyboard) {
-      this.#doneUndo.requestFocus();
+      this.#undoWindow.requestFocus();
     }
 
     this.#leave();

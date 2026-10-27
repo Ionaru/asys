@@ -3,6 +3,7 @@ import { Component, signal, viewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import type { Activation } from '../../support/activation';
+import { IconName } from '../../atoms/icon/icon';
 import { UndoBar, UndoBarVariant } from './undo-bar';
 
 @Component({
@@ -11,6 +12,10 @@ import { UndoBar, UndoBarVariant } from './undo-bar';
     <asys-undo-bar
       [variant]="variant()"
       [title]="title()"
+      [status]="status()"
+      [statusIcon]="statusIcon()"
+      [undoLabel]="undoLabel()"
+      [failedText]="failedText()"
       [detail]="detail()"
       [canRetry]="canRetry()"
       [windowMs]="windowMs()"
@@ -28,9 +33,17 @@ import { UndoBar, UndoBarVariant } from './undo-bar';
 class Host {
   readonly bar = viewChild.required(UndoBar);
 
-  readonly variant = signal(UndoBarVariant.Done);
+  readonly variant = signal(UndoBarVariant.Pending);
 
   readonly title = signal('Pay the invoice');
+
+  readonly status = signal('Done');
+
+  readonly statusIcon = signal(IconName.Check);
+
+  readonly undoLabel = signal<string | null>(null);
+
+  readonly failedText = signal<string | null>(null);
 
   readonly detail = signal<string | null>(null);
 
@@ -83,7 +96,7 @@ class Host {
   template: `<asys-undo-bar [variant]="variant" title="Pay the invoice" />`,
 })
 class BareHost {
-  protected readonly variant = UndoBarVariant.Done;
+  protected readonly variant = UndoBarVariant.Pending;
 }
 
 const NOT_SENT = 'ASYS cannot reach the server. Try again.';
@@ -110,7 +123,7 @@ const pointerClick = (element: HTMLElement, detail = 1): void => {
   element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail }));
 };
 
-const setup = async (variant = UndoBarVariant.Done) => {
+const setup = async (variant = UndoBarVariant.Pending) => {
   const fixture = TestBed.createComponent(Host);
 
   fixture.componentInstance.variant.set(variant);
@@ -160,7 +173,7 @@ describe('UndoBar', () => {
     expect(bar().classList.contains('asys-undobar')).toBe(false);
   });
 
-  describe('the Done variant', () => {
+  describe('the Pending variant', () => {
     it('lays out the check, the text and the Undo button in that order', async () => {
       const { order } = await setup();
 
@@ -209,6 +222,39 @@ describe('UndoBar', () => {
 
       expect(button('Undo')?.getAttribute('aria-label')).toBe('Undo Done: Pay the invoice');
       expect(button('Undo')?.textContent?.trim()).toBe('Undo');
+    });
+
+    it('shows the status and the icon it is given in place of Done and the check', async () => {
+      const { q, text, update, host } = await setup();
+
+      await update(() => {
+        host.status.set('Triaged as Plan');
+        host.statusIcon.set(IconName.Xmark);
+      });
+
+      expect(text('.asys-undo__status')).toBe('Triaged as Plan');
+      expect(text('.asys-undo__title')).toBe('Pay the invoice');
+      expect(q('asys-icon.asys-undo__check svg[data-icon="xmark"]')).not.toBeNull();
+      expect(q('asys-icon.asys-undo__check svg[data-icon="check"]')).toBeNull();
+    });
+
+    it('names the Undo button with the label it is given, and keeps Undo Done: title without one', async () => {
+      const { button, update, host } = await setup();
+
+      expect(button('Undo')?.getAttribute('aria-label')).toBe('Undo Done: Pay the invoice');
+
+      await update(() => {
+        host.undoLabel.set('Undo Drop: Pay the invoice');
+      });
+
+      expect(button('Undo')?.getAttribute('aria-label')).toBe('Undo Drop: Pay the invoice');
+
+      await update(() => {
+        host.undoLabel.set(null);
+        host.title.set('Call Marit');
+      });
+
+      expect(button('Undo')?.getAttribute('aria-label')).toBe('Undo Done: Call Marit');
     });
 
     it('draws the timer inside the button, hidden from screen readers, as a ring and a fill', async () => {
@@ -465,6 +511,23 @@ describe('UndoBar', () => {
         '“Pay the invoice” is not Done.',
       );
       expect(text('p.asys-undo__detail')).toBe(NOT_SENT);
+    });
+
+    it('opens with the failure text it is given in place of the Done sentence', async () => {
+      const { text, update, host, bar } = await failed(true);
+
+      await update(() => {
+        host.failedText.set('“Pay the invoice” is not triaged.');
+      });
+
+      expect(text('p.asys-undo__text--failed')).toBe('“Pay the invoice” is not triaged.');
+      expect(bar().textContent).not.toContain('is not Done');
+
+      await update(() => {
+        host.failedText.set(null);
+      });
+
+      expect(text('p.asys-undo__text--failed')).toBe('“Pay the invoice” is not Done.');
     });
 
     it('shows none of the Done layout: no check, status, title or timer', async () => {
@@ -867,7 +930,7 @@ describe('UndoBar', () => {
 
       expect(host.undos).toBe(0);
 
-      await update(() => host.variant.set(UndoBarVariant.Done));
+      await update(() => host.variant.set(UndoBarVariant.Pending));
       keydown({ key: 'z', ctrlKey: true });
 
       expect(host.undos).toBe(1);

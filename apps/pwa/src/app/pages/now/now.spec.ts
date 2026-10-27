@@ -32,7 +32,13 @@ import { CommandOutcomeTag, type CommandOutcome } from '../../core/api/data-api'
 import { AreaPickStore } from '../../core/data/area-pick-store';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { DataStore, SyncStatus } from '../../core/data/data-store';
-import { DoneOrigin, DoneUndo, type DoneUndone, type PendingDone } from '../../core/data/done-undo';
+import {
+  DoneOrigin,
+  UndoKind,
+  UndoWindow,
+  type Undone,
+  type PendingUndo,
+} from '../../core/data/undo-window';
 import { Clock } from '../../core/platform/clock';
 import { Ids } from '../../core/platform/ids';
 import { Motion, MotionDuration, MotionEasing } from '../../core/platform/motion';
@@ -223,8 +229,8 @@ interface SetupOptions {
   readonly allowed?: boolean;
   /** Whether `Motion.play` stays pending until `motion.release()`. */
   readonly hold?: boolean;
-  /** The value of `DoneUndo.undone` when Now is created. */
-  readonly undone?: DoneUndone | null;
+  /** The value of `UndoWindow.undone` when Now is created. */
+  readonly undone?: Undone | null;
   /** Whether Now gets the real `Motion` instead of the fake; `allowed` and `hold` then do nothing. */
   readonly realMotion?: boolean;
   /** The Clock when Now is created; Sunday 4 October 2026, 10:00 in Amsterdam when absent. */
@@ -282,14 +288,14 @@ const setup = async (options: SetupOptions = {}) => {
   let counter = 0;
   const next = vi.fn<() => string>(() => `key-${++counter}`);
   const handleError = vi.fn<(error: unknown) => void>();
-  const pending = signal<PendingDone | null>(null);
-  const undone = signal<DoneUndone | null>(options.undone ?? null);
+  const pending = signal<PendingUndo | null>(null);
+  const undone = signal<Undone | null>(options.undone ?? null);
   // As a hold would: the Task disappears from the state at once.
   const complete = vi.fn<(task: Task, origin: DoneOrigin) => void>((done) => {
     state.update((s) => (s === null ? s : without(s, done.id)));
   });
   const requestFocus = vi.fn<() => void>();
-  const doneUndo = { complete, requestFocus, pending, undone };
+  const undoWindow = { complete, requestFocus, pending, undone };
   const plays: Play[] = [];
   const held: ReturnType<typeof deferred<void>>[] = [];
   let holding = options.hold ?? false;
@@ -330,7 +336,7 @@ const setup = async (options: SetupOptions = {}) => {
         useValue: { state, status, awaitingSync, now, currentArea: currentAreaOf, send, refresh },
       },
       { provide: AreaPickStore, useValue: areaPickStore },
-      { provide: DoneUndo, useValue: doneUndo },
+      { provide: UndoWindow, useValue: undoWindow },
       ...(options.realMotion === true
         ? []
         : [
@@ -462,7 +468,7 @@ const setup = async (options: SetupOptions = {}) => {
     refresh,
     next,
     handleError,
-    doneUndo,
+    undoWindow,
     motion,
     internals,
     article,
@@ -917,7 +923,7 @@ describe('Now', () => {
     });
 
     it('sends and holds nothing for Done', async () => {
-      const { doneUndo, internals, topButton, awaitingSync, send, press, settle } = await setup();
+      const { undoWindow, internals, topButton, awaitingSync, send, press, settle } = await setup();
 
       awaitingSync.set(new Set(['invoice']));
       await press(topButton('Done'));
@@ -925,7 +931,7 @@ describe('Now', () => {
       await settle();
 
       expect(send).not.toHaveBeenCalled();
-      expect(doneUndo.complete).not.toHaveBeenCalled();
+      expect(undoWindow.complete).not.toHaveBeenCalled();
     });
 
     it('shows the note before the Log progress form', async () => {
@@ -1322,25 +1328,25 @@ describe('Now', () => {
   });
 
   describe('Done', () => {
-    it('hands the Task to DoneUndo as a Button Done and sends nothing itself', async () => {
-      const { doneUndo, send, topButton, press } = await setup();
+    it('hands the Task to UndoWindow as a Button Done and sends nothing itself', async () => {
+      const { undoWindow, send, topButton, press } = await setup();
 
       await press(topButton('Done'));
 
-      expect(doneUndo.complete).toHaveBeenCalledExactlyOnceWith(INVOICE, DoneOrigin.Button);
-      expect(doneUndo.requestFocus).not.toHaveBeenCalled();
+      expect(undoWindow.complete).toHaveBeenCalledExactlyOnceWith(INVOICE, DoneOrigin.Button);
+      expect(undoWindow.requestFocus).not.toHaveBeenCalled();
       expect(send).not.toHaveBeenCalled();
     });
 
     it('shows a check and Done in place of the actions while the exit is playing', async () => {
-      const { doneUndo, motion, topPick, topTitle, topButton, press } = await setup({
+      const { undoWindow, motion, topPick, topTitle, topButton, press } = await setup({
         allowed: true,
         hold: true,
       });
 
       await press(topButton('Done'));
 
-      expect(doneUndo.complete).toHaveBeenCalledTimes(1);
+      expect(undoWindow.complete).toHaveBeenCalledTimes(1);
       expect(topPick()).not.toBeNull();
       expect(topTitle().textContent?.trim()).toBe('Pay the invoice');
       expect(must(topPick()).querySelector('.asys-top-pick__done')?.textContent?.trim()).toBe(
@@ -1433,23 +1439,23 @@ describe('Now', () => {
     });
 
     it('still hands over to the next top pick when motion is not allowed', async () => {
-      const { doneUndo, topTitle, topLink, topButton, press } = await setup({ allowed: false });
+      const { undoWindow, topTitle, topLink, topButton, press } = await setup({ allowed: false });
 
       await press(topButton('Done'));
 
-      expect(doneUndo.complete).toHaveBeenCalledTimes(1);
+      expect(undoWindow.complete).toHaveBeenCalledTimes(1);
       expect(topTitle().textContent?.trim()).toBe('Call the dentist');
       expect(document.activeElement).toBe(topLink());
     });
 
     it('leaves focus on the Undo bar for a keyboard Done and asks for it once', async () => {
-      const { doneUndo, topTitle, topLink, topButton, settle } = await setup({ allowed: true });
+      const { undoWindow, topTitle, topLink, topButton, settle } = await setup({ allowed: true });
 
       must(topButton('Done')).click();
       await settle();
 
-      expect(doneUndo.complete).toHaveBeenCalledExactlyOnceWith(INVOICE, DoneOrigin.Button);
-      expect(doneUndo.requestFocus).toHaveBeenCalledTimes(1);
+      expect(undoWindow.complete).toHaveBeenCalledExactlyOnceWith(INVOICE, DoneOrigin.Button);
+      expect(undoWindow.requestFocus).toHaveBeenCalledTimes(1);
       expect(topTitle().textContent?.trim()).toBe('Call the dentist');
       expect(document.activeElement).not.toBe(topLink());
     });
@@ -1478,14 +1484,14 @@ describe('Now', () => {
         document.documentElement.style.setProperty('--duration-quick', '120ms');
         document.documentElement.style.setProperty('--ease-in', 'cubic-bezier(0.3, 0, 0.8, 0.15)');
 
-        const { doneUndo, topPick, topTitle, topLink, topButton, press } = await setup({
+        const { undoWindow, topPick, topTitle, topLink, topButton, press } = await setup({
           realMotion: true,
         });
 
         await press(topButton('Done'));
 
         expect(animate).toHaveBeenCalledTimes(1);
-        expect(doneUndo.complete).toHaveBeenCalledTimes(1);
+        expect(undoWindow.complete).toHaveBeenCalledTimes(1);
         expect(must(topPick()).hasAttribute('inert')).toBe(false);
         expect(must(topPick()).hasAttribute('data-leaving')).toBe(false);
         expect(must(topPick()).querySelector('.asys-top-pick__done')).toBeNull();
@@ -1496,7 +1502,7 @@ describe('Now', () => {
     });
 
     it('does nothing for a second Done of the Task that is leaving', async () => {
-      const { doneUndo, motion, internals, topButton, press } = await setup({
+      const { undoWindow, motion, internals, topButton, press } = await setup({
         allowed: true,
         hold: true,
       });
@@ -1504,13 +1510,13 @@ describe('Now', () => {
       await press(topButton('Done'));
       await internals().done(INVOICE, DoneOrigin.Button, false);
 
-      expect(doneUndo.complete).toHaveBeenCalledTimes(1);
+      expect(undoWindow.complete).toHaveBeenCalledTimes(1);
 
       motion.release();
     });
 
     it('takes over from a running exit when a new Done arrives, and shows the next top pick', async () => {
-      const { doneUndo, motion, internals, topPick, topTitle, topButton, press, settle } =
+      const { undoWindow, motion, internals, topPick, topTitle, topButton, press, settle } =
         await setup({ allowed: true, hold: true });
 
       await press(topButton('Done'));
@@ -1519,7 +1525,7 @@ describe('Now', () => {
       await second;
       await settle();
 
-      expect(doneUndo.complete).toHaveBeenCalledTimes(2);
+      expect(undoWindow.complete).toHaveBeenCalledTimes(2);
       expect(must(topPick()).hasAttribute('data-leaving')).toBe(false);
       expect(must(topPick()).hasAttribute('inert')).toBe(false);
       expect(topTitle().textContent?.trim()).toBe('Send the report');
@@ -1551,14 +1557,15 @@ describe('Now', () => {
     });
 
     it('shows the Task again, not leaving, when it is undone during its exit, and the exit then does nothing more', async () => {
-      const { state, doneUndo, motion, topPick, topTitle, topButton, press, settle } = await setup({
-        allowed: true,
-        hold: true,
-      });
+      const { state, undoWindow, motion, topPick, topTitle, topButton, press, settle } =
+        await setup({
+          allowed: true,
+          hold: true,
+        });
 
       await press(topButton('Done'));
       state.set(FULL);
-      doneUndo.undone.set({ taskId: 'invoice', seq: 1 });
+      undoWindow.undone.set({ taskId: 'invoice', kind: UndoKind.Done, seq: 1 });
       await settle();
 
       expect(topTitle().textContent?.trim()).toBe('Pay the invoice');
@@ -1576,23 +1583,26 @@ describe('Now', () => {
       expect(must(topPick()).hasAttribute('inert')).toBe(false);
     });
 
-    it('does nothing for a Done of the Task that DoneUndo already holds', async () => {
-      const { doneUndo, internals, settle } = await setup();
+    it('does nothing for a Done of the Task that UndoWindow already holds', async () => {
+      const { undoWindow, internals, settle } = await setup();
 
-      doneUndo.pending.set({
+      undoWindow.pending.set({
         taskId: 'invoice',
         title: 'Pay the invoice',
+        kind: UndoKind.Done,
+        status: 'Done',
+        undoLabel: 'Undo Done: Pay the invoice',
         origin: DoneOrigin.Button,
         remainingMs: 5_000,
       });
       await internals().done(INVOICE, DoneOrigin.Button, false);
       await settle();
 
-      expect(doneUndo.complete).not.toHaveBeenCalled();
+      expect(undoWindow.complete).not.toHaveBeenCalled();
     });
 
     it('does nothing when the screen is destroyed while the exit is playing', async () => {
-      const { fixture, motion, handleError, doneUndo, topButton, press } = await setup({
+      const { fixture, motion, handleError, undoWindow, topButton, press } = await setup({
         allowed: true,
         hold: true,
       });
@@ -1603,7 +1613,7 @@ describe('Now', () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(handleError).not.toHaveBeenCalled();
-      expect(doneUndo.requestFocus).not.toHaveBeenCalled();
+      expect(undoWindow.requestFocus).not.toHaveBeenCalled();
       // Only the exit was played: no rise starts on a destroyed screen.
       expect(motion.plays).toHaveLength(1);
     });
@@ -1670,7 +1680,7 @@ describe('Now', () => {
 
     describe('on a ranked row', () => {
       it('holds that Task and leaves the card, focus and motion alone', async () => {
-        const { doneUndo, motion, internals, heading, topPick, topTitle, now, settle } =
+        const { undoWindow, motion, internals, heading, topPick, topTitle, now, settle } =
           await setup({ allowed: true });
         const plants = must(now().ranked[2]).task;
 
@@ -1678,7 +1688,7 @@ describe('Now', () => {
         await internals().done(plants, DoneOrigin.Button, false);
         await settle();
 
-        expect(doneUndo.complete).toHaveBeenCalledExactlyOnceWith(PLANTS, DoneOrigin.Button);
+        expect(undoWindow.complete).toHaveBeenCalledExactlyOnceWith(PLANTS, DoneOrigin.Button);
         expect(topTitle().textContent?.trim()).toBe('Pay the invoice');
         expect(must(topPick()).hasAttribute('data-leaving')).toBe(false);
         expect(topPick()?.querySelector('.asys-top-pick__done')).toBeNull();
@@ -1689,7 +1699,7 @@ describe('Now', () => {
 
     describe('as a Swipe', () => {
       it('skips the exit and rises the next content at once', async () => {
-        const { doneUndo, motion, internals, article, root, topTitle, topLink, now, settle } =
+        const { undoWindow, motion, internals, article, root, topTitle, topLink, now, settle } =
           await setup({
             allowed: true,
             hold: true,
@@ -1700,7 +1710,7 @@ describe('Now', () => {
         await internals().done(invoice, DoneOrigin.Swipe, false);
         await settle();
 
-        expect(doneUndo.complete).toHaveBeenCalledExactlyOnceWith(INVOICE, DoneOrigin.Swipe);
+        expect(undoWindow.complete).toHaveBeenCalledExactlyOnceWith(INVOICE, DoneOrigin.Swipe);
         expect(root().querySelector('.asys-top-pick__done')).toBeNull();
         expect(topTitle().textContent?.trim()).toBe('Call the dentist');
         expect(motion.plays).toHaveLength(1);
@@ -1843,7 +1853,7 @@ describe('Now', () => {
 
   describe('Undo', () => {
     it('plays the rise on the card for the Task that comes back', async () => {
-      const { state, doneUndo, motion, article, topButton, press, settle } = await setup({
+      const { state, undoWindow, motion, article, topButton, press, settle } = await setup({
         allowed: true,
       });
       const card = article();
@@ -1851,7 +1861,7 @@ describe('Now', () => {
       await press(topButton('Done'));
       motion.plays.length = 0;
       state.set(FULL);
-      doneUndo.undone.set({ taskId: 'invoice', seq: 1 });
+      undoWindow.undone.set({ taskId: 'invoice', kind: UndoKind.Done, seq: 1 });
       await settle();
 
       expect(motion.plays).toHaveLength(1);
@@ -1864,10 +1874,24 @@ describe('Now', () => {
       expect(must(motion.plays[0]).title).toBe('Pay the invoice');
     });
 
+    it('ignores the Undo of a Triage or a Drop, even for the Task on the card', async () => {
+      const { state, undoWindow, motion, settle } = await setup({ allowed: true });
+
+      await settle();
+      motion.plays.length = 0;
+      state.set(FULL);
+      undoWindow.undone.set({ taskId: 'invoice', kind: UndoKind.Triage, seq: 1 });
+      await settle();
+      undoWindow.undone.set({ taskId: 'invoice', kind: UndoKind.Drop, seq: 2 });
+      await settle();
+
+      expect(motion.plays).toEqual([]);
+    });
+
     it('ignores an Undo from before Now was created, and reacts to a later one', async () => {
-      const { doneUndo, motion, article, settle } = await setup({
+      const { undoWindow, motion, article, settle } = await setup({
         allowed: true,
-        undone: { taskId: 'invoice', seq: 1 },
+        undone: { taskId: 'invoice', kind: UndoKind.Done, seq: 1 },
       });
       const card = article();
 
@@ -1875,7 +1899,7 @@ describe('Now', () => {
 
       expect(motion.plays).toEqual([]);
 
-      doneUndo.undone.set({ taskId: 'invoice', seq: 2 });
+      undoWindow.undone.set({ taskId: 'invoice', kind: UndoKind.Done, seq: 2 });
       await settle();
 
       expect(motion.plays).toHaveLength(1);
@@ -1884,23 +1908,23 @@ describe('Now', () => {
     });
 
     it('plays no rise when the restored Task is not the one on the card', async () => {
-      const { doneUndo, motion, settle } = await setup({ allowed: true });
+      const { undoWindow, motion, settle } = await setup({ allowed: true });
 
-      doneUndo.undone.set({ taskId: 'plants', seq: 1 });
+      undoWindow.undone.set({ taskId: 'plants', kind: UndoKind.Done, seq: 1 });
       await settle();
 
       expect(motion.plays).toEqual([]);
     });
 
     it('expands only the row of the Task that the Done promoted, and only once', async () => {
-      const { state, doneUndo, motion, internals, topButton, press, settle } = await setup({
+      const { state, undoWindow, motion, internals, topButton, press, settle } = await setup({
         allowed: true,
       });
 
       await press(topButton('Done'));
       motion.plays.length = 0;
       state.set(FULL);
-      doneUndo.undone.set({ taskId: 'invoice', seq: 1 });
+      undoWindow.undone.set({ taskId: 'invoice', kind: UndoKind.Done, seq: 1 });
       await settle();
       motion.plays.length = 0;
 
@@ -1926,13 +1950,13 @@ describe('Now', () => {
     });
 
     it('expands the row of a ranked Task that was held and comes back, without a card rise', async () => {
-      const { state, doneUndo, motion, internals, now, settle } = await setup({ allowed: true });
+      const { state, undoWindow, motion, internals, now, settle } = await setup({ allowed: true });
       const dentist = must(now().ranked[1]).task;
 
       await internals().done(dentist, DoneOrigin.Button, false);
       await settle();
       state.set(FULL);
-      doneUndo.undone.set({ taskId: 'dentist', seq: 1 });
+      undoWindow.undone.set({ taskId: 'dentist', kind: UndoKind.Done, seq: 1 });
       await settle();
 
       expect(motion.plays).toEqual([]);
@@ -2102,7 +2126,7 @@ describe('Now', () => {
     });
 
     it('closes the form when Done is pressed while it is open, and sends nothing', async () => {
-      const { doneUndo, send, topButton, press, form, settle } = await setup();
+      const { undoWindow, send, topButton, press, form, settle } = await setup();
 
       await press(topButton('Log progress'));
 
@@ -2111,7 +2135,7 @@ describe('Now', () => {
       await press(topButton('Done'));
       await settle();
 
-      expect(doneUndo.complete).toHaveBeenCalledTimes(1);
+      expect(undoWindow.complete).toHaveBeenCalledTimes(1);
       expect(form()).toBeNull();
       expect(send).not.toHaveBeenCalled();
     });
@@ -2267,35 +2291,35 @@ describe('Now', () => {
     });
 
     describe('toward the end', () => {
-      it('hands the top pick to DoneUndo as a Swipe Done, and hands over to the next top pick', async () => {
-        const { doneUndo, send, swipeEnd, topTitle, topLink } = await setup();
+      it('hands the top pick to UndoWindow as a Swipe Done, and hands over to the next top pick', async () => {
+        const { undoWindow, send, swipeEnd, topTitle, topLink } = await setup();
 
         await swipeEnd('invoice');
 
-        expect(doneUndo.complete).toHaveBeenCalledExactlyOnceWith(INVOICE, DoneOrigin.Swipe);
+        expect(undoWindow.complete).toHaveBeenCalledExactlyOnceWith(INVOICE, DoneOrigin.Swipe);
         expect(send).not.toHaveBeenCalled();
         expect(topTitle().textContent?.trim()).toBe('Call the dentist');
         expect(document.activeElement).toBe(topLink());
       });
 
-      it('hands a ranked row to DoneUndo as a Swipe Done, without the card leaving', async () => {
-        const { doneUndo, send, swipeEnd, topPick } = await setup();
+      it('hands a ranked row to UndoWindow as a Swipe Done, without the card leaving', async () => {
+        const { undoWindow, send, swipeEnd, topPick } = await setup();
 
         // No assertion on which Task is the top pick afterwards: Report was blocked by Dentist.
         await swipeEnd('dentist');
 
-        expect(doneUndo.complete).toHaveBeenCalledExactlyOnceWith(DENTIST, DoneOrigin.Swipe);
+        expect(undoWindow.complete).toHaveBeenCalledExactlyOnceWith(DENTIST, DoneOrigin.Swipe);
         expect(send).not.toHaveBeenCalled();
         expect(must(topPick()).hasAttribute('data-leaving')).toBe(false);
       });
 
       it.each(['flights', 'nope'])('does nothing for %j, which is not ranked', async (id) => {
-        const { doneUndo, send, swipeEnd } = await setup();
+        const { undoWindow, send, swipeEnd } = await setup();
 
         await swipeEnd('dentist', id);
 
-        expect(doneUndo.complete).not.toHaveBeenCalled();
-        expect(doneUndo.requestFocus).not.toHaveBeenCalled();
+        expect(undoWindow.complete).not.toHaveBeenCalled();
+        expect(undoWindow.requestFocus).not.toHaveBeenCalled();
         expect(send).not.toHaveBeenCalled();
       });
     });
@@ -2594,17 +2618,17 @@ describe('Now', () => {
       });
 
       it('does not move when focus was elsewhere', async () => {
-        const { doneUndo, swipeEnd, heading } = await setup();
+        const { undoWindow, swipeEnd, heading } = await setup();
 
         heading().focus();
         await swipeEnd('dentist');
 
-        expect(doneUndo.complete).toHaveBeenCalledExactlyOnceWith(DENTIST, DoneOrigin.Swipe);
+        expect(undoWindow.complete).toHaveBeenCalledExactlyOnceWith(DENTIST, DoneOrigin.Swipe);
         expect(document.activeElement).toBe(heading());
       });
 
       it('does nothing for a row whose Done is refused, and leaves focus on its link', async () => {
-        const { doneUndo, awaitingSync, swipe, swipeEnd, rowLink, settle } = await setup();
+        const { undoWindow, awaitingSync, swipe, swipeEnd, rowLink, settle } = await setup();
 
         awaitingSync.set(new Set(['dentist']));
         await settle();
@@ -2615,7 +2639,7 @@ describe('Now', () => {
 
         await swipeEnd('dentist');
 
-        expect(doneUndo.complete).not.toHaveBeenCalled();
+        expect(undoWindow.complete).not.toHaveBeenCalled();
         expect(document.activeElement).toBe(rowLink('dentist'));
       });
     });

@@ -22,7 +22,7 @@ import {
 
 import { CommandOutcomeTag, DataApi, type CommandOutcome } from '../../core/api/data-api';
 import { DataStore, SyncStatus } from '../../core/data/data-store';
-import { DoneOrigin, DoneUndo, type DoneUndone, type PendingDone } from '../../core/data/done-undo';
+import { DoneOrigin, UndoWindow, type Undone, type PendingUndo } from '../../core/data/undo-window';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
 import { Ids } from '../../core/platform/ids';
@@ -250,17 +250,17 @@ const stubs = (options: SetupOptions) => {
     },
   );
   const requestFocus = vi.fn<() => void>();
-  const doneUndo = {
+  const undoWindow = {
     complete,
     requestFocus,
-    pending: signal<PendingDone | null>(null),
-    undone: signal<DoneUndone | null>(null),
+    pending: signal<PendingUndo | null>(null),
+    undone: signal<Undone | null>(null),
   };
 
   return {
     state,
     handleError,
-    doneUndo,
+    undoWindow,
     status,
     awaitingSync,
     sends,
@@ -271,7 +271,7 @@ const stubs = (options: SetupOptions) => {
     providers: [
       { provide: DataStore, useValue: { state, status, awaitingSync, send, refresh } },
       { provide: DataApi, useValue: { runCommand } },
-      { provide: DoneUndo, useValue: doneUndo },
+      { provide: UndoWindow, useValue: undoWindow },
       { provide: Clock, useValue: { now: options.readNow ?? signal(options.now ?? T0) } },
       { provide: Ids, useValue: { next } },
       { provide: ErrorHandler, useValue: { handleError } },
@@ -607,11 +607,11 @@ describe('TaskEditor', () => {
     });
 
     it('never shows the missing line once a Done is held, and keeps the last title', async () => {
-      const { text, heading, footerButton, press, update, doneUndo } = await setup();
+      const { text, heading, footerButton, press, update, undoWindow } = await setup();
 
       await press(footerButton('Mark Done'));
 
-      expect(doneUndo.complete).toHaveBeenCalledTimes(1);
+      expect(undoWindow.complete).toHaveBeenCalledTimes(1);
 
       await update(withoutTask(BASE, 't1'));
 
@@ -1575,11 +1575,11 @@ describe('TaskEditor', () => {
 
   describe('Done', () => {
     it('holds the Task and goes to Now at once when there is no history', async () => {
-      const { doneUndo, send, footerButton, press, navigate, back } = await setup();
+      const { undoWindow, send, footerButton, press, navigate, back } = await setup();
 
       await press(footerButton('Mark Done'));
 
-      expect(doneUndo.complete).toHaveBeenCalledExactlyOnceWith(
+      expect(undoWindow.complete).toHaveBeenCalledExactlyOnceWith(
         CALL,
         DoneOrigin.Button,
         expect.any(Promise),
@@ -1590,13 +1590,13 @@ describe('TaskEditor', () => {
     });
 
     it('goes back at once when the router has a previous navigation', async () => {
-      const { doneUndo, send, footerButton, press, navigate, back } = await setup({
+      const { undoWindow, send, footerButton, press, navigate, back } = await setup({
         withHistory: true,
       });
 
       await press(footerButton('Mark Done'));
 
-      expect(doneUndo.complete).toHaveBeenCalledExactlyOnceWith(
+      expect(undoWindow.complete).toHaveBeenCalledExactlyOnceWith(
         CALL,
         DoneOrigin.Button,
         expect.any(Promise),
@@ -1607,29 +1607,29 @@ describe('TaskEditor', () => {
     });
 
     it('a pointer Done does not ask the Undo bar for focus', async () => {
-      const { doneUndo, footerButton, press } = await setup();
+      const { undoWindow, footerButton, press } = await setup();
 
       await press(footerButton('Mark Done'));
 
-      expect(doneUndo.requestFocus).not.toHaveBeenCalled();
+      expect(undoWindow.requestFocus).not.toHaveBeenCalled();
     });
 
     it('a keyboard Done asks the Undo bar for focus, between holding the Task and leaving', async () => {
-      const { doneUndo, footerButton, click, navigate } = await setup();
+      const { undoWindow, footerButton, click, navigate } = await setup();
 
       await click(footerButton('Mark Done'));
 
-      expect(doneUndo.requestFocus).toHaveBeenCalledTimes(1);
+      expect(undoWindow.requestFocus).toHaveBeenCalledTimes(1);
 
       const order = (fn: { mock: { invocationCallOrder: number[] } }): number =>
         must(fn.mock.invocationCallOrder[0]);
 
-      expect(order(doneUndo.complete)).toBeLessThan(order(doneUndo.requestFocus));
-      expect(order(doneUndo.requestFocus)).toBeLessThan(order(navigate));
+      expect(order(undoWindow.complete)).toBeLessThan(order(undoWindow.requestFocus));
+      expect(order(undoWindow.requestFocus)).toBeLessThan(order(navigate));
     });
 
     it('is not disabled by an autosave in flight, so one click is enough', async () => {
-      const { doneUndo, send, footerButton, press, importanceButton, navigate } = await setup();
+      const { undoWindow, send, footerButton, press, importanceButton, navigate } = await setup();
 
       await press(importanceButton('Not important'));
 
@@ -1638,7 +1638,7 @@ describe('TaskEditor', () => {
 
       await press(footerButton('Mark Done'));
 
-      expect(doneUndo.complete).toHaveBeenCalledExactlyOnceWith(
+      expect(undoWindow.complete).toHaveBeenCalledExactlyOnceWith(
         CALL,
         DoneOrigin.Button,
         expect.any(Promise),
@@ -1648,12 +1648,12 @@ describe('TaskEditor', () => {
     });
 
     it('gives the held Done a promise that settles once the autosave has', async () => {
-      const { doneUndo, send, footerButton, press, importanceButton, finish } = await setup();
+      const { undoWindow, send, footerButton, press, importanceButton, finish } = await setup();
 
       await press(importanceButton('Not important'));
       await press(footerButton('Mark Done'));
 
-      const after = doneUndo.complete.mock.calls[0]?.[2];
+      const after = undoWindow.complete.mock.calls[0]?.[2];
       let settled = false;
 
       expect(after).toBeInstanceOf(Promise);
@@ -1673,7 +1673,7 @@ describe('TaskEditor', () => {
     });
 
     it('sends a committed change that is not sent yet before it holds the Task', async () => {
-      const { doneUndo, send, footerButton, titleField, settle } = await setup();
+      const { undoWindow, send, footerButton, titleField, settle } = await setup();
       const title = titleField();
 
       title.value = 'Call Marit back';
@@ -1686,9 +1686,9 @@ describe('TaskEditor', () => {
 
       expect(send).toHaveBeenCalledTimes(1);
       expect(sent(send, 0)).toEqual(editTask('t1', { title: 'Call Marit back' }));
-      expect(doneUndo.complete).toHaveBeenCalledTimes(1);
+      expect(undoWindow.complete).toHaveBeenCalledTimes(1);
       expect(must(send.mock.invocationCallOrder[0])).toBeLessThan(
-        must(doneUndo.complete.mock.invocationCallOrder[0]),
+        must(undoWindow.complete.mock.invocationCallOrder[0]),
       );
     });
 
@@ -1716,7 +1716,7 @@ describe('TaskEditor', () => {
     });
 
     it('is disabled, and holds nothing, while the Task waits for the server', async () => {
-      const { doneUndo, footerButton, press, awaitingSync, settle, navigate } = await setup();
+      const { undoWindow, footerButton, press, awaitingSync, settle, navigate } = await setup();
 
       awaitingSync.set(new Set(['t1']));
       await settle();
@@ -1726,7 +1726,7 @@ describe('TaskEditor', () => {
 
       await press(footerButton('Mark Done'));
 
-      expect(doneUndo.complete).not.toHaveBeenCalled();
+      expect(undoWindow.complete).not.toHaveBeenCalled();
       expect(navigate).not.toHaveBeenCalled();
     });
 
@@ -1760,37 +1760,37 @@ describe('TaskEditor', () => {
 
     describe('the Title the Undo bar names', () => {
       it('is the Title being saved, trimmed, after a rename', async () => {
-        const { doneUndo, footerButton, typeTitle, press } = await setup();
+        const { undoWindow, footerButton, typeTitle, press } = await setup();
 
         await typeTitle('  Call Marit back ');
         await press(footerButton('Mark Done'));
 
-        expect(doneUndo.complete).toHaveBeenCalledTimes(1);
+        expect(undoWindow.complete).toHaveBeenCalledTimes(1);
 
-        const [held, origin] = must(doneUndo.complete.mock.calls[0]);
+        const [held, origin] = must(undoWindow.complete.mock.calls[0]);
 
         expect(held).toEqual({ ...CALL, title: 'Call Marit back' });
         expect(origin).toBe(DoneOrigin.Button);
       });
 
       it('is the stored Title when the typed one is blank', async () => {
-        const { doneUndo, footerButton, typeTitle, press } = await setup();
+        const { undoWindow, footerButton, typeTitle, press } = await setup();
 
         await typeTitle('   ');
         await press(footerButton('Mark Done'));
 
-        expect(doneUndo.complete).toHaveBeenCalledTimes(1);
-        expect(must(doneUndo.complete.mock.calls[0])[0]).toEqual(CALL);
+        expect(undoWindow.complete).toHaveBeenCalledTimes(1);
+        expect(must(undoWindow.complete.mock.calls[0])[0]).toEqual(CALL);
       });
 
       it('is the stored Task unchanged when nothing was edited', async () => {
-        const { doneUndo, footerButton, press } = await setup();
+        const { undoWindow, footerButton, press } = await setup();
 
         await press(footerButton('Mark Done'));
 
-        expect(doneUndo.complete).toHaveBeenCalledTimes(1);
-        expect(must(doneUndo.complete.mock.calls[0])[0]).toEqual(CALL);
-        expect(must(doneUndo.complete.mock.calls[0])[0].title).toBe('Call Marit');
+        expect(undoWindow.complete).toHaveBeenCalledTimes(1);
+        expect(must(undoWindow.complete.mock.calls[0])[0]).toEqual(CALL);
+        expect(must(undoWindow.complete.mock.calls[0])[0].title).toBe('Call Marit');
       });
     });
   });

@@ -8,8 +8,10 @@ import {
   type BlockerLink,
   type CompleteTask,
   type DomainState,
+  type DropTask,
   type Instant,
   type Task,
+  type TriageTask,
 } from '@asys/domain';
 
 import { applyHolds, isStillHeld, type Hold } from './held-state';
@@ -51,6 +53,36 @@ const holdOf = (taskId: string, key = `hold-${taskId}`): Hold => ({
   command: complete(taskId),
   at: AT,
 });
+
+const triage = (taskId: string, overrides: Partial<TriageTask> = {}): TriageTask => ({
+  _tag: CommandTag.TriageTask,
+  taskId,
+  important: true,
+  estimateMinutes: 15,
+  expect: { status: TaskStatus.Open },
+  ...overrides,
+});
+
+const drop = (taskId: string): DropTask => ({
+  _tag: CommandTag.DropTask,
+  taskId,
+  expect: { status: TaskStatus.Open },
+});
+
+const triageHold = (taskId: string, key = `triage-${taskId}`): Hold => ({
+  key,
+  command: triage(taskId),
+  at: AT,
+});
+
+const dropHold = (taskId: string, key = `drop-${taskId}`): Hold => ({
+  key,
+  command: drop(taskId),
+  at: AT,
+});
+
+const taskOf = (state: DomainState, id: string): Task | undefined =>
+  state.tasks.find((t) => t.id === id);
 
 const idsOf = (state: DomainState): readonly string[] => state.tasks.map((t) => t.id);
 
@@ -141,5 +173,106 @@ describe('isStillHeld', () => {
 
   it('is false when the Task is missing', () => {
     expect(isStillHeld(domainState([]), holdOf('A'))).toBe(false);
+  });
+});
+
+describe('applyHolds with a Triage hold', () => {
+  it('sets Important and the Estimate on a Task in the Inbox, so the Inbox count drops', () => {
+    const synced = domainState([
+      task({ id: 'A', title: 'A', important: null, estimateMinutes: null }),
+      task({ id: 'B', title: 'B', important: null }),
+    ]);
+
+    const result = applyHolds(synced, [triageHold('A')]);
+
+    expect(taskOf(result, 'A')).toMatchObject({ important: true, estimateMinutes: 15 });
+    expect(inboxCount(synced)).toBe(2);
+    expect(inboxCount(result)).toBe(1);
+  });
+
+  it('skips the hold when the Task is no longer in the Inbox, so it keeps what was set elsewhere', () => {
+    const synced = domainState([
+      task({ id: 'A', title: 'A', important: false, estimateMinutes: 60 }),
+    ]);
+
+    const result = applyHolds(synced, [triageHold('A')]);
+
+    expect(result).toBe(synced);
+    expect(taskOf(result, 'A')).toMatchObject({ important: false, estimateMinutes: 60 });
+  });
+
+  it('skips the hold when the Task is missing or not Open, and returns synced itself', () => {
+    const closed = domainState([
+      task({ id: 'A', title: 'A', important: null, status: TaskStatus.Done, closedAt: AT }),
+    ]);
+
+    expect(applyHolds(closed, [triageHold('A'), triageHold('missing')])).toBe(closed);
+  });
+
+  it('applies a Triage hold after a Drop hold of another Task, in order', () => {
+    const synced = domainState([
+      task({ id: 'A', title: 'A', important: null }),
+      task({ id: 'B', title: 'B', important: null }),
+    ]);
+
+    const result = applyHolds(synced, [dropHold('A'), triageHold('B')]);
+
+    expect(idsOf(result)).toEqual(['B']);
+    expect(taskOf(result, 'B')).toMatchObject({ important: true });
+    expect(inboxCount(result)).toBe(0);
+  });
+});
+
+describe('applyHolds with a Drop hold', () => {
+  it('removes a held Open Task', () => {
+    const synced = domainState([
+      task({ id: 'A', title: 'A', important: null }),
+      task({ id: 'B', title: 'B' }),
+    ]);
+
+    const result = applyHolds(synced, [dropHold('A')]);
+
+    expect(idsOf(result)).toEqual(['B']);
+    expect(inboxCount(result)).toBe(0);
+  });
+
+  it('returns synced itself when the Task is missing or already Dropped', () => {
+    const dropped = domainState([
+      task({ id: 'A', title: 'A', status: TaskStatus.Dropped, closedAt: AT }),
+    ]);
+
+    expect(applyHolds(dropped, [dropHold('A'), dropHold('missing')])).toBe(dropped);
+  });
+});
+
+describe('isStillHeld with a Triage or Drop hold', () => {
+  it('is true for a Triage while the synced Task is in the Inbox', () => {
+    const synced = domainState([task({ id: 'A', title: 'A', important: null })]);
+
+    expect(isStillHeld(synced, triageHold('A'))).toBe(true);
+  });
+
+  it('is false for a Triage when the synced Task is missing, closed or already triaged', () => {
+    expect(isStillHeld(domainState([]), triageHold('A'))).toBe(false);
+    expect(
+      isStillHeld(
+        domainState([
+          task({ id: 'A', title: 'A', important: null, status: TaskStatus.Done, closedAt: AT }),
+        ]),
+        triageHold('A'),
+      ),
+    ).toBe(false);
+    expect(isStillHeld(domainState([task({ id: 'A', title: 'A' })]), triageHold('A'))).toBe(false);
+  });
+
+  it('is true for a Drop while the synced Task is Open, false once it is closed or missing', () => {
+    expect(isStillHeld(domainState([task({ id: 'A', title: 'A' })]), dropHold('A'))).toBe(true);
+    expect(
+      isStillHeld(
+        domainState([task({ id: 'A', title: 'A', status: TaskStatus.Dropped, closedAt: AT })]),
+        dropHold('A'),
+      ),
+    ).toBe(false);
+    expect(isStillHeld(domainState([]), dropHold('A'))).toBe(false);
   });
 });

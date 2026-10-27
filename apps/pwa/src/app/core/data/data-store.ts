@@ -9,7 +9,6 @@ import {
   type Change,
   ChangeEntity,
   type Command,
-  type CompleteTask,
   type DomainState,
   type Instant,
   inboxCount,
@@ -29,7 +28,7 @@ import { Clock } from '../platform/clock';
 import { Ids } from '../platform/ids';
 import { AreaPickStore } from './area-pick-store';
 import { commandSubject } from './command-subject';
-import { applyHolds, type Hold, isStillHeld } from './held-state';
+import { applyHolds, type Hold, type HeldCommand, isStillHeld } from './held-state';
 
 /** Where the store stands with the server. */
 export enum SyncStatus {
@@ -104,7 +103,7 @@ export class DataStore {
     return synced === null ? null : applyHolds(synced, this.#holds());
   });
 
-  /** The keys of the Dones currently held. */
+  /** The keys of the commands currently held. */
   readonly heldKeys: Signal<ReadonlySet<string>> = computed<ReadonlySet<string>>(
     () => new Set(this.#holds().map((hold) => hold.key)),
   );
@@ -257,8 +256,8 @@ export class DataStore {
     }
   }
 
-  /** Hides a Done from the state at once, before it is sent. A hold with a key already held replaces it. */
-  hold(command: CompleteTask, key: string): void {
+  /** Applies a Done, a Triage or a Drop to the state at once, before it is sent. A hold with a key already held replaces it. */
+  hold(command: HeldCommand, key: string): void {
     const hold: Hold = { key, command, at: this.#clock.now() };
 
     this.#holds.set([...this.#holds().filter((held) => held.key !== key), hold]);

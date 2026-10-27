@@ -1,12 +1,20 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { DOCUMENT } from '@angular/common';
 import { computed, DestroyRef, inject, type Signal, Service, signal } from '@angular/core';
-import { CommandTag, type CompleteTask, TaskStatus, type Task } from '@asys/domain';
+import {
+  CommandTag,
+  type CompleteTask,
+  type DropTask,
+  type Task,
+  TaskStatus,
+  type TriageTask,
+} from '@asys/domain';
 
 import { CommandOutcomeTag, DataApi, isRetryable, type CommandOutcome } from '../api/data-api';
 import { Haptics } from '../platform/haptics';
 import { CommandAttempts } from './command-attempts';
 import { DataStore } from './data-store';
+import type { HeldCommand } from './held-state';
 import { outcomeMessage } from './outcome-message';
 
 /** Where a Done came from: the button gets a haptic tick, a swipe already had its threshold tick. */
@@ -21,53 +29,118 @@ export enum PauseReason {
   Focus = 'focus',
 }
 
-/** How long a Done can be undone, in milliseconds. */
+/** What the Undo window holds: a Done, a Triage or a Drop. */
+export enum UndoKind {
+  Done = 'done',
+  Triage = 'triage',
+  Drop = 'drop',
+}
+
+/** How long a Done, a Triage or a Drop can be undone, in milliseconds. */
 export const UNDO_WINDOW_MS = 5_000;
 
-/** The Done whose Undo window is open, with how much of the window is left when its bar appears. */
-export interface PendingDone {
+/** The held command whose Undo window is open, with the copy its bar shows and how much of the window is left when it appears. */
+export interface PendingUndo {
   readonly taskId: string;
   readonly title: string;
+  readonly kind: UndoKind;
+  /** The bar's status word: `Done`, `Triaged as Plan` or `Dropped`. */
+  readonly status: string;
+  /** The Undo button's accessible name, such as `Undo Done: <title>`. */
+  readonly undoLabel: string;
   readonly origin: DoneOrigin;
   readonly remainingMs: number;
 }
 
-/** A Done that was not applied, with the sentence to show and what the person can do about it. */
-export interface DoneFailure {
+/** A held command that was not applied, with the sentence to show and what the person can do about it. */
+export interface UndoFailure {
   readonly taskId: string;
   readonly title: string;
+  readonly kind: UndoKind;
+  /** The sentence that names the Task, such as `“<title>” is not Done.`, before the message. */
+  readonly text: string;
   readonly message: string;
   readonly canRetry: boolean;
   readonly closedElsewhere: boolean;
 }
 
 /** One line for the shell's status region; `seq` differs for every notice, so equal texts are announced again. */
-export interface DoneNotice {
+export interface UndoNotice {
   readonly text: string;
   readonly seq: number;
 }
 
-/** The Done that was just undone, for Now and the shell to restore focus. */
-export interface DoneUndone {
+/** The Done, Triage or Drop that was just undone, for Now and the shell to restore focus. */
+export interface Undone {
   readonly taskId: string;
+  readonly kind: UndoKind;
   readonly seq: number;
 }
 
 interface Held {
   readonly task: Task;
-  readonly command: CompleteTask;
+  readonly kind: UndoKind;
+  readonly command: HeldCommand;
+  /** The Quadrant word a Triage was filed under, for its copy and for a retry; empty for the other kinds. */
+  readonly quadrantWord: string;
   readonly key: string;
   readonly origin: DoneOrigin;
   /** Work this Done waits for before a normal send, such as an edit still being saved. */
   readonly after: Promise<void> | undefined;
 }
 
+const statusOf = (kind: UndoKind, quadrantWord: string): string => {
+  switch (kind) {
+    case UndoKind.Done:
+      return 'Done';
+    case UndoKind.Triage:
+      return `Triaged as ${quadrantWord}`;
+    case UndoKind.Drop:
+      return 'Dropped';
+  }
+};
+
+const undoLabelOf = (kind: UndoKind, title: string): string => {
+  switch (kind) {
+    case UndoKind.Done:
+      return `Undo Done: ${title}`;
+    case UndoKind.Triage:
+      return `Undo Triage: ${title}`;
+    case UndoKind.Drop:
+      return `Undo Drop: ${title}`;
+  }
+};
+
+const heldAnnouncementOf = (kind: UndoKind, title: string, quadrantWord: string): string => {
+  const window = `Undo is available for ${UNDO_WINDOW_MS / 1000} seconds.`;
+
+  switch (kind) {
+    case UndoKind.Done:
+      return `“${title}” is Done. ${window}`;
+    case UndoKind.Triage:
+      return `“${title}” is triaged as ${quadrantWord}. ${window}`;
+    case UndoKind.Drop:
+      return `“${title}” is dropped. ${window}`;
+  }
+};
+
+const failureTextOf = (kind: UndoKind, title: string): string => {
+  switch (kind) {
+    case UndoKind.Done:
+      return `“${title}” is not Done.`;
+    case UndoKind.Triage:
+      return `“${title}” is not triaged.`;
+    case UndoKind.Drop:
+      return `“${title}” is not dropped.`;
+  }
+};
+
 /**
- * Owns a Done's Undo window, its idempotency key and its send, so the key outlives Now and the
- * editor. Provide it in the shell: `providers: [CommandAttempts, CaptureQueue, DoneUndo]`.
+ * Owns the Undo window of a Done, a Triage or a Drop, its idempotency key and its send, so the key outlives
+ * Now, the Inbox and the editor. Provide it in the shell: `providers: [CommandAttempts, CaptureQueue, UndoWindow]`.
  */
 @Service({ autoProvided: false })
-export class DoneUndo {
+export class UndoWindow {
   readonly #dataStore = inject(DataStore);
 
   readonly #dataApi = inject(DataApi);
@@ -82,14 +155,14 @@ export class DoneUndo {
 
   readonly #view = this.#document.defaultView;
 
-  readonly #pendingSignal = signal<PendingDone | null>(null);
+  readonly #pendingSignal = signal<PendingUndo | null>(null);
 
-  /** The failure the shell shows, beside the Task it is about, which only `retry` needs. */
-  readonly #failed = signal<{ readonly failure: DoneFailure; readonly task: Task } | null>(null);
+  /** The failure the shell shows, beside the held command it is about, which only `retry` needs. */
+  readonly #failed = signal<{ readonly failure: UndoFailure; readonly held: Held } | null>(null);
 
-  readonly #noticeSignal = signal<DoneNotice | null>(null);
+  readonly #noticeSignal = signal<UndoNotice | null>(null);
 
-  readonly #undoneSignal = signal<DoneUndone | null>(null);
+  readonly #undoneSignal = signal<Undone | null>(null);
 
   readonly #focusSignal = signal(0);
 
@@ -115,13 +188,13 @@ export class DoneUndo {
 
   #undoneSeq = 0;
 
-  readonly pending: Signal<PendingDone | null> = this.#pendingSignal.asReadonly();
+  readonly pending: Signal<PendingUndo | null> = this.#pendingSignal.asReadonly();
 
-  readonly failure: Signal<DoneFailure | null> = computed(() => this.#failed()?.failure ?? null);
+  readonly failure: Signal<UndoFailure | null> = computed(() => this.#failed()?.failure ?? null);
 
-  readonly notice: Signal<DoneNotice | null> = this.#noticeSignal.asReadonly();
+  readonly notice: Signal<UndoNotice | null> = this.#noticeSignal.asReadonly();
 
-  readonly undone: Signal<DoneUndone | null> = this.#undoneSignal.asReadonly();
+  readonly undone: Signal<Undone | null> = this.#undoneSignal.asReadonly();
 
   readonly focusRequest: Signal<number> = this.#focusSignal.asReadonly();
 
@@ -150,49 +223,40 @@ export class DoneUndo {
   }
 
   /**
-   * Hides the Task at once and opens its Undo window; an earlier Done is sent without waiting. A normal
-   * send first awaits `after` (a rejection counts as settled); a send with `keepalive` does not wait.
+   * Hides the Task at once and opens its Undo window; an earlier Done, Triage or Drop is sent without
+   * waiting. A normal send first awaits `after` (a rejection counts as settled); a send with `keepalive`
+   * does not wait.
    */
   complete(task: Task, origin: DoneOrigin, after?: Promise<void>): void {
-    if (this.#held?.task.id === task.id) {
-      return;
-    }
-
-    this.#failed.set(null);
-
-    const earlier = this.#take();
-
-    if (earlier !== null) {
-      void this.#dispatch(earlier, false);
-    }
-
     const command: CompleteTask = {
       _tag: CommandTag.CompleteTask,
       taskId: task.id,
       expect: { status: TaskStatus.Open },
     };
-    const key = this.#attempts.keyFor(command);
 
-    this.#dataStore.hold(command, key);
-    this.#held = { task, command, key, origin, after };
-    this.#remaining = UNDO_WINDOW_MS;
-    this.#pendingSignal.set({
-      taskId: task.id,
-      title: task.title,
-      origin,
-      remainingMs: UNDO_WINDOW_MS,
-    });
-    this.#announce(
-      `“${task.title}” is Done. Undo is available for ${UNDO_WINDOW_MS / 1000} seconds.`,
-    );
-    this.#syncTimer();
-
-    if (origin === DoneOrigin.Button) {
-      this.#haptics.tick();
-    }
+    this.#hold(task, UndoKind.Done, command, '', origin, after);
   }
 
-  /** Takes the pending Done back: releases the hold and sends nothing. */
+  /**
+   * Applies a Triage to the Task at once and opens its Undo window, as `complete` does for a Done.
+   * `quadrantWord` is the Quadrant the Task lands in, as the bar says it ("Triaged as Plan").
+   */
+  triage(task: Task, command: TriageTask, quadrantWord: string): void {
+    this.#hold(task, UndoKind.Triage, command, quadrantWord, DoneOrigin.Button, undefined);
+  }
+
+  /** Drops the Task at once and opens its Undo window, as `complete` does for a Done. */
+  drop(task: Task): void {
+    const command: DropTask = {
+      _tag: CommandTag.DropTask,
+      taskId: task.id,
+      expect: { status: TaskStatus.Open },
+    };
+
+    this.#hold(task, UndoKind.Drop, command, '', DoneOrigin.Button, undefined);
+  }
+
+  /** Takes the pending command back: releases the hold and sends nothing. */
   undo(): void {
     const held = this.#take();
 
@@ -202,11 +266,11 @@ export class DoneUndo {
 
     this.#dataStore.release(held.key);
     this.#undoneSeq += 1;
-    this.#undoneSignal.set({ taskId: held.task.id, seq: this.#undoneSeq });
+    this.#undoneSignal.set({ taskId: held.task.id, kind: held.kind, seq: this.#undoneSeq });
     this.#clearPausesWhenIdle();
   }
 
-  /** Sends a pending Done at once and resolves when every send in flight has been handled. */
+  /** Sends the pending command at once and resolves when every send in flight has been handled. */
   flush(): Promise<void> {
     this.#sendHeld(false);
 
@@ -217,7 +281,7 @@ export class DoneUndo {
     return Promise.allSettled(this.#inflight).then(() => undefined);
   }
 
-  /** Holds the failed Task again with the key it has now: the same after Failed, a fresh one after KeyReused. */
+  /** Holds the failed command again with the key it has now: the same after Failed, a fresh one after KeyReused. */
   retry(): void {
     const failed = this.#failed();
 
@@ -225,17 +289,29 @@ export class DoneUndo {
       return;
     }
 
-    this.complete(failed.task, DoneOrigin.Button);
+    const { task, command, quadrantWord } = failed.held;
+
+    switch (command._tag) {
+      case CommandTag.CompleteTask:
+        this.complete(task, DoneOrigin.Button);
+        break;
+      case CommandTag.TriageTask:
+        this.triage(task, command, quadrantWord);
+        break;
+      case CommandTag.DropTask:
+        this.drop(task);
+        break;
+    }
   }
 
-  /** Closes the failure or notice; a displaced Done's window runs again for the time it had left. */
+  /** Closes the failure or notice; a displaced command's window runs again for the time it had left. */
   dismiss(): void {
     const displaced = this.#failed() !== null;
 
     this.#failed.set(null);
     this.#syncTimer();
 
-    // The bar shows the displaced Done again, so its ring starts where the timer is.
+    // The bar shows the displaced command again, so its ring starts where the timer is.
     if (displaced) {
       this.#pendingSignal.update((pending) =>
         pending === null ? null : { ...pending, remainingMs: this.#remaining },
@@ -278,7 +354,7 @@ export class DoneUndo {
     this.#sendHeld(false);
   };
 
-  /** Sends the pending Done now, if there is one; with `keepalive`, the request outlives the page. */
+  /** Sends the pending command now, if there is one; with `keepalive`, the request outlives the page. */
   #sendHeld(keepalive: boolean): void {
     if (keepalive) {
       this.#sendWaiting();
@@ -321,7 +397,7 @@ export class DoneUndo {
     return held;
   }
 
-  /** Runs the timer only while a Done is pending, no pause reason holds and no failure displaces the bar. */
+  /** Runs the timer only while a command is pending, no pause reason holds and no failure displaces the bar. */
   #syncTimer(): void {
     const shouldRun =
       !this.#destroyRef.destroyed &&
@@ -343,6 +419,49 @@ export class DoneUndo {
   #clearPausesWhenIdle(): void {
     if (this.#held === null && this.#failed() === null) {
       this.#paused.clear();
+    }
+  }
+
+  /** Puts the command on hold for the Task, opens its window and announces it; ignored while this Task is already held. */
+  #hold(
+    task: Task,
+    kind: UndoKind,
+    command: HeldCommand,
+    quadrantWord: string,
+    origin: DoneOrigin,
+    after: Promise<void> | undefined,
+  ): void {
+    if (this.#held?.task.id === task.id) {
+      return;
+    }
+
+    this.#failed.set(null);
+
+    const earlier = this.#take();
+
+    if (earlier !== null) {
+      void this.#dispatch(earlier, false);
+    }
+
+    const key = this.#attempts.keyFor(command);
+
+    this.#dataStore.hold(command, key);
+    this.#held = { task, kind, command, quadrantWord, key, origin, after };
+    this.#remaining = UNDO_WINDOW_MS;
+    this.#pendingSignal.set({
+      taskId: task.id,
+      title: task.title,
+      kind,
+      status: statusOf(kind, quadrantWord),
+      undoLabel: undoLabelOf(kind, task.title),
+      origin,
+      remainingMs: UNDO_WINDOW_MS,
+    });
+    this.#announce(heldAnnouncementOf(kind, task.title, quadrantWord));
+    this.#syncTimer();
+
+    if (origin === DoneOrigin.Button) {
+      this.#haptics.tick();
     }
   }
 
@@ -406,20 +525,23 @@ export class DoneUndo {
 
     const message = outcomeMessage(outcome) ?? '';
     const title = held.task.title;
+    const text = failureTextOf(held.kind, title);
     const closedElsewhere = outcome._tag === CommandOutcomeTag.NotApplicable;
 
     this.#failed.set({
       failure: {
         taskId: held.task.id,
         title,
+        kind: held.kind,
+        text,
         message,
         canRetry: isRetryable(outcome._tag),
         closedElsewhere,
       },
-      task: held.task,
+      held,
     });
-    // Closed elsewhere, the Task may well be Done, so the title line is left out.
-    this.#announce(closedElsewhere ? message : `“${title}” is not Done. ${message}`);
+    // Closed elsewhere, the Task may well be closed already, so the title line is left out.
+    this.#announce(closedElsewhere ? message : `${text} ${message}`);
     this.#syncTimer();
   }
 }

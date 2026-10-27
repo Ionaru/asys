@@ -20,7 +20,7 @@ import { PasskeyCeremony } from '../../core/api/passkey-ceremony';
 import { Session, SignOutReason } from '../../core/auth/session';
 import { CaptureQueue } from '../../core/data/capture-queue';
 import { DataStore } from '../../core/data/data-store';
-import { DoneUndo } from '../../core/data/done-undo';
+import { UndoWindow } from '../../core/data/undo-window';
 import { GENERIC_MESSAGE } from '../../core/data/outcome-message';
 import { AppUpdate } from '../../core/platform/app-update';
 import { Clock } from '../../core/platform/clock';
@@ -133,7 +133,7 @@ const setup = async ({ api = {}, create = vi.fn() }: Seams = {}) => {
           signedOut,
         },
       },
-      { provide: DoneUndo, useValue: { flush } },
+      { provide: UndoWindow, useValue: { flush } },
       { provide: CaptureQueue, useValue: { drain } },
     ],
   });

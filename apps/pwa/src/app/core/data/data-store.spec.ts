@@ -2320,6 +2320,38 @@ describe('DataStore', () => {
       expect(store.inboxCount()).toBe(2);
     });
 
+    it('drops the Inbox count at once for a held Triage, and again restores it on release', async () => {
+      await begin(12, {
+        tasks: [aTask('A', { important: null }), aTask('B', { important: null })],
+      });
+
+      store.hold(
+        { _tag: CommandTag.TriageTask, taskId: 'A', important: true, estimateMinutes: 15 },
+        'triage-a',
+      );
+
+      expect(store.inboxCount()).toBe(1);
+      expect(store.state()?.tasks.find((t) => t.id === 'A')).toMatchObject({
+        important: true,
+        estimateMinutes: 15,
+      });
+      store.release('triage-a');
+      expect(store.inboxCount()).toBe(2);
+    });
+
+    it('drops the Inbox count and hides the Task for a held Drop', async () => {
+      await begin(12, {
+        tasks: [aTask('A', { important: null }), aTask('B', { important: null })],
+      });
+
+      store.hold({ _tag: CommandTag.DropTask, taskId: 'A' }, 'drop-a');
+
+      expect(store.inboxCount()).toBe(1);
+      expect(stateIds()).toEqual(['B']);
+      store.release('drop-a');
+      expect(store.inboxCount()).toBe(2);
+    });
+
     it('lets a second hold with the same key replace the first', async () => {
       await begin(12, withAB);
 

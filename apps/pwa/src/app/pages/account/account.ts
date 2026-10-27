@@ -21,7 +21,7 @@ import { recoveryCodes } from '../../core/auth/recovery-codes';
 import { Session, SignOutReason } from '../../core/auth/session';
 import { CaptureQueue } from '../../core/data/capture-queue';
 import { DataStore } from '../../core/data/data-store';
-import { DoneUndo } from '../../core/data/done-undo';
+import { UndoWindow } from '../../core/data/undo-window';
 import { GENERIC_MESSAGE } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
 import { DeviceZone } from '../../core/platform/device-zone';
@@ -102,7 +102,7 @@ export class Account {
 
   readonly #deviceZone = inject(DeviceZone);
 
-  readonly #doneUndo = inject(DoneUndo);
+  readonly #undoWindow = inject(UndoWindow);
 
   readonly #captureQueue = inject(CaptureQueue);
 
@@ -336,7 +336,7 @@ export class Account {
     this.signingOut.set(true);
 
     try {
-      await this.#doneUndo.flush();
+      await this.#undoWindow.flush();
       await this.#captureQueue.drain();
 
       const result = await this.#authApi.signOut();
