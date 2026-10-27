@@ -9,7 +9,7 @@ ASYS (Assisting System) is a personal task manager that answers "what should I d
 - `CONTEXT.md` is the domain language. Use its terms exactly and capitalised (Task, Estimate, Available from, Due, Picker, Now, Inbox, Review item, Area, Voice) in code, tests, UI copy and docs. Never use the words on its _Avoid_ lines, such as "to-do", "event", "deadline" or "project".
 - `docs/adr/` holds the decisions that bind the code. Read the ADR before changing what it governs.
 - `docs/mvp-plan.md` says what each slice and stage holds. `docs/scenarios.md` holds the acceptance examples, mirrored one-to-one by `libs/domain/src/scenarios/s<N>.spec.ts`.
-- `docs/slice-1-plan.md` records how slice 1 was built: its decisions, known limits and dated "Facts checked" notes. Its "Pulled ahead before slice 2" section holds what the motion, Undo, swipe, Current Area and Task editor work left open, phone checks included. Counts and versions in it are historical, so check the code.
+- `docs/slice-1-plan.md` records how slice 1 was built: its decisions, known limits and dated "Facts checked" notes. Its "Pulled ahead before slice 2" section holds what the motion, Undo, swipe, Current Area, Task editor and Triage card work left open, phone checks included; `docs/triage-plan.md` records the Triage card. Counts and versions in it are historical, so check the code.
 - `README.md` covers running the stack, the end-to-end tests, CI and the deploy runbook.
 
 ## Projects
