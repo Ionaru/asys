@@ -1,14 +1,74 @@
 /* SPDX-License-Identifier: EUPL-1.2 */
+/* Fills the viewport above the nav (less the page's top and bottom padding), so the action bar sits on the nav even under a short card. */
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(
+    100dvh - var(--space-6) - var(--space-4) - var(--shell-nav-height) - var(--shell-undo-height) -
+      env(safe-area-inset-bottom)
+  );
+}
+
+.inbox__card {
+  display: block;
+  margin: 0 0 var(--space-4);
+}
+
+.inbox__sync {
+  margin: var(--space-2) 0 0;
+
+  .inbox__card + & {
+    margin: calc(var(--space-2) - var(--space-4)) 0 var(--space-4);
+  }
+}
+
+.inbox__empty {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+
+.inbox__progress {
+  margin: 0 0 var(--space-2);
+  color: var(--ink-muted);
+  font-size: var(--font-size-reason);
+  line-height: var(--line-height-reason);
+}
+
+.inbox__empty-title {
+  margin: 0 0 var(--space-1);
+}
+
+.inbox__empty-text {
+  margin: 0;
+  color: var(--ink-muted);
+}
+
 .inbox__reviews {
   margin: 0 0 var(--space-4);
   padding: 0;
   list-style: none;
 }
 
-.inbox__sync {
-  margin: var(--space-2) 0 0;
+/* Pushed to the bottom, and over the page's bottom padding, so no gap opens above the nav at the end of the page. */
+.inbox__actions {
+  margin-top: auto;
+  margin-bottom: calc(var(--space-4) * -1);
+
+  & > .inbox__triage {
+    flex-grow: 2;
+  }
 }
 
-.inbox__text {
-  margin: 0 0 var(--space-2);
+.inbox__more {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* The design sets the More sheet's actions as a list, each from its start. */
+.inbox__more-action {
+  justify-content: flex-start;
 }

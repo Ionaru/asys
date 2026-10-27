@@ -10,6 +10,36 @@
 </h1>
 <p asys-text class="asys-page__status inbox__status" role="status">{{ statusLine() }}</p>
 @if (loaded()) {
+  @for (task of cards(); track task.id) {
+    <asys-triage-card
+      class="inbox__card"
+      [taskId]="task.id"
+      [position]="position()"
+      [total]="total()"
+      [capturedText]="task.capturedText"
+      [areas]="areas()"
+      [today]="today()"
+      [attempts]="attempts()"
+      [reason]="reason()"
+      [busy]="cardBusy()"
+      [(draft)]="draft"
+      (more)="moreOpen.set(true)"
+    />
+    @if (task.awaitingSync) {
+      <p asys-sync-note class="inbox__sync"></p>
+    }
+  }
+  @if (empty()) {
+    <section class="inbox__empty">
+      @if (handled() > 0) {
+        <p class="inbox__progress">{{ handled() }} of {{ handled() }} triaged</p>
+      }
+      <h2 asys-text class="inbox__empty-title" [textStyle]="TextStyle.Display">Inbox is empty</h2>
+      <p asys-text class="inbox__empty-text" [textStyle]="TextStyle.Reason">
+        New captures land here.
+      </p>
+    </section>
+  }
   @if (reviews().length > 0) {
     <ul class="inbox__reviews">
       @for (review of reviews(); track review.id) {
@@ -39,28 +69,86 @@
       }
     </ul>
   }
-  @for (task of cards(); track task.id) {
-    <asys-triage-card
-      [position]="position()"
-      [total]="total()"
-      [title]="task.title"
-      [rawText]="task.rawText"
-      [areas]="areas()"
-      [(draft)]="draft"
-      [busy]="cardBusy()"
-      [canLater]="canLater()"
-      (triage)="triage.emit($event)"
-      (dropTask)="dropTask.emit()"
-      (later)="later.emit(task.id)"
-      (edit)="edit.emit(task.id)"
-    />
-    @if (task.awaitingSync) {
-      <p asys-sync-note class="inbox__sync"></p>
-    }
-  }
-  @if (empty()) {
-    <p asys-text class="inbox__text">Nothing waits here.</p>
+  @if (card() !== null) {
+    <footer asys-action-bar class="inbox__actions">
+      <button
+        asys-button
+        type="button"
+        [variant]="Variant.Secondary"
+        [size]="Size.Large"
+        [icon]="Icons.Xmark"
+        [disabled]="cardBusy()"
+        (click)="dropTask.emit()"
+      >
+        Drop
+      </button>
+      <button
+        asys-button
+        type="button"
+        class="inbox__triage"
+        [variant]="Variant.Primary"
+        [size]="Size.Large"
+        [icon]="Icons.Check"
+        [disabled]="cardBusy()"
+        (click)="triage.emit()"
+      >
+        {{ triageLabel() }}
+      </button>
+    </footer>
   }
 } @else {
   <asys-load-state [failed]="loadFailed()" (retry)="retry.emit()" />
 }
+<asys-sheet heading="More" [(open)]="moreOpen">
+  <ng-template>
+    <div class="inbox__more">
+      <button
+        asys-button
+        type="button"
+        class="inbox__more-action inbox__open-editor"
+        [variant]="Variant.Secondary"
+        [block]="true"
+        (click)="chooseOpenEditor()"
+      >
+        Open in the editor
+      </button>
+      <button
+        asys-button
+        type="button"
+        class="inbox__more-action"
+        [variant]="Variant.Secondary"
+        [block]="true"
+        [icon]="Icons.Ban"
+        (click)="chooseBlockedBy()"
+      >
+        Blocked by
+      </button>
+      <button
+        asys-button
+        type="button"
+        class="inbox__more-action"
+        [variant]="Variant.Danger"
+        [block]="true"
+        [icon]="Icons.Xmark"
+        (click)="chooseDrop()"
+      >
+        Drop
+      </button>
+    </div>
+  </ng-template>
+</asys-sheet>
+<asys-task-blockers
+  summary=""
+  [header]="false"
+  [busy]="blockersBusy()"
+  [blockedBy]="blockedBy()"
+  [blocks]="blocks()"
+  [candidates]="candidates()"
+  [message]="blockerMessage()"
+  [adding]="blockerAdding()"
+  [(filter)]="blockerFilter"
+  [(open)]="blockersOpen"
+  (openChange)="blockersOpenChange($event)"
+  (add)="addBlocker.emit($event)"
+  (remove)="removeBlocker.emit($event)"
+/>

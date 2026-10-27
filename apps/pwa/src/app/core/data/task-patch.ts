@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { type DateSpec, sameDateSpec, type Task, type TaskPatch } from '@asys/domain';
 
-import type { DraftFields } from '../../core/data/draft-follow';
+import type { DraftFields } from './draft-follow';
 
 /** The editable fields of a Task as the editor holds them; areaId '' means No Area. */
 export interface TaskDraft {

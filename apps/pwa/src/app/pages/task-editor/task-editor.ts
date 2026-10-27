@@ -40,9 +40,9 @@ import { TaskMorph } from '../../core/platform/task-morph';
 import { TaskEditorTemplate } from '../../components/templates/task-editor-template/task-editor-template';
 import { byAreaName } from '../../core/data/area-order';
 import { SaveState, TaskDraftSaver } from './task-draft-saver';
-import { TaskBlockerActions } from './task-blocker-actions';
-import { previewTask } from './task-preview';
-import { buildTaskPatch, savableDraft, TASK_DRAFT_FIELDS } from './task-patch';
+import { TaskBlockerActions } from '../../core/data/task-blocker-actions';
+import { previewTask } from '../../core/data/task-preview';
+import { buildTaskPatch, savableDraft, TASK_DRAFT_FIELDS } from '../../core/data/task-patch';
 
 /** How many live editors have published their chrome on the root element; the last one out removes it. */
 let chromeEditors = 0;

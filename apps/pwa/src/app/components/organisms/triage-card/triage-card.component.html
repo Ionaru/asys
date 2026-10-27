@@ -1,88 +1,141 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
-<article class="asys-triage">
-  <p class="asys-triage__progress">{{ position() }} of {{ total() }}</p>
-  <h2 class="asys-triage__title" tabindex="-1">{{ title() }}</h2>
-  @if (showRaw()) {
-    <p class="asys-triage__raw">{{ rawText() }}</p>
+<section
+  #section
+  class="asys-triage"
+  aria-label="Task to triage"
+  tabindex="-1"
+  [attr.data-focus-title]="taskId()"
+>
+  <div class="asys-triage__head">
+    <p class="asys-triage__progress">{{ position() }} of {{ total() }}</p>
+    <button
+      #moreButton
+      asys-button
+      type="button"
+      aria-label="More for this Task"
+      aria-haspopup="dialog"
+      [variant]="Variant.Quiet"
+      [iconOnly]="true"
+      [icon]="Icons.Ellipsis"
+      [disabled]="busy()"
+      (click)="more.emit()"
+    ></button>
+  </div>
+  <textarea
+    asys-input
+    asys-single-line
+    class="asys-triage__title"
+    [variant]="InputVariants.Title"
+    [submitOnEnter]="false"
+    aria-label="Title"
+    placeholder="Title"
+    enterkeyhint="done"
+    [attr.data-task-id]="taskId()"
+    [value]="draft().title"
+    [disabled]="busy()"
+    [attr.aria-invalid]="needsTitle() ? 'true' : null"
+    [attr.aria-describedby]="needsTitle() ? titleErrorId : null"
+    (lineChange)="edit('title', $event)"
+  ></textarea>
+  @if (needsTitle()) {
+    <p asys-field-error [id]="titleErrorId">Needs a title</p>
+  }
+  @if (notesShown()) {
+    <textarea
+      #notesField
+      asys-input
+      class="asys-triage__notes"
+      [variant]="InputVariants.Grow"
+      aria-label="Notes"
+      placeholder="Add notes"
+      rows="1"
+      [value]="draft().notes"
+      [disabled]="busy()"
+      (input)="typeNotes($event)"
+    ></textarea>
+  } @else {
+    <button
+      asys-button
+      type="button"
+      class="asys-triage__add-notes"
+      [variant]="Variant.Quiet"
+      [size]="Size.Small"
+      [icon]="Icons.Plus"
+      [disabled]="busy()"
+      (click)="addNotes()"
+    >
+      Add notes
+    </button>
+  }
+  @if (capturedText(); as text) {
+    <p class="asys-triage__captured">
+      <span class="asys-triage__captured-label">Captured text</span>
+      <span class="asys-triage__captured-text">{{ text }}</span>
+    </p>
   }
   <asys-segmented-control
     legend="Importance"
     [options]="importanceOptions"
     [layout]="SegmentLayout.Fill"
+    [need]="importanceNeed()"
     [disabled]="busy()"
     [value]="draft().important"
-    (valueChange)="draft.set({ ...draft(), important: $event })"
+    (valueChange)="edit('important', $event)"
   />
   <asys-estimate-picker
     legend="Estimate"
+    [layout]="EstimateLayout.Ruler"
+    [need]="estimateNeed()"
     [disabled]="busy()"
     [value]="draft().estimateMinutes"
-    (valueChange)="draft.set({ ...draft(), estimateMinutes: $event })"
+    (valueChange)="edit('estimateMinutes', $event)"
   />
-  <div class="asys-triage__area">
-    <span>
-      Area: <strong>{{ areaName() }}</strong>
-    </span>
-    @if (!changingArea()) {
-      <button
-        asys-button
-        type="button"
-        [variant]="Variants.Quiet"
-        [size]="Sizes.Small"
-        [disabled]="busy()"
-        (click)="changeArea()"
-      >
-        Change
-      </button>
-    }
-  </div>
-  @if (changingArea()) {
-    <asys-select-field
+  <div class="asys-triage__rows">
+    <asys-choice-row
       label="Area"
       [options]="areaOptions()"
+      [icon]="Icons.Folder"
       [disabled]="busy()"
-      [value]="draft().areaId ?? ''"
-      (valueChange)="draft.set({ ...draft(), areaId: $event === '' ? null : $event })"
+      [value]="draft().areaId"
+      (valueChange)="edit('areaId', $event)"
     />
-  }
-  <div class="asys-triage__footer">
-    <button
-      asys-button
-      type="button"
-      [variant]="Variants.Primary"
-      [disabled]="incomplete() || busy()"
-      [attr.aria-describedby]="reason() === null ? null : reasonId"
-      (click)="triage.emit(draft())"
-    >
-      Triage
-    </button>
-    @if (canLater()) {
-      <button asys-button type="button" [variant]="Variants.Quiet" (click)="later.emit()">
-        Later
-      </button>
-    }
-    <button asys-button type="button" [variant]="Variants.Quiet" (click)="edit.emit()">Edit</button>
-    <button
-      asys-button
-      type="button"
-      class="asys-triage__drop"
-      [variant]="Variants.Quiet"
+    <asys-date-field
+      label="Available from"
+      noneLabel="Any time"
+      removeLabel="Remove Available from"
+      timePrefix="Available from"
+      [today]="today()"
       [disabled]="busy()"
-      (click)="confirmingDrop.set(true)"
-    >
-      Drop
-    </button>
-    @if (reason(); as text) {
-      <p class="asys-triage__reason" [id]="reasonId">{{ text }}</p>
+      [value]="draft().availableFrom"
+      (valueChange)="edit('availableFrom', $event)"
+    />
+    <asys-date-field
+      label="Due"
+      noneLabel="None"
+      removeLabel="Remove Due"
+      timePrefix="Due at"
+      [today]="today()"
+      [disabled]="busy()"
+      [value]="draft().due"
+      (valueChange)="edit('due', $event)"
+    />
+  </div>
+  <div class="asys-triage__footer">
+    @if (reason(); as r) {
+      <p class="asys-triage__reason">
+        <asys-quadrant-label [quadrant]="r.quadrant" [strong]="true" />
+        <span>{{ r.text }}</span>
+      </p>
+    } @else {
+      <p
+        class="asys-triage__hint"
+        role="status"
+        [class.asys-triage__hint--missing]="attempts() > 0"
+      >
+        @for (n of [attempts()]; track n) {
+          {{ hintText() }}
+        }
+      </p>
     }
   </div>
-  @if (confirmingDrop()) {
-    <asys-inline-confirm
-      [message]="dropMessage()"
-      confirmLabel="Drop"
-      [busy]="busy()"
-      (confirm)="dropTask.emit()"
-      (cancel)="cancelDrop()"
-    />
-  }
-</article>
+</section>

@@ -1,107 +1,144 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { Component, signal, viewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { Quadrant } from '@asys/domain';
 
-import { AreaChoice, TriageCard, TriageDraft } from './triage-card';
+import { type AreaChoice, TriageCard, type TriageDraft, type TriageReason } from './triage-card';
 
 const AREAS: readonly AreaChoice[] = [
   { id: 'a-home', name: 'Home' },
   { id: 'a-work', name: 'Work' },
 ];
 
-const COMPLETE: TriageDraft = { important: true, estimateMinutes: 25, areaId: 'a-work' };
+const EMPTY: TriageDraft = {
+  title: 'Call Marit',
+  notes: '',
+  important: null,
+  estimateMinutes: null,
+  areaId: '',
+  availableFrom: null,
+  due: null,
+};
+
+const PLAN: TriageReason = { quadrant: Quadrant.Plan, text: 'Important, no deadline: plan it.' };
 
 @Component({
   imports: [TriageCard],
   template: `
     <asys-triage-card
+      [taskId]="taskId()"
       [position]="position()"
       [total]="total()"
-      [title]="title()"
-      [rawText]="rawText()"
+      [capturedText]="capturedText()"
       [areas]="areas()"
-      [(draft)]="draft"
+      [today]="today"
+      [attempts]="attempts()"
+      [reason]="reason()"
       [busy]="busy()"
-      [canLater]="canLater()"
-      (triage)="triaged.push($event)"
-      (dropTask)="dropped = dropped + 1"
-      (later)="laters = laters + 1"
-      (edit)="edits = edits + 1"
+      [(draft)]="draft"
+      (more)="mores = mores + 1"
     />
   `,
 })
 class Host {
   readonly card = viewChild.required(TriageCard);
 
+  readonly taskId = signal('t1');
+
   readonly position = signal(1);
 
   readonly total = signal(5);
 
-  readonly title = signal('Call Marit');
-
-  readonly rawText = signal('');
+  readonly capturedText = signal<string | null>(null);
 
   readonly areas = signal<readonly AreaChoice[]>(AREAS);
 
-  readonly draft = signal<TriageDraft>({ important: null, estimateMinutes: null, areaId: null });
+  readonly today = '2026-10-04';
+
+  readonly attempts = signal(0);
+
+  readonly reason = signal<TriageReason | null>(null);
 
   readonly busy = signal(false);
 
-  readonly canLater = signal(true);
+  readonly draft = signal<TriageDraft>(EMPTY);
 
-  readonly triaged: TriageDraft[] = [];
-
-  dropped = 0;
-
-  laters = 0;
-
-  edits = 0;
+  mores = 0;
 }
 
-const must = <T>(value: T | null | undefined, what = 'value'): T => {
-  if (value === null || value === undefined) {
-    throw new Error(`Missing ${what}`);
-  }
+const squash = (text: string | null | undefined): string =>
+  (text ?? '').replace(/\s+/g, ' ').trim();
 
-  return value;
-};
-
-const setup = async (draft?: TriageDraft) => {
+const setup = async (draft: TriageDraft = EMPTY) => {
   const fixture = TestBed.createComponent(Host);
-  if (draft) {
-    fixture.componentInstance.draft.set(draft);
-  }
+
+  fixture.componentInstance.draft.set(draft);
   document.body.appendChild(fixture.nativeElement);
   await fixture.whenStable();
 
+  const host = fixture.componentInstance;
   const root: HTMLElement = fixture.nativeElement;
   const q = <T extends HTMLElement>(selector: string): T | null => root.querySelector<T>(selector);
-  const textIn = (parent: ParentNode, selector: string) =>
-    parent.querySelector(selector)?.textContent?.replace(/\s+/g, ' ').trim();
-  const find = (selector: string, label: string): HTMLButtonElement | undefined =>
-    Array.from(root.querySelectorAll<HTMLButtonElement>(selector)).find(
-      (b) => b.textContent?.trim() === label,
-    );
-  const footerButton = (label: string) => find('.asys-triage__footer button', label);
-  const segment = (label: string) => find('asys-segmented-control .asys-segment', label);
-  const chip = (label: string) => find('asys-estimate-picker .asys-segment', label);
-  const changeButton = () => find('.asys-triage__area button', 'Change');
-  const select = () => q<HTMLSelectElement>('asys-select-field select');
+  const all = <T extends HTMLElement>(selector: string): T[] =>
+    Array.from(root.querySelectorAll<T>(selector));
   const settle = () => fixture.whenStable();
+  // A pointer press: `click()` has detail 0, which counts as a keyboard activation.
+  const press = async (el: HTMLElement | null | undefined): Promise<void> => {
+    el?.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    await settle();
+  };
+  const type = async (el: HTMLTextAreaElement | null, text: string): Promise<void> => {
+    if (el === null) {
+      throw new Error('Missing field');
+    }
+
+    el.value = text;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle();
+  };
+  const section = () => q<HTMLElement>('section.asys-triage');
+  const title = () => q<HTMLTextAreaElement>('textarea.asys-triage__title');
+  const notes = () => q<HTMLTextAreaElement>('textarea[aria-label="Notes"]');
+  const more = () => q<HTMLButtonElement>('button[aria-label="More for this Task"]');
+  const addNotes = () =>
+    all<HTMLButtonElement>('button').find((b) => squash(b.textContent) === 'Add notes');
+  const segment = (label: string) =>
+    all<HTMLButtonElement>('asys-segmented-control .asys-segment').find(
+      (b) => squash(b.textContent) === label,
+    );
+  const chip = (aria: string) =>
+    q<HTMLButtonElement>(`asys-estimate-picker .asys-segment[aria-label="${aria}"]`);
+  const importanceNeed = () => q('asys-segmented-control .asys-label__need');
+  const estimateNeed = () => q('asys-estimate-picker .asys-label__need');
+  const hint = () => q('p.asys-triage__hint');
+  const dialog = (heading: string) =>
+    all<HTMLDialogElement>('dialog.asys-sheet').find(
+      (d) => squash(d.querySelector('h2.asys-sheet__heading')?.textContent) === heading,
+    );
+  const rowOpen = (selector: string, label: string) =>
+    all<HTMLButtonElement>(selector).find((b) => squash(b.textContent).startsWith(label));
 
   return {
     fixture,
-    host: fixture.componentInstance,
+    host,
     root,
     q,
-    textIn,
-    find,
-    footerButton,
+    all,
+    settle,
+    press,
+    type,
+    section,
+    title,
+    notes,
+    more,
+    addNotes,
     segment,
     chip,
-    changeButton,
-    select,
-    settle,
+    importanceNeed,
+    estimateNeed,
+    hint,
+    dialog,
+    rowOpen,
   };
 };
 
@@ -110,507 +147,421 @@ describe('TriageCard', () => {
     document.body.innerHTML = '';
   });
 
-  describe('progress and title', () => {
-    it('shows the position out of the total', async () => {
-      const { q } = await setup();
+  describe('the section', () => {
+    it('is a focusable section labelled "Task to triage" that carries the focus marker, not the task id', async () => {
+      const { section } = await setup();
 
-      expect(q('.asys-triage__progress')?.textContent?.trim()).toBe('1 of 5');
+      expect(section()?.getAttribute('aria-label')).toBe('Task to triage');
+      expect(section()?.getAttribute('tabindex')).toBe('-1');
+      expect(section()?.getAttribute('data-focus-title')).toBe('t1');
+      expect(section()?.hasAttribute('data-task-id')).toBe(false);
     });
 
-    it('updates the progress text when the inputs change', async () => {
+    it('puts the task id on the Title only', async () => {
+      const { all, title } = await setup();
+
+      expect(title()?.getAttribute('data-task-id')).toBe('t1');
+      expect(all('[data-task-id]')).toHaveLength(1);
+    });
+  });
+
+  describe('progress and More', () => {
+    it('shows the position out of the total and follows the inputs', async () => {
       const { host, q, settle } = await setup();
+
+      expect(squash(q('.asys-triage__progress')?.textContent)).toBe('1 of 5');
 
       host.position.set(3);
       host.total.set(4);
       await settle();
 
-      expect(q('.asys-triage__progress')?.textContent?.trim()).toBe('3 of 4');
+      expect(squash(q('.asys-triage__progress')?.textContent)).toBe('3 of 4');
     });
 
-    it('renders the title as an h2 that can take programmatic focus', async () => {
-      const { q } = await setup();
+    it('offers a More button that announces a dialog and emits more', async () => {
+      const { host, more, press } = await setup();
 
-      const title = q('.asys-triage__title');
+      expect(more()?.getAttribute('aria-haspopup')).toBe('dialog');
+      expect(more()?.classList.contains('asys-button--quiet')).toBe(true);
+      expect(more()?.classList.contains('asys-button--icon')).toBe(true);
 
-      expect(title?.tagName).toBe('H2');
-      expect(title?.textContent?.trim()).toBe('Call Marit');
-      expect(title?.getAttribute('tabindex')).toBe('-1');
-    });
+      await press(more());
 
-    it('moves focus to the title from focusTitle()', async () => {
-      const { host, q } = await setup();
-
-      host.card().focusTitle();
-
-      expect(document.activeElement).toBe(q('.asys-triage__title'));
+      expect(host.mores).toBe(1);
     });
   });
 
-  describe('raw text', () => {
-    it('is shown when it differs from the title', async () => {
+  describe('the Title', () => {
+    it('shows the draft title in a textarea named Title', async () => {
+      const { title } = await setup();
+
+      expect(title()?.getAttribute('aria-label')).toBe('Title');
+      expect(title()?.getAttribute('placeholder')).toBe('Title');
+      expect(title()?.getAttribute('enterkeyhint')).toBe('done');
+      expect(title()?.value).toBe('Call Marit');
+      expect(title()?.classList.contains('asys-input--title')).toBe(true);
+    });
+
+    it('writes an edit into the draft and keeps the rest', async () => {
+      const { host, title, type } = await setup({ ...EMPTY, important: true });
+
+      await type(title(), 'Call Marit back');
+
+      expect(host.draft()).toEqual({ ...EMPTY, important: true, title: 'Call Marit back' });
+    });
+
+    it('shows no error while the title has text', async () => {
+      const { q, title } = await setup();
+
+      expect(q('p[asys-field-error]')).toBeNull();
+      expect(title()?.hasAttribute('aria-invalid')).toBe(false);
+    });
+
+    it('shows "Needs a title" when the title is blank after trimming, and links it to the field', async () => {
+      const { q, title, type } = await setup();
+
+      await type(title(), '   ');
+
+      const error = q('p[asys-field-error]');
+
+      expect(squash(error?.textContent)).toContain('Needs a title');
+      expect(title()?.getAttribute('aria-invalid')).toBe('true');
+      expect(error?.id).not.toBe('');
+      expect(title()?.getAttribute('aria-describedby')).toBe(error?.id);
+    });
+  });
+
+  describe('Notes', () => {
+    it('offers Add notes while the notes are empty, and Add notes shows and focuses the field', async () => {
+      const { addNotes, notes, press } = await setup();
+
+      expect(notes()).toBeNull();
+      expect(addNotes()).toBeDefined();
+
+      await press(addNotes());
+
+      expect(notes()).not.toBeNull();
+      expect(document.activeElement).toBe(notes());
+      expect(addNotes()).toBeUndefined();
+    });
+
+    it('shows the field at once when the draft has notes', async () => {
+      const { addNotes, notes } = await setup({ ...EMPTY, notes: 'Ask about the form' });
+
+      expect(notes()?.value).toBe('Ask about the form');
+      expect(notes()?.getAttribute('placeholder')).toBe('Add notes');
+      expect(notes()?.getAttribute('rows')).toBe('1');
+      expect(notes()?.classList.contains('asys-input--grow')).toBe(true);
+      expect(addNotes()).toBeUndefined();
+    });
+
+    it('writes typing into the draft', async () => {
+      const { host, notes, type, press, addNotes } = await setup();
+
+      await press(addNotes());
+      await type(notes(), 'Mind the deadline');
+
+      expect(host.draft().notes).toBe('Mind the deadline');
+    });
+
+    it('keeps the field when typing clears the notes', async () => {
+      const { notes, press, addNotes, type } = await setup();
+
+      await press(addNotes());
+      await type(notes(), 'x');
+      await type(notes(), '');
+
+      expect(notes()).not.toBeNull();
+    });
+  });
+
+  describe('captured text', () => {
+    it('is hidden without capturedText', async () => {
+      const { q } = await setup();
+
+      expect(q('.asys-triage__captured')).toBeNull();
+    });
+
+    it('shows the label and the text when given', async () => {
       const { host, q, settle } = await setup();
 
-      host.rawText.set('call marit about the roof tomorrow');
+      host.capturedText.set('call marit\nabout the form');
       await settle();
 
-      expect(q('.asys-triage__raw')?.textContent?.trim()).toBe(
-        'call marit about the roof tomorrow',
+      const block = q('.asys-triage__captured');
+
+      expect(squash(block?.querySelector('.asys-triage__captured-label')?.textContent)).toBe(
+        'Captured text',
+      );
+      expect(block?.querySelector('.asys-triage__captured-text')?.textContent).toBe(
+        'call marit\nabout the form',
       );
     });
-
-    it('is hidden when it equals the title', async () => {
-      const { host, q, settle } = await setup();
-
-      host.rawText.set('Call Marit');
-      await settle();
-
-      expect(q('.asys-triage__raw')).toBeNull();
-    });
-
-    it('is hidden when it is empty', async () => {
-      const { q } = await setup();
-
-      expect(q('.asys-triage__raw')).toBeNull();
-    });
-
-    it('is hidden when it is only whitespace', async () => {
-      const { host, q, settle } = await setup();
-
-      host.rawText.set('   \n ');
-      await settle();
-
-      expect(q('.asys-triage__raw')).toBeNull();
-    });
-
-    it('is rendered as plain text, never as markup', async () => {
-      const { host, q, settle } = await setup();
-
-      host.rawText.set('<b>bold</b> <img src=x>');
-      await settle();
-
-      expect(q('.asys-triage__raw')?.textContent?.trim()).toBe('<b>bold</b> <img src=x>');
-      expect(q('.asys-triage__raw b')).toBeNull();
-      expect(q('.asys-triage__raw img')).toBeNull();
-    });
   });
 
-  describe('draft controls', () => {
-    it('labels the importance and estimate controls', async () => {
-      const { q, segment } = await setup();
+  describe('the choices', () => {
+    it('writes Importance into the draft', async () => {
+      const { host, segment, press } = await setup();
 
-      expect(q('.asys-segmented-control > legend')?.textContent?.trim()).toBe('Importance');
-      expect(segment('Important')).toBeDefined();
-      expect(segment('Not important')).toBeDefined();
-      expect(q('.asys-estimate__legend')?.textContent?.trim()).toBe('Estimate');
+      await press(segment('Important'));
+
+      expect(host.draft()).toEqual({ ...EMPTY, important: true });
+
+      await press(segment('Not important'));
+
+      expect(host.draft().important).toBe(false);
     });
 
-    it('sets important to true from the Important segment, keeping the rest', async () => {
-      const { host, segment, settle } = await setup(COMPLETE);
-      host.draft.set({ important: null, estimateMinutes: 25, areaId: 'a-work' });
-      await settle();
+    it('shows Importance and Estimate legends, and the Estimate as a ruler', async () => {
+      const { q } = await setup();
 
-      segment('Important')?.click();
-      await settle();
-
-      expect(host.draft()).toEqual({ important: true, estimateMinutes: 25, areaId: 'a-work' });
+      expect(squash(q('asys-segmented-control legend')?.textContent)).toContain('Importance');
+      expect(squash(q('asys-estimate-picker .asys-estimate__legend')?.textContent)).toContain(
+        'Estimate',
+      );
+      expect(q('asys-estimate-picker .asys-estimate--ruler')).not.toBeNull();
+      expect(q('asys-segmented-control .asys-segmented-control--fill')).not.toBeNull();
     });
 
-    it('sets important to false from the Not important segment', async () => {
-      const { host, segment, settle } = await setup(COMPLETE);
+    it('writes an Estimate into the draft', async () => {
+      const { host, chip, press } = await setup();
 
-      segment('Not important')?.click();
-      await settle();
+      await press(chip('25 min'));
 
-      expect(host.draft()).toEqual({ important: false, estimateMinutes: 25, areaId: 'a-work' });
-    });
-
-    it('reflects the draft importance in the pressed segment', async () => {
-      const { segment } = await setup({ important: false, estimateMinutes: null, areaId: null });
-
-      expect(segment('Not important')?.getAttribute('aria-pressed')).toBe('true');
-      expect(segment('Important')?.getAttribute('aria-pressed')).toBe('false');
-    });
-
-    it('sets the estimate from a chip, keeping the rest', async () => {
-      const { host, chip, settle } = await setup({
-        important: true,
-        estimateMinutes: null,
-        areaId: 'a-home',
-      });
-
-      chip('25 min')?.click();
-      await settle();
-
-      expect(host.draft()).toEqual({ important: true, estimateMinutes: 25, areaId: 'a-home' });
-    });
-
-    it('reflects the draft estimate in the pressed chip', async () => {
-      const { chip } = await setup(COMPLETE);
-
+      expect(host.draft().estimateMinutes).toBe(25);
       expect(chip('25 min')?.getAttribute('aria-pressed')).toBe('true');
     });
-  });
 
-  describe('Area', () => {
-    it('shows the name of the draft Area', async () => {
-      const { q } = await setup(COMPLETE);
+    it('writes an Area into the draft, and No Area as an empty id', async () => {
+      const { host, dialog, press, rowOpen, all, settle } = await setup();
 
-      expect(q('.asys-triage__area')?.textContent?.replace(/\s+/g, ' ').trim()).toContain(
-        'Area: Work',
+      await press(rowOpen('button.asys-choice-row__open', 'Area'));
+
+      const options = () => all<HTMLButtonElement>('ul.asys-option-list button.asys-field-row');
+
+      expect(options().map((b) => squash(b.textContent))).toEqual(['No Area', 'Home', 'Work']);
+
+      await press(options()[2]);
+
+      expect(host.draft().areaId).toBe('a-work');
+      expect(dialog('Area')).toBeDefined();
+
+      await settle();
+      await press(rowOpen('button.asys-choice-row__open', 'Area'));
+      await press(options()[0]);
+
+      expect(host.draft().areaId).toBe('');
+    });
+
+    it('shows the drafted Area on its row', async () => {
+      const { rowOpen } = await setup({ ...EMPTY, areaId: 'a-home' });
+
+      expect(squash(rowOpen('button.asys-choice-row__open', 'Area')?.textContent)).toContain(
+        'Home',
       );
-      expect(q('.asys-triage__area strong')?.textContent?.trim()).toBe('Work');
     });
 
-    it('shows No Area when the draft has no Area', async () => {
-      const { q } = await setup();
+    it('writes Available from and Due into the draft, and removes them', async () => {
+      const { host, all, press, rowOpen, dialog } = await setup();
+      const firstChip = (heading: string) =>
+        dialog(heading)?.querySelectorAll<HTMLButtonElement>(
+          '.asys-date-picker__chips > .asys-segment',
+        )[0];
 
-      expect(q('.asys-triage__area strong')?.textContent?.trim()).toBe('No Area');
-    });
+      await press(rowOpen('button.asys-date-row__open', 'Available from'));
+      await press(firstChip('Available from'));
 
-    it('shows No Area when the draft Area is not among the areas', async () => {
-      const { q } = await setup({ important: true, estimateMinutes: 5, areaId: 'a-gone' });
+      expect(host.draft().availableFrom).toEqual({ date: '2026-10-04' });
+      expect(host.draft().due).toBeNull();
 
-      expect(q('.asys-triage__area strong')?.textContent?.trim()).toBe('No Area');
-    });
+      await press(rowOpen('button.asys-date-row__open', 'Due'));
+      await press(firstChip('Due'));
 
-    it('hides the select until Change is pressed', async () => {
-      const { select, changeButton } = await setup();
+      expect(host.draft().due).toEqual({ date: '2026-10-04' });
 
-      expect(select()).toBeNull();
-      expect(changeButton()).toBeDefined();
-    });
-
-    it('shows a focused Area select and hides Change when Change is pressed', async () => {
-      const { changeButton, select, q, settle } = await setup(COMPLETE);
-
-      changeButton()?.click();
-      await settle();
-
-      expect(select()).not.toBeNull();
-      expect(document.activeElement).toBe(select());
-      expect(q('asys-select-field label')?.textContent?.trim()).toBe('Area');
-      expect(changeButton()).toBeUndefined();
-    });
-
-    it('offers No Area first, then the areas in order', async () => {
-      const { changeButton, select, settle } = await setup(COMPLETE);
-
-      changeButton()?.click();
-      await settle();
-
-      const options = Array.from(must(select()).options).map((o) => [
-        o.value,
-        o.textContent?.trim(),
-      ]);
-
-      expect(options).toEqual([
-        ['', 'No Area'],
-        ['a-home', 'Home'],
-        ['a-work', 'Work'],
-      ]);
-    });
-
-    it('selects the draft Area, or No Area when there is none', async () => {
-      const first = await setup(COMPLETE);
-      first.changeButton()?.click();
-      await first.settle();
-
-      expect(first.select()?.value).toBe('a-work');
-
-      const second = await setup();
-      second.changeButton()?.click();
-      await second.settle();
-
-      expect(second.select()?.value).toBe('');
-    });
-
-    it('sets the draft Area from the select, keeping the rest', async () => {
-      const { host, changeButton, select, settle } = await setup(COMPLETE);
-      changeButton()?.click();
-      await settle();
-
-      must(select()).value = 'a-home';
-      must(select()).dispatchEvent(new Event('change', { bubbles: true }));
-      await settle();
-
-      expect(host.draft()).toEqual({ important: true, estimateMinutes: 25, areaId: 'a-home' });
-    });
-
-    it('turns the empty option into a null Area', async () => {
-      const { host, q, changeButton, select, settle } = await setup(COMPLETE);
-      changeButton()?.click();
-      await settle();
-
-      must(select()).value = '';
-      must(select()).dispatchEvent(new Event('change', { bubbles: true }));
-      await settle();
-
-      expect(host.draft().areaId).toBeNull();
-      expect(q('.asys-triage__area strong')?.textContent?.trim()).toBe('No Area');
-    });
-  });
-
-  describe('Triage button and reason line', () => {
-    it('renders the footer buttons in order: Triage, Later, Edit, Drop', async () => {
-      const { root } = await setup();
-
-      const labels = Array.from(root.querySelectorAll('.asys-triage__footer button')).map((b) =>
-        b.textContent?.trim(),
+      await press(rowOpen('button.asys-date-row__open', 'Due'));
+      await press(
+        dialog('Due')?.querySelector<HTMLButtonElement>('button.asys-date-picker__remove'),
       );
 
-      expect(labels).toEqual(['Triage', 'Later', 'Edit', 'Drop']);
+      expect(host.draft().due).toBeNull();
+      expect(host.draft().availableFrom).toEqual({ date: '2026-10-04' });
+      expect(all('asys-date-field')).toHaveLength(2);
     });
 
-    it('uses a Primary Triage button and Quiet others', async () => {
-      const { footerButton } = await setup();
+    it('labels the rows as the Task editor does', async () => {
+      const { all } = await setup();
 
-      expect(footerButton('Triage')?.classList.contains('asys-button--primary')).toBe(true);
-      for (const label of ['Later', 'Edit', 'Drop']) {
-        expect(footerButton(label)?.classList.contains('asys-button--quiet')).toBe(true);
-      }
-    });
-
-    it('asks for an Importance and an Estimate when both are missing', async () => {
-      const { q, footerButton } = await setup();
-
-      const reason = q('.asys-triage__reason');
-
-      expect(reason?.textContent?.trim()).toBe('Needs an Importance and an Estimate');
-      expect(footerButton('Triage')?.disabled).toBe(true);
-      expect(footerButton('Triage')?.getAttribute('aria-describedby')).toBe(reason?.id);
-      expect(reason?.id).toBeTruthy();
-    });
-
-    it('asks for an Importance when only that is missing', async () => {
-      const { q, footerButton } = await setup({
-        important: null,
-        estimateMinutes: 25,
-        areaId: null,
-      });
-
-      expect(q('.asys-triage__reason')?.textContent?.trim()).toBe('Needs an Importance');
-      expect(footerButton('Triage')?.disabled).toBe(true);
-    });
-
-    it('asks for an Estimate when only that is missing', async () => {
-      const { q, footerButton } = await setup({
-        important: false,
-        estimateMinutes: null,
-        areaId: null,
-      });
-
-      expect(q('.asys-triage__reason')?.textContent?.trim()).toBe('Needs an Estimate');
-      expect(footerButton('Triage')?.disabled).toBe(true);
-    });
-
-    it('enables Triage and drops the reason line once the draft is complete', async () => {
-      const { q, footerButton } = await setup({
-        important: false,
-        estimateMinutes: 5,
-        areaId: null,
-      });
-
-      expect(q('.asys-triage__reason')).toBeNull();
-      expect(footerButton('Triage')?.disabled).toBe(false);
-    });
-
-    it('updates the reason line as the controls are used', async () => {
-      const { q, segment, chip, settle } = await setup();
-
-      segment('Important')?.click();
-      await settle();
-
-      expect(q('.asys-triage__reason')?.textContent?.trim()).toBe('Needs an Estimate');
-
-      chip('15 min')?.click();
-      await settle();
-
-      expect(q('.asys-triage__reason')).toBeNull();
-    });
-
-    it('emits triage with the current draft', async () => {
-      const { host, footerButton, settle } = await setup(COMPLETE);
-
-      footerButton('Triage')?.click();
-      await settle();
-
-      expect(host.triaged).toEqual([COMPLETE]);
-    });
-
-    it('emits nothing from Triage while the draft is incomplete', async () => {
-      const { host, footerButton, settle } = await setup();
-
-      footerButton('Triage')?.click();
-      await settle();
-
-      expect(host.triaged).toEqual([]);
-    });
-  });
-
-  describe('Later and Edit', () => {
-    it('emits later and edit from their buttons', async () => {
-      const { host, footerButton, settle } = await setup();
-
-      footerButton('Later')?.click();
-      await settle();
-
-      expect(host.laters).toBe(1);
-      expect(host.edits).toBe(0);
-
-      footerButton('Edit')?.click();
-      await settle();
-
-      expect(host.edits).toBe(1);
-      expect(host.laters).toBe(1);
-    });
-
-    it('hides Later when canLater is false', async () => {
-      const { host, footerButton, settle } = await setup();
-
-      host.canLater.set(false);
-      await settle();
-
-      expect(footerButton('Later')).toBeUndefined();
-      expect(footerButton('Edit')).toBeDefined();
-    });
-  });
-
-  describe('Drop', () => {
-    it('shows no confirmation until Drop is pressed', async () => {
-      const { q } = await setup();
-
-      expect(q('asys-inline-confirm')).toBeNull();
-    });
-
-    it('asks for confirmation with the title in curly quotes', async () => {
-      const { q, footerButton, settle } = await setup();
-
-      footerButton('Drop')?.click();
-      await settle();
-
-      expect(q('.asys-confirm__message')?.textContent?.trim()).toBe(
-        'Drop “Call Marit”? This cannot be undone.',
-      );
-      expect(q('.asys-confirm .asys-button--danger')?.textContent?.trim()).toBe('Drop');
-    });
-
-    it('places the confirmation after the footer', async () => {
-      const { q, footerButton, settle } = await setup();
-
-      footerButton('Drop')?.click();
-      await settle();
-
-      const footer = must(q('.asys-triage__footer'));
-      const confirm = must(q('asys-inline-confirm'));
-
-      expect(footer.contains(confirm)).toBe(false);
       expect(
-        footer.compareDocumentPosition(confirm) & Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy();
+        all('.asys-triage__rows > *').map((row) =>
+          squash(row.querySelector('.asys-field-row__label, .asys-date-row__label')?.textContent),
+        ),
+      ).toEqual(['Area', 'Available from', 'Due']);
+    });
+  });
+
+  describe('Needed markers', () => {
+    it('marks Importance and Estimate Needed until chosen', async () => {
+      const { importanceNeed, estimateNeed } = await setup();
+
+      expect(squash(importanceNeed()?.textContent)).toBe('Needed');
+      expect(squash(estimateNeed()?.textContent)).toBe('Needed');
+      expect(importanceNeed()?.classList.contains('asys-label__need--missing')).toBe(false);
+      expect(estimateNeed()?.classList.contains('asys-label__need--missing')).toBe(false);
     });
 
-    it('does not emit dropTask before it is confirmed', async () => {
-      const { host, footerButton, settle } = await setup();
+    it('drops the marker of the field that is chosen', async () => {
+      const { importanceNeed, estimateNeed } = await setup({ ...EMPTY, important: false });
 
-      footerButton('Drop')?.click();
-      await settle();
-
-      expect(host.dropped).toBe(0);
+      expect(importanceNeed()).toBeNull();
+      expect(estimateNeed()).not.toBeNull();
     });
 
-    it('emits dropTask when confirmed', async () => {
-      const { host, q, footerButton, settle } = await setup();
-      footerButton('Drop')?.click();
+    it('turns the markers Missing once Triage was refused, for the unchosen fields only', async () => {
+      const { host, importanceNeed, estimateNeed, settle } = await setup({
+        ...EMPTY,
+        estimateMinutes: 25,
+      });
+
+      host.attempts.set(1);
       await settle();
 
-      q<HTMLButtonElement>('.asys-confirm .asys-button--danger')?.click();
-      await settle();
-
-      expect(host.dropped).toBe(1);
+      expect(importanceNeed()?.classList.contains('asys-label__need--missing')).toBe(true);
+      expect(estimateNeed()).toBeNull();
     });
 
-    it('ignores a native DOM drop event bubbling to the card host', async () => {
-      const { host, root, footerButton, settle } = await setup();
+    it('shows no markers when both are chosen', async () => {
+      const { importanceNeed, estimateNeed } = await setup({
+        ...EMPTY,
+        important: true,
+        estimateMinutes: 25,
+      });
 
-      root.querySelector('asys-triage-card')?.dispatchEvent(new Event('drop', { bubbles: true }));
-      await settle();
+      expect(importanceNeed()).toBeNull();
+      expect(estimateNeed()).toBeNull();
+    });
+  });
 
-      expect(host.dropped).toBe(0);
+  describe('the footer', () => {
+    it('asks for both while neither is chosen, as a status', async () => {
+      const { hint } = await setup();
 
-      footerButton('Drop')?.click();
-      await settle();
-      root.querySelector('asys-triage-card')?.dispatchEvent(new Event('drop', { bubbles: true }));
-      await settle();
-
-      expect(host.dropped).toBe(0);
+      expect(hint()?.getAttribute('role')).toBe('status');
+      expect(squash(hint()?.textContent)).toBe('Pick an Importance and an Estimate to triage.');
+      expect(hint()?.classList.contains('asys-triage__hint--missing')).toBe(false);
     });
 
-    it('hides the confirmation and refocuses Drop on cancel', async () => {
-      const { host, q, footerButton, settle } = await setup();
-      footerButton('Drop')?.click();
-      await settle();
+    it('asks for the Estimate alone, and for the Importance alone', async () => {
+      const first = await setup({ ...EMPTY, important: true });
 
-      q<HTMLButtonElement>('.asys-confirm__cancel')?.click();
-      await settle();
+      expect(squash(first.hint()?.textContent)).toBe('Pick an Estimate to triage.');
 
-      expect(q('asys-inline-confirm')).toBeNull();
-      expect(document.activeElement).toBe(footerButton('Drop'));
-      expect(host.dropped).toBe(0);
+      document.body.innerHTML = '';
+
+      const second = await setup({ ...EMPTY, estimateMinutes: 25 });
+
+      expect(squash(second.hint()?.textContent)).toBe('Pick an Importance to triage.');
     });
 
-    it('cancels the confirmation on Escape and refocuses Drop', async () => {
-      const { q, footerButton, settle } = await setup();
-      footerButton('Drop')?.click();
+    it('turns the hint to the missing form after a refused Triage', async () => {
+      const { host, hint, settle } = await setup();
+
+      host.attempts.set(2);
       await settle();
 
-      q('.asys-confirm')?.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
-      );
+      expect(hint()?.classList.contains('asys-triage__hint--missing')).toBe(true);
+    });
+
+    it('renders the hint text anew on every attempt, so a screen reader announces it again', async () => {
+      const { host, hint, settle } = await setup();
+
+      host.attempts.set(1);
       await settle();
 
-      expect(q('asys-inline-confirm')).toBeNull();
-      expect(document.activeElement).toBe(footerButton('Drop'));
+      const before = hint()?.firstChild;
+      const element = hint();
+
+      host.attempts.set(2);
+      await settle();
+
+      expect(hint()).toBe(element);
+      expect(hint()?.textContent?.trim()).toBe('Pick an Importance and an Estimate to triage.');
+      expect(hint()?.firstChild).not.toBe(before);
+    });
+
+    it('replaces the hint with the strong quadrant label and the reason', async () => {
+      const { host, q, hint, settle } = await setup({
+        ...EMPTY,
+        important: true,
+        estimateMinutes: 25,
+      });
+
+      host.reason.set(PLAN);
+      await settle();
+
+      const line = q('p.asys-triage__reason');
+      const label = line?.querySelector('asys-quadrant-label');
+
+      expect(hint()).toBeNull();
+      expect(label?.classList.contains('asys-quadrant--strong')).toBe(true);
+      expect(label?.classList.contains('asys-quadrant--plan')).toBe(true);
+      expect(squash(line?.textContent)).toContain('Important, no deadline: plan it.');
+    });
+
+    it('goes back to the hint when the reason goes', async () => {
+      const { host, q, hint, settle } = await setup();
+
+      host.reason.set(PLAN);
+      await settle();
+      host.reason.set(null);
+      await settle();
+
+      expect(q('p.asys-triage__reason')).toBeNull();
+      expect(hint()).not.toBeNull();
     });
   });
 
   describe('busy', () => {
-    it('disables Triage, Drop and the three controls but not Later or Edit', async () => {
-      const { host, root, footerButton, settle } = await setup(COMPLETE);
+    it('disables every control, and enables them again', async () => {
+      const { host, root, more, title, settle } = await setup({ ...EMPTY, notes: 'x' });
 
       host.busy.set(true);
       await settle();
 
-      expect(footerButton('Triage')?.disabled).toBe(true);
-      expect(footerButton('Drop')?.disabled).toBe(true);
-      expect(footerButton('Later')?.disabled).toBe(false);
-      expect(footerButton('Edit')?.disabled).toBe(false);
-      for (const control of root.querySelectorAll<HTMLButtonElement>(
-        'asys-segmented-control .asys-segment, asys-estimate-picker .asys-segment',
-      )) {
-        expect(control.disabled).toBe(true);
-      }
+      // The sheets' own Close buttons are not the card's controls.
+      const controls = Array.from(
+        root.querySelectorAll<HTMLButtonElement | HTMLTextAreaElement>(
+          'button:not(dialog button), textarea',
+        ),
+      );
+
+      expect(controls.length).toBeGreaterThan(10);
+      expect(controls.filter((control) => !control.disabled)).toEqual([]);
+      expect(more()?.disabled).toBe(true);
+      expect(title()?.disabled).toBe(true);
+
+      host.busy.set(false);
+      await settle();
+
+      expect(controls.filter((control) => control.disabled)).toEqual([]);
+    });
+  });
+
+  describe('focus', () => {
+    it('focusCard focuses the section', async () => {
+      const { host, section } = await setup();
+
+      host.card().focusCard();
+
+      expect(document.activeElement).toBe(section());
     });
 
-    it('disables the Area select while busy', async () => {
-      const { host, changeButton, select, settle } = await setup(COMPLETE);
-      changeButton()?.click();
-      await settle();
+    it('focusMore focuses the More button', async () => {
+      const { host, more } = await setup();
 
-      host.busy.set(true);
-      await settle();
+      host.card().focusMore();
 
-      expect(select()?.disabled).toBe(true);
-    });
-
-    it('disables the confirm button of an open Drop confirmation while busy', async () => {
-      const { host, q, footerButton, settle } = await setup(COMPLETE);
-      footerButton('Drop')?.click();
-      await settle();
-
-      host.busy.set(true);
-      await settle();
-
-      expect(q<HTMLButtonElement>('.asys-confirm .asys-button--danger')?.disabled).toBe(true);
+      expect(document.activeElement).toBe(more());
     });
   });
 });

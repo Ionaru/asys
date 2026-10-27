@@ -28,7 +28,7 @@ import {
   savableDraft,
   TASK_DRAFT_FIELDS,
   type TaskDraft,
-} from './task-patch';
+} from '../../core/data/task-patch';
 
 /** What the last save of this visit came to. */
 export enum SaveState {
