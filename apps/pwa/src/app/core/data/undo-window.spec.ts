@@ -1513,13 +1513,35 @@ describe('UndoWindow', () => {
       expect(undoWindow.pending()).toBeNull();
     });
 
-    it('is ignored while the Task is already held', () => {
+    it('is ignored while a Triage of the Task is already held', () => {
       undoWindow.triage(A, triageCommand('a'), 'Plan');
       undoWindow.triage(A, triageCommand('a'), 'Do');
-      undoWindow.drop(A);
 
       expect(hold).toHaveBeenCalledTimes(1);
       expect(undoWindow.pending()?.status).toBe('Triaged as Plan');
+    });
+
+    it('is sent at once when a Done of the same Task follows, which is then held', () => {
+      const command = triageCommand('a');
+
+      undoWindow.triage(A, command, 'Plan');
+      undoWindow.complete(A, DoneOrigin.Button);
+
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(send.mock.calls[0]?.[0]).toBe(command);
+      expect(hold).toHaveBeenCalledTimes(2);
+      expect(undoWindow.pending()).toMatchObject({ taskId: 'a', kind: UndoKind.Done });
+    });
+
+    it('is sent at once when a Drop of the same Task follows, which is then held', () => {
+      const command = triageCommand('a');
+
+      undoWindow.triage(A, command, 'Plan');
+      undoWindow.drop(A);
+
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(send.mock.calls[0]?.[0]).toBe(command);
+      expect(undoWindow.pending()).toMatchObject({ taskId: 'a', kind: UndoKind.Drop });
     });
 
     it('undo releases the key and reports the kind, and nothing is sent', async () => {

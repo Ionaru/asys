@@ -2404,6 +2404,43 @@ describe('DataStore', () => {
     });
 
     describe('poll', () => {
+      it('keeps a held Triage while a poll leaves its Task in the Inbox at the version held', async () => {
+        await begin(12, { tasks: [aTask('A', { important: null }), aTask('B')] });
+        store.hold(
+          { _tag: CommandTag.TriageTask, taskId: 'A', important: true, estimateMinutes: 15 },
+          'triage-a',
+        );
+
+        await advance(POLL_INTERVAL_MS);
+        await respond(http.expectOne('/v1/changes?after=12'), changesBody(13, [putTask(13, 'B')]));
+
+        expect(store.heldKeys()).toEqual(new Set(['triage-a']));
+        expect(store.inboxCount()).toBe(0);
+      });
+
+      it('drops a held Triage once a poll brings its Task back to the Inbox at another version', async () => {
+        await begin(12, { tasks: [aTask('A', { important: null }), aTask('B')] });
+        store.hold(
+          { _tag: CommandTag.TriageTask, taskId: 'A', important: true, estimateMinutes: 15 },
+          'triage-a',
+        );
+
+        await advance(POLL_INTERVAL_MS);
+        await respond(
+          http.expectOne('/v1/changes?after=12'),
+          changesBody(13, [
+            putTask(13, 'A', { important: true, estimateMinutes: null, version: 3 }),
+          ]),
+        );
+
+        expect(store.heldKeys().size).toBe(0);
+        expect(store.state()?.tasks.find((t) => t.id === 'A')).toMatchObject({
+          estimateMinutes: null,
+          version: 3,
+        });
+        expect(store.inboxCount()).toBe(1);
+      });
+
       it('keeps the hold while a poll still has the Task Open', async () => {
         await begin(12, withAB);
         store.hold(holdA, 'hold-a');

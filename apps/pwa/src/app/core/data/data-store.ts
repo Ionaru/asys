@@ -258,7 +258,13 @@ export class DataStore {
 
   /** Applies a Done, a Triage or a Drop to the state at once, before it is sent. A hold with a key already held replaces it. */
   hold(command: HeldCommand, key: string): void {
-    const hold: Hold = { key, command, at: this.#clock.now() };
+    const version = this.#stateSignal()?.tasks.find((task) => task.id === command.taskId)?.version;
+    const hold: Hold = {
+      key,
+      command,
+      at: this.#clock.now(),
+      ...(version === undefined ? {} : { version }),
+    };
 
     this.#holds.set([...this.#holds().filter((held) => held.key !== key), hold]);
   }

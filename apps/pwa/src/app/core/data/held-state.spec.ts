@@ -265,6 +265,19 @@ describe('isStillHeld with a Triage or Drop hold', () => {
     expect(isStillHeld(domainState([task({ id: 'A', title: 'A' })]), triageHold('A'))).toBe(false);
   });
 
+  it('is true for a Triage held at the synced version, and false once the Task has another one', () => {
+    const synced = domainState([task({ id: 'A', title: 'A', important: null, version: 2 })]);
+
+    expect(isStillHeld(synced, { ...triageHold('A'), version: 2 })).toBe(true);
+    expect(isStillHeld(synced, { ...triageHold('A'), version: 1 })).toBe(false);
+  });
+
+  it('does not apply a Triage held at another version than the Task has, so the state is synced itself', () => {
+    const synced = domainState([task({ id: 'A', title: 'A', important: null, version: 3 })]);
+
+    expect(applyHolds(synced, [{ ...triageHold('A'), version: 2 }])).toBe(synced);
+  });
+
   it('is true for a Drop while the synced Task is Open, false once it is closed or missing', () => {
     expect(isStillHeld(domainState([task({ id: 'A', title: 'A' })]), dropHold('A'))).toBe(true);
     expect(

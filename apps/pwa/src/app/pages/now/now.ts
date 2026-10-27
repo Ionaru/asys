@@ -573,11 +573,13 @@ export class Now {
     }
   }
 
-  /** Whether a Done for this Task is refused: it is busy, already held in UndoWindow, or its card is leaving. */
+  /** Whether a Done for this Task is refused: it is busy, its Done is already held in UndoWindow, or its card is leaving. */
   #refusesDone(taskId: string): boolean {
+    const pending = this.#undoWindow.pending();
+
     return (
       this.#busy(taskId) ||
-      this.#undoWindow.pending()?.taskId === taskId ||
+      (pending?.taskId === taskId && pending.kind === UndoKind.Done) ||
       this.leaving()?.task.id === taskId
     );
   }

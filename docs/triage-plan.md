@@ -56,7 +56,13 @@ Each piece was built from a written contract with its tests first, then its new 
 - Screenshots of every state, light and dark at 390 px, were compared with the design (`triage.shots.ts`), next to shots of the old card taken before the change.
 - The initial bundle is 664 kB against its 650 kB warning. `main` was already at 660 kB.
 
+**Review (2026-10-27).** A review of the branch found one correctness bug and one narrow race, both fixed with tests seen to fail against the old logic:
+- **A held Triage blocked a Done.** The Undo window ignored any new hold for a Task it already held, whatever the kind, and Now refused a Done while anything of its Task was held. A held Triage leaves its Task on Now and in the editor, so a Done there within the window was dropped without a word. Now only a second hold of the same kind is ignored: a Done or a Drop of a Task whose Triage is held sends the Triage at once and is held itself, and Now refuses only a second Done.
+- **A Triage hold could outlive its Apply.** A Triage hold stayed while the synced Task was in the Inbox, so if another device sent the Task back to the Inbox before the next poll, this device kept showing it triaged until a reload. A hold now records the Task's version when it is held, and a Triage hold ends once the synced Task has another version.
+
 **Known limits**
+- **A failed Triage comes back first.** When an earlier Triage fails after the person has moved on, its Task is the oldest in the Inbox again and replaces the card being edited, which drops focus and the phone keyboard. The other card's edits are kept, and the Undo bar says what failed.
+- **A change elsewhere during the window.** Another device's edit of a Task while its Triage is held changes the Task's version, so the card shows again until the window ends and the Triage is sent.
 - **Unsent edits live in the page.** Edits made on the card and not yet triaged are lost when the Inbox is left or reloaded, unless Open in the editor saved them.
 - **One Undo at a time.** A Triage followed by a Drop, or by a Done on Now, sends the Triage at once. A held Triage or Drop lives in memory only, as a held Done does.
 - **The pointer pauses the window.** With a mouse, Triage and Drop leave the pointer where the Undo bar appears, so the window waits until the pointer leaves it. Touch has no such pause.

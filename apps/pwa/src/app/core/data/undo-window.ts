@@ -422,7 +422,11 @@ export class UndoWindow {
     }
   }
 
-  /** Puts the command on hold for the Task, opens its window and announces it; ignored while this Task is already held. */
+  /**
+   * Puts the command on hold for the Task, opens its window and announces it; ignored while this Task is
+   * already held for the same kind. Any other held command is sent at once first, a held Triage of this
+   * Task included, which a Done or a Drop of it from Now or the editor then follows.
+   */
   #hold(
     task: Task,
     kind: UndoKind,
@@ -431,7 +435,7 @@ export class UndoWindow {
     origin: DoneOrigin,
     after: Promise<void> | undefined,
   ): void {
-    if (this.#held?.task.id === task.id) {
+    if (this.#held?.task.id === task.id && this.#held.kind === kind) {
       return;
     }
 

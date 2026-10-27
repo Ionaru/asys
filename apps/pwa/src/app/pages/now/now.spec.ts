@@ -1601,6 +1601,24 @@ describe('Now', () => {
       expect(undoWindow.complete).not.toHaveBeenCalled();
     });
 
+    it('still holds a Done of a Task whose Triage UndoWindow holds', async () => {
+      const { undoWindow, internals, settle } = await setup();
+
+      undoWindow.pending.set({
+        taskId: 'invoice',
+        title: 'Pay the invoice',
+        kind: UndoKind.Triage,
+        status: 'Triaged as Do',
+        undoLabel: 'Undo Triage: Pay the invoice',
+        origin: DoneOrigin.Button,
+        remainingMs: 5_000,
+      });
+      await internals().done(INVOICE, DoneOrigin.Button, false);
+      await settle();
+
+      expect(undoWindow.complete).toHaveBeenCalledExactlyOnceWith(INVOICE, DoneOrigin.Button);
+    });
+
     it('does nothing when the screen is destroyed while the exit is playing', async () => {
       const { fixture, motion, handleError, undoWindow, topButton, press } = await setup({
         allowed: true,
