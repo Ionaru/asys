@@ -11,7 +11,7 @@ This plan replaces the Inbox's Triage card with the maintainer's design from the
 
 A Triage tapped while Importance or the Estimate is missing changes nothing but the markers and the line under the card, which turn `danger` with an exclamation icon.
 
-The work sits outside the slice plan and is done before slice 2, on the branch `claude/triage-screen-implementation-mancjy`.
+The work sits outside the slice plan and is done before slice 2, in pull request #57.
 
 ## Decisions
 
