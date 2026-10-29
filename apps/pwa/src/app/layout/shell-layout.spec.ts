@@ -2259,6 +2259,77 @@ describe('ShellLayout', () => {
     });
   });
 
+  describe('the quick add height', () => {
+    const QUICKADD_HEIGHT = '--shell-quickadd-height';
+
+    const heightOf = (host: HTMLElement | null): string =>
+      host?.style.getPropertyValue(QUICKADD_HEIGHT) ?? '';
+
+    it('publishes the observed border-box height of the open quick add on the shell host', async () => {
+      const instances = stubResizeObserver(true, false);
+      const { shellHost, bar, open } = await setup();
+
+      expect(heightOf(shellHost())).toBe('');
+
+      await open();
+
+      const quickAdd = must(bar(), 'quick add');
+      const observer = instances.find((instance) => instance.observed.includes(quickAdd));
+
+      observer?.fire(quickAdd, 96);
+
+      expect(heightOf(shellHost())).toBe('96px');
+
+      observer?.fire(quickAdd, 140);
+
+      expect(heightOf(shellHost())).toBe('140px');
+    });
+
+    it('sets 0px and disconnects the observer once quick add is closed', async () => {
+      const instances = stubResizeObserver(true);
+      const { shellHost, bar, open, closeButton, settle } = await setup();
+
+      await open();
+
+      const quickAdd = must(bar(), 'quick add');
+
+      expect(heightOf(shellHost())).toBe('64px');
+
+      closeButton()?.click();
+      await settle();
+
+      const observers = instances.filter((instance) => instance.observed.includes(quickAdd));
+
+      expect(heightOf(shellHost())).toBe('0px');
+      expect(observers.length).toBeGreaterThan(0);
+      expect(observers.every((instance) => instance.disconnect.mock.calls.length > 0)).toBe(true);
+    });
+
+    it('keeps the quick add height apart from the Undo bar height', async () => {
+      const instances = stubResizeObserver(true, false);
+      const { shellHost, bar, open } = await setup();
+
+      await open();
+
+      const quickAdd = must(bar(), 'quick add');
+
+      instances.find((instance) => instance.observed.includes(quickAdd))?.fire(quickAdd, 96);
+
+      expect(shellHost()?.style.getPropertyValue('--shell-undo-height')).not.toBe('96px');
+    });
+
+    it('observes nothing and writes no quick add height without ResizeObserver', async () => {
+      stubResizeObserver(false);
+
+      const { shellHost, bar, open } = await setup();
+
+      await open();
+
+      expect(bar()).not.toBeNull();
+      expect(heightOf(shellHost())).not.toBe('64px');
+    });
+  });
+
   describe('the nav height', () => {
     const NAV_HEIGHT = '--shell-nav-height';
 

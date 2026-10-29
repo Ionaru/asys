@@ -470,6 +470,28 @@ test('At the end of the Inbox the action bar covers no part of the card and sits
   expect(Math.abs(gap), JSON.stringify({ barBox, navBox })).toBeLessThanOrEqual(1);
 });
 
+test('On the Inbox, the open quick add leaves Drop and Triage clear of it and of the nav', async ({
+  page,
+}) => {
+  await seedPhoneTasks(page);
+  await page.goto('/inbox');
+  const card = page.getByRole('region', { name: 'Task to triage' });
+  await expect(card).toBeVisible();
+  const bar = page.locator('footer.inbox__actions');
+  const drop = bar.getByRole('button', { name: 'Drop', exact: true });
+  const triage = bar.locator('.inbox__triage');
+  const nav = page.getByRole('navigation', { name: 'Primary' });
+
+  await page.getByRole('button', { name: 'Capture' }).click();
+  const quickAdd = page.locator('asys-quick-add');
+  await expect(quickAdd).toBeVisible();
+  await scrollToBottom(page);
+
+  await expectClearOf(drop, [quickAdd, nav]);
+  await expectClearOf(triage, [quickAdd, nav]);
+  await expectClearOf(card, [quickAdd, nav]);
+});
+
 for (const width of [320, 375]) {
   test.describe(`The Current Area control at ${width} wide`, () => {
     test.use({ viewport: { width, height: 812 } });

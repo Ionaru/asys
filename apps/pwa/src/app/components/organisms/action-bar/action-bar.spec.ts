@@ -45,4 +45,14 @@ describe('ActionBar', () => {
 
     expect(root.querySelector('footer.plain')?.classList.contains('asys-action-bar')).toBe(false);
   });
+
+  it('sticks above the nav, the Undo bar and open quick add', async () => {
+    const root = await setup();
+    const bar = root.querySelector('footer[asys-action-bar]');
+    const bottom = getComputedStyle(bar as Element).bottom;
+
+    expect(bottom).toContain('var(--shell-nav-height, 0px)');
+    expect(bottom).toContain('var(--shell-undo-height, 0px)');
+    expect(bottom).toContain('var(--shell-quickadd-height, 0px)');
+  });
 });

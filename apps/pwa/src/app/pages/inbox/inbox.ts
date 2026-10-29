@@ -32,7 +32,8 @@ import { DataStore, SyncStatus, zoneOrUtc } from '../../core/data/data-store';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { TaskBlockerActions } from '../../core/data/task-blocker-actions';
 import {
-  buildTaskPatch,
+  buildSavePatch,
+  committedOf,
   draftOf,
   TASK_DRAFT_FIELDS,
   type TaskDraft,
@@ -106,9 +107,9 @@ const areaChoices = (state: DomainState): readonly AreaChoice[] =>
       (draftChange)="draftChange($event)"
       (retry)="dataStore.refresh()"
       (dismiss)="dismiss($event)"
-      (triage)="triage()"
-      (dropTask)="drop()"
-      (openEditor)="openEditor()"
+      (triage)="triage($event)"
+      (dropTask)="drop($event)"
+      (openEditor)="openEditor($event)"
       (addBlocker)="addBlocker($event)"
       (removeBlocker)="removeBlocker($event)"
     />
@@ -326,10 +327,10 @@ export class Inbox {
   }
 
   /** Holds the Triage through the Undo window, or counts a refused tap while a field is missing. */
-  protected triage(): void {
+  protected triage(taskId: string): void {
     const task = this.#task();
 
-    if (task === null || this.cardBusy()) {
+    if (task === null || task.id !== taskId || this.cardBusy()) {
       return;
     }
 
@@ -351,10 +352,10 @@ export class Inbox {
   }
 
   /** Holds a Drop of the stored Task through the Undo window; the card's edits are not saved. */
-  protected drop(): void {
+  protected drop(taskId: string): void {
     const task = this.#task();
 
-    if (task === null || this.cardBusy()) {
+    if (task === null || task.id !== taskId || this.cardBusy()) {
       return;
     }
 
@@ -364,22 +365,18 @@ export class Inbox {
   }
 
   /** Saves the person's changes as one EditTask, then opens the Task; a failure stays with its message. */
-  protected async openEditor(): Promise<void> {
+  protected async openEditor(taskId: string): Promise<void> {
     const task = this.#task();
 
-    if (task === null || this.cardBusy()) {
+    if (task === null || task.id !== taskId || this.cardBusy()) {
       return;
     }
 
     this.statusLine.set('');
 
     const stored = draftOf(task);
-    const changes = this.#changes().get(task.id) ?? {};
-    const edited = { ...stored, ...changes };
-    const patch = buildTaskPatch(stored, {
-      ...edited,
-      title: edited.title.trim() === '' ? stored.title : edited.title,
-    });
+    const edited = { ...stored, ...this.#changes().get(task.id) };
+    const patch = buildSavePatch(stored, edited, committedOf(edited));
 
     if (Object.keys(patch).length > 0) {
       const outcome = await this.#commands.send({

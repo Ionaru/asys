@@ -30,7 +30,26 @@ export enum LabelNeed {
   `,
   encapsulation: ViewEncapsulation.None,
   host: { class: 'asys-label' },
-  styleUrl: './label.css',
+  styles: `
+    .asys-label__need {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-1);
+      margin-inline-start: var(--space-2);
+      color: var(--ink-muted);
+      font-weight: 400;
+      letter-spacing: 0;
+
+      & .asys-icon {
+        font-size: 0.9375em;
+      }
+    }
+
+    .asys-label__need--missing {
+      color: var(--danger);
+      font-weight: 700;
+    }
+  `,
 })
 export class Label {
   /** Marks the field as needed (`Needed`), or as needed and missed (`Missing`). */

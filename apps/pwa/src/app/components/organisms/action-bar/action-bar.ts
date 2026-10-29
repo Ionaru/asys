@@ -3,7 +3,8 @@ import { Component, ViewEncapsulation } from '@angular/core';
 
 /**
  * The large Buttons of a screen's main actions, sharing one sticky row like a fill ButtonGroup. It sits
- * on the bottom nav where there is one, and on the Undo bar where the nav is hidden.
+ * on the bottom nav where there is one, and on the Undo bar where the nav is hidden. Open quick add
+ * sits on the same bars, so the row rides above it.
  */
 @Component({
   selector: 'footer[asys-action-bar]',
@@ -14,7 +15,8 @@ import { Component, ViewEncapsulation } from '@angular/core';
     .asys-action-bar {
       position: sticky;
       bottom: calc(
-        var(--shell-nav-height, 0px) + var(--shell-undo-height, 0px) + env(safe-area-inset-bottom)
+        var(--shell-nav-height, 0px) + var(--shell-undo-height, 0px) +
+          var(--shell-quickadd-height, 0px) + env(safe-area-inset-bottom)
       );
       display: flex;
       flex-wrap: wrap;

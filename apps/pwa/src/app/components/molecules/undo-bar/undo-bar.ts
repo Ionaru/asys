@@ -69,11 +69,11 @@ export class UndoBar {
   /** The icon the Pending layout shows before the status. */
   readonly statusIcon = input<IconName>(IconName.Check);
 
-  /** The Undo button's accessible name; `null` keeps `Undo Done: <title>`. */
-  readonly undoLabel = input<string | null>(null);
+  /** The Undo button's accessible name in the Pending layout, such as `Undo Done: <title>`. */
+  readonly undoLabel = input.required<string>();
 
-  /** The sentence the Failed layout opens with; `null` keeps `“<title>” is not Done.` */
-  readonly failedText = input<string | null>(null);
+  /** The sentence the Failed layout opens with, such as `“<title>” is not Done.` */
+  readonly failedText = input.required<string>();
 
   readonly detail = input<string | null>(null);
 

@@ -11,7 +11,7 @@
       type="button"
       class="asys-undo__button"
       [variant]="Variants.Secondary"
-      [attr.aria-label]="undoLabel() ?? 'Undo Done: ' + title()"
+      [attr.aria-label]="undoLabel()"
       (click)="undo.emit()"
     >
       <span asys-countdown [paused]="paused()"></span>
@@ -20,7 +20,7 @@
   }
   @case (Variant.Failed) {
     <p class="asys-undo__text asys-undo__text--failed">
-      {{ failedText() ?? '“' + title() + '” is not Done.' }}
+      {{ failedText() }}
     </p>
     @if (detail() !== null) {
       <p class="asys-undo__detail">{{ detail() }}</p>

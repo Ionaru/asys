@@ -69,7 +69,7 @@
       }
     </ul>
   }
-  @if (card() !== null) {
+  @if (card(); as current) {
     <footer asys-action-bar class="inbox__actions">
       <button
         asys-button
@@ -78,7 +78,7 @@
         [size]="Size.Large"
         [icon]="Icons.Xmark"
         [disabled]="cardBusy()"
-        (click)="dropTask.emit()"
+        (click)="dropTask.emit(current.id)"
       >
         Drop
       </button>
@@ -90,7 +90,7 @@
         [size]="Size.Large"
         [icon]="Icons.Check"
         [disabled]="cardBusy()"
-        (click)="triage.emit()"
+        (click)="triage.emit(current.id)"
       >
         {{ triageLabel() }}
       </button>

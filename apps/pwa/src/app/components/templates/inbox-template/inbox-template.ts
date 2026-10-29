@@ -7,9 +7,9 @@ import {
   inject,
   Injector,
   input,
+  linkedSignal,
   model,
   output,
-  signal,
   viewChild,
   viewChildren,
 } from '@angular/core';
@@ -162,14 +162,14 @@ export class InboxTemplate {
   /** Asks to dismiss the Review item with this id. */
   readonly dismiss = output<string>();
 
-  /** Asks to triage the card's Task. */
-  readonly triage = output();
+  /** Asks to triage the Task; carries its Task id, the card's at the tap. */
+  readonly triage = output<string>();
 
-  /** Asks to drop the card's Task. */
-  readonly dropTask = output();
+  /** Asks to drop the Task; carries its Task id, the card's at the tap. */
+  readonly dropTask = output<string>();
 
-  /** Asks to open the card's Task in the editor. */
-  readonly openEditor = output();
+  /** Asks to open the Task in the editor; carries its Task id, the card's at the tap. */
+  readonly openEditor = output<string>();
 
   /** Asks to make a Task a blocker of the card's Task; carries its Task id. */
   readonly addBlocker = output<string>();
@@ -185,9 +185,20 @@ export class InboxTemplate {
 
   private readonly reviewItems = viewChildren(ReviewItem);
 
-  protected readonly moreOpen = signal(false);
+  /** The card's Task id; a computed, so a card that changes in other ways keeps the sheets open. */
+  readonly #cardId = computed(() => this.card()?.id);
 
-  protected readonly blockersOpen = signal(false);
+  /** Whether the More sheet is open; it closes when the card's Task changes, so it never acts on a new card. */
+  protected readonly moreOpen = linkedSignal<string | undefined, boolean>({
+    source: this.#cardId,
+    computation: () => false,
+  });
+
+  /** Whether the Blocked by sheet is open; it closes when the card's Task changes, like the More sheet. */
+  protected readonly blockersOpen = linkedSignal<string | undefined, boolean>({
+    source: this.#cardId,
+    computation: () => false,
+  });
 
   protected readonly cards = computed<readonly InboxCard[]>(() => {
     const card = this.card();
@@ -236,8 +247,13 @@ export class InboxTemplate {
   }
 
   protected chooseOpenEditor(): void {
+    const id = this.card()?.id;
+
     this.moreOpen.set(false);
-    this.openEditor.emit();
+
+    if (id !== undefined) {
+      this.openEditor.emit(id);
+    }
   }
 
   protected chooseBlockedBy(): void {
@@ -246,8 +262,13 @@ export class InboxTemplate {
   }
 
   protected chooseDrop(): void {
+    const id = this.card()?.id;
+
     this.moreOpen.set(false);
-    this.dropTask.emit();
+
+    if (id !== undefined) {
+      this.dropTask.emit(id);
+    }
   }
 
   /** The button in the More sheet that opened Blocked by is gone, so focus goes to the card's More button. */

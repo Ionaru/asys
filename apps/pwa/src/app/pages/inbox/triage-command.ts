@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { CommandTag, type Task, TaskStatus, type TriageTask } from '@asys/domain';
 
-import { buildTaskPatch, draftOf, type TaskDraft } from '../../core/data/task-patch';
+import { buildSavePatch, committedOf, draftOf, type TaskDraft } from '../../core/data/task-patch';
 
 /**
  * The TriageTask for the card's Task and its draft, or null while Importance or an Estimate is missing.
@@ -16,7 +16,7 @@ export const triageCommand = (task: Task, draft: TaskDraft): TriageTask | null =
     return null;
   }
 
-  const patch = buildTaskPatch(draftOf(task), draft);
+  const patch = buildSavePatch(draftOf(task), draft, committedOf(draft));
 
   return {
     _tag: CommandTag.TriageTask,
@@ -25,7 +25,7 @@ export const triageCommand = (task: Task, draft: TaskDraft): TriageTask | null =
     estimateMinutes,
     expect: { status: TaskStatus.Open, version: task.version },
     ...(patch.areaId === undefined ? {} : { areaId: patch.areaId }),
-    ...(patch.title === undefined || patch.title === '' ? {} : { title: patch.title }),
+    ...(patch.title === undefined ? {} : { title: patch.title }),
     ...(patch.notes === undefined ? {} : { notes: patch.notes }),
     ...(patch.availableFrom === undefined ? {} : { availableFrom: patch.availableFrom }),
     ...(patch.due === undefined ? {} : { due: patch.due }),

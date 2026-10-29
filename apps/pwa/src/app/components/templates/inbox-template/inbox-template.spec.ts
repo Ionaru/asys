@@ -372,8 +372,8 @@ describe('InboxTemplate', () => {
 
     it('B9 emits triage and dropTask, and is disabled only while the card is busy', async () => {
       const { fixture, update, actions, button } = await setup({ card: CARD, attempts: 2 });
-      const triage = vi.fn<() => void>();
-      const dropTask = vi.fn<() => void>();
+      const triage = vi.fn<(taskId: string) => void>();
+      const dropTask = vi.fn<(taskId: string) => void>();
       fixture.componentInstance.triage.subscribe(triage);
       fixture.componentInstance.dropTask.subscribe(dropTask);
       const bar = must(actions());
@@ -384,8 +384,8 @@ describe('InboxTemplate', () => {
       button(bar, 'Triage').click();
       button(bar, 'Drop').click();
 
-      expect(triage).toHaveBeenCalledOnce();
-      expect(dropTask).toHaveBeenCalledOnce();
+      expect(triage).toHaveBeenCalledExactlyOnceWith('c1');
+      expect(dropTask).toHaveBeenCalledExactlyOnceWith('c1');
 
       await update('cardBusy', true);
 
@@ -419,26 +419,63 @@ describe('InboxTemplate', () => {
 
     it('B10 closes before Open in the editor emits openEditor', async () => {
       const { fixture, sheet, more, click, button } = await setup({ card: CARD });
-      const openEditor = vi.fn<() => void>();
+      const openEditor = vi.fn<(taskId: string) => void>();
       fixture.componentInstance.openEditor.subscribe(openEditor);
 
       await click(more());
       await click(button(sheet('More'), 'Open in the editor'));
 
-      expect(openEditor).toHaveBeenCalledOnce();
+      expect(openEditor).toHaveBeenCalledExactlyOnceWith('c1');
       expect(sheet('More').open).toBe(false);
     });
 
     it('B10 closes before Drop emits dropTask', async () => {
       const { fixture, sheet, more, click, button } = await setup({ card: CARD });
-      const dropTask = vi.fn<() => void>();
+      const dropTask = vi.fn<(taskId: string) => void>();
       fixture.componentInstance.dropTask.subscribe(dropTask);
 
       await click(more());
       await click(button(sheet('More'), 'Drop'));
 
-      expect(dropTask).toHaveBeenCalledOnce();
+      expect(dropTask).toHaveBeenCalledExactlyOnceWith('c1');
       expect(sheet('More').open).toBe(false);
+    });
+
+    it('B10 closes when the card’s Task changes, so Drop never reaches the new card', async () => {
+      const { fixture, sheet, more, click, update } = await setup({ card: CARD });
+      const dropTask = vi.fn<(taskId: string) => void>();
+      fixture.componentInstance.dropTask.subscribe(dropTask);
+
+      await click(more());
+
+      expect(sheet('More').open).toBe(true);
+
+      await update('card', { ...CARD, id: 'c2' });
+
+      expect(sheet('More').open).toBe(false);
+      expect(dropTask).not.toHaveBeenCalled();
+    });
+
+    it('B10 stays open while the same Task’s card changes in other ways', async () => {
+      const { sheet, more, click, update } = await setup({ card: CARD });
+
+      await click(more());
+      await update('card', { ...CARD, awaitingSync: true });
+
+      expect(sheet('More').open).toBe(true);
+    });
+
+    it('B10 reopens for the new card and names that card in what it emits', async () => {
+      const { fixture, sheet, more, click, update, button } = await setup({ card: CARD });
+      const openEditor = vi.fn<(taskId: string) => void>();
+      fixture.componentInstance.openEditor.subscribe(openEditor);
+
+      await click(more());
+      await update('card', { ...CARD, id: 'c2' });
+      await click(more());
+      await click(button(sheet('More'), 'Open in the editor'));
+
+      expect(openEditor).toHaveBeenCalledExactlyOnceWith('c2');
     });
 
     it('B10 swaps itself for the Blocked by sheet', async () => {
@@ -464,6 +501,18 @@ describe('InboxTemplate', () => {
 
       return s.sheet('Blocked by');
     };
+
+    it('B11 closes when the card’s Task changes, so Add blocker never reaches the new card', async () => {
+      const s = await setup({ card: CARD });
+
+      await openBlockers(s);
+
+      expect(s.sheet('Blocked by').open).toBe(true);
+
+      await s.update('card', { ...CARD, id: 'c2' });
+
+      expect(s.sheet('Blocked by').open).toBe(false);
+    });
 
     it('B11 passes the blocker inputs and re-emits add and remove', async () => {
       const s = await setup({

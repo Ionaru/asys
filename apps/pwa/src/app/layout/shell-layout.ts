@@ -58,6 +58,8 @@ export class ShellLayout {
 
   private readonly quickAdd = viewChild(QuickAdd);
 
+  private readonly quickAddHost = viewChild(QuickAdd, { read: ElementRef<HTMLElement> });
+
   private readonly bottomNavHost = viewChild(BottomNav, { read: ElementRef<HTMLElement> });
 
   private readonly pill = viewChild('pill', { read: ElementRef<HTMLElement> });
@@ -119,6 +121,11 @@ export class ShellLayout {
     return notice === null ? [] : [notice];
   });
 
+  /** The icon the Pending layout shows before its status: a cross for a Drop, a check for anything else. */
+  protected readonly statusIcon = computed(() =>
+    this.undoWindow.pending()?.kind === UndoKind.Drop ? IconName.Xmark : IconName.Check,
+  );
+
   protected readonly undoView = computed(() => {
     const failure = this.undoWindow.failure();
 
@@ -127,8 +134,7 @@ export class ShellLayout {
         variant: failure.closedElsewhere ? UndoBarVariant.Notice : UndoBarVariant.Failed,
         title: failure.title,
         status: '',
-        statusIcon: IconName.Check,
-        undoLabel: null,
+        undoLabel: '',
         failedText: failure.text,
         detail: failure.message,
         canRetry: failure.canRetry,
@@ -144,9 +150,8 @@ export class ShellLayout {
         variant: UndoBarVariant.Pending,
         title: pending.title,
         status: pending.status,
-        statusIcon: pending.kind === UndoKind.Drop ? IconName.Xmark : IconName.Check,
         undoLabel: pending.undoLabel,
-        failedText: null,
+        failedText: '',
         detail: null,
         canRetry: false,
         remainingMs: pending.remainingMs,
@@ -204,6 +209,24 @@ export class ShellLayout {
       onCleanup(() => {
         stop();
         this.#host.nativeElement.style.setProperty('--shell-undo-height', '0px');
+      });
+    });
+
+    // The open quick add's height lifts the Action bar above it, on the screens that have one.
+    effect((onCleanup) => {
+      const element = this.quickAddHost()?.nativeElement;
+
+      if (!element || typeof ResizeObserver !== 'function') {
+        return;
+      }
+
+      const stop = observeBlockSize(element, (size) =>
+        this.#host.nativeElement.style.setProperty('--shell-quickadd-height', `${size}px`),
+      );
+
+      onCleanup(() => {
+        stop();
+        this.#host.nativeElement.style.setProperty('--shell-quickadd-height', '0px');
       });
     });
 

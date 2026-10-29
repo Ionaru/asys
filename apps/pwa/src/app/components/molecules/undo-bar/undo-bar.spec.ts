@@ -41,9 +41,9 @@ class Host {
 
   readonly statusIcon = signal(IconName.Check);
 
-  readonly undoLabel = signal<string | null>(null);
+  readonly undoLabel = signal('Undo Done: Pay the invoice');
 
-  readonly failedText = signal<string | null>(null);
+  readonly failedText = signal('“Pay the invoice” is not Done.');
 
   readonly detail = signal<string | null>(null);
 
@@ -93,7 +93,12 @@ class Host {
 /** A bar with neither `windowMs` nor `remainingMs` bound, to see their defaults. */
 @Component({
   imports: [UndoBar],
-  template: `<asys-undo-bar [variant]="variant" title="Pay the invoice" />`,
+  template: `<asys-undo-bar
+    [variant]="variant"
+    title="Pay the invoice"
+    undoLabel="Undo Done: Pay the invoice"
+    failedText="“Pay the invoice” is not Done."
+  />`,
 })
 class BareHost {
   protected readonly variant = UndoBarVariant.Pending;
@@ -238,10 +243,8 @@ describe('UndoBar', () => {
       expect(q('asys-icon.asys-undo__check svg[data-icon="check"]')).toBeNull();
     });
 
-    it('names the Undo button with the label it is given, and keeps Undo Done: title without one', async () => {
+    it('names the Undo button with the label it is given and writes no copy of its own', async () => {
       const { button, update, host } = await setup();
-
-      expect(button('Undo')?.getAttribute('aria-label')).toBe('Undo Done: Pay the invoice');
 
       await update(() => {
         host.undoLabel.set('Undo Drop: Pay the invoice');
@@ -250,11 +253,10 @@ describe('UndoBar', () => {
       expect(button('Undo')?.getAttribute('aria-label')).toBe('Undo Drop: Pay the invoice');
 
       await update(() => {
-        host.undoLabel.set(null);
         host.title.set('Call Marit');
       });
 
-      expect(button('Undo')?.getAttribute('aria-label')).toBe('Undo Done: Call Marit');
+      expect(button('Undo')?.getAttribute('aria-label')).toBe('Undo Drop: Pay the invoice');
     });
 
     it('draws the timer inside the button, hidden from screen readers, as a ring and a fill', async () => {
@@ -297,10 +299,13 @@ describe('UndoBar', () => {
       expect(q('svg[data-icon="rotate-right"]')).toBeNull();
     });
 
-    it('follows the title input, in the text and in the button name', async () => {
+    it('follows the title input in the text, and the label input in the button name', async () => {
       const { host, update, text, button } = await setup();
 
-      await update(() => host.title.set('Call Marit'));
+      await update(() => {
+        host.title.set('Call Marit');
+        host.undoLabel.set('Undo Done: Call Marit');
+      });
 
       expect(text('.asys-undo__title')).toBe('Call Marit');
       expect(button('Undo')?.getAttribute('aria-label')).toBe('Undo Done: Call Marit');
@@ -513,7 +518,7 @@ describe('UndoBar', () => {
       expect(text('p.asys-undo__detail')).toBe(NOT_SENT);
     });
 
-    it('opens with the failure text it is given in place of the Done sentence', async () => {
+    it('opens with the failure text it is given and writes no copy of its own', async () => {
       const { text, update, host, bar } = await failed(true);
 
       await update(() => {
@@ -524,10 +529,10 @@ describe('UndoBar', () => {
       expect(bar().textContent).not.toContain('is not Done');
 
       await update(() => {
-        host.failedText.set(null);
+        host.title.set('Call Marit');
       });
 
-      expect(text('p.asys-undo__text--failed')).toBe('“Pay the invoice” is not Done.');
+      expect(text('p.asys-undo__text--failed')).toBe('“Pay the invoice” is not triaged.');
     });
 
     it('shows none of the Done layout: no check, status, title or timer', async () => {

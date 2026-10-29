@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 import { Component, ErrorHandler, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideRouter, Router } from '@angular/router';
 import {
   CommandTag,
@@ -26,6 +27,7 @@ import { outcomeMessage } from '../../core/data/outcome-message';
 import { type PendingUndo, type Undone, UndoWindow } from '../../core/data/undo-window';
 import { Clock } from '../../core/platform/clock';
 import { Ids } from '../../core/platform/ids';
+import { InboxTemplate } from '../../components/templates/inbox-template/inbox-template';
 import { Inbox } from './inbox';
 
 const APPLIED: CommandOutcome = { _tag: CommandOutcomeTag.Applied, seq: 1 };
@@ -285,6 +287,9 @@ const setup = async (options: SetupOptions = {}) => {
 
     return sheet('More');
   };
+  /** The template's outputs, to emit one the way a sheet that stayed open for an older card would. */
+  const template = (): InboxTemplate =>
+    must(fixture.debugElement.query(By.directive(InboxTemplate))).componentInstance;
   const undo = async (): Promise<void> => {
     const back = must(held.pop(), 'a held Task');
 
@@ -343,6 +348,7 @@ const setup = async (options: SetupOptions = {}) => {
     chooseArea,
     sheet,
     openMore,
+    template,
     undo,
     finish,
   };
@@ -634,6 +640,17 @@ describe('Inbox', () => {
       );
     });
 
+    it('ignores a Triage for a Task that is not the card’s', async () => {
+      const { important, template, settle, triage, send } = await setup();
+
+      await important(true);
+      template().triage.emit('b');
+      await settle();
+
+      expect(triage).not.toHaveBeenCalled();
+      expect(send).not.toHaveBeenCalled();
+    });
+
     it('does nothing while the card is busy', async () => {
       const { awaitingSync, settle, important, triageButton, triage } = await setup();
 
@@ -666,6 +683,16 @@ describe('Inbox', () => {
 
       expect(drop).toHaveBeenCalledTimes(2);
       expect(must(drop.mock.calls[1])[0]).toEqual(B);
+    });
+
+    it('ignores a Drop for a Task that is not the card’s', async () => {
+      const { template, settle, drop, progress } = await setup();
+
+      template().dropTask.emit('b');
+      await settle();
+
+      expect(drop).not.toHaveBeenCalled();
+      expect(progress()).toBe('1 of 3');
     });
 
     it('focuses the next card', async () => {
@@ -801,6 +828,35 @@ describe('Inbox', () => {
 
       expect(s.send).not.toHaveBeenCalled();
       expect(s.router.url).toBe('/tasks/a');
+    });
+
+    it('keeps the stored title and saves the rest when the title is blank', async () => {
+      const s = await setup();
+
+      await s.typeTitle('  ');
+      await s.important(true);
+      await openEditor(s);
+
+      expect(s.send).toHaveBeenCalledExactlyOnceWith(
+        {
+          _tag: CommandTag.EditTask,
+          taskId: 'a',
+          patch: { important: true },
+          expect: { status: TaskStatus.Open },
+        },
+        'key-1',
+      );
+    });
+
+    it('ignores an Open in the editor for a Task that is not the card’s', async () => {
+      const s = await setup();
+
+      await s.typeTitle('Alpha, mine');
+      s.template().openEditor.emit('b');
+      await s.settle();
+
+      expect(s.send).not.toHaveBeenCalled();
+      expect(s.router.url).toBe('/');
     });
 
     it('stays with the message when the save fails', async () => {
