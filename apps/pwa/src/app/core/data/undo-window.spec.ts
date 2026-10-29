@@ -106,6 +106,10 @@ describe('UndoWindow', () => {
     >
   >;
   let tick: ReturnType<typeof vi.fn<() => void>>;
+  let onHeldTriage: ReturnType<
+    typeof vi.fn<(sender: (taskId: string, key: string) => Promise<void>) => () => void>
+  >;
+  let unregisterHeldTriage: ReturnType<typeof vi.fn<() => void>>;
   let sendResolvers: ((outcome: CommandOutcome) => void)[];
   let runResolvers: ((outcome: CommandOutcome) => void)[];
 
@@ -172,12 +176,16 @@ describe('UndoWindow', () => {
         }),
     );
     tick = vi.fn<() => void>();
+    unregisterHeldTriage = vi.fn<() => void>();
+    onHeldTriage = vi.fn<(sender: (taskId: string, key: string) => Promise<void>) => () => void>(
+      () => unregisterHeldTriage,
+    );
 
     TestBed.configureTestingModule({
       providers: [
         UndoWindow,
         CommandAttempts,
-        { provide: DataStore, useValue: { hold, release, send } },
+        { provide: DataStore, useValue: { hold, release, send, onHeldTriage } },
         { provide: DataApi, useValue: { runCommand } },
         {
           provide: Ids,
@@ -224,6 +232,7 @@ describe('UndoWindow', () => {
         undoLabel: 'Undo Done: Pay the invoice',
         origin: 'button',
         remainingMs: 5_000,
+        windowKey: 'key-1',
       });
       expect(tick).toHaveBeenCalledTimes(1);
       expect(undoWindow.notice()).toEqual({
@@ -244,6 +253,7 @@ describe('UndoWindow', () => {
         undoLabel: 'Undo Done: Pay the invoice',
         origin: 'swipe',
         remainingMs: 5_000,
+        windowKey: 'key-1',
       });
       expect(hold).toHaveBeenCalledTimes(1);
       expect(tick).not.toHaveBeenCalled();
@@ -342,6 +352,7 @@ describe('UndoWindow', () => {
         undoLabel: 'Undo Done: Call Marit',
         origin: 'button',
         remainingMs: 5_000,
+        windowKey: 'key-2',
       });
       expect(undoWindow.notice()).toEqual({ text: doneAnnouncement('Call Marit'), seq: 2 });
 
@@ -587,6 +598,7 @@ describe('UndoWindow', () => {
         undoLabel: 'Undo Done: Pay the invoice',
         origin: 'button',
         remainingMs: 5_000,
+        windowKey: 'key-1',
       });
       expect(undoWindow.failure()).toBeNull();
 
@@ -760,6 +772,7 @@ describe('UndoWindow', () => {
         undoLabel: 'Undo Done: Call Marit',
         origin: 'button',
         remainingMs: 3_000,
+        windowKey: 'key-2',
       });
     });
 
@@ -1488,6 +1501,7 @@ describe('UndoWindow', () => {
         undoLabel: 'Undo Triage: Pay the invoice',
         origin: 'button',
         remainingMs: 5_000,
+        windowKey: 'key-1',
       });
       expect(undoWindow.notice()).toEqual({
         text: '“Pay the invoice” is triaged as Plan. Undo is available for 5 seconds.',
@@ -1626,6 +1640,318 @@ describe('UndoWindow', () => {
     });
   });
 
+  describe('sending a held Triage ahead of another command', () => {
+    /** The sender the window registered with DataStore. */
+    const sender = (): ((taskId: string, key: string) => Promise<void>) => {
+      const registered = onHeldTriage.mock.calls[0]?.[0];
+
+      if (registered === undefined) {
+        throw new Error('No sender was registered');
+      }
+
+      return registered;
+    };
+
+    /** Asks the sender for Task `taskId` on behalf of the command with `key`, and reports when it resolves. */
+    const ask = (taskId: string, key = 'other-key'): { done: boolean } => {
+      const flag = { done: false };
+
+      void sender()(taskId, key).then(() => {
+        flag.done = true;
+      });
+
+      return flag;
+    };
+
+    const gate = () => {
+      let resolve!: () => void;
+      const promise = new Promise<void>((res) => {
+        resolve = res;
+      });
+
+      return { promise, resolve };
+    };
+
+    it('registers with DataStore once, and unregisters when destroyed', () => {
+      expect(onHeldTriage).toHaveBeenCalledTimes(1);
+      expect(unregisterHeldTriage).not.toHaveBeenCalled();
+
+      TestBed.resetTestingModule();
+
+      expect(unregisterHeldTriage).toHaveBeenCalledTimes(1);
+    });
+
+    it('sends a held Triage of that Task now, closes its window and resolves once its outcome is handled', async () => {
+      const command = triageCommand('a');
+
+      undoWindow.triage(A, command, 'Plan');
+
+      const asked = ask('a');
+
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(send.mock.calls[0]?.[0]).toBe(command);
+      expect(send.mock.calls[0]?.[1]).toBe('key-1');
+      expect(undoWindow.pending()).toBeNull();
+
+      await advance(0);
+      expect(asked.done).toBe(false);
+
+      await resolveSend(0, APPLIED);
+      expect(asked.done).toBe(true);
+
+      await advance(UNDO_WINDOW_MS);
+      expect(send).toHaveBeenCalledTimes(1);
+    });
+
+    it('resolves after the failure of that Triage is shown', async () => {
+      undoWindow.triage(A, triageCommand('a'), 'Plan');
+
+      const asked = ask('a');
+
+      await resolveSend(0, NOT_APPLICABLE);
+
+      expect(asked.done).toBe(true);
+      expect(undoWindow.failure()?.kind).toBe(UndoKind.Triage);
+      expect(release).toHaveBeenCalledWith('key-1');
+    });
+
+    it('resolves after a send of a Triage of that Task that is already in flight', async () => {
+      undoWindow.triage(A, triageCommand('a'), 'Plan');
+      await advance(UNDO_WINDOW_MS);
+
+      const asked = ask('a');
+
+      await advance(0);
+      expect(asked.done).toBe(false);
+      expect(send).toHaveBeenCalledTimes(1);
+
+      await resolveSend(0, APPLIED);
+      expect(asked.done).toBe(true);
+    });
+
+    it('resolves after a keepalive send of a Triage of that Task that is already in flight', async () => {
+      undoWindow.triage(A, triageCommand('a'), 'Plan');
+      setVisibility('hidden');
+      document.dispatchEvent(new Event('visibilitychange'));
+
+      const asked = ask('a');
+
+      await advance(0);
+      expect(asked.done).toBe(false);
+
+      await resolveRun(0, APPLIED);
+      expect(asked.done).toBe(true);
+      expect(send).not.toHaveBeenCalled();
+    });
+
+    it('resolves at once with nothing of that Task held or in flight', async () => {
+      const asked = ask('a');
+
+      await advance(0);
+
+      expect(asked.done).toBe(true);
+      expect(send).not.toHaveBeenCalled();
+    });
+
+    it('resolves at once and keeps the window when the held Triage is of another Task', async () => {
+      undoWindow.triage(B, triageCommand('b'), 'Plan');
+
+      const asked = ask('a');
+
+      await advance(0);
+
+      expect(asked.done).toBe(true);
+      expect(send).not.toHaveBeenCalled();
+      expect(undoWindow.pending()?.taskId).toBe('b');
+    });
+
+    it('resolves at once and keeps the window when a Done of that Task is held', async () => {
+      undoWindow.complete(A, DoneOrigin.Button);
+
+      const asked = ask('a');
+
+      await advance(0);
+
+      expect(asked.done).toBe(true);
+      expect(send).not.toHaveBeenCalled();
+      expect(undoWindow.pending()?.kind).toBe(UndoKind.Done);
+    });
+
+    it('does not wait for a Done of that Task in flight, which may itself wait for the save that asks', async () => {
+      const after = gate();
+
+      undoWindow.complete(A, DoneOrigin.Button, after.promise);
+      await advance(UNDO_WINDOW_MS);
+
+      const asked = ask('a', 'edit-key');
+
+      await advance(0);
+
+      expect(asked.done).toBe(true);
+    });
+
+    it('does not wait for the send of the command that asks', async () => {
+      undoWindow.triage(A, triageCommand('a'), 'Plan');
+      await advance(UNDO_WINDOW_MS);
+
+      const asked = ask('a', 'key-1');
+
+      await advance(0);
+
+      expect(asked.done).toBe(true);
+    });
+
+    it('lets a Done that followed the held Triage wait for it, and a flush wait for both', async () => {
+      undoWindow.triage(A, triageCommand('a'), 'Plan');
+      undoWindow.complete(A, DoneOrigin.Button);
+      await advance(UNDO_WINDOW_MS);
+
+      // DataStore asks on behalf of the Done, whose own send is in flight.
+      const asked = ask('a', 'key-2');
+      let flushed = false;
+
+      void undoWindow.flush().then(() => {
+        flushed = true;
+      });
+      await advance(0);
+      expect(asked.done).toBe(false);
+
+      await resolveSend(0, APPLIED);
+      expect(asked.done).toBe(true);
+      expect(flushed).toBe(false);
+
+      await resolveSend(1, APPLIED);
+      expect(flushed).toBe(true);
+    });
+  });
+
+  describe('a second Triage of the same Task', () => {
+    it('replaces a different one that is held: the first is released and never sent, and the second gets a fresh window', async () => {
+      const first = triageCommand('a');
+      const second: TriageTask = { ...triageCommand('a'), important: false };
+
+      undoWindow.triage(A, first, 'Plan');
+      await advance(3_000);
+      undoWindow.triage(A, second, 'Do');
+
+      expect(release).toHaveBeenCalledExactlyOnceWith('key-1');
+      expect(hold).toHaveBeenCalledTimes(2);
+      expect(hold.mock.calls[1]?.[0]).toBe(second);
+      expect(hold.mock.calls[1]?.[1]).toBe('key-2');
+      expect(undoWindow.pending()).toMatchObject({
+        status: 'Triaged as Do',
+        remainingMs: UNDO_WINDOW_MS,
+        windowKey: 'key-2',
+      });
+      expect(send).not.toHaveBeenCalled();
+
+      await advance(UNDO_WINDOW_MS - 1);
+      expect(send).not.toHaveBeenCalled();
+
+      await advance(1);
+      expect(send).toHaveBeenCalledExactlyOnceWith(second, 'key-2');
+    });
+
+    it('ignores an equal one, which keeps the first window running', async () => {
+      undoWindow.triage(A, triageCommand('a'), 'Plan');
+      await advance(3_000);
+      undoWindow.triage(A, triageCommand('a'), 'Plan');
+
+      expect(release).not.toHaveBeenCalled();
+      expect(hold).toHaveBeenCalledTimes(1);
+
+      await advance(2_000);
+      expect(send).toHaveBeenCalledExactlyOnceWith(triageCommand('a'), 'key-1');
+    });
+  });
+
+  describe('a keepalive send after an earlier send of the same Task', () => {
+    const hide = (): void => {
+      setVisibility('hidden');
+      document.dispatchEvent(new Event('visibilitychange'));
+    };
+
+    it('waits until the earlier send of that Task has been handled', async () => {
+      undoWindow.triage(A, triageCommand('a'), 'Plan');
+      undoWindow.complete(A, DoneOrigin.Button);
+      hide();
+      await advance(0);
+
+      expect(runCommand).not.toHaveBeenCalled();
+
+      await resolveSend(0, APPLIED);
+
+      expect(runCommand).toHaveBeenCalledExactlyOnceWith(completeCommand('a'), 'key-2', {
+        keepalive: true,
+      });
+    });
+
+    it('goes at once when the send in flight is of another Task', async () => {
+      undoWindow.triage(B, triageCommand('b'), 'Plan');
+      undoWindow.complete(A, DoneOrigin.Button);
+      hide();
+
+      expect(runCommand).toHaveBeenCalledExactlyOnceWith(completeCommand('a'), 'key-2', {
+        keepalive: true,
+      });
+    });
+
+    it('also waits for a Done that waited for `after`, which a flush then follows to the end', async () => {
+      let open!: () => void;
+      const after = new Promise<void>((resolve) => {
+        open = resolve;
+      });
+
+      undoWindow.triage(A, triageCommand('a'), 'Plan');
+      undoWindow.complete(A, DoneOrigin.Button, after);
+      await advance(UNDO_WINDOW_MS);
+      hide();
+      await advance(0);
+
+      expect(runCommand).not.toHaveBeenCalled();
+
+      let flushed = false;
+
+      void undoWindow.flush().then(() => {
+        flushed = true;
+      });
+      await resolveSend(0, APPLIED);
+
+      expect(runCommand).toHaveBeenCalledExactlyOnceWith(completeCommand('a'), 'key-2', {
+        keepalive: true,
+      });
+      expect(flushed).toBe(false);
+
+      await resolveRun(0, APPLIED);
+      expect(flushed).toBe(true);
+      open();
+      await advance(0);
+      expect(send).toHaveBeenCalledTimes(1);
+    });
+
+    it('goes at once on destroy, without waiting for the earlier send', () => {
+      undoWindow.triage(A, triageCommand('a'), 'Plan');
+      undoWindow.complete(A, DoneOrigin.Button);
+      TestBed.resetTestingModule();
+
+      expect(runCommand).toHaveBeenCalledExactlyOnceWith(completeCommand('a'), 'key-2', {
+        keepalive: true,
+      });
+    });
+  });
+
+  describe('windowKey', () => {
+    it('is the key of each hold, so a Done that follows a Triage of the same Task has another one', () => {
+      undoWindow.triage(A, triageCommand('a'), 'Plan');
+
+      expect(undoWindow.pending()?.windowKey).toBe('key-1');
+
+      undoWindow.complete(A, DoneOrigin.Button);
+
+      expect(undoWindow.pending()?.windowKey).toBe('key-2');
+    });
+  });
+
   describe('drop', () => {
     it('holds a DropTask with the first key, shows the status, label and announcement, and ticks', () => {
       undoWindow.drop(A);
@@ -1641,6 +1967,7 @@ describe('UndoWindow', () => {
         undoLabel: 'Undo Drop: Pay the invoice',
         origin: 'button',
         remainingMs: 5_000,
+        windowKey: 'key-1',
       });
       expect(undoWindow.notice()).toEqual({
         text: '“Pay the invoice” is dropped. Undo is available for 5 seconds.',

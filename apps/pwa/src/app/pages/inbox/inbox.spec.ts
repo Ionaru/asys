@@ -114,7 +114,7 @@ const TRIAGE_A: TriageTask = {
   taskId: 'a',
   important: true,
   estimateMinutes: 25,
-  expect: { status: TaskStatus.Open },
+  expect: { status: TaskStatus.Open, version: 1 },
 };
 
 const must = <T>(value: T | null | undefined, what = 'value'): T => {

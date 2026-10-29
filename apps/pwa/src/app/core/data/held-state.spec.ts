@@ -265,17 +265,44 @@ describe('isStillHeld with a Triage or Drop hold', () => {
     expect(isStillHeld(domainState([task({ id: 'A', title: 'A' })]), triageHold('A'))).toBe(false);
   });
 
-  it('is true for a Triage held at the synced version, and false once the Task has another one', () => {
+  it('is true for a Triage that expects the synced version, and false once the Task has another one', () => {
     const synced = domainState([task({ id: 'A', title: 'A', important: null, version: 2 })]);
+    const expecting = (version: number): Hold => ({
+      ...triageHold('A'),
+      command: triage('A', { expect: { status: TaskStatus.Open, version } }),
+    });
 
-    expect(isStillHeld(synced, { ...triageHold('A'), version: 2 })).toBe(true);
-    expect(isStillHeld(synced, { ...triageHold('A'), version: 1 })).toBe(false);
+    expect(isStillHeld(synced, expecting(2))).toBe(true);
+    expect(isStillHeld(synced, expecting(1))).toBe(false);
   });
 
-  it('does not apply a Triage held at another version than the Task has, so the state is synced itself', () => {
+  it('applies a Triage that expects the synced version, and leaves the state synced itself for another version', () => {
     const synced = domainState([task({ id: 'A', title: 'A', important: null, version: 3 })]);
+    const expecting = (version: number): Hold => ({
+      ...triageHold('A'),
+      command: triage('A', { expect: { status: TaskStatus.Open, version } }),
+    });
 
-    expect(applyHolds(synced, [{ ...triageHold('A'), version: 2 }])).toBe(synced);
+    expect(inboxCount(applyHolds(synced, [expecting(3)]))).toBe(0);
+    expect(applyHolds(synced, [expecting(2)])).toBe(synced);
+  });
+
+  it('applies and keeps a Triage without an expected version at any version while its Task is in the Inbox', () => {
+    const synced = domainState([task({ id: 'A', title: 'A', important: null, version: 7 })]);
+
+    expect(isStillHeld(synced, triageHold('A'))).toBe(true);
+    expect(inboxCount(applyHolds(synced, [triageHold('A')]))).toBe(0);
+  });
+
+  it('prunes a Triage, with or without an expected version, once its Task has left the Inbox', () => {
+    const synced = domainState([task({ id: 'A', title: 'A', version: 2 })]);
+    const expecting: Hold = {
+      ...triageHold('A'),
+      command: triage('A', { expect: { status: TaskStatus.Open, version: 2 } }),
+    };
+
+    expect(isStillHeld(synced, expecting)).toBe(false);
+    expect(isStillHeld(synced, triageHold('A'))).toBe(false);
   });
 
   it('is true for a Drop while the synced Task is Open, false once it is closed or missing', () => {

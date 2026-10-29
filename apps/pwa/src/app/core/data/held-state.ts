@@ -24,8 +24,6 @@ export interface Hold {
   readonly key: string;
   readonly command: HeldCommand;
   readonly at: Instant;
-  /** The held Task's version in the synced state when it was held, if the Task was there. */
-  readonly version?: number;
 }
 
 /** The held command's own transition over the state. */
@@ -44,9 +42,9 @@ const transition = (state: DomainState, hold: Hold): TransitionResult => {
 
 /**
  * The changes the hold makes in this state, or null when it has no work to do. A Triage also needs its Task
- * in the Inbox at the version it was held at: another device may have triaged it already, and applying the
- * hold again would overwrite that; and once any change has reached the Task, this Triage among them, a Task
- * back in the Inbox was sent there after it, so the hold must not hide that either.
+ * in the Inbox and, when the command expects a version, at that version: another device may have triaged it
+ * already, and applying the hold again would overwrite that; and once any change has reached the Task, this
+ * Triage among them, a Task back in the Inbox was sent there after it, so the hold must not hide that either.
  */
 const changesOf = (state: DomainState, hold: Hold): readonly Change[] | null => {
   const command = hold.command;
@@ -57,7 +55,7 @@ const changesOf = (state: DomainState, hold: Hold): readonly Change[] | null => 
     if (
       task === undefined ||
       !isInInbox(task) ||
-      (hold.version !== undefined && task.version !== hold.version)
+      (command.expect?.version !== undefined && task.version !== command.expect.version)
     ) {
       return null;
     }
@@ -83,6 +81,6 @@ export const applyHolds = (synced: DomainState, holds: readonly Hold[]): DomainS
   return acc;
 };
 
-/** Whether the synced state still shows the held Task as the hold expects it (open, and for a Triage in the Inbox at the version held), so the hold has work to do. */
+/** Whether the synced state still shows the held Task as the hold expects it (open, and for a Triage in the Inbox at the version it expects, if any), so the hold has work to do. */
 export const isStillHeld = (synced: DomainState, hold: Hold): boolean =>
   changesOf(synced, hold) !== null;

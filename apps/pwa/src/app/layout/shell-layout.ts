@@ -150,7 +150,7 @@ export class ShellLayout {
         detail: null,
         canRetry: false,
         remainingMs: pending.remainingMs,
-        windowKey: pending.taskId,
+        windowKey: pending.windowKey,
       };
     }
 

@@ -9,6 +9,7 @@ import {
   type Change,
   ChangeEntity,
   type Command,
+  CommandTag,
   type DomainState,
   type Instant,
   inboxCount,
@@ -78,6 +79,12 @@ interface Waiter {
   readonly subject: string;
   readonly resolve: () => void;
 }
+
+/**
+ * Sends the held Triage of a Task now, so a command that waits for it reaches the server after it. It
+ * gets the Task's id and the idempotency key of the waiting command, whose own send it must never wait for.
+ */
+export type HeldTriageSender = (taskId: string, key: string) => Promise<void>;
 
 /** The signed-in Owner's working set: loaded, kept current by polling, changed by commands. */
 @Service()
@@ -164,6 +171,7 @@ export class DataStore {
   #needsSnapshot = false;
   #waiters: Waiter[] = [];
   readonly #settingsChecks = new Set<() => void>();
+  readonly #heldTriageSenders = new Set<HeldTriageSender>();
   #timer: ReturnType<typeof setTimeout> | undefined;
   #preload: Preload | null = null;
 
@@ -258,13 +266,7 @@ export class DataStore {
 
   /** Applies a Done, a Triage or a Drop to the state at once, before it is sent. A hold with a key already held replaces it. */
   hold(command: HeldCommand, key: string): void {
-    const version = this.#stateSignal()?.tasks.find((task) => task.id === command.taskId)?.version;
-    const hold: Hold = {
-      key,
-      command,
-      at: this.#clock.now(),
-      ...(version === undefined ? {} : { version }),
-    };
+    const hold: Hold = { key, command, at: this.#clock.now() };
 
     this.#holds.set([...this.#holds().filter((held) => held.key !== key), hold]);
   }
@@ -283,8 +285,20 @@ export class DataStore {
     this.#trigger();
   }
 
-  /** Submits a command and resolves its outcome; an Applied or NotApplicable outcome resolves only after the store has synced past it. */
+  /**
+   * Submits a command and resolves its outcome; an Applied or NotApplicable outcome resolves only after the
+   * store has synced past it. A command for a Task whose Triage is held under another key first waits for
+   * the senders from `onHeldTriage`, so it never reaches the server ahead of that Triage. Only a held Triage
+   * counts: a held Done may itself wait for a send (the editor's save), which must not then wait for it.
+   */
   async send(command: Command, idempotencyKey: string = this.#ids.next()): Promise<CommandOutcome> {
+    const heldTriage = this.#heldTriageFirst(command, idempotencyKey);
+
+    if (heldTriage !== null) {
+      await heldTriage;
+    }
+
+    // Read after the wait, which a stop may have ended.
     const generation = this.#generation;
     const wasStarted = this.#started;
     const outcome = await this.#api.runCommand(command, idempotencyKey);
@@ -294,6 +308,18 @@ export class DataStore {
     }
 
     return outcome;
+  }
+
+  /**
+   * Registers the sender a command for a Task waits for while that Task's Triage is held (see `send`). The
+   * shell's `UndoWindow` registers one. Returns a function that removes it.
+   */
+  onHeldTriage(send: HeldTriageSender): () => void {
+    this.#heldTriageSenders.add(send);
+
+    return () => {
+      this.#heldTriageSenders.delete(send);
+    };
   }
 
   /**
@@ -328,6 +354,29 @@ export class DataStore {
         this.#startNext();
       }
     });
+  }
+
+  /** The wait for the held Triage of the command's Task, or null when nothing needs waiting for. A rejection counts as settled. */
+  #heldTriageFirst(command: Command, key: string): Promise<void> | null {
+    if (this.#heldTriageSenders.size === 0) {
+      return null;
+    }
+
+    const taskId = commandSubject(command);
+    const triageHeld = this.#holds().some(
+      (hold) =>
+        hold.command._tag === CommandTag.TriageTask &&
+        hold.command.taskId === taskId &&
+        hold.key !== key,
+    );
+
+    if (!triageHeld) {
+      return null;
+    }
+
+    const sends = [...this.#heldTriageSenders].map((send) => send(taskId, key));
+
+    return Promise.allSettled(sends).then(() => undefined);
   }
 
   /** Whether an outcome applied while the store is started in the given generation. */

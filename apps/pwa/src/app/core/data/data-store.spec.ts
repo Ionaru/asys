@@ -2273,6 +2273,123 @@ describe('DataStore', () => {
     });
   });
 
+  describe('send after a held Triage', () => {
+    const triageA = {
+      _tag: CommandTag.TriageTask,
+      taskId: 'A',
+      important: true,
+      estimateMinutes: 15,
+    } as const;
+
+    const logA: Command = { _tag: CommandTag.LogProgress, taskId: 'A', remainingMinutes: 10 };
+
+    const inboxA = { tasks: [aTask('A', { important: null }), aTask('B')] };
+
+    /** A sender for held Triages that the test lets go of by hand. */
+    const gatedSender = () => {
+      let open!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        open = resolve;
+      });
+      const sender = vi.fn<(taskId: string, key: string) => Promise<void>>(() => gate);
+
+      return { sender, open };
+    };
+
+    it('waits for the sender before it posts a command for a Task whose Triage is held under another key', async () => {
+      await begin(12, inboxA);
+      const { sender, open } = gatedSender();
+
+      store.onHeldTriage(sender);
+      store.hold(triageA, 'triage-a');
+
+      const result = store.send(logA, 'log-1');
+      const flag = track(result);
+      await advance(0);
+
+      expect(sender).toHaveBeenCalledTimes(1);
+      expect(sender).toHaveBeenCalledWith('A', 'log-1');
+      http.expectNone('/v1/commands');
+
+      open();
+      await advance(0);
+
+      const req = http.expectOne({ method: 'POST', url: '/v1/commands' });
+      expect(req.request.body).toEqual({ ...logA, idempotencyKey: 'log-1' });
+      await respond(req, applied(13));
+      expect(flag.done).toBe(false);
+      await respond(http.expectOne('/v1/changes?after=12'), changesBody(13));
+      expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 13 });
+    });
+
+    it('still posts once the wait ends after a stop, and then waits for no poll', async () => {
+      await begin(12, inboxA);
+      const { sender, open } = gatedSender();
+
+      store.onHeldTriage(sender);
+      store.hold(triageA, 'triage-a');
+
+      const result = store.send(logA, 'log-1');
+      await advance(0);
+      store.stop();
+      open();
+      await advance(0);
+
+      await respond(http.expectOne('/v1/commands'), applied(13));
+      http.expectNone('/v1/changes?after=12');
+      expect(await result).toEqual({ _tag: CommandOutcomeTag.Applied, seq: 13 });
+    });
+
+    it.each<[string, () => void]>([
+      ['no Triage of the Task is held', () => undefined],
+      ['the held Triage has the same key', () => store.hold(triageA, 'log-1')],
+      ['only a Done of the Task is held', () => store.hold(holdA, 'done-a')],
+      [
+        'only a Triage of another Task is held',
+        () => store.hold({ ...triageA, taskId: 'B' }, 't-b'),
+      ],
+    ])('posts at once without asking the sender when %s', async (_, arrange) => {
+      await begin(12, inboxA);
+      const { sender } = gatedSender();
+
+      store.onHeldTriage(sender);
+      arrange();
+
+      void store.send(logA, 'log-1');
+
+      expect(sender).not.toHaveBeenCalled();
+      http.expectOne({ method: 'POST', url: '/v1/commands' });
+    });
+
+    it('posts at once when no sender is registered, or it was unregistered', async () => {
+      await begin(12, inboxA);
+      store.hold(triageA, 'triage-a');
+
+      void store.send(logA, 'log-1');
+      http.expectOne({ method: 'POST', url: '/v1/commands' });
+
+      const { sender } = gatedSender();
+      const unregister = store.onHeldTriage(sender);
+
+      unregister();
+      void store.send(logA, 'log-2');
+
+      expect(sender).not.toHaveBeenCalled();
+      http.expectOne({ method: 'POST', url: '/v1/commands' });
+    });
+
+    it('treats a rejected wait as settled and posts anyway', async () => {
+      await begin(12, inboxA);
+      store.onHeldTriage(() => Promise.reject(new Error('gone')));
+      store.hold(triageA, 'triage-a');
+
+      void store.send(logA, 'log-1');
+      await advance(0);
+
+      http.expectOne({ method: 'POST', url: '/v1/commands' });
+    });
+  });
+
   describe('hold and release', () => {
     const rankedIds = (): readonly string[] =>
       store.now()?.ranked.map((ranked) => ranked.task.id) ?? [];
@@ -2407,7 +2524,13 @@ describe('DataStore', () => {
       it('keeps a held Triage while a poll leaves its Task in the Inbox at the version held', async () => {
         await begin(12, { tasks: [aTask('A', { important: null }), aTask('B')] });
         store.hold(
-          { _tag: CommandTag.TriageTask, taskId: 'A', important: true, estimateMinutes: 15 },
+          {
+            _tag: CommandTag.TriageTask,
+            taskId: 'A',
+            important: true,
+            estimateMinutes: 15,
+            expect: { version: 1 },
+          },
           'triage-a',
         );
 
@@ -2421,7 +2544,13 @@ describe('DataStore', () => {
       it('drops a held Triage once a poll brings its Task back to the Inbox at another version', async () => {
         await begin(12, { tasks: [aTask('A', { important: null }), aTask('B')] });
         store.hold(
-          { _tag: CommandTag.TriageTask, taskId: 'A', important: true, estimateMinutes: 15 },
+          {
+            _tag: CommandTag.TriageTask,
+            taskId: 'A',
+            important: true,
+            estimateMinutes: 15,
+            expect: { version: 1 },
+          },
           'triage-a',
         );
 

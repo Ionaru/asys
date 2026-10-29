@@ -36,7 +36,7 @@ const BARE = {
   taskId: 't1',
   important: true,
   estimateMinutes: 25,
-  expect: { status: TaskStatus.Open },
+  expect: { status: TaskStatus.Open, version: 1 },
 };
 
 describe('triageCommand', () => {
@@ -44,6 +44,12 @@ describe('triageCommand', () => {
     expect(triageCommand(TASK, draftOf(TASK))).toBeNull();
     expect(triageCommand(TASK, chosen({ important: null }))).toBeNull();
     expect(triageCommand(TASK, chosen({ estimateMinutes: null }))).toBeNull();
+  });
+
+  it('expects the Task Open at the version it was triaged at', () => {
+    const command = triageCommand({ ...TASK, version: 4 }, chosen());
+
+    expect(command?.expect).toEqual({ status: TaskStatus.Open, version: 4 });
   });
 
   it('carries only Importance, the Estimate and the expectation when nothing else changed', () => {

@@ -86,6 +86,7 @@ const PENDING: PendingUndo = {
   undoLabel: 'Undo Done: Pay the invoice',
   origin: DoneOrigin.Button,
   remainingMs: UNDO_WINDOW_MS,
+  windowKey: 'key-1',
 };
 
 const TRIAGED: PendingUndo = {
@@ -1449,11 +1450,49 @@ describe('ShellLayout', () => {
       const animation = { currentTime: 2_400 } as unknown as Animation;
 
       fill.getAnimations = () => [animation];
-      undoWindow.pending.set({ ...PENDING, taskId: 'b', title: 'Water the plants' });
+      undoWindow.pending.set({
+        ...PENDING,
+        taskId: 'b',
+        title: 'Water the plants',
+        windowKey: 'key-2',
+      });
       await settle();
 
       expect(undoBar()?.querySelector('.asys-countdown__fill')).toBe(fill);
       expect(animation.currentTime).toBe(0);
+    });
+
+    it('starts the ring again when a Done replaces a held Triage of the same Task, by the key of each hold', async () => {
+      const { undoWindow, undoBar, settle } = await setup();
+
+      undoWindow.pending.set(TRIAGED);
+      await settle();
+
+      const fill = must(undoBar()?.querySelector('.asys-countdown__fill'));
+      const animation = { currentTime: 2_400 } as unknown as Animation;
+
+      fill.getAnimations = () => [animation];
+      undoWindow.pending.set({ ...PENDING, windowKey: 'key-2' });
+      await settle();
+
+      expect(undoBar()?.querySelector('.asys-countdown__fill')).toBe(fill);
+      expect(animation.currentTime).toBe(0);
+    });
+
+    it('keeps the ring running while the same hold stays in the bar', async () => {
+      const { undoWindow, undoBar, settle } = await setup();
+
+      undoWindow.pending.set(TRIAGED);
+      await settle();
+
+      const fill = must(undoBar()?.querySelector('.asys-countdown__fill'));
+      const animation = { currentTime: 2_400 } as unknown as Animation;
+
+      fill.getAnimations = () => [animation];
+      undoWindow.pending.set({ ...TRIAGED, title: 'Pay the invoice now', taskId: 'z' });
+      await settle();
+
+      expect(animation.currentTime).toBe(2_400);
     });
 
     it('carries the time left only into the Done layout, never into a failure', async () => {

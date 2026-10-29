@@ -13,7 +13,7 @@ import {
 import { CommandOutcomeTag, DataApi, isRetryable, type CommandOutcome } from '../api/data-api';
 import { Haptics } from '../platform/haptics';
 import { CommandAttempts } from './command-attempts';
-import { DataStore } from './data-store';
+import { DataStore, type HeldTriageSender } from './data-store';
 import type { HeldCommand } from './held-state';
 import { outcomeMessage } from './outcome-message';
 
@@ -50,6 +50,8 @@ export interface PendingUndo {
   readonly undoLabel: string;
   readonly origin: DoneOrigin;
   readonly remainingMs: number;
+  /** Names this hold's window (its idempotency key), so the bar starts the ring again for every new hold. */
+  readonly windowKey: string;
 }
 
 /** A held command that was not applied, with the sentence to show and what the person can do about it. */
@@ -88,6 +90,12 @@ interface Held {
   /** Work this Done waits for before a normal send, such as an edit still being saved. */
   readonly after: Promise<void> | undefined;
 }
+
+/** Picks the held commands for the same Task as `held`. */
+const sameTask =
+  (held: Held) =>
+  (other: Held): boolean =>
+    other.task.id === held.task.id;
 
 const statusOf = (kind: UndoKind, quadrantWord: string): string => {
   switch (kind) {
@@ -168,7 +176,8 @@ export class UndoWindow {
 
   readonly #paused = new Set<PauseReason>();
 
-  readonly #inflight = new Set<Promise<void>>();
+  /** The runs of the sends in flight, in the order they started, each with the held command it sends. */
+  readonly #inflight = new Map<Promise<void>, Held>();
 
   /**
    * Dones taken for a normal send that still wait for `after`, each with the function that wakes its run: with
@@ -202,10 +211,15 @@ export class UndoWindow {
     this.#document.addEventListener('visibilitychange', this.#onVisibilityChange);
     this.#view?.addEventListener('pagehide', this.#onPageHide);
 
+    const unregisterHeldTriage = this.#dataStore.onHeldTriage(this.#sendHeldTriage);
+
     this.#destroyRef.onDestroy(() => {
+      unregisterHeldTriage();
       this.#document.removeEventListener('visibilitychange', this.#onVisibilityChange);
       this.#view?.removeEventListener('pagehide', this.#onPageHide);
 
+      // A destroy cannot wait, so these go at once, even ahead of an earlier send of the same Task that is
+      // still in flight (a known limit), unlike a hide's keepalive sends, which wait for it.
       const held = this.#take();
 
       if (held !== null) {
@@ -278,7 +292,7 @@ export class UndoWindow {
       return Promise.resolve();
     }
 
-    return Promise.allSettled(this.#inflight).then(() => undefined);
+    return Promise.allSettled(this.#inflight.keys()).then(() => undefined);
   }
 
   /** Holds the failed command again with the key it has now: the same after Failed, a fresh one after KeyReused. */
@@ -354,6 +368,29 @@ export class UndoWindow {
     this.#sendHeld(false);
   };
 
+  /**
+   * DataStore's sender for held Triages (see `DataStore.send`): a held Triage of the Task goes now, as the
+   * window's end would send it, which closes its window. Resolves once every send of a Triage of the Task
+   * that started before the waiting command's own send (the one with `key`) has been handled, and at once
+   * when there is none. Only Triages count, because a Done in flight may itself wait for the save that asks.
+   */
+  readonly #sendHeldTriage: HeldTriageSender = (taskId, key) => {
+    const held = this.#held;
+
+    if (held?.task.id === taskId && held.kind === UndoKind.Triage) {
+      this.#take();
+      void this.#dispatch(held, false);
+      this.#clearPausesWhenIdle();
+    }
+
+    const ahead = this.#runsAhead(
+      (other) => other.key === key,
+      (other) => other.task.id === taskId && other.kind === UndoKind.Triage,
+    );
+
+    return ahead.length === 0 ? Promise.resolve() : Promise.allSettled(ahead).then(() => undefined);
+  };
+
   /** Sends the pending command now, if there is one; with `keepalive`, the request outlives the page. */
   #sendHeld(keepalive: boolean): void {
     if (keepalive) {
@@ -369,14 +406,51 @@ export class UndoWindow {
   }
 
   /**
-   * Sends every Done that waits for `after` at once with keepalive, and hands the send to its own run, which
-   * handles the outcome instead of sending normally; a flush that holds that run waits for exactly this send.
+   * Sends every Done that waits for `after` with keepalive, without waiting for `after`, and hands the send
+   * to its own run, which handles the outcome instead of sending normally; a flush that holds that run waits
+   * for exactly this send. Like every keepalive send, it first lets an earlier send of its Task settle.
    */
   #sendWaiting(): void {
     for (const [waiting, wake] of this.#waiting) {
       this.#waiting.delete(waiting);
-      wake(this.#dataApi.runCommand(waiting.command, waiting.key, { keepalive: true }));
+      wake(
+        this.#sendKeepalive(
+          waiting,
+          this.#runsAhead((other) => other === waiting, sameTask(waiting)),
+        ),
+      );
     }
+  }
+
+  /**
+   * The runs in flight that `matches` picks, among those that started before the first run `stop` picks (all
+   * of them when it picks none). Every wait points only at earlier runs, so no send waits for itself.
+   */
+  #runsAhead(stop: (held: Held) => boolean, matches: (held: Held) => boolean): Promise<void>[] {
+    const ahead: Promise<void>[] = [];
+
+    for (const [run, held] of this.#inflight) {
+      if (stop(held)) {
+        break;
+      }
+
+      if (matches(held)) {
+        ahead.push(run);
+      }
+    }
+
+    return ahead;
+  }
+
+  /**
+   * Sends with keepalive once the runs ahead of it have settled, so a Done never reaches the server before
+   * the Triage of its Task sent just before it; with none ahead it goes at once, as the page may be leaving.
+   */
+  #sendKeepalive(held: Held, ahead: readonly Promise<void>[]): Promise<CommandOutcome> {
+    const send = (): Promise<CommandOutcome> =>
+      this.#dataApi.runCommand(held.command, held.key, { keepalive: true });
+
+    return ahead.length === 0 ? send() : Promise.allSettled(ahead).then(send);
   }
 
   /** Stops the timer and empties the slot; the caller sends or releases what it got. */
@@ -423,9 +497,11 @@ export class UndoWindow {
   }
 
   /**
-   * Puts the command on hold for the Task, opens its window and announces it; ignored while this Task is
-   * already held for the same kind. Any other held command is sent at once first, a held Triage of this
-   * Task included, which a Done or a Drop of it from Now or the editor then follows.
+   * Puts the command on hold for the Task, opens its window and announces it; ignored while the same command
+   * is already held. A different command of the same kind for the same Task replaces the held one, which is
+   * released without being sent: the person's latest choice wins. Any other held command is sent at once
+   * first, a held Triage of this Task included when a Done or a Drop of it from Now follows; that Done or
+   * Drop then waits for the Triage through `DataStore.send` when its own window ends.
    */
   #hold(
     task: Task,
@@ -435,7 +511,9 @@ export class UndoWindow {
     origin: DoneOrigin,
     after: Promise<void> | undefined,
   ): void {
-    if (this.#held?.task.id === task.id && this.#held.kind === kind) {
+    const key = this.#attempts.keyFor(command);
+
+    if (this.#held?.key === key) {
       return;
     }
 
@@ -443,11 +521,12 @@ export class UndoWindow {
 
     const earlier = this.#take();
 
-    if (earlier !== null) {
+    if (earlier?.task.id === task.id && earlier.kind === kind) {
+      // It never reached the server, so letting go of it is enough.
+      this.#dataStore.release(earlier.key);
+    } else if (earlier !== null) {
       void this.#dispatch(earlier, false);
     }
-
-    const key = this.#attempts.keyFor(command);
 
     this.#dataStore.hold(command, key);
     this.#held = { task, kind, command, quadrantWord, key, origin, after };
@@ -460,6 +539,7 @@ export class UndoWindow {
       undoLabel: undoLabelOf(kind, task.title),
       origin,
       remainingMs: UNDO_WINDOW_MS,
+      windowKey: key,
     });
     this.#announce(heldAnnouncementOf(kind, task.title, quadrantWord));
     this.#syncTimer();
@@ -474,7 +554,13 @@ export class UndoWindow {
     this.#noticeSignal.set({ text, seq: this.#noticeSeq });
   }
 
+  /**
+   * Sends the held command and handles its outcome. A normal send goes through `DataStore.send`, which lets a
+   * held Triage of the Task go first; a keepalive send waits for the sends of its Task already in flight.
+   */
   #dispatch(held: Held, keepalive: boolean): Promise<void> {
+    // Taken before this run is registered, so it holds only earlier runs.
+    const ahead = keepalive ? this.#runsAhead(() => false, sameTask(held)) : [];
     const run = async (): Promise<void> => {
       let started: Promise<CommandOutcome> | null = null;
 
@@ -501,7 +587,7 @@ export class UndoWindow {
 
       const outcome = await (started ??
         (keepalive
-          ? this.#dataApi.runCommand(held.command, held.key, { keepalive: true })
+          ? this.#sendKeepalive(held, ahead)
           : this.#dataStore.send(held.command, held.key)));
 
       this.#attempts.settle(held.command, outcome);
@@ -511,7 +597,7 @@ export class UndoWindow {
       this.#inflight.delete(promise);
     });
 
-    this.#inflight.add(promise);
+    this.#inflight.set(promise, held);
 
     return promise;
   }

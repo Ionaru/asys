@@ -54,6 +54,7 @@ const setup = async () => {
           refresh: vi.fn(),
           start: vi.fn(),
           stop: vi.fn(),
+          onHeldTriage: vi.fn(() => () => undefined),
         },
       },
       { provide: TimeZoneSync, useValue: { choose: vi.fn() } },

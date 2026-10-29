@@ -1594,6 +1594,7 @@ describe('Now', () => {
         undoLabel: 'Undo Done: Pay the invoice',
         origin: DoneOrigin.Button,
         remainingMs: 5_000,
+        windowKey: 'key-1',
       });
       await internals().done(INVOICE, DoneOrigin.Button, false);
       await settle();
@@ -1612,6 +1613,7 @@ describe('Now', () => {
         undoLabel: 'Undo Triage: Pay the invoice',
         origin: DoneOrigin.Button,
         remainingMs: 5_000,
+        windowKey: 'key-1',
       });
       await internals().done(INVOICE, DoneOrigin.Button, false);
       await settle();
