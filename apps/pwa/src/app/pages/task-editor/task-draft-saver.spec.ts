@@ -17,7 +17,7 @@ import { CommandAttempts } from '../../core/data/command-attempts';
 import { DataStore } from '../../core/data/data-store';
 import { Ids } from '../../core/platform/ids';
 import { SaveState, TaskDraftSaver } from './task-draft-saver';
-import type { TaskDraft } from './task-patch';
+import type { TaskDraft } from '../../core/data/task-patch';
 
 const APPLIED: CommandOutcome = { _tag: CommandOutcomeTag.Applied, seq: 1 };
 

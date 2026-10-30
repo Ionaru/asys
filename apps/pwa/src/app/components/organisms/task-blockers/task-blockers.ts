@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: EUPL-1.2
-import { Component, ElementRef, inject, input, model, output, signal } from '@angular/core';
+import { Component, ElementRef, inject, input, model, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { Button, ButtonSize, ButtonVariant } from '../../atoms/button/button';
@@ -49,6 +49,12 @@ export class TaskBlockers {
   /** True while the editor is leaving, the Task awaits sync, or the editor is read-only. */
   readonly busy = input<boolean>(false);
 
+  /** Whether the section shows its own header button; false leaves the sheet to be opened through `open`. */
+  readonly header = input<boolean>(true);
+
+  /** Whether the Blocked by sheet is open, so a screen can open it from elsewhere. */
+  readonly open = model<boolean>(false);
+
   /** Whether an AddBlocker from this section is in flight. */
   readonly adding = input<boolean>(false);
 
@@ -72,8 +78,6 @@ export class TaskBlockers {
   protected readonly Icons = IconName;
 
   protected readonly SectionHeaderAction = SectionHeaderAction;
-
-  protected readonly open = signal(false);
 
   /** Focuses the Remove button at this index, else the last one, else the Find a Task field, if rendered. */
   focusRemove(index: number): void {

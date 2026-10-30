@@ -74,7 +74,15 @@ export const captureTask = async (
 export const triageTask = async (
   page: Page,
   taskId: string,
-  input: { important: boolean; estimateMinutes: number; areaId?: string },
+  input: {
+    important: boolean;
+    estimateMinutes: number;
+    areaId?: string;
+    title?: string;
+    notes?: string;
+    availableFrom?: DateSpec | null;
+    due?: DateSpec | null;
+  },
 ): Promise<void> => {
   await command(page, {
     _tag: 'TriageTask',
@@ -82,6 +90,10 @@ export const triageTask = async (
     important: input.important,
     estimateMinutes: input.estimateMinutes,
     ...(input.areaId === undefined ? {} : { areaId: input.areaId }),
+    ...(input.title === undefined ? {} : { title: input.title }),
+    ...(input.notes === undefined ? {} : { notes: input.notes }),
+    ...(input.availableFrom === undefined ? {} : { availableFrom: input.availableFrom }),
+    ...(input.due === undefined ? {} : { due: input.due }),
   });
 };
 

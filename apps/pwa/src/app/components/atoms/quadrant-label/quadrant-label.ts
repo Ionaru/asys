@@ -2,12 +2,7 @@
 import { Component, computed, input, ViewEncapsulation } from '@angular/core';
 import { Quadrant } from '@asys/domain';
 
-const QUADRANT_WORDS: Record<Quadrant, string> = {
-  [Quadrant.Do]: 'Do',
-  [Quadrant.Plan]: 'Plan',
-  [Quadrant.Delegate]: 'Delegate',
-  [Quadrant.Drop]: 'Drop',
-};
+import { quadrantWord } from '../../support/quadrant-word';
 
 /** The cells of the 2x2 glyph: Do top left, Plan top right, Delegate bottom left, Drop bottom right. */
 const GLYPH_CELLS: readonly {
@@ -71,5 +66,5 @@ export class QuadrantLabel {
   /** Draws the chip in full ink and a heavier weight. */
   readonly strong = input<boolean>(false);
 
-  protected readonly word = computed(() => QUADRANT_WORDS[this.quadrant()]);
+  protected readonly word = computed(() => quadrantWord(this.quadrant()));
 }

@@ -3,6 +3,7 @@ import { Component, signal, viewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { form, FormField, validate, type ValidationError } from '@angular/forms/signals';
 
+import { LabelNeed } from '../../atoms/label/label';
 import { IMPORTANCE_OPTIONS } from '../../support/importance-options';
 import { SegmentedControl, SegmentedControlLayout, type SegmentOption } from './segmented-control';
 
@@ -19,6 +20,7 @@ const ABC: readonly SegmentOption<string>[] = [
       legend="Pick"
       [options]="options()"
       [layout]="layout()"
+      [need]="need()"
       [value]="value()"
       (valueChange)="value.set($event)"
       [hint]="hint()"
@@ -35,6 +37,8 @@ class Host {
   readonly options = signal<readonly SegmentOption<string>[]>(ABC);
 
   readonly layout = signal<SegmentedControlLayout>(SegmentedControlLayout.Wrap);
+
+  readonly need = signal<LabelNeed>(LabelNeed.None);
 
   readonly value = signal<string | null>(null);
 
@@ -96,6 +100,23 @@ const setup = async () => {
 };
 
 describe('SegmentedControl', () => {
+  it('passes need to its legend', async () => {
+    const { fixture, host, root } = await setup();
+    const legend = (): Element | null => root().querySelector('fieldset > legend.asys-label');
+
+    expect(legend()?.querySelector('.asys-label__need')).toBeNull();
+
+    host.need.set(LabelNeed.Needed);
+    await fixture.whenStable();
+
+    expect(legend()?.querySelector('.asys-label__need')?.textContent?.trim()).toBe('Needed');
+
+    host.need.set(LabelNeed.Missing);
+    await fixture.whenStable();
+
+    expect(legend()?.querySelector('.asys-label__need--missing')).not.toBeNull();
+  });
+
   it('renders a fieldset with the legend and one Segment per option in order', async () => {
     const { root, options } = await setup();
 

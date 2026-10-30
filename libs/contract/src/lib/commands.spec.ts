@@ -82,6 +82,15 @@ const requests: readonly CommandRequest[] = [
   { _tag: CommandTag.ResolveReviewItem, idempotencyKey: key, reviewItemId: uuid(5) },
 ];
 
+const triageEdits = {
+  title: 'New title',
+  notes: 'Some notes',
+  availableFrom: { date: '2026-12-14' },
+  due: { date: '2026-12-15', time: '10:00' },
+} as const;
+
+const triageWithEdits = { ...requests[1], ...triageEdits } as CommandRequest;
+
 const capture = requests[0];
 
 const complete = requests[4];
@@ -107,6 +116,41 @@ describe('CommandSchema', () => {
     };
 
     expect(decode(json(request))).toStrictEqual(request);
+  });
+
+  describe('TriageTask with the edits made while triaging', () => {
+    const triage = requests[1] as Extract<CommandRequest, { _tag: CommandTag.TriageTask }>;
+
+    it('decodes a title, notes, Available from and Due', () => {
+      const request = { ...triage, ...triageEdits };
+
+      expect(decode(json(request))).toStrictEqual(request);
+    });
+
+    it('decodes a null Available from and a null Due', () => {
+      const request = { ...triage, availableFrom: null, due: null };
+
+      expect(decode(json(request))).toStrictEqual(request);
+    });
+
+    it('decodes a TriageTask without the edits to one with no such keys', () => {
+      const decoded = decode(json(triage));
+
+      expect(['title', 'notes', 'availableFrom', 'due'].filter((k) => k in decoded)).toStrictEqual(
+        [],
+      );
+    });
+
+    it.each([
+      ['an impossible Available from date', { availableFrom: { date: '2026-02-30' } }],
+      ['an impossible Due date', { due: { date: '2026-02-30' } }],
+      ['an invalid Due time', { due: { date: '2026-12-15', time: '25:00' } }],
+      ['a null title', { title: null }],
+      ['a null notes value', { notes: null }],
+      ['an explicit undefined title', { title: undefined }],
+    ])('rejects %s', (_name, extra) => {
+      expect(() => decode({ ...(json(triage) as object), ...extra })).toThrow(Schema.SchemaError);
+    });
   });
 
   it('decodes a fractional estimate so the domain can reject it later', () => {
@@ -279,6 +323,8 @@ const uuidFields: readonly (readonly [string, CommandRequest, string])[] = [
 const textFields: readonly (readonly [string, CommandRequest, string])[] = [
   ['CaptureTask.title', at(0), 'title'],
   ['CaptureTask.captureText', at(0), 'captureText'],
+  ['TriageTask.title', triageWithEdits, 'title'],
+  ['TriageTask.notes', triageWithEdits, 'notes'],
   ['EditTask.patch.title', at(2), 'patch.title'],
   ['EditTask.patch.notes', at(2), 'patch.notes'],
   ['CreateArea.name', at(8), 'name'],

@@ -86,6 +86,45 @@ describe('TaskBlockers', () => {
     expect(header().parentElement).toBe(host);
   });
 
+  it('shows its header by default and leaves it out when header is false', async () => {
+    const { host, update } = await setup();
+
+    expect(host.querySelector('button.asys-section-header')).not.toBeNull();
+
+    await update('header', false);
+
+    expect(host.querySelector('button.asys-section-header')).toBeNull();
+    expect(host.querySelector('asys-sheet')).not.toBeNull();
+  });
+
+  it('opens the sheet from outside through its open model, with no header', async () => {
+    const { fixture, host, update, dialog, text } = await setup({
+      header: false,
+      candidates: [taskOf('t2', 'Call Jan')],
+    });
+
+    expect(host.querySelector('.task-blockers__candidate')).toBeNull();
+
+    await update('open', true);
+
+    expect(dialog().open).toBe(true);
+    expect(text(dialog().querySelector('.task-blockers__candidate'))).toBe('Call Jan');
+    expect(fixture.componentInstance.open()).toBe(true);
+  });
+
+  it('reports the sheet closing through its open model', async () => {
+    const { fixture, open, dialog } = await setup();
+
+    await open();
+
+    expect(fixture.componentInstance.open()).toBe(true);
+
+    dialog().dispatchEvent(new Event('close'));
+    await fixture.whenStable();
+
+    expect(fixture.componentInstance.open()).toBe(false);
+  });
+
   it('shows no rows, candidates or Blocks before it is opened', async () => {
     const { host } = await setup({
       blockedBy: [row('l1', 'Water form')],

@@ -4,6 +4,7 @@ import {
   DestroyRef,
   inject,
   Injectable,
+  linkedSignal,
   signal,
   type Signal,
   type WritableSignal,
@@ -18,20 +19,32 @@ import {
   type Task,
 } from '@asys/domain';
 
-import type {
-  TaskBlockerRow,
-  TaskBlockerTask,
-} from '../../components/organisms/task-blockers/task-blockers';
-import { CommandOutcomeTag } from '../../core/api/data-api';
-import { CommandAttempts } from '../../core/data/command-attempts';
-import { DataStore } from '../../core/data/data-store';
-import { outcomeMessage } from '../../core/data/outcome-message';
-import { Ids } from '../../core/platform/ids';
+import { CommandOutcomeTag } from '../api/data-api';
+import { Ids } from '../platform/ids';
 import { blockerSummary } from './blocker-summary';
+import { CommandAttempts } from './command-attempts';
+import { DataStore } from './data-store';
+import { outcomeMessage } from './outcome-message';
+
+/** A Task the card's Task waits for, with whether its Remove is pending (the TaskBlockers organism's row). */
+export interface BlockerRow {
+  readonly linkId: string;
+  readonly title: string;
+  readonly busy: boolean;
+}
+
+/** A Task shown in the Blocks and Find a Task lists (the TaskBlockers organism's Task). */
+export interface BlockerTask {
+  readonly id: string;
+  readonly title: string;
+}
 
 /**
  * The blockers of the Task being edited: what it waits for, what waits for it, the Tasks it could wait
- * for, and the Add and Remove commands. Provided by the Task editor, which calls `connect` once.
+ * for, and the Add and Remove commands. Provided by the Task editor or the Inbox, which calls `connect`
+ * once. The Task id may change over time (the Inbox's card moves on) and may be '' (no card): the lists
+ * are then empty, Add and Remove do nothing, and the Find a Task text and the failure message start over
+ * with each Task.
  */
 @Injectable()
 export class TaskBlockerActions {
@@ -49,22 +62,31 @@ export class TaskBlockerActions {
 
   #connected = signal(false);
 
-  /** The Find a Task text. */
-  readonly filter: WritableSignal<string> = signal('');
+  /** The Find a Task text; empty again whenever the Task changes. */
+  readonly filter: WritableSignal<string> = linkedSignal({
+    source: () => this.#currentId(),
+    computation: () => '',
+  });
 
-  readonly #message = signal('');
+  readonly #message = linkedSignal({
+    source: () => this.#currentId(),
+    computation: () => '',
+  });
 
   readonly #adding = signal(false);
 
-  /** The AddBlocker commands still being tried, by blocker id, so a retry reuses its linkId. */
+  /** The AddBlocker commands still being tried, by Task and blocker id, so a retry reuses its linkId. */
   readonly #addCommands = new Map<string, AddBlocker>();
 
+  /** The connected Task id, '' until `connect` is called. */
+  readonly #currentId = computed(() => (this.#connected() ? this.#taskId() : ''));
+
   readonly #task = computed<Task | undefined>(() => {
-    if (!this.#connected()) {
+    const taskId = this.#currentId();
+
+    if (taskId === '') {
       return undefined;
     }
-
-    const taskId = this.#taskId();
 
     return this.#dataStore.state()?.tasks.find((task) => task.id === taskId);
   });
@@ -76,7 +98,7 @@ export class TaskBlockerActions {
   readonly adding: Signal<boolean> = this.#adding.asReadonly();
 
   /** The Tasks the Task waits for, in link order, with whether each Remove is pending. */
-  readonly blockedBy = computed<readonly TaskBlockerRow[]>(() => {
+  readonly blockedBy = computed<readonly BlockerRow[]>(() => {
     const state = this.#dataStore.state();
     const task = this.#task();
 
@@ -96,7 +118,7 @@ export class TaskBlockerActions {
   });
 
   /** The Tasks that wait for the Task. */
-  readonly blocks = computed<readonly TaskBlockerTask[]>(() => {
+  readonly blocks = computed<readonly BlockerTask[]>(() => {
     const state = this.#dataStore.state();
     const task = this.#task();
 
@@ -106,7 +128,7 @@ export class TaskBlockerActions {
   });
 
   /** The Tasks offered as a blocker, filtered by the Find a Task text. */
-  readonly candidates = computed<readonly TaskBlockerTask[]>(() => {
+  readonly candidates = computed<readonly BlockerTask[]>(() => {
     const state = this.#dataStore.state();
     const task = this.#task();
 
@@ -145,7 +167,7 @@ export class TaskBlockerActions {
   /** The one-line summary of the blockers. */
   readonly summary = computed(() => blockerSummary(this.#waitsFor(), this.blocks().length));
 
-  /** Reads the Task id and whether the editor is busy from the page; called once. */
+  /** Reads the Task id ('' for none) and whether the page is busy from the page; called once. */
   connect(taskId: () => string, busy: () => boolean): void {
     this.#taskId = taskId;
     this.#busy = busy;
@@ -154,20 +176,23 @@ export class TaskBlockerActions {
 
   /** Makes a Task a blocker. Resolves true when the server applied it. */
   async add(blockerId: string): Promise<boolean> {
-    if (this.#busy() || this.#adding()) {
+    const taskId = this.#currentId();
+
+    if (taskId === '' || this.#busy() || this.#adding()) {
       return false;
     }
 
     this.#message.set('');
 
-    const command: AddBlocker = this.#addCommands.get(blockerId) ?? {
+    const key = `${taskId}:${blockerId}`;
+    const command: AddBlocker = this.#addCommands.get(key) ?? {
       _tag: CommandTag.AddBlocker,
       linkId: this.#ids.next(),
-      taskId: this.#taskId(),
+      taskId,
       blockerId,
     };
 
-    this.#addCommands.set(blockerId, command);
+    this.#addCommands.set(key, command);
     this.#adding.set(true);
 
     const outcome = await this.#attempts.send(command);
@@ -179,21 +204,32 @@ export class TaskBlockerActions {
     this.#adding.set(false);
 
     if (outcome._tag !== CommandOutcomeTag.Failed) {
-      this.#addCommands.delete(blockerId);
+      this.#addCommands.delete(key);
     }
 
+    // The card may have moved on while the send ran: its state is not this Task's to touch.
+    const current = this.#currentId() === taskId;
+
     if (outcome._tag === CommandOutcomeTag.Applied) {
-      this.filter.set('');
+      if (current) {
+        this.filter.set('');
+      }
+
       return true;
     }
 
-    this.#message.set(outcomeMessage(outcome) ?? '');
+    if (current) {
+      this.#message.set(outcomeMessage(outcome) ?? '');
+    }
+
     return false;
   }
 
   /** Removes a blocker by its link id. Resolves true when the server applied it. */
   async remove(linkId: string): Promise<boolean> {
-    if (this.#busy() || this.#attempts.busy(linkId)) {
+    const taskId = this.#currentId();
+
+    if (taskId === '' || this.#busy() || this.#attempts.busy(linkId)) {
       return false;
     }
 
@@ -209,7 +245,10 @@ export class TaskBlockerActions {
       return true;
     }
 
-    this.#message.set(outcomeMessage(outcome) ?? '');
+    if (this.#currentId() === taskId) {
+      this.#message.set(outcomeMessage(outcome) ?? '');
+    }
+
     return false;
   }
 }

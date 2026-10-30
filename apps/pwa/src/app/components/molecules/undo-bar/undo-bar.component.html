@@ -1,9 +1,9 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
 @switch (variant()) {
-  @case (Variant.Done) {
-    <asys-icon class="asys-undo__check" [name]="Icons.Check" />
+  @case (Variant.Pending) {
+    <asys-icon class="asys-undo__check" [name]="statusIcon()" />
     <span class="asys-undo__text">
-      <span class="asys-undo__status">Done</span>
+      <span class="asys-undo__status">{{ status() }}</span>
       <span class="asys-undo__title">{{ title() }}</span>
     </span>
     <button
@@ -11,7 +11,7 @@
       type="button"
       class="asys-undo__button"
       [variant]="Variants.Secondary"
-      [attr.aria-label]="'Undo Done: ' + title()"
+      [attr.aria-label]="undoLabel()"
       (click)="undo.emit()"
     >
       <span asys-countdown [paused]="paused()"></span>
@@ -19,7 +19,9 @@
     </button>
   }
   @case (Variant.Failed) {
-    <p class="asys-undo__text asys-undo__text--failed">“{{ title() }}” is not Done.</p>
+    <p class="asys-undo__text asys-undo__text--failed">
+      {{ failedText() }}
+    </p>
     @if (detail() !== null) {
       <p class="asys-undo__detail">{{ detail() }}</p>
     }

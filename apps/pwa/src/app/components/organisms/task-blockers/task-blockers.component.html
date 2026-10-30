@@ -1,13 +1,15 @@
 <!-- SPDX-License-Identifier: EUPL-1.2 -->
-<button
-  asys-section-header
-  [action]="SectionHeaderAction.Open"
-  [icon]="Icons.Ban"
-  [trailingIcon]="Icons.Plus"
-  [title]="'Blocked by'"
-  [summary]="summary()"
-  (click)="open.set(true)"
-></button>
+@if (header()) {
+  <button
+    asys-section-header
+    [action]="SectionHeaderAction.Open"
+    [icon]="Icons.Ban"
+    [trailingIcon]="Icons.Plus"
+    [title]="'Blocked by'"
+    [summary]="summary()"
+    (click)="open.set(true)"
+  ></button>
+}
 <asys-sheet heading="Blocked by" [(open)]="open">
   <ng-template>
     <div class="task-blockers__body">

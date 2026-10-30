@@ -20,12 +20,12 @@ import { Icon, IconName } from '../../atoms/icon/icon';
 
 /** Which layout the Undo bar shows. */
 export enum UndoBarVariant {
-  Done = 'done',
+  Pending = 'pending',
   Failed = 'failed',
   Notice = 'notice',
 }
 
-/** The bar above the bottom navigation: Undo for a held Done, or a Done that was not applied. */
+/** The bar above the bottom navigation: Undo for a held Done, Triage or Drop, or one that was not applied. */
 @Component({
   selector: 'asys-undo-bar',
   imports: [Button, Countdown, Icon],
@@ -63,6 +63,18 @@ export class UndoBar {
 
   readonly title = input<string>('');
 
+  /** The word the Pending layout shows beside its icon, such as `Done`, `Triaged as Plan` or `Dropped`. */
+  readonly status = input<string>('Done');
+
+  /** The icon the Pending layout shows before the status. */
+  readonly statusIcon = input<IconName>(IconName.Check);
+
+  /** The Undo button's accessible name in the Pending layout, such as `Undo Done: <title>`. */
+  readonly undoLabel = input.required<string>();
+
+  /** The sentence the Failed layout opens with, such as `“<title>” is not Done.` */
+  readonly failedText = input.required<string>();
+
   readonly detail = input<string | null>(null);
 
   readonly canRetry = input(false);
@@ -70,10 +82,10 @@ export class UndoBar {
   /** The whole Undo window, in milliseconds: how long the ring takes to fill. */
   readonly windowMs = input<number>(5000);
 
-  /** How much of the window is left when the Done layout appears; `null` means all of it. */
+  /** How much of the window is left when the Pending layout appears; `null` means all of it. */
   readonly remainingMs = input<number | null>(null);
 
-  /** Names the Undo window the Done layout counts down; a new name starts the ring again. */
+  /** Names the Undo window the Pending layout counts down; a new name starts the ring again. */
   readonly windowKey = input<string | null>(null);
 
   readonly undo = output<void>();
@@ -105,8 +117,8 @@ export class UndoBar {
   });
 
   constructor() {
-    // A Done that follows another keeps the Done layout, and with it the running fill, so the ring starts
-    // again here. A layout that is new (the first Done, or one back from a failure) starts it by itself.
+    // A held command that follows another keeps the Pending layout, and with it the running fill, so the ring
+    // starts again here. A layout that is new (the first one, or one back from a failure) starts it by itself.
     effect(() => {
       this.windowKey();
       this.remainingMs();
@@ -145,10 +157,10 @@ export class UndoBar {
     }
   }
 
-  /** Ctrl+Z or Cmd+Z undoes the Done, except in an editable field, where it stays text undo. */
+  /** Ctrl+Z or Cmd+Z undoes the held command, except in an editable field, where it stays text undo. */
   protected onDocumentKeydown(event: KeyboardEvent): void {
     if (
-      this.variant() !== UndoBarVariant.Done ||
+      this.variant() !== UndoBarVariant.Pending ||
       (event.key !== 'z' && event.key !== 'Z') ||
       !(event.ctrlKey || event.metaKey) ||
       event.shiftKey

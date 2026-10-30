@@ -4,7 +4,7 @@ import type { FormValueControl } from '@angular/forms/signals';
 
 import { FieldControl } from '../../support/field-control';
 import { FieldError } from '../../atoms/field-error/field-error';
-import { Label } from '../../atoms/label/label';
+import { Label, LabelNeed } from '../../atoms/label/label';
 import { Segment } from '../../atoms/segment/segment';
 
 let nextId = 0;
@@ -31,7 +31,7 @@ export interface SegmentOption<T> {
       class="asys-fieldset-reset asys-segmented-control"
       [class.asys-segmented-control--fill]="layout() === Layout.Fill"
     >
-      <legend asys-label>{{ legend() }}</legend>
+      <legend asys-label [need]="need()">{{ legend() }}</legend>
       <div class="asys-segmented-control__options">
         @for (option of options(); track option.value) {
           <button
@@ -67,6 +67,9 @@ export class SegmentedControl<T extends string | number | boolean = string>
   readonly options = input.required<readonly SegmentOption<T>[]>();
 
   readonly layout = input<SegmentedControlLayout>(SegmentedControlLayout.Wrap);
+
+  /** Marks the legend as needed, or as needed and missed. */
+  readonly need = input<LabelNeed>(LabelNeed.None);
 
   protected readonly Layout = SegmentedControlLayout;
 

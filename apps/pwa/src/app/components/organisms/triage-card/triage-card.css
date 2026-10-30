@@ -1,80 +1,96 @@
 /* SPDX-License-Identifier: EUPL-1.2 */
 .asys-triage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  padding: var(--space-4);
   color: var(--ink);
 }
 
+/* The More button sits in the card's corner, and the head leaves no gap above the Title. */
+.asys-triage__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: calc(var(--space-2) * -1) calc(var(--space-2) * -1) calc(var(--space-4) * -1) 0;
+}
+
 .asys-triage__progress {
-  margin: 0 0 var(--space-2);
+  margin: 0;
   color: var(--ink-muted);
   font-size: var(--font-size-reason);
   line-height: var(--line-height-reason);
   font-weight: 400;
 }
 
-.asys-triage__title {
-  margin: 0;
-  font-size: var(--font-size-display);
-  line-height: var(--line-height-display);
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  overflow-wrap: anywhere;
+/* The icon lines up with the card's content edge, and the tap target reaches into the padding. */
+.asys-triage__add-notes {
+  align-self: flex-start;
+  margin-inline-start: calc(var(--space-4) * -1);
 }
 
-.asys-triage__raw {
-  margin: var(--space-2) 0 0;
+.asys-triage__captured {
+  margin: 0;
   padding: var(--space-3);
   background: var(--sunken);
   border-radius: var(--radius-md);
   color: var(--ink-muted);
   font-size: var(--font-size-reason);
   line-height: var(--line-height-reason);
-  font-weight: 400;
+}
+
+.asys-triage__captured-text {
   white-space: pre-wrap;
 }
 
-.asys-triage .asys-segmented-control,
-.asys-triage .asys-estimate,
-.asys-triage asys-select-field {
+.asys-triage__captured-label {
   display: block;
-  margin-top: var(--space-4);
+  font-size: var(--font-size-label);
+  line-height: var(--line-height-label);
+  font-weight: 700;
 }
 
-.asys-triage__area {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-top: var(--space-4);
-  color: var(--ink-muted);
-  font-size: var(--font-size-reason);
-  line-height: var(--line-height-reason);
-  font-weight: 400;
+.asys-triage__rows {
+  margin-inline: calc(var(--space-4) * -1);
+  border-top: 1px solid var(--line);
 
-  & strong {
-    color: var(--ink);
-    font-weight: 600;
+  /* The row hosts are inline elements, which would paint no line between the rows. */
+  & > * {
+    display: block;
+  }
+
+  & > * + * {
+    border-top: 1px solid var(--line);
   }
 }
 
+/* The footer's line meets the last row, as the line above the first row meets the card's content. */
 .asys-triage__footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2) var(--space-3);
-  margin-top: var(--space-4);
-  padding-top: var(--space-4);
+  margin: calc(var(--space-4) * -1) calc(var(--space-4) * -1) 0;
+  padding: var(--space-3) var(--space-4) 0;
   border-top: 1px solid var(--line);
 }
 
-.asys-triage__reason {
-  flex: 1 1 100%;
-  order: 3;
+.asys-triage__reason,
+.asys-triage__hint {
   margin: 0;
   color: var(--ink-muted);
   font-size: var(--font-size-reason);
   line-height: var(--line-height-reason);
-  font-weight: 400;
+}
+
+.asys-triage__reason {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-2);
+}
+
+.asys-triage__hint--missing {
+  color: var(--danger);
+  font-weight: 600;
 }

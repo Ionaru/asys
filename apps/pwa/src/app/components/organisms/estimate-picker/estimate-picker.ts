@@ -20,7 +20,7 @@ import { Button, ButtonSize, ButtonVariant } from '../../atoms/button/button';
 import { FieldControl } from '../../support/field-control';
 import { FieldError } from '../../atoms/field-error/field-error';
 import { InputBox } from '../../atoms/input/input-box';
-import { Label } from '../../atoms/label/label';
+import { Label, LabelNeed } from '../../atoms/label/label';
 import { Segment } from '../../atoms/segment/segment';
 import { SingleLine } from '../../atoms/input/single-line';
 
@@ -52,6 +52,9 @@ export class EstimatePicker extends FieldControl implements FormValueControl<num
   readonly legend = input<string>('Estimate');
 
   readonly layout = input<EstimateLayout>(EstimateLayout.Chips);
+
+  /** Marks the legend as needed, or as needed and missed. */
+  readonly need = input<LabelNeed>(LabelNeed.None);
 
   protected readonly Layout = EstimateLayout;
 

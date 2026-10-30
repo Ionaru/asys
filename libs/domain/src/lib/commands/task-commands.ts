@@ -86,6 +86,51 @@ const unknownArea = (state: DomainState, areaId: string | null | undefined): boo
   return areaId !== undefined && areaId !== null && !state.areas.some((a) => a.id === areaId);
 };
 
+/** The text and date fields that Triage and Edit both carry. */
+interface TextAndDateFields {
+  readonly title?: string;
+  readonly notes?: string;
+  readonly availableFrom?: DateSpec | null;
+  readonly due?: DateSpec | null;
+}
+
+/** The stateless check of the text and date fields that are present, in the order Title, Notes, Available from, Due. */
+const invalidTextOrDate = (fields: TextAndDateFields): RejectedReason | undefined => {
+  if (present(fields, 'title')) {
+    const title: unknown = fields.title;
+    if (typeof title !== 'string' || title.trim() === '') return RejectedReason.InvalidTitle;
+  }
+  if (present(fields, 'notes') && typeof fields.notes !== 'string') {
+    return RejectedReason.InvalidNotes;
+  }
+  if (present(fields, 'availableFrom')) {
+    const v = fields.availableFrom;
+    if (v !== null && v !== undefined && !isValidDateSpec(v)) return RejectedReason.InvalidDate;
+  }
+  if (present(fields, 'due')) {
+    const v = fields.due;
+    if (v !== null && v !== undefined && !isValidDateSpec(v)) return RejectedReason.InvalidDate;
+  }
+  return undefined;
+};
+
+/** Applies the text and date fields that are present, with the Due move rule; the fields are already validated. */
+const applyTextAndDate = (task: Task, fields: TextAndDateFields): Task => {
+  let next: Task = task;
+  if (present(fields, 'title')) next = { ...next, title: (fields.title as string).trim() };
+  if (present(fields, 'notes')) next = { ...next, notes: fields.notes as string };
+  if (present(fields, 'availableFrom')) {
+    next = { ...next, availableFrom: fields.availableFrom as DateSpec | null };
+  }
+  if (present(fields, 'due')) {
+    const due = fields.due as DateSpec | null;
+    // Only a change of the Due's date, or clearing it, is a move; a time added, changed or removed on the same date is not.
+    const moved = task.due !== null && (due === null || due.date !== task.due.date);
+    next = { ...next, due, dueMoveCount: task.dueMoveCount + (moved ? 1 : 0) };
+  }
+  return next;
+};
+
 export const captureTask = (
   state: DomainState,
   command: CaptureTask,
@@ -126,6 +171,8 @@ export const triageTask = (
   _now: Instant,
 ): TransitionResult => {
   if (!isMinutes(command.estimateMinutes)) return rejected(RejectedReason.InvalidEstimate);
+  const invalid = invalidTextOrDate(command);
+  if (invalid !== undefined) return rejected(invalid);
   const task = state.tasks.find((t) => t.id === command.taskId);
   if (task === undefined) return rejected(RejectedReason.NotFound);
   if (expectationFails(task, command.expect)) {
@@ -138,7 +185,7 @@ export const triageTask = (
     return { _tag: TransitionResultTag.NotApplicable, reason: NotApplicableReason.NotOpen };
   if (unknownArea(state, command.areaId)) return rejected(RejectedReason.UnknownArea);
   return put(task, {
-    ...task,
+    ...applyTextAndDate(task, command),
     important: command.important,
     estimateMinutes: command.estimateMinutes,
     areaId: command.areaId !== undefined ? command.areaId : task.areaId,
@@ -151,23 +198,8 @@ export const editTask = (
   _now: Instant,
 ): TransitionResult => {
   const patch = command.patch;
-  if (present(patch, 'title')) {
-    const title: unknown = patch.title;
-    if (typeof title !== 'string' || title.trim() === '')
-      return rejected(RejectedReason.InvalidTitle);
-  }
-  if (present(patch, 'notes') && typeof patch.notes !== 'string')
-    return rejected(RejectedReason.InvalidNotes);
-  if (present(patch, 'availableFrom')) {
-    const v = patch.availableFrom;
-    if (v !== null && v !== undefined && !isValidDateSpec(v))
-      return rejected(RejectedReason.InvalidDate);
-  }
-  if (present(patch, 'due')) {
-    const v = patch.due;
-    if (v !== null && v !== undefined && !isValidDateSpec(v))
-      return rejected(RejectedReason.InvalidDate);
-  }
+  const invalid = invalidTextOrDate(patch);
+  if (invalid !== undefined) return rejected(invalid);
   if (present(patch, 'estimateMinutes')) {
     const v = patch.estimateMinutes;
     if (v !== null && !isMinutes(v)) return rejected(RejectedReason.InvalidEstimate);
@@ -183,19 +215,8 @@ export const editTask = (
   if (present(patch, 'areaId') && unknownArea(state, patch.areaId))
     return rejected(RejectedReason.UnknownArea);
 
-  let next: Task = task;
-  if (present(patch, 'title')) next = { ...next, title: (patch.title as string).trim() };
-  if (present(patch, 'notes')) next = { ...next, notes: patch.notes as string };
+  let next: Task = applyTextAndDate(task, patch);
   if (present(patch, 'areaId')) next = { ...next, areaId: patch.areaId as string | null };
-  if (present(patch, 'availableFrom')) {
-    next = { ...next, availableFrom: patch.availableFrom as DateSpec | null };
-  }
-  if (present(patch, 'due')) {
-    const due = patch.due as DateSpec | null;
-    // Only a change of the Due's date, or clearing it, is a move; a time added, changed or removed on the same date is not.
-    const moved = task.due !== null && (due === null || due.date !== task.due.date);
-    next = { ...next, due, dueMoveCount: task.dueMoveCount + (moved ? 1 : 0) };
-  }
   if (present(patch, 'estimateMinutes')) {
     next = { ...next, estimateMinutes: patch.estimateMinutes as number | null };
   }

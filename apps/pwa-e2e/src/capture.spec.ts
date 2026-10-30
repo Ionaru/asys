@@ -37,25 +37,34 @@ test('Capture adds Tasks to the Inbox from Now and from the share route', async 
     .getByRole('navigation', { name: 'Primary' })
     .getByRole('link', { name: /^Inbox/ })
     .click();
-  const card = page.locator('article.asys-triage');
+  const card = page.getByRole('region', { name: 'Task to triage' });
+  const title = card.getByRole('textbox', { name: 'Title' });
   await expect(card.locator('.asys-triage__progress')).toHaveText('1 of 4');
 
-  const seen: { title: string; raw: string | null }[] = [];
+  // Drop moves to the next card at once, so each card is read before it goes.
+  const seen: { title: string; captured: string | null }[] = [];
   for (let step = 0; step < 4; step++) {
-    const title = (await card.locator('.asys-triage__title').innerText()).trim();
-    const rawLocator = card.locator('.asys-triage__raw');
-    const raw = (await rawLocator.count()) > 0 ? await rawLocator.innerText() : null;
-    seen.push({ title, raw });
+    const current = await title.inputValue();
+    const capturedLocator = card.locator('.asys-triage__captured-text');
+    const captured = (await capturedLocator.count()) > 0 ? await capturedLocator.innerText() : null;
+    seen.push({ title: current, captured });
     if (step < 3) {
-      await card.getByRole('button', { name: 'Later' }).click();
-      await expect(card.locator('.asys-triage__title')).not.toHaveText(title);
+      await page
+        .locator('footer.inbox__actions')
+        .getByRole('button', { name: 'Drop', exact: true })
+        .click();
+      await expect(title).not.toHaveValue(current);
+      await expect(card.locator('.asys-triage__progress')).toHaveText(`${step + 2} of 4`);
     }
   }
 
   expect(new Set(seen.map((entry) => entry.title)).size).toBe(4);
   const matching = seen.filter((entry) => entry.title === 'a');
   expect(matching).toHaveLength(1);
-  expect(matching[0].raw).toContain('https://x.y');
+  expect(matching[0].captured).toContain('https://x.y');
+  expect(
+    seen.filter((entry) => entry.title !== 'a').every((entry) => entry.captured === null),
+  ).toBe(true);
 });
 
 test('Quick add keeps focus in the field when Add is clicked with the mouse', async ({ page }) => {

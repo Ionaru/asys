@@ -33,7 +33,7 @@ import { CommandOutcomeTag } from '../../core/api/data-api';
 import { AreaPickStore } from '../../core/data/area-pick-store';
 import { CommandAttempts } from '../../core/data/command-attempts';
 import { DataStore, SyncStatus, zoneOrUtc } from '../../core/data/data-store';
-import { DoneOrigin, DoneUndo } from '../../core/data/done-undo';
+import { DoneOrigin, UndoKind, UndoWindow } from '../../core/data/undo-window';
 import { estimateNowText, logProgressCommand } from '../../core/data/log-progress';
 import { outcomeMessage } from '../../core/data/outcome-message';
 import { Clock } from '../../core/platform/clock';
@@ -115,7 +115,7 @@ export class Now {
 
   readonly #attempts = inject(CommandAttempts);
 
-  readonly #doneUndo = inject(DoneUndo);
+  readonly #undoWindow = inject(UndoWindow);
 
   readonly #motion = inject(Motion);
 
@@ -161,7 +161,7 @@ export class Now {
   /** The row that comes back with the Undo in progress, if any. */
   #displaced: string | null = null;
 
-  #seenUndone = this.#doneUndo.undone()?.seq ?? 0;
+  #seenUndone = this.#undoWindow.undone()?.seq ?? 0;
 
   /** Numbers each Done, so an exit that a newer Done or an Undo ended does nothing more. */
   #doneSeq = 0;
@@ -336,12 +336,16 @@ export class Now {
     });
 
     effect(() => {
-      const undone = this.#doneUndo.undone();
+      const undone = this.#undoWindow.undone();
       untracked(() => {
         if (undone === null || undone.seq <= this.#seenUndone) {
           return;
         }
         this.#seenUndone = undone.seq;
+        // Only a Done is Now's to restore: a Triage or Drop undone from the Inbox bar leaves its state alone.
+        if (undone.kind !== UndoKind.Done) {
+          return;
+        }
         this.#displaced = this.#rowsToExpand.get(undone.taskId) ?? null;
         this.#rowsToExpand.delete(undone.taskId);
         if (this.leaving()?.task.id === undone.taskId) {
@@ -495,7 +499,7 @@ export class Now {
     }
   }
 
-  /** Holds the Task through DoneUndo, then plays the exit and rise for the card; a row just collapses. */
+  /** Holds the Task through UndoWindow, then plays the exit and rise for the card; a row just collapses. */
   protected async done(
     task: Task,
     origin: DoneOrigin = DoneOrigin.Button,
@@ -512,17 +516,17 @@ export class Now {
     const card = this.#cardElement();
 
     if (top === null || top.task.id !== task.id) {
-      this.#doneUndo.complete(task, origin);
+      this.#undoWindow.complete(task, origin);
       this.#rememberRow(task.id, task.id);
       return;
     }
 
     if (origin === DoneOrigin.Button && card !== null) {
       this.leaving.set(top);
-      this.#doneUndo.complete(task, origin);
+      this.#undoWindow.complete(task, origin);
       this.#rememberRow(task.id, this.dataStore.now()?.ranked[0]?.task.id);
       if (keyboard) {
-        this.#doneUndo.requestFocus();
+        this.#undoWindow.requestFocus();
       }
       await this.#motion.play(card, EXIT_KEYFRAMES, {
         duration: MotionDuration.Quick,
@@ -538,7 +542,7 @@ export class Now {
       return;
     }
 
-    this.#doneUndo.complete(task, origin);
+    this.#undoWindow.complete(task, origin);
     this.#rememberRow(task.id, this.dataStore.now()?.ranked[0]?.task.id);
     this.#riseAfterRender(seq, !keyboard);
   }
@@ -569,11 +573,13 @@ export class Now {
     }
   }
 
-  /** Whether a Done for this Task is refused: it is busy, already held in DoneUndo, or its card is leaving. */
+  /** Whether a Done for this Task is refused: it is busy, its Done is already held in UndoWindow, or its card is leaving. */
   #refusesDone(taskId: string): boolean {
+    const pending = this.#undoWindow.pending();
+
     return (
       this.#busy(taskId) ||
-      this.#doneUndo.pending()?.taskId === taskId ||
+      (pending?.taskId === taskId && pending.kind === UndoKind.Done) ||
       this.leaving()?.task.id === taskId
     );
   }

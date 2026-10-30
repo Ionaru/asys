@@ -94,15 +94,19 @@ test.describe('phone', () => {
     await shoot(page, '07-estimate-ruler', 'Task editor, Estimate, Other', { group: 'Minutes' });
 
     await page.goto('/inbox');
-    const card = page.locator('article.asys-triage');
+    const card = page.getByRole('region', { name: 'Task to triage' });
     await expect(card).toBeVisible();
-    await card.getByRole('button', { name: 'Other', exact: true }).tap();
-    const chipMinutes = card.getByLabel('Minutes');
-    await expect(chipMinutes).toBeFocused();
-    await typeInto(chipMinutes, '40');
+    await card
+      .getByRole('group', { name: 'Estimate' })
+      .getByRole('button', { name: 'Other', exact: true })
+      .tap();
+    const cardMinutes = card.getByLabel('Minutes');
+    await expect(cardMinutes).toBeFocused();
+    await typeInto(cardMinutes, '40');
     await shoot(page, '08-estimate-triage', 'Triage, Estimate, Other', { group: 'Minutes' });
-    await typeInto(chipMinutes, 'abc');
-    await expect(card.locator('.asys-field__error')).toBeVisible();
+    await typeInto(cardMinutes, 'abc');
+    await cardMinutes.blur();
+    await expect(card.locator('p.asys-field__error')).toBeVisible();
     await shoot(page, '09-estimate-triage-error', 'Triage, Estimate, error', { group: 'Minutes' });
 
     await page.goto(`/settings/areas/${seeded.personal}`);

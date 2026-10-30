@@ -57,6 +57,10 @@ export const CommandSchema = Schema.Union([
     important: Schema.Boolean,
     estimateMinutes: Schema.Finite,
     areaId: Schema.optionalKey(Schema.NullOr(UuidSchema)),
+    title: Schema.optionalKey(TextSchema),
+    notes: Schema.optionalKey(TextSchema),
+    availableFrom: Schema.optionalKey(Schema.NullOr(DateSpecSchema)),
+    due: Schema.optionalKey(Schema.NullOr(DateSpecSchema)),
     expect: Schema.optionalKey(ExpectationSchema),
   }),
   command(CommandTag.EditTask, {

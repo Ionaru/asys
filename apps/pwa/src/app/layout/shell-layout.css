@@ -2,6 +2,7 @@
 :host {
   --shell-nav-height: calc(var(--tap-target-large) + 2 * var(--space-2) + 1px);
   --shell-undo-height: 0px;
+  --shell-quickadd-height: 0px;
 }
 
 .shell__page {

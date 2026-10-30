@@ -87,13 +87,16 @@ test('No sideways scroll on the Task screens at phone width', async ({ page }) =
   const screens: readonly (readonly [string, Locator])[] = [
     ['/now', page.locator('a.asys-task-row').filter({ hasText: TRIAGED_URL_TITLE })],
     ['/today', heading('Today')],
-    ['/inbox', page.locator('article.asys-triage .asys-triage__title')],
+    [
+      '/inbox',
+      page.getByRole('region', { name: 'Task to triage' }).getByRole('textbox', { name: 'Title' }),
+    ],
     ['/capture', heading('Capture')],
     [`/tasks/${urlTaskId}`, page.getByRole('textbox', { name: 'Title' })],
   ];
   for (const [path, ready] of screens) {
     await expectNoSidewaysScroll(page, path, ready);
-    if (path === '/inbox') await expect(ready).toHaveText(URL_TITLE);
+    if (path === '/inbox') await expect(ready).toHaveValue(URL_TITLE);
     if (path.startsWith('/tasks/')) await expect(ready).toHaveValue(TRIAGED_URL_TITLE);
   }
 });
@@ -440,26 +443,53 @@ test('Nothing covers the last Now row, with the pill or the open quick add', asy
   await expectClearOf(lastRow, [undoBar, quickAdd, nav]);
 });
 
-test('Nothing covers the Inbox Triage card footer or its open Drop confirmation', async ({
+test('At the end of the Inbox the action bar covers no part of the card and sits on the nav', async ({
   page,
 }) => {
   await seedPhoneTasks(page);
   await page.goto('/inbox');
-  const card = page.locator('article.asys-triage');
+  const card = page.getByRole('region', { name: 'Task to triage' });
   await expect(card).toBeVisible();
   const footer = card.locator('.asys-triage__footer');
+  const bar = page.locator('footer.inbox__actions');
   const nav = page.getByRole('navigation', { name: 'Primary' });
   const pill = page.getByRole('button', { name: 'Capture' });
 
   await scrollToBottom(page);
-  await expectClearOf(footer, [pill, nav]);
+  await expectClearOf(card, [bar]);
+  await expectClearOf(footer, [bar, pill, nav]);
+  await expectClearOf(card, [pill, nav]);
+  await expectClearOf(bar, [pill, nav]);
 
-  await card.locator('.asys-triage__drop').click();
-  const confirm = card.getByRole('group', { name: /^Drop “/ });
-  await expect(confirm).toBeVisible();
+  // The bar sits directly on the nav, with no gap.
+  const barBox = await bar.boundingBox();
+  const navBox = await nav.boundingBox();
+  if (barBox === null || navBox === null) throw new Error('no box');
+  // Sub-pixel rounding of the nav's height is not a gap.
+  const gap = navBox.y - (barBox.y + barBox.height);
+  expect(Math.abs(gap), JSON.stringify({ barBox, navBox })).toBeLessThanOrEqual(1);
+});
+
+test('On the Inbox, the open quick add leaves Drop and Triage clear of it and of the nav', async ({
+  page,
+}) => {
+  await seedPhoneTasks(page);
+  await page.goto('/inbox');
+  const card = page.getByRole('region', { name: 'Task to triage' });
+  await expect(card).toBeVisible();
+  const bar = page.locator('footer.inbox__actions');
+  const drop = bar.getByRole('button', { name: 'Drop', exact: true });
+  const triage = bar.locator('.inbox__triage');
+  const nav = page.getByRole('navigation', { name: 'Primary' });
+
+  await page.getByRole('button', { name: 'Capture' }).click();
+  const quickAdd = page.locator('asys-quick-add');
+  await expect(quickAdd).toBeVisible();
   await scrollToBottom(page);
-  await expectClearOf(footer, [pill, nav]);
-  await expectClearOf(confirm, [pill, nav]);
+
+  await expectClearOf(drop, [quickAdd, nav]);
+  await expectClearOf(triage, [quickAdd, nav]);
+  await expectClearOf(card, [quickAdd, nav]);
 });
 
 for (const width of [320, 375]) {

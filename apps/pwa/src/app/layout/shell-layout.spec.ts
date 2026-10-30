@@ -11,14 +11,15 @@ import { CommandAttempts } from '../core/data/command-attempts';
 import { DataStore } from '../core/data/data-store';
 import {
   DoneOrigin,
-  DoneUndo,
   PauseReason,
   UNDO_WINDOW_MS,
-  type DoneFailure,
-  type DoneNotice,
-  type DoneUndone,
-  type PendingDone,
-} from '../core/data/done-undo';
+  UndoKind,
+  UndoWindow,
+  type UndoFailure,
+  type UndoNotice,
+  type Undone,
+  type PendingUndo,
+} from '../core/data/undo-window';
 import { Ids } from '../core/platform/ids';
 import { Motion } from '../core/platform/motion';
 import { TAB_PATHS } from '../core/platform/tabs';
@@ -33,6 +34,8 @@ interface NowItem {
   readonly linked?: boolean;
   /** Carries data-task-id (the morph hook) but not data-focus-title: never a focus target. */
   readonly unmarked?: boolean;
+  /** Names its Task in data-focus-title itself, with no data-task-id, as the Triage card's section does. */
+  readonly named?: boolean;
 }
 
 /** What `NowStub` renders after its h1; a case sets it and `afterEach` resets it. */
@@ -52,6 +55,8 @@ const nowItems = signal<readonly NowItem[]>([]);
             item.id
           }}</span></a
         >
+      } @else if (item.named) {
+        <section tabindex="-1" [attr.data-focus-title]="item.id">{{ item.id }}</section>
       } @else if (item.unmarked) {
         <span tabindex="-1" [attr.data-task-id]="item.id">{{ item.id }}</span>
       } @else {
@@ -73,11 +78,29 @@ class NowStub {
 })
 class EditorStub {}
 
-const PENDING: PendingDone = {
+const PENDING: PendingUndo = {
   taskId: 'a',
   title: 'Pay the invoice',
+  kind: UndoKind.Done,
+  status: 'Done',
+  undoLabel: 'Undo Done: Pay the invoice',
   origin: DoneOrigin.Button,
   remainingMs: UNDO_WINDOW_MS,
+  windowKey: 'key-1',
+};
+
+const TRIAGED: PendingUndo = {
+  ...PENDING,
+  kind: UndoKind.Triage,
+  status: 'Triaged as Plan',
+  undoLabel: 'Undo Triage: Pay the invoice',
+};
+
+const DROPPED: PendingUndo = {
+  ...PENDING,
+  kind: UndoKind.Drop,
+  status: 'Dropped',
+  undoLabel: 'Undo Drop: Pay the invoice',
 };
 
 /** The Undo bar's ring duration and delay, set on its host as custom properties. */
@@ -91,9 +114,11 @@ const NO_DELAY = /^-?0ms$/;
 const ringStyle = (bar: HTMLElement | null, name: string): string | undefined =>
   bar?.style.getPropertyValue(name).trim();
 
-const NOT_DONE: DoneFailure = {
+const NOT_DONE: UndoFailure = {
   taskId: 'a',
   title: 'Pay the invoice',
+  kind: UndoKind.Done,
+  text: '“Pay the invoice” is not Done.',
   message: 'ASYS cannot reach the server. Try again.',
   canRetry: true,
   closedElsewhere: false,
@@ -101,12 +126,12 @@ const NOT_DONE: DoneFailure = {
 
 const REVIEW_SENTENCE = 'That no longer applied, so it waits in the Inbox as a Review item.';
 
-/** A stand-in for the shell's DoneUndo: writable signals and spies. */
-const fakeDoneUndo = () => {
-  const pending = signal<PendingDone | null>(null);
-  const failure = signal<DoneFailure | null>(null);
-  const notice = signal<DoneNotice | null>(null);
-  const undone = signal<DoneUndone | null>(null);
+/** A stand-in for the shell's UndoWindow: writable signals and spies. */
+const fakeUndoWindow = () => {
+  const pending = signal<PendingUndo | null>(null);
+  const failure = signal<UndoFailure | null>(null);
+  const notice = signal<UndoNotice | null>(null);
+  const undone = signal<Undone | null>(null);
   const focusRequest = signal(0);
 
   return {
@@ -115,7 +140,7 @@ const fakeDoneUndo = () => {
     notice,
     undone,
     focusRequest,
-    // The real DoneUndo clears the failure on both; a retry also holds the Task again.
+    // The real UndoWindow clears the failure on both; a retry also holds the Task again.
     undo: vi.fn<() => void>(),
     retry: vi.fn<() => void>(() => failure.set(null)),
     dismiss: vi.fn<() => void>(() => failure.set(null)),
@@ -163,7 +188,7 @@ interface SetupOptions {
 
 const setup = async (url = '/now', { motion }: SetupOptions = {}) => {
   let counter = 0;
-  const doneUndo = fakeDoneUndo();
+  const undoWindow = fakeUndoWindow();
   const send = vi.fn<(command: Command, key: string) => Promise<CommandOutcome>>();
   // `state` is null until the store has loaded; the shell hands the nav null for the count then.
   const dataStore = { state: signal<object | null>({}), inboxCount: signal(0), send };
@@ -204,10 +229,10 @@ const setup = async (url = '/now', { motion }: SetupOptions = {}) => {
   });
 
   // TestBed.overrideProvider does not reach the component-level provider, so the shell's own
-  // provider list is replaced with the fake in place of the real DoneUndo.
+  // provider list is replaced with the fake in place of the real UndoWindow.
   TestBed.overrideComponent(ShellLayout, {
     set: {
-      providers: [CommandAttempts, CaptureQueue, { provide: DoneUndo, useValue: doneUndo }],
+      providers: [CommandAttempts, CaptureQueue, { provide: UndoWindow, useValue: undoWindow }],
     },
   });
 
@@ -320,7 +345,7 @@ const setup = async (url = '/now', { motion }: SetupOptions = {}) => {
     fixture,
     dataStore,
     inboxBadge,
-    doneUndo,
+    undoWindow,
     undoBar,
     undoButton,
     statusRegion,
@@ -1254,29 +1279,29 @@ describe('ShellLayout', () => {
     });
 
     it('holds a notice text and nothing else', async () => {
-      const { doneUndo, statusRegion, settle } = await setup();
+      const { undoWindow, statusRegion, settle } = await setup();
 
-      doneUndo.notice.set({ text: '“Pay the invoice” is Done.', seq: 1 });
+      undoWindow.notice.set({ text: '“Pay the invoice” is Done.', seq: 1 });
       await settle();
 
       expect(statusRegion()?.textContent).toBe('“Pay the invoice” is Done.');
 
-      doneUndo.notice.set({ text: 'That no longer applied.', seq: 2 });
+      undoWindow.notice.set({ text: 'That no longer applied.', seq: 2 });
       await settle();
 
       expect(statusRegion()?.textContent).toBe('That no longer applied.');
     });
 
     it('announces an identical second notice as a new node in the region', async () => {
-      const { doneUndo, statusRegion, settle } = await setup();
+      const { undoWindow, statusRegion, settle } = await setup();
       const text = '“Pay the invoice” is Done.';
 
-      doneUndo.notice.set({ text, seq: 1 });
+      undoWindow.notice.set({ text, seq: 1 });
       await settle();
 
       const first = statusRegion()?.firstElementChild;
 
-      doneUndo.notice.set({ text, seq: 2 });
+      undoWindow.notice.set({ text, seq: 2 });
       await settle();
 
       // A live region announces added nodes; the same text in the same node would not be read again.
@@ -1295,9 +1320,9 @@ describe('ShellLayout', () => {
     });
 
     it('shows the Done layout with the title and Undo for a pending Done, and Undo calls undo', async () => {
-      const { doneUndo, undoBar, undoButton, settle } = await setup();
+      const { undoWindow, undoBar, undoButton, settle } = await setup();
 
-      doneUndo.pending.set(PENDING);
+      undoWindow.pending.set(PENDING);
       await settle();
 
       expect(undoBar()?.classList.contains('asys-undo')).toBe(true);
@@ -1309,13 +1334,82 @@ describe('ShellLayout', () => {
       undoButton('Undo')?.click();
       await settle();
 
-      expect(doneUndo.undo).toHaveBeenCalledTimes(1);
+      expect(undoWindow.undo).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows the Triage status, the check and the Undo Triage label for a pending Triage', async () => {
+      const { undoWindow, undoBar, undoButton, settle } = await setup();
+
+      undoWindow.pending.set(TRIAGED);
+      await settle();
+
+      expect(undoBar()?.querySelector('.asys-undo__status')?.textContent?.trim()).toBe(
+        'Triaged as Plan',
+      );
+      expect(undoBar()?.querySelector('.asys-undo__title')?.textContent?.trim()).toBe(
+        'Pay the invoice',
+      );
+      expect(undoBar()?.querySelector('svg[data-icon="check"]')).not.toBeNull();
+      expect(undoButton('Undo')?.getAttribute('aria-label')).toBe('Undo Triage: Pay the invoice');
+
+      undoButton('Undo')?.click();
+      await settle();
+
+      expect(undoWindow.undo).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows the Dropped status, the cross and the Undo Drop label for a pending Drop', async () => {
+      const { undoWindow, undoBar, undoButton, settle } = await setup();
+
+      undoWindow.pending.set(DROPPED);
+      await settle();
+
+      expect(undoBar()?.querySelector('.asys-undo__status')?.textContent?.trim()).toBe('Dropped');
+      expect(undoBar()?.querySelector('svg[data-icon="xmark"]')).not.toBeNull();
+      expect(undoBar()?.querySelector('svg[data-icon="check"]')).toBeNull();
+      expect(undoButton('Undo')?.getAttribute('aria-label')).toBe('Undo Drop: Pay the invoice');
+    });
+
+    it('says Done for a pending Done, with the check', async () => {
+      const { undoWindow, undoBar, settle } = await setup();
+
+      undoWindow.pending.set(PENDING);
+      await settle();
+
+      expect(undoBar()?.querySelector('.asys-undo__status')?.textContent?.trim()).toBe('Done');
+      expect(undoBar()?.querySelector('svg[data-icon="check"]')).not.toBeNull();
+    });
+
+    it('shows the failure sentence of the kind, not the Done one, when a Triage or a Drop failed', async () => {
+      const { undoWindow, undoBar, settle } = await setup();
+
+      undoWindow.failure.set({
+        ...NOT_DONE,
+        kind: UndoKind.Triage,
+        text: '“Pay the invoice” is not triaged.',
+      });
+      await settle();
+
+      expect(undoBar()?.querySelector('.asys-undo__text--failed')?.textContent?.trim()).toBe(
+        '“Pay the invoice” is not triaged.',
+      );
+
+      undoWindow.failure.set({
+        ...NOT_DONE,
+        kind: UndoKind.Drop,
+        text: '“Pay the invoice” is not dropped.',
+      });
+      await settle();
+
+      expect(undoBar()?.querySelector('.asys-undo__text--failed')?.textContent?.trim()).toBe(
+        '“Pay the invoice” is not dropped.',
+      );
     });
 
     it('gives the bar the whole Undo window to run for a Done that has just opened', async () => {
-      const { doneUndo, undoBar, settle } = await setup();
+      const { undoWindow, undoBar, settle } = await setup();
 
-      doneUndo.pending.set(PENDING);
+      undoWindow.pending.set(PENDING);
       await settle();
 
       expect(ringStyle(undoBar(), RING_DURATION)).toBe(`${UNDO_WINDOW_MS}ms`);
@@ -1323,9 +1417,9 @@ describe('ShellLayout', () => {
     });
 
     it('hands the bar the time the Done has left, so the ring starts part-way round', async () => {
-      const { doneUndo, undoBar, settle } = await setup();
+      const { undoWindow, undoBar, settle } = await setup();
 
-      doneUndo.pending.set({ ...PENDING, remainingMs: 3_000 });
+      undoWindow.pending.set({ ...PENDING, remainingMs: 3_000 });
       await settle();
 
       expect(ringStyle(undoBar(), RING_DURATION)).toBe(`${UNDO_WINDOW_MS}ms`);
@@ -1333,13 +1427,13 @@ describe('ShellLayout', () => {
     });
 
     it('restarts the ring where the timer is when a dismissed failure lets the Done run again', async () => {
-      const { doneUndo, undoBar, settle } = await setup();
+      const { undoWindow, undoBar, settle } = await setup();
 
-      doneUndo.pending.set(PENDING);
-      doneUndo.failure.set(NOT_DONE);
+      undoWindow.pending.set(PENDING);
+      undoWindow.failure.set(NOT_DONE);
       await settle();
-      doneUndo.pending.set({ ...PENDING, remainingMs: 3_000 });
-      doneUndo.failure.set(null);
+      undoWindow.pending.set({ ...PENDING, remainingMs: 3_000 });
+      undoWindow.failure.set(null);
       await settle();
 
       expect(undoBar()?.textContent).toContain('Pay the invoice');
@@ -1347,27 +1441,65 @@ describe('ShellLayout', () => {
     });
 
     it('starts the ring again when a second Done replaces the first in the open bar', async () => {
-      const { doneUndo, undoBar, settle } = await setup();
+      const { undoWindow, undoBar, settle } = await setup();
 
-      doneUndo.pending.set(PENDING);
+      undoWindow.pending.set(PENDING);
       await settle();
 
       const fill = must(undoBar()?.querySelector('.asys-countdown__fill'));
       const animation = { currentTime: 2_400 } as unknown as Animation;
 
       fill.getAnimations = () => [animation];
-      doneUndo.pending.set({ ...PENDING, taskId: 'b', title: 'Water the plants' });
+      undoWindow.pending.set({
+        ...PENDING,
+        taskId: 'b',
+        title: 'Water the plants',
+        windowKey: 'key-2',
+      });
       await settle();
 
       expect(undoBar()?.querySelector('.asys-countdown__fill')).toBe(fill);
       expect(animation.currentTime).toBe(0);
     });
 
-    it('carries the time left only into the Done layout, never into a failure', async () => {
-      const { doneUndo, undoBar, settle } = await setup();
+    it('starts the ring again when a Done replaces a held Triage of the same Task, by the key of each hold', async () => {
+      const { undoWindow, undoBar, settle } = await setup();
 
-      doneUndo.pending.set({ ...PENDING, remainingMs: 3_000 });
-      doneUndo.failure.set(NOT_DONE);
+      undoWindow.pending.set(TRIAGED);
+      await settle();
+
+      const fill = must(undoBar()?.querySelector('.asys-countdown__fill'));
+      const animation = { currentTime: 2_400 } as unknown as Animation;
+
+      fill.getAnimations = () => [animation];
+      undoWindow.pending.set({ ...PENDING, windowKey: 'key-2' });
+      await settle();
+
+      expect(undoBar()?.querySelector('.asys-countdown__fill')).toBe(fill);
+      expect(animation.currentTime).toBe(0);
+    });
+
+    it('keeps the ring running while the same hold stays in the bar', async () => {
+      const { undoWindow, undoBar, settle } = await setup();
+
+      undoWindow.pending.set(TRIAGED);
+      await settle();
+
+      const fill = must(undoBar()?.querySelector('.asys-countdown__fill'));
+      const animation = { currentTime: 2_400 } as unknown as Animation;
+
+      fill.getAnimations = () => [animation];
+      undoWindow.pending.set({ ...TRIAGED, title: 'Pay the invoice now', taskId: 'z' });
+      await settle();
+
+      expect(animation.currentTime).toBe(2_400);
+    });
+
+    it('carries the time left only into the Done layout, never into a failure', async () => {
+      const { undoWindow, undoBar, settle } = await setup();
+
+      undoWindow.pending.set({ ...PENDING, remainingMs: 3_000 });
+      undoWindow.failure.set(NOT_DONE);
       await settle();
 
       expect(undoBar()?.textContent).toContain('is not Done');
@@ -1376,9 +1508,9 @@ describe('ShellLayout', () => {
     });
 
     it('sits after <main> in the shell, not inside it', async () => {
-      const { doneUndo, undoBar, root, settle } = await setup();
+      const { undoWindow, undoBar, root, settle } = await setup();
 
-      doneUndo.pending.set(PENDING);
+      undoWindow.pending.set(PENDING);
       await settle();
 
       const main = root().querySelector('main');
@@ -1390,21 +1522,21 @@ describe('ShellLayout', () => {
     });
 
     it('closes when nothing is pending any more', async () => {
-      const { doneUndo, undoBar, settle } = await setup();
+      const { undoWindow, undoBar, settle } = await setup();
 
-      doneUndo.pending.set(PENDING);
+      undoWindow.pending.set(PENDING);
       await settle();
-      doneUndo.pending.set(null);
+      undoWindow.pending.set(null);
       await settle();
 
       expect(undoBar()).toBeNull();
     });
 
     it('shows the failed layout in place of a pending Done', async () => {
-      const { doneUndo, undoBar, undoButton, settle } = await setup();
+      const { undoWindow, undoBar, undoButton, settle } = await setup();
 
-      doneUndo.pending.set(PENDING);
-      doneUndo.failure.set(NOT_DONE);
+      undoWindow.pending.set(PENDING);
+      undoWindow.failure.set(NOT_DONE);
       await settle();
 
       expect(undoBar()?.textContent).toContain('“Pay the invoice” is not Done.');
@@ -1415,9 +1547,9 @@ describe('ShellLayout', () => {
     });
 
     it('shows Dismiss only for a failure that cannot be retried', async () => {
-      const { doneUndo, undoButton, settle } = await setup();
+      const { undoWindow, undoButton, settle } = await setup();
 
-      doneUndo.failure.set({ ...NOT_DONE, canRetry: false });
+      undoWindow.failure.set({ ...NOT_DONE, canRetry: false });
       await settle();
 
       expect(undoButton('Try again')).toBeUndefined();
@@ -1425,9 +1557,9 @@ describe('ShellLayout', () => {
     });
 
     it('shows the notice layout for a failure closed elsewhere: the sentence and Dismiss only', async () => {
-      const { doneUndo, undoBar, undoButton, settle } = await setup();
+      const { undoWindow, undoBar, undoButton, settle } = await setup();
 
-      doneUndo.failure.set({
+      undoWindow.failure.set({
         ...NOT_DONE,
         message: REVIEW_SENTENCE,
         canRetry: false,
@@ -1443,12 +1575,12 @@ describe('ShellLayout', () => {
     });
 
     it('goes back to the Done layout when the failure clears while a Done is pending', async () => {
-      const { doneUndo, undoButton, settle } = await setup();
+      const { undoWindow, undoButton, settle } = await setup();
 
-      doneUndo.pending.set(PENDING);
-      doneUndo.failure.set(NOT_DONE);
+      undoWindow.pending.set(PENDING);
+      undoWindow.failure.set(NOT_DONE);
       await settle();
-      doneUndo.failure.set(null);
+      undoWindow.failure.set(null);
       await settle();
 
       expect(undoButton('Undo')).toBeDefined();
@@ -1456,55 +1588,55 @@ describe('ShellLayout', () => {
     });
 
     it('calls retry for Try again and dismiss for Dismiss', async () => {
-      const { doneUndo, undoButton, settle } = await setup();
+      const { undoWindow, undoButton, settle } = await setup();
 
-      doneUndo.failure.set(NOT_DONE);
+      undoWindow.failure.set(NOT_DONE);
       await settle();
       undoButton('Try again')?.click();
       await settle();
 
-      expect(doneUndo.retry).toHaveBeenCalledTimes(1);
-      expect(doneUndo.dismiss).not.toHaveBeenCalled();
+      expect(undoWindow.retry).toHaveBeenCalledTimes(1);
+      expect(undoWindow.dismiss).not.toHaveBeenCalled();
 
-      doneUndo.failure.set(NOT_DONE);
+      undoWindow.failure.set(NOT_DONE);
       await settle();
       undoButton('Dismiss')?.click();
       await settle();
 
-      expect(doneUndo.dismiss).toHaveBeenCalledTimes(1);
+      expect(undoWindow.dismiss).toHaveBeenCalledTimes(1);
     });
 
     it('pauses and resumes the window for the pointer and for focus, with the right reasons', async () => {
-      const { doneUndo, undoBar, undoButton, settle } = await setup();
+      const { undoWindow, undoBar, undoButton, settle } = await setup();
 
-      doneUndo.pending.set(PENDING);
+      undoWindow.pending.set(PENDING);
       await settle();
 
       undoBar()?.dispatchEvent(new Event('pointerenter'));
 
-      expect(doneUndo.pause).toHaveBeenLastCalledWith(PauseReason.Pointer);
+      expect(undoWindow.pause).toHaveBeenLastCalledWith(PauseReason.Pointer);
 
       undoBar()?.dispatchEvent(new Event('pointerleave'));
 
-      expect(doneUndo.resume).toHaveBeenLastCalledWith(PauseReason.Pointer);
+      expect(undoWindow.resume).toHaveBeenLastCalledWith(PauseReason.Pointer);
 
       undoButton('Undo')?.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
 
-      expect(doneUndo.pause).toHaveBeenLastCalledWith(PauseReason.Focus);
+      expect(undoWindow.pause).toHaveBeenLastCalledWith(PauseReason.Focus);
 
       undoButton('Undo')?.dispatchEvent(
         new FocusEvent('focusout', { bubbles: true, relatedTarget: null }),
       );
 
-      expect(doneUndo.resume).toHaveBeenLastCalledWith(PauseReason.Focus);
-      expect(doneUndo.pause).toHaveBeenCalledTimes(2);
-      expect(doneUndo.resume).toHaveBeenCalledTimes(2);
+      expect(undoWindow.resume).toHaveBeenLastCalledWith(PauseReason.Focus);
+      expect(undoWindow.pause).toHaveBeenCalledTimes(2);
+      expect(undoWindow.resume).toHaveBeenCalledTimes(2);
     });
 
     it('pauses the ring while the pointer rests on the bar, and lets it run when it leaves', async () => {
-      const { doneUndo, undoBar, settle } = await setup();
+      const { undoWindow, undoBar, settle } = await setup();
 
-      doneUndo.pending.set(PENDING);
+      undoWindow.pending.set(PENDING);
       await settle();
 
       expect(undoBar()?.classList.contains('is-paused')).toBe(false);
@@ -1525,39 +1657,39 @@ describe('ShellLayout', () => {
     const focusedText = (): string | null => document.activeElement?.textContent?.trim() ?? null;
 
     it('does not move focus to the bar when a Done is pending without a focus request', async () => {
-      const { doneUndo, undoBar, settle } = await setup();
+      const { undoWindow, undoBar, settle } = await setup();
 
-      doneUndo.pending.set(PENDING);
+      undoWindow.pending.set(PENDING);
       await settle();
 
       expect(undoBar()?.contains(document.activeElement)).toBe(false);
     });
 
     it('moves focus to Undo on a focus request, even when the bar renders in the same pass', async () => {
-      const { doneUndo, undoButton, settle } = await setup();
+      const { undoWindow, undoButton, settle } = await setup();
 
-      doneUndo.pending.set(PENDING);
-      doneUndo.focusRequest.set(1);
+      undoWindow.pending.set(PENDING);
+      undoWindow.focusRequest.set(1);
       await settle();
 
       expect(document.activeElement).toBe(undoButton('Undo'));
     });
 
     it('moves focus to Undo on a later focus request for a bar already shown', async () => {
-      const { doneUndo, undoButton, settle } = await setup();
+      const { undoWindow, undoButton, settle } = await setup();
 
-      doneUndo.pending.set(PENDING);
+      undoWindow.pending.set(PENDING);
       await settle();
-      doneUndo.focusRequest.set(1);
+      undoWindow.focusRequest.set(1);
       await settle();
 
       expect(document.activeElement).toBe(undoButton('Undo'));
     });
 
     it('moves focus to the h1 on Escape when no Task title is in the page', async () => {
-      const { doneUndo, root, pressEscapeInBar, settle } = await setup();
+      const { undoWindow, root, pressEscapeInBar, settle } = await setup();
 
-      doneUndo.pending.set(PENDING);
+      undoWindow.pending.set(PENDING);
       await settle();
       await pressEscapeInBar();
 
@@ -1565,10 +1697,10 @@ describe('ShellLayout', () => {
     });
 
     it('moves focus to the first Task title on Escape', async () => {
-      const { doneUndo, root, pressEscapeInBar, settle } = await setup();
+      const { undoWindow, root, pressEscapeInBar, settle } = await setup();
 
       nowItems.set([{ id: 'b' }, { id: 'c' }]);
-      doneUndo.pending.set(PENDING);
+      undoWindow.pending.set(PENDING);
       await settle();
       await pressEscapeInBar();
 
@@ -1576,9 +1708,9 @@ describe('ShellLayout', () => {
     });
 
     it('focuses the h1, not the Title textarea, on Escape in the Task editor', async () => {
-      const { doneUndo, root, pressEscapeInBar, settle } = await setup('/tasks/x');
+      const { undoWindow, root, pressEscapeInBar, settle } = await setup('/tasks/x');
 
-      doneUndo.pending.set(PENDING);
+      undoWindow.pending.set(PENDING);
       await settle();
       await pressEscapeInBar();
 
@@ -1587,9 +1719,9 @@ describe('ShellLayout', () => {
     });
 
     it('focuses the h1, not the Title textarea, after an Undo of that Task in the Task editor', async () => {
-      const { doneUndo, root, settle } = await setup('/tasks/x');
+      const { undoWindow, root, settle } = await setup('/tasks/x');
 
-      doneUndo.undone.set({ taskId: 't1', seq: 1 });
+      undoWindow.undone.set({ taskId: 't1', kind: UndoKind.Done, seq: 1 });
       await settle();
 
       expect(document.activeElement).toBe(root().querySelector('main h1'));
@@ -1597,10 +1729,10 @@ describe('ShellLayout', () => {
     });
 
     it('skips a leaving title on Escape, even though its own element has no data-leaving', async () => {
-      const { doneUndo, root, pressEscapeInBar, settle } = await setup();
+      const { undoWindow, root, pressEscapeInBar, settle } = await setup();
 
       nowItems.set([{ id: 'a', leaving: true }, { id: 'b' }]);
-      doneUndo.pending.set(PENDING);
+      undoWindow.pending.set(PENDING);
       await settle();
       await pressEscapeInBar();
 
@@ -1608,10 +1740,10 @@ describe('ShellLayout', () => {
     });
 
     it('falls back to the h1 on Escape when every title is leaving', async () => {
-      const { doneUndo, root, pressEscapeInBar, settle } = await setup();
+      const { undoWindow, root, pressEscapeInBar, settle } = await setup();
 
       nowItems.set([{ id: 'a', leaving: true }]);
-      doneUndo.pending.set(PENDING);
+      undoWindow.pending.set(PENDING);
       await settle();
       await pressEscapeInBar();
 
@@ -1619,10 +1751,10 @@ describe('ShellLayout', () => {
     });
 
     it('focuses the closest link of the title on Escape', async () => {
-      const { doneUndo, root, pressEscapeInBar, settle } = await setup();
+      const { undoWindow, root, pressEscapeInBar, settle } = await setup();
 
       nowItems.set([{ id: 'b', linked: true }]);
-      doneUndo.pending.set(PENDING);
+      undoWindow.pending.set(PENDING);
       await settle();
       await pressEscapeInBar();
 
@@ -1630,7 +1762,7 @@ describe('ShellLayout', () => {
     });
 
     it('ignores a data-task-id outside <main> on Escape', async () => {
-      const { doneUndo, root, pressEscapeInBar, settle } = await setup();
+      const { undoWindow, root, pressEscapeInBar, settle } = await setup();
       const outside = document.createElement('span');
 
       outside.tabIndex = -1;
@@ -1638,7 +1770,7 @@ describe('ShellLayout', () => {
       outside.dataset['focusTitle'] = '';
       must(root().querySelector('nav[aria-label="Primary"]')).appendChild(outside);
 
-      doneUndo.pending.set(PENDING);
+      undoWindow.pending.set(PENDING);
       await settle();
       await pressEscapeInBar();
 
@@ -1647,10 +1779,10 @@ describe('ShellLayout', () => {
     });
 
     it('never focuses an element with data-task-id but no data-focus-title on Escape', async () => {
-      const { doneUndo, root, pressEscapeInBar, settle } = await setup();
+      const { undoWindow, root, pressEscapeInBar, settle } = await setup();
 
       nowItems.set([{ id: 'a', unmarked: true }]);
-      doneUndo.pending.set(PENDING);
+      undoWindow.pending.set(PENDING);
       await settle();
       await pressEscapeInBar();
 
@@ -1659,10 +1791,10 @@ describe('ShellLayout', () => {
     });
 
     it('skips an unmarked element for the first marked title on Escape', async () => {
-      const { doneUndo, root, pressEscapeInBar, settle } = await setup();
+      const { undoWindow, root, pressEscapeInBar, settle } = await setup();
 
       nowItems.set([{ id: 'a', unmarked: true }, { id: 'b' }]);
-      doneUndo.pending.set(PENDING);
+      undoWindow.pending.set(PENDING);
       await settle();
       await pressEscapeInBar();
 
@@ -1670,23 +1802,49 @@ describe('ShellLayout', () => {
     });
 
     it('never focuses an unmarked element of the restored Task after an Undo', async () => {
-      const { doneUndo, root, settle } = await setup();
+      const { undoWindow, root, settle } = await setup();
 
       nowItems.set([{ id: 'b', unmarked: true }]);
       await settle();
-      doneUndo.undone.set({ taskId: 'b', seq: 1 });
+      undoWindow.undone.set({ taskId: 'b', kind: UndoKind.Done, seq: 1 });
       await settle();
 
       expect(document.activeElement).not.toBe(root().querySelector('main [data-task-id="b"]'));
       expect(document.activeElement).toBe(root().querySelector('main h1'));
     });
 
+    it('focuses an element that names the restored Task in data-focus-title itself', async () => {
+      const { undoWindow, root, settle } = await setup();
+
+      nowItems.set([
+        { id: 'a', named: true },
+        { id: 'b', named: true },
+      ]);
+      await settle();
+      undoWindow.undone.set({ taskId: 'b', kind: UndoKind.Triage, seq: 1 });
+      await settle();
+
+      expect(document.activeElement).toBe(root().querySelector('main [data-focus-title="b"]'));
+      expect(focusedText()).toBe('b');
+    });
+
+    it('focuses a title that names its Task in data-focus-title on Escape too', async () => {
+      const { undoWindow, root, pressEscapeInBar, settle } = await setup();
+
+      nowItems.set([{ id: 'a', named: true }]);
+      undoWindow.pending.set(TRIAGED);
+      await settle();
+      await pressEscapeInBar();
+
+      expect(document.activeElement).toBe(root().querySelector('main [data-focus-title="a"]'));
+    });
+
     it('focuses the restored Task title after an Undo', async () => {
-      const { doneUndo, root, settle } = await setup();
+      const { undoWindow, root, settle } = await setup();
 
       nowItems.set([{ id: 'a' }, { id: 'b' }]);
       await settle();
-      doneUndo.undone.set({ taskId: 'b', seq: 1 });
+      undoWindow.undone.set({ taskId: 'b', kind: UndoKind.Done, seq: 1 });
       await settle();
 
       expect(document.activeElement).toBe(root().querySelector('main [data-task-id="b"]'));
@@ -1694,22 +1852,22 @@ describe('ShellLayout', () => {
     });
 
     it('focuses the restored title, not a leaving copy of it', async () => {
-      const { doneUndo, root, settle } = await setup();
+      const { undoWindow, root, settle } = await setup();
 
       nowItems.set([{ id: 'a', leaving: true }]);
       await settle();
-      doneUndo.undone.set({ taskId: 'a', seq: 1 });
+      undoWindow.undone.set({ taskId: 'a', kind: UndoKind.Done, seq: 1 });
       await settle();
 
       expect(document.activeElement).toBe(root().querySelector('main h1'));
     });
 
     it('focuses the h1 after an Undo when the restored Task is not in the page', async () => {
-      const { doneUndo, root, settle } = await setup();
+      const { undoWindow, root, settle } = await setup();
 
       nowItems.set([{ id: 'b' }]);
       await settle();
-      doneUndo.undone.set({ taskId: 'a', seq: 1 });
+      undoWindow.undone.set({ taskId: 'a', kind: UndoKind.Done, seq: 1 });
       await settle();
 
       expect(document.activeElement).toBe(root().querySelector('main h1'));
@@ -1726,40 +1884,40 @@ describe('ShellLayout', () => {
 
     describe('after Dismiss or Try again', () => {
       it('moves focus to the bar when Dismiss leaves a pending Done behind', async () => {
-        const { doneUndo, undoButton, settle } = await setup();
+        const { undoWindow, undoButton, settle } = await setup();
 
-        doneUndo.pending.set(PENDING);
-        doneUndo.failure.set(NOT_DONE);
+        undoWindow.pending.set(PENDING);
+        undoWindow.failure.set(NOT_DONE);
         await settle();
         undoButton('Dismiss')?.focus();
         undoButton('Dismiss')?.click();
         await settle();
 
-        expect(doneUndo.dismiss).toHaveBeenCalledTimes(1);
+        expect(undoWindow.dismiss).toHaveBeenCalledTimes(1);
         expect(undoButton('Undo')).toBeDefined();
         expect(document.activeElement).toBe(undoButton('Undo'));
       });
 
       it('moves focus to the bar when Try again leaves a pending Done behind', async () => {
-        const { doneUndo, undoButton, settle } = await setup();
+        const { undoWindow, undoButton, settle } = await setup();
 
-        doneUndo.pending.set(PENDING);
-        doneUndo.failure.set(NOT_DONE);
+        undoWindow.pending.set(PENDING);
+        undoWindow.failure.set(NOT_DONE);
         await settle();
         undoButton('Try again')?.focus();
         undoButton('Try again')?.click();
         await settle();
 
-        expect(doneUndo.retry).toHaveBeenCalledTimes(1);
+        expect(undoWindow.retry).toHaveBeenCalledTimes(1);
         expect(document.activeElement).toBe(undoButton('Undo'));
       });
 
       it('leaves focus where it was when a pointer Dismiss leaves a pending Done behind', async () => {
-        const { doneUndo, root, undoButton, settle } = await setup();
+        const { undoWindow, root, undoButton, settle } = await setup();
         const link = must(root().querySelector<HTMLAnchorElement>('nav[aria-label="Primary"] a'));
 
-        doneUndo.pending.set(PENDING);
-        doneUndo.failure.set(NOT_DONE);
+        undoWindow.pending.set(PENDING);
+        undoWindow.failure.set(NOT_DONE);
         await settle();
         link.focus();
         pointerClick(undoButton('Dismiss'));
@@ -1770,10 +1928,10 @@ describe('ShellLayout', () => {
       });
 
       it('moves focus to the next title when a keyboard Dismiss closes the last bar', async () => {
-        const { doneUndo, root, undoBar, undoButton, settle } = await setup();
+        const { undoWindow, root, undoBar, undoButton, settle } = await setup();
 
         nowItems.set([{ id: 'b', leaving: false }]);
-        doneUndo.failure.set(NOT_DONE);
+        undoWindow.failure.set(NOT_DONE);
         await settle();
         undoButton('Dismiss')?.focus();
         undoButton('Dismiss')?.click();
@@ -1784,10 +1942,10 @@ describe('ShellLayout', () => {
       });
 
       it('leaves focus alone when no bar is left', async () => {
-        const { doneUndo, root, undoBar, undoButton, settle } = await setup();
+        const { undoWindow, root, undoBar, undoButton, settle } = await setup();
         const link = must(root().querySelector<HTMLAnchorElement>('nav[aria-label="Primary"] a'));
 
-        doneUndo.failure.set(NOT_DONE);
+        undoWindow.failure.set(NOT_DONE);
         await settle();
         link.focus();
         pointerClick(undoButton('Dismiss'));
@@ -1798,50 +1956,50 @@ describe('ShellLayout', () => {
       });
 
       it('leaves focus where it fell when a pointer Dismiss leaves a pending Done behind, and resumes the Focus pause', async () => {
-        const { doneUndo, undoButton, settle } = await setup();
+        const { undoWindow, undoButton, settle } = await setup();
 
         nowItems.set([{ id: 'b' }]);
-        doneUndo.pending.set(PENDING);
-        doneUndo.failure.set(NOT_DONE);
+        undoWindow.pending.set(PENDING);
+        undoWindow.failure.set(NOT_DONE);
         await settle();
         undoButton('Dismiss')?.focus();
         await settle();
 
-        expect(doneUndo.pause).toHaveBeenLastCalledWith(PauseReason.Focus);
-        expect(doneUndo.resume).not.toHaveBeenCalled();
+        expect(undoWindow.pause).toHaveBeenLastCalledWith(PauseReason.Focus);
+        expect(undoWindow.resume).not.toHaveBeenCalled();
 
         pointerClick(undoButton('Dismiss'));
         await settle();
 
-        expect(doneUndo.dismiss).toHaveBeenCalledTimes(1);
+        expect(undoWindow.dismiss).toHaveBeenCalledTimes(1);
         expect(undoButton('Undo')).toBeDefined();
-        expect(doneUndo.resume).toHaveBeenCalledWith(PauseReason.Focus);
+        expect(undoWindow.resume).toHaveBeenCalledWith(PauseReason.Focus);
         expect(document.activeElement).toBe(document.body);
       });
 
       it('leaves focus where it fell when a pointer Try again leaves a pending Done behind, and resumes the Focus pause', async () => {
-        const { doneUndo, undoButton, settle } = await setup();
+        const { undoWindow, undoButton, settle } = await setup();
 
         nowItems.set([{ id: 'b' }]);
-        doneUndo.pending.set(PENDING);
-        doneUndo.failure.set(NOT_DONE);
+        undoWindow.pending.set(PENDING);
+        undoWindow.failure.set(NOT_DONE);
         await settle();
         undoButton('Try again')?.focus();
         await settle();
         pointerClick(undoButton('Try again'));
         await settle();
 
-        expect(doneUndo.retry).toHaveBeenCalledTimes(1);
+        expect(undoWindow.retry).toHaveBeenCalledTimes(1);
         expect(undoButton('Undo')).toBeDefined();
-        expect(doneUndo.resume).toHaveBeenCalledWith(PauseReason.Focus);
+        expect(undoWindow.resume).toHaveBeenCalledWith(PauseReason.Focus);
         expect(document.activeElement).toBe(document.body);
       });
 
       it('does not focus the next title when a pointer Dismiss closes the last bar, and resumes the Focus pause', async () => {
-        const { doneUndo, root, undoBar, undoButton, settle } = await setup();
+        const { undoWindow, root, undoBar, undoButton, settle } = await setup();
 
         nowItems.set([{ id: 'b' }]);
-        doneUndo.failure.set(NOT_DONE);
+        undoWindow.failure.set(NOT_DONE);
         await settle();
         undoButton('Dismiss')?.focus();
         await settle();
@@ -1849,16 +2007,16 @@ describe('ShellLayout', () => {
         await settle();
 
         expect(undoBar()).toBeNull();
-        expect(doneUndo.resume).toHaveBeenCalledWith(PauseReason.Focus);
+        expect(undoWindow.resume).toHaveBeenCalledWith(PauseReason.Focus);
         expect(document.activeElement).not.toBe(root().querySelector('[data-task-id="b"]'));
         expect(document.activeElement).toBe(document.body);
       });
 
       it('consumes the pointer mark on the next change even when focus was not in the bar', async () => {
-        const { doneUndo, undoButton, settle } = await setup();
+        const { undoWindow, undoButton, settle } = await setup();
 
-        doneUndo.pending.set(PENDING);
-        doneUndo.failure.set(NOT_DONE);
+        undoWindow.pending.set(PENDING);
+        undoWindow.failure.set(NOT_DONE);
         await settle();
 
         // This pointer Dismiss starts with focus outside the bar. It still marks the next guard run,
@@ -1868,7 +2026,7 @@ describe('ShellLayout', () => {
 
         // The mark was consumed by that run, so this keyboard-driven displacement moves focus.
         undoButton('Undo')?.focus();
-        doneUndo.failure.set(NOT_DONE);
+        undoWindow.failure.set(NOT_DONE);
         await settle();
 
         expect(document.activeElement).toBe(undoButton('Try again'));
@@ -1877,13 +2035,13 @@ describe('ShellLayout', () => {
 
     describe('the guard after the bar loses focus', () => {
       it('moves focus to the failure layout first button when a failure displaces the pending Done', async () => {
-        const { doneUndo, undoButton, settle } = await setup();
+        const { undoWindow, undoButton, settle } = await setup();
 
-        doneUndo.pending.set(PENDING);
+        undoWindow.pending.set(PENDING);
         await settle();
         undoButton('Undo')?.focus();
         await settle();
-        doneUndo.failure.set(NOT_DONE);
+        undoWindow.failure.set(NOT_DONE);
         await settle();
 
         expect(undoButton('Undo')).toBeUndefined();
@@ -1891,27 +2049,27 @@ describe('ShellLayout', () => {
       });
 
       it('moves focus to Dismiss when the failure cannot be retried', async () => {
-        const { doneUndo, undoButton, settle } = await setup();
+        const { undoWindow, undoButton, settle } = await setup();
 
-        doneUndo.pending.set(PENDING);
+        undoWindow.pending.set(PENDING);
         await settle();
         undoButton('Undo')?.focus();
         await settle();
-        doneUndo.failure.set({ ...NOT_DONE, canRetry: false });
+        undoWindow.failure.set({ ...NOT_DONE, canRetry: false });
         await settle();
 
         expect(document.activeElement).toBe(undoButton('Dismiss'));
       });
 
       it('moves focus to the next title when the bar goes without a failure', async () => {
-        const { doneUndo, root, undoBar, undoButton, settle } = await setup();
+        const { undoWindow, root, undoBar, undoButton, settle } = await setup();
 
         nowItems.set([{ id: 'b' }]);
-        doneUndo.pending.set(PENDING);
+        undoWindow.pending.set(PENDING);
         await settle();
         undoButton('Undo')?.focus();
         await settle();
-        doneUndo.pending.set(null);
+        undoWindow.pending.set(null);
         await settle();
 
         expect(undoBar()).toBeNull();
@@ -1919,70 +2077,70 @@ describe('ShellLayout', () => {
       });
 
       it('moves focus to the h1 when the bar goes and no title is in the page', async () => {
-        const { doneUndo, root, undoButton, settle } = await setup();
+        const { undoWindow, root, undoButton, settle } = await setup();
 
-        doneUndo.pending.set(PENDING);
+        undoWindow.pending.set(PENDING);
         await settle();
         undoButton('Undo')?.focus();
         await settle();
-        doneUndo.pending.set(null);
+        undoWindow.pending.set(null);
         await settle();
 
         expect(document.activeElement).toBe(root().querySelector('main h1'));
       });
 
       it('resumes the Focus pause when the bar goes under focus', async () => {
-        const { doneUndo, undoButton, settle } = await setup();
+        const { undoWindow, undoButton, settle } = await setup();
 
-        doneUndo.pending.set(PENDING);
+        undoWindow.pending.set(PENDING);
         await settle();
         undoButton('Undo')?.focus();
         await settle();
-        doneUndo.pending.set(null);
+        undoWindow.pending.set(null);
         await settle();
 
-        expect(doneUndo.resume).toHaveBeenCalledWith(PauseReason.Focus);
+        expect(undoWindow.resume).toHaveBeenCalledWith(PauseReason.Focus);
       });
 
       it('does nothing while focus is still inside the bar after another Task replaces the pending one', async () => {
-        const { doneUndo, undoButton, settle } = await setup();
+        const { undoWindow, undoButton, settle } = await setup();
 
         nowItems.set([{ id: 'b' }]);
-        doneUndo.pending.set(PENDING);
+        undoWindow.pending.set(PENDING);
         await settle();
         undoButton('Undo')?.focus();
         await settle();
-        doneUndo.pending.set({
+        undoWindow.pending.set({
+          ...PENDING,
           taskId: 'b',
           title: 'Call Marit',
-          origin: DoneOrigin.Button,
-          remainingMs: UNDO_WINDOW_MS,
+          undoLabel: 'Undo Done: Call Marit',
         });
         await settle();
 
         expect(document.activeElement).toBe(undoButton('Undo'));
-        expect(doneUndo.resume).not.toHaveBeenCalled();
+        expect(undoWindow.resume).not.toHaveBeenCalled();
       });
 
       it('does not move focus when it was on a bottom nav link and the layout changes', async () => {
-        const { doneUndo, root, undoBar, settle } = await setup();
+        const { undoWindow, root, undoBar, settle } = await setup();
         const link = must(root().querySelector<HTMLAnchorElement>('nav[aria-label="Primary"] a'));
 
         nowItems.set([{ id: 'b' }]);
-        doneUndo.pending.set(PENDING);
+        undoWindow.pending.set(PENDING);
         await settle();
         link.focus();
-        doneUndo.failure.set(NOT_DONE);
+        undoWindow.failure.set(NOT_DONE);
         await settle();
 
         expect(document.activeElement).toBe(link);
 
-        doneUndo.failure.set(null);
+        undoWindow.failure.set(null);
         await settle();
 
         expect(document.activeElement).toBe(link);
 
-        doneUndo.pending.set(null);
+        undoWindow.pending.set(null);
         await settle();
 
         expect(undoBar()).toBeNull();
@@ -1990,12 +2148,12 @@ describe('ShellLayout', () => {
       });
 
       it('does not move focus when nothing had focus and the bar goes', async () => {
-        const { doneUndo, root, settle } = await setup();
+        const { undoWindow, root, settle } = await setup();
 
         nowItems.set([{ id: 'b' }]);
-        doneUndo.pending.set(PENDING);
+        undoWindow.pending.set(PENDING);
         await settle();
-        doneUndo.pending.set(null);
+        undoWindow.pending.set(null);
         await settle();
 
         expect(document.activeElement).not.toBe(root().querySelector('[data-task-id="b"]'));
@@ -2003,17 +2161,17 @@ describe('ShellLayout', () => {
       });
 
       it('does not steal focus that someone moved to another title as the bar goes', async () => {
-        const { doneUndo, root, undoButton, settle } = await setup();
+        const { undoWindow, root, undoButton, settle } = await setup();
 
         nowItems.set([{ id: 'a' }, { id: 'b' }]);
-        doneUndo.pending.set(PENDING);
+        undoWindow.pending.set(PENDING);
         await settle();
         undoButton('Undo')?.focus();
         await settle();
 
         const second = must(root().querySelector<HTMLElement>('main [data-task-id="b"]'));
 
-        doneUndo.pending.set(null);
+        undoWindow.pending.set(null);
         second.focus();
         await settle();
 
@@ -2021,10 +2179,10 @@ describe('ShellLayout', () => {
       });
 
       it('lets the restored title take focus after an Undo, and the guard leaves it', async () => {
-        const { doneUndo, root, undoButton, settle } = await setup();
+        const { undoWindow, root, undoButton, settle } = await setup();
 
         nowItems.set([{ id: 'a' }, { id: 'b' }]);
-        doneUndo.pending.set(PENDING);
+        undoWindow.pending.set(PENDING);
         await settle();
         undoButton('Undo')?.focus();
         await settle();
@@ -2040,8 +2198,8 @@ describe('ShellLayout', () => {
         });
 
         // The real undo() clears the pending Done and records `undone` together.
-        doneUndo.pending.set(null);
-        doneUndo.undone.set({ taskId: 'b', seq: 1 });
+        undoWindow.pending.set(null);
+        undoWindow.undone.set({ taskId: 'b', kind: UndoKind.Done, seq: 1 });
         await settle();
         spy.mockRestore();
 
@@ -2058,9 +2216,9 @@ describe('ShellLayout', () => {
 
     it('publishes the observed border-box height on the shell host and observes the bar', async () => {
       const instances = stubResizeObserver(true);
-      const { doneUndo, shellHost, undoBar, settle } = await setup();
+      const { undoWindow, shellHost, undoBar, settle } = await setup();
 
-      doneUndo.pending.set(PENDING);
+      undoWindow.pending.set(PENDING);
       await settle();
 
       expect(heightOf(shellHost())).toBe('64px');
@@ -2069,14 +2227,14 @@ describe('ShellLayout', () => {
 
     it('sets 0px and disconnects the bar observer once the bar is gone', async () => {
       const instances = stubResizeObserver(true);
-      const { doneUndo, shellHost, undoBar, settle } = await setup();
+      const { undoWindow, shellHost, undoBar, settle } = await setup();
 
-      doneUndo.pending.set(PENDING);
+      undoWindow.pending.set(PENDING);
       await settle();
 
       const bar = must(undoBar());
 
-      doneUndo.pending.set(null);
+      undoWindow.pending.set(null);
       await settle();
 
       const barObservers = instances.filter((instance) => instance.observed.includes(bar));
@@ -2091,12 +2249,83 @@ describe('ShellLayout', () => {
     it('observes nothing and still shows the bar without ResizeObserver', async () => {
       stubResizeObserver(false);
 
-      const { doneUndo, shellHost, undoBar, settle } = await setup();
+      const { undoWindow, shellHost, undoBar, settle } = await setup();
 
-      doneUndo.pending.set(PENDING);
+      undoWindow.pending.set(PENDING);
       await settle();
 
       expect(undoBar()).not.toBeNull();
+      expect(heightOf(shellHost())).not.toBe('64px');
+    });
+  });
+
+  describe('the quick add height', () => {
+    const QUICKADD_HEIGHT = '--shell-quickadd-height';
+
+    const heightOf = (host: HTMLElement | null): string =>
+      host?.style.getPropertyValue(QUICKADD_HEIGHT) ?? '';
+
+    it('publishes the observed border-box height of the open quick add on the shell host', async () => {
+      const instances = stubResizeObserver(true, false);
+      const { shellHost, bar, open } = await setup();
+
+      expect(heightOf(shellHost())).toBe('');
+
+      await open();
+
+      const quickAdd = must(bar(), 'quick add');
+      const observer = instances.find((instance) => instance.observed.includes(quickAdd));
+
+      observer?.fire(quickAdd, 96);
+
+      expect(heightOf(shellHost())).toBe('96px');
+
+      observer?.fire(quickAdd, 140);
+
+      expect(heightOf(shellHost())).toBe('140px');
+    });
+
+    it('sets 0px and disconnects the observer once quick add is closed', async () => {
+      const instances = stubResizeObserver(true);
+      const { shellHost, bar, open, closeButton, settle } = await setup();
+
+      await open();
+
+      const quickAdd = must(bar(), 'quick add');
+
+      expect(heightOf(shellHost())).toBe('64px');
+
+      closeButton()?.click();
+      await settle();
+
+      const observers = instances.filter((instance) => instance.observed.includes(quickAdd));
+
+      expect(heightOf(shellHost())).toBe('0px');
+      expect(observers.length).toBeGreaterThan(0);
+      expect(observers.every((instance) => instance.disconnect.mock.calls.length > 0)).toBe(true);
+    });
+
+    it('keeps the quick add height apart from the Undo bar height', async () => {
+      const instances = stubResizeObserver(true, false);
+      const { shellHost, bar, open } = await setup();
+
+      await open();
+
+      const quickAdd = must(bar(), 'quick add');
+
+      instances.find((instance) => instance.observed.includes(quickAdd))?.fire(quickAdd, 96);
+
+      expect(shellHost()?.style.getPropertyValue('--shell-undo-height')).not.toBe('96px');
+    });
+
+    it('observes nothing and writes no quick add height without ResizeObserver', async () => {
+      stubResizeObserver(false);
+
+      const { shellHost, bar, open } = await setup();
+
+      await open();
+
+      expect(bar()).not.toBeNull();
       expect(heightOf(shellHost())).not.toBe('64px');
     });
   });

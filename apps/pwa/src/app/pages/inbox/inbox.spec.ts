@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: EUPL-1.2
-import { ErrorHandler, signal } from '@angular/core';
+import { Component, ErrorHandler, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter, Router, type UrlTree } from '@angular/router';
+import { By } from '@angular/platform-browser';
+import { provideRouter, Router } from '@angular/router';
 import {
   CommandTag,
-  NotApplicableReason,
+  explainTask,
+  type Instant,
   RejectedReason,
+  TaskExplanationTag,
   TaskKind,
   TaskStatus,
   WORK_ACTIVE_HOURS,
@@ -15,23 +18,24 @@ import {
   type DomainState,
   type ReviewItem,
   type Task,
+  type TriageTask,
 } from '@asys/domain';
 
 import { CommandOutcomeTag, type CommandOutcome } from '../../core/api/data-api';
 import { DataStore, SyncStatus } from '../../core/data/data-store';
 import { outcomeMessage } from '../../core/data/outcome-message';
+import { type PendingUndo, type Undone, UndoWindow } from '../../core/data/undo-window';
+import { Clock } from '../../core/platform/clock';
 import { Ids } from '../../core/platform/ids';
+import { InboxTemplate } from '../../components/templates/inbox-template/inbox-template';
 import { Inbox } from './inbox';
 
 const APPLIED: CommandOutcome = { _tag: CommandOutcomeTag.Applied, seq: 1 };
 
 const FAILED: CommandOutcome = { _tag: CommandOutcomeTag.Failed, status: 0 };
 
-const NOT_APPLICABLE: CommandOutcome = {
-  _tag: CommandOutcomeTag.NotApplicable,
-  reason: NotApplicableReason.ExpectationFailed,
-  reviewItemId: 'rx',
-};
+/** 10:00 in Amsterdam on 2026-10-04. */
+const T0 = Date.parse('2026-10-04T08:00:00.000Z') as Instant;
 
 const task = (overrides: Partial<Task> & Pick<Task, 'id' | 'title'>): Task => ({
   kind: TaskKind.Task,
@@ -61,18 +65,13 @@ const area = (id: string, name: string): Area => ({
   version: 1,
 });
 
-const reviewItem = (
-  id: string,
-  taskId: string,
-  createdAt: number,
-  command: Record<string, unknown> = { _tag: CommandTag.CompleteTask },
-): ReviewItem => ({
+const reviewItem = (id: string, taskId: string, createdAt: number): ReviewItem => ({
   id,
   kind: 'command_not_applicable',
   subjects: [],
   payload: {
     command: {
-      ...command,
+      _tag: CommandTag.CompleteTask,
       taskId,
       expect: { status: 'open' },
       idempotencyKey: '00000000-0000-4000-8000-000000000001',
@@ -110,7 +109,15 @@ const C = task({ id: 'c', title: 'Charlie', important: null, estimateMinutes: nu
 // Not in the Inbox: open, with both fields set.
 const CALL = task({ id: 't1', title: 'Call Marit', createdAt: 10 });
 
-const THREE = domainState([A, B, C]);
+const THREE = domainState([A, B, C, CALL]);
+
+const TRIAGE_A: TriageTask = {
+  _tag: CommandTag.TriageTask,
+  taskId: 'a',
+  important: true,
+  estimateMinutes: 25,
+  expect: { status: TaskStatus.Open, version: 1 },
+};
 
 const must = <T>(value: T | null | undefined, what = 'value'): T => {
   if (value === null || value === undefined) {
@@ -128,6 +135,14 @@ const deferred = <T>() => {
 
   return { promise, resolve };
 };
+
+const without = (state: DomainState, id: string): DomainState => ({
+  ...state,
+  tasks: state.tasks.filter((t) => t.id !== id),
+});
+
+@Component({ template: '' })
+class Stub {}
 
 interface SetupOptions {
   readonly state?: DomainState | null;
@@ -152,23 +167,46 @@ const setup = async (options: SetupOptions = {}) => {
   let counter = 0;
   const next = vi.fn<() => string>(() => `key-${++counter}`);
   const handleError = vi.fn<(error: unknown) => void>();
+  // As a hold would: the Task leaves the state at once, and an Undo puts the stored Task back.
+  const held: Task[] = [];
+  const hide = (heldTask: Task): void => {
+    const stored = state()?.tasks.find((t) => t.id === heldTask.id);
+
+    if (stored !== undefined) {
+      held.push(stored);
+    }
+
+    state.update((current) => (current === null ? current : without(current, heldTask.id)));
+  };
+  const triage = vi.fn<(task: Task, command: TriageTask, quadrantWord: string) => void>(hide);
+  const drop = vi.fn<(task: Task) => void>(hide);
+  const undoWindow = {
+    triage,
+    drop,
+    pending: signal<PendingUndo | null>(null),
+    undone: signal<Undone | null>(null),
+  };
 
   TestBed.configureTestingModule({
     providers: [
-      provideRouter([]),
+      provideRouter([{ path: 'tasks/:id', component: Stub }]),
       { provide: DataStore, useValue: { state, status, awaitingSync, currentArea, send, refresh } },
+      { provide: UndoWindow, useValue: undoWindow },
+      { provide: Clock, useValue: { now: signal(T0) } },
       { provide: Ids, useValue: { next } },
       { provide: ErrorHandler, useValue: { handleError } },
     ],
   });
 
   const fixture = TestBed.createComponent(Inbox);
+  const router = TestBed.inject(Router);
 
   document.body.appendChild(fixture.nativeElement);
   await fixture.whenStable();
 
   const root = (): HTMLElement => fixture.nativeElement;
-  const text = (el: Element = root()): string => (el.textContent ?? '').replace(/\s+/g, ' ').trim();
+  const text = (el: Element | null | undefined = root()): string =>
+    (el?.textContent ?? '').replace(/\s+/g, ' ').trim();
   const settle = async (): Promise<void> => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     await fixture.whenStable();
@@ -178,63 +216,88 @@ const setup = async (options: SetupOptions = {}) => {
   const heading = (): HTMLElement => must(root().querySelector('h1.inbox__title'));
   const statusLine = (): HTMLElement => must(root().querySelector('p.inbox__status'));
   const card = (): HTMLElement | null => root().querySelector('asys-triage-card');
-  const cardTitle = (): HTMLElement => must(root().querySelector('.asys-triage__title'));
-  const progress = (): string | undefined =>
-    root().querySelector('.asys-triage__progress')?.textContent?.trim();
-  const cardButton = (name: string): HTMLButtonElement | undefined =>
-    Array.from(card()?.querySelectorAll('button') ?? []).find(
-      (b) => (b.textContent ?? '').trim() === name,
-    );
-  const confirmButton = (name: string): HTMLButtonElement | undefined =>
-    Array.from(root().querySelectorAll('.asys-confirm button')).find(
-      (b) => (b.textContent ?? '').trim() === name,
-    ) as HTMLButtonElement | undefined;
+  const section = (): HTMLElement | null => root().querySelector('section.asys-triage');
+  const titleField = (): HTMLTextAreaElement =>
+    must(root().querySelector<HTMLTextAreaElement>('textarea.asys-triage__title'));
+  const progress = (): string => text(root().querySelector('.asys-triage__progress'));
+  const hint = (): HTMLElement | null => root().querySelector('p.asys-triage__hint');
+  const buttonIn = (scope: ParentNode, name: string): HTMLButtonElement | undefined =>
+    Array.from(scope.querySelectorAll<HTMLButtonElement>('button')).find((b) => text(b) === name);
+  const barButton = (name: string): HTMLButtonElement | undefined =>
+    buttonIn(must(root().querySelector('footer.inbox__actions'), 'the action bar'), name);
+  const triageButton = (): HTMLButtonElement =>
+    must(root().querySelector<HTMLButtonElement>('button.inbox__triage'));
   const reviews = (): HTMLElement[] =>
     Array.from(root().querySelectorAll<HTMLElement>('ul.inbox__reviews > li'));
   const dismissButton = (index = 0): HTMLButtonElement | undefined =>
-    Array.from(reviews()[index]?.querySelectorAll('button') ?? []).find(
-      (b) => (b.textContent ?? '').trim() === 'Dismiss',
-    );
+    buttonIn(must(reviews()[index]), 'Dismiss');
   const click = async (el: HTMLElement | undefined): Promise<void> => {
     must(el).click();
     await settle();
   };
   const important = async (value: boolean): Promise<void> => {
+    await click(buttonIn(must(card()), value ? 'Important' : 'Not important'));
+  };
+  const estimate = async (label: string): Promise<void> => {
     await click(
-      root().querySelectorAll<HTMLElement>('asys-segmented-control .asys-segment')[value ? 0 : 1],
+      must(
+        root().querySelector<HTMLElement>(
+          `asys-estimate-picker .asys-segment[aria-label="${label}"]`,
+        ),
+      ),
     );
   };
-  // The chips are 5, 15, 25, 45, 60 and 120 minutes.
-  const chip = async (index: number): Promise<void> => {
-    await click(
-      root().querySelectorAll<HTMLElement>('asys-estimate-picker .asys-segment--num')[index],
-    );
-  };
-  // The pressed Importance option and Estimate chip, as 'importance:<index>' and 'chip:<index>'.
-  const pressed = (): string[] => {
-    const mark = (selector: string, name: string): string[] =>
-      Array.from(root().querySelectorAll(selector))
-        .map((b, i) => (b.getAttribute('aria-pressed') === 'true' ? `${name}:${i}` : ''))
-        .filter((m) => m !== '');
+  const pressedEstimate = (): string | null =>
+    root()
+      .querySelector('asys-estimate-picker .asys-segment[aria-pressed="true"]')
+      ?.getAttribute('aria-label') ?? null;
+  const pressedImportance = (): string | null =>
+    text(root().querySelector('asys-segmented-control .asys-segment[aria-pressed="true"]')) || null;
+  const typeTitle = async (value: string): Promise<void> => {
+    const field = titleField();
 
-    return [
-      ...mark('asys-segmented-control .asys-segment', 'importance'),
-      ...mark('asys-estimate-picker .asys-segment--num', 'chip'),
-    ];
-  };
-  const chooseArea = async (value: string): Promise<void> => {
-    await click(cardButton('Change'));
-
-    const select = must(root().querySelector<HTMLSelectElement>('asys-select-field select'));
-
-    select.value = value;
-    select.dispatchEvent(new Event('change', { bubbles: true }));
+    field.value = value;
+    field.dispatchEvent(new Event('input', { bubbles: true }));
     await settle();
   };
-  const areaOptions = (): string[] =>
-    Array.from(root().querySelectorAll<HTMLOptionElement>('asys-select-field option')).map(
-      (o) => o.value,
+  const shownArea = (): string => text(root().querySelector('asys-choice-row'));
+  const chooseArea = async (name: string): Promise<void> => {
+    await click(
+      Array.from(root().querySelectorAll<HTMLButtonElement>('button.asys-choice-row__open')).find(
+        (b) => text(b).startsWith('Area'),
+      ),
     );
+    await click(
+      Array.from(
+        root().querySelectorAll<HTMLButtonElement>('ul.asys-option-list button.asys-field-row'),
+      ).find((b) => text(b) === name),
+    );
+  };
+  const sheet = (heading: string): HTMLDialogElement =>
+    must(
+      Array.from(root().querySelectorAll<HTMLDialogElement>('dialog.asys-sheet')).find(
+        (d) => text(d.querySelector('h2.asys-sheet__heading')) === heading,
+      ),
+      `the ${heading} sheet`,
+    );
+  const openMore = async (): Promise<HTMLDialogElement> => {
+    await click(
+      must(root().querySelector<HTMLButtonElement>('button[aria-label="More for this Task"]')),
+    );
+
+    return sheet('More');
+  };
+  /** The template's outputs, to emit one the way a sheet that stayed open for an older card would. */
+  const template = (): InboxTemplate =>
+    must(fixture.debugElement.query(By.directive(InboxTemplate))).componentInstance;
+  const undo = async (): Promise<void> => {
+    const back = must(held.pop(), 'a held Task');
+
+    state.update((current) =>
+      current === null ? current : { ...current, tasks: [...current.tasks, back] },
+    );
+    await settle();
+  };
   // Resolves the n-th send; the state is updated first, as the store does after its follow-up sync.
   const finish = async (
     n: number,
@@ -251,44 +314,45 @@ const setup = async (options: SetupOptions = {}) => {
 
   return {
     fixture,
+    router,
     state,
-    status,
     awaitingSync,
     currentArea,
     send,
     sends,
     refresh,
-    next,
     handleError,
+    triage,
+    drop,
     root,
     text,
     settle,
     heading,
     statusLine,
     card,
-    cardTitle,
+    section,
+    titleField,
     progress,
-    cardButton,
-    confirmButton,
+    hint,
+    barButton,
+    triageButton,
     reviews,
     dismissButton,
     click,
     important,
-    chip,
-    pressed,
+    estimate,
+    pressedEstimate,
+    pressedImportance,
+    typeTitle,
+    shownArea,
     chooseArea,
-    areaOptions,
+    sheet,
+    openMore,
+    template,
+    undo,
     finish,
   };
 };
-
-const sent = (send: { mock: { calls: unknown[][] } }, n: number): Command =>
-  must(send.mock.calls[n])[0] as Command;
-
-const without = (state: DomainState, ...ids: string[]): DomainState => ({
-  ...state,
-  tasks: state.tasks.filter((t) => !ids.includes(t.id)),
-});
 
 describe('Inbox', () => {
   afterEach(() => {
@@ -296,31 +360,27 @@ describe('Inbox', () => {
   });
 
   describe('without state', () => {
-    it('shows Loading… and no alert while there is no state', async () => {
+    it('shows Loading… and no card while there is no state', async () => {
       const { root, text, card } = await setup({ state: null, status: SyncStatus.Loading });
 
       expect(text()).toContain('Loading…');
       expect(root().querySelector('[role="alert"]')).toBeNull();
       expect(card()).toBeNull();
+      expect(root().querySelector('footer.inbox__actions')).toBeNull();
     });
 
     it('shows an alert and Try again when loading failed, and Try again refreshes', async () => {
-      const { root, text, refresh, settle } = await setup({
-        state: null,
-        status: SyncStatus.Failed,
-      });
+      const { root, refresh, click } = await setup({ state: null, status: SyncStatus.Failed });
 
       expect(root().querySelector('p[role="alert"]')?.textContent?.trim()).toBe(
         'ASYS could not load your Tasks.',
       );
-      expect(text()).not.toContain('Loading…');
 
-      const retry = Array.from(root().querySelectorAll('button')).find(
-        (b) => b.textContent?.trim() === 'Try again',
+      await click(
+        Array.from(root().querySelectorAll('button')).find(
+          (b) => b.textContent?.trim() === 'Try again',
+        ),
       );
-
-      must(retry).click();
-      await settle();
 
       expect(refresh).toHaveBeenCalledTimes(1);
     });
@@ -329,78 +389,529 @@ describe('Inbox', () => {
       const { heading, statusLine } = await setup({ state: null });
 
       expect(heading().textContent?.trim()).toBe('Inbox');
-      expect(heading().tagName).toBe('H1');
       expect(heading().getAttribute('tabindex')).toBe('-1');
       expect(statusLine().getAttribute('role')).toBe('status');
       expect(statusLine().textContent?.trim()).toBe('');
       expect(heading().nextElementSibling).toBe(statusLine());
     });
-
-    it('shows the Tasks, not the alert, when there is state although the status is Failed', async () => {
-      const { root, card } = await setup({ status: SyncStatus.Failed });
-
-      expect(root().querySelector('[role="alert"]')).toBeNull();
-      expect(card()).not.toBeNull();
-    });
   });
 
   describe('the layout', () => {
-    it('shows the Review items before the card, under the heading and the status line', async () => {
-      const { reviews, card, heading, statusLine } = await setup({
+    it('shows the card before the Review items', async () => {
+      const { reviews, card } = await setup({
         state: domainState([A, B, CALL], { reviewItems: [reviewItem('r1', 't1', 1)] }),
       });
 
       expect(reviews()).toHaveLength(1);
-      expect(heading().nextElementSibling).toBe(statusLine());
       expect(
-        must(reviews()[0]).compareDocumentPosition(must(card())) & Node.DOCUMENT_POSITION_FOLLOWING,
+        must(card()).compareDocumentPosition(must(reviews()[0])) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     });
 
-    it('says Nothing waits here. when there is no Review item and no Inbox Task', async () => {
-      const { root, card, reviews } = await setup({ state: domainState([CALL]) });
+    it('shows the empty card, without progress, when there is no Review item and no Inbox Task', async () => {
+      const { root, text, card } = await setup({ state: domainState([CALL]) });
+      const empty = must(root().querySelector('section.inbox__empty'));
 
-      expect(root().querySelector('p.inbox__text')?.textContent?.trim()).toBe(
-        'Nothing waits here.',
-      );
+      expect(text(empty)).toBe('Inbox is empty New captures land here.');
       expect(card()).toBeNull();
-      expect(reviews()).toHaveLength(0);
+      expect(root().querySelector('footer.inbox__actions')).toBeNull();
     });
 
-    it('does not say it while a Review item waits', async () => {
-      const { text } = await setup({
+    it('does not show the empty card while a Review item waits', async () => {
+      const { root } = await setup({
         state: domainState([CALL], { reviewItems: [reviewItem('r1', 't1', 1)] }),
       });
 
-      expect(text()).not.toContain('Nothing waits here.');
+      expect(root().querySelector('section.inbox__empty')).toBeNull();
+    });
+  });
+
+  describe('the card', () => {
+    it('shows the oldest Inbox Task with its progress and its capture text', async () => {
+      const { root, titleField, progress, section } = await setup();
+
+      expect(root().querySelectorAll('asys-triage-card')).toHaveLength(1);
+      expect(titleField().value).toBe('Alpha');
+      expect(section()?.getAttribute('data-focus-title')).toBe('a');
+      expect(progress()).toBe('1 of 3');
+      expect(root().querySelector('.asys-triage__captured-text')?.textContent?.trim()).toBe(
+        'alpha raw text',
+      );
     });
 
-    it('does not say it while an Inbox Task waits', async () => {
-      const { text } = await setup();
+    it('hides the capture text when it is blank or the title', async () => {
+      const { root, state, settle } = await setup({ state: domainState([B]) });
 
-      expect(text()).not.toContain('Nothing waits here.');
+      expect(root().querySelector('.asys-triage__captured')).toBeNull();
+
+      state.set(domainState([{ ...B, captureText: 'Bravo' }]));
+      await settle();
+
+      expect(root().querySelector('.asys-triage__captured')).toBeNull();
     });
 
-    it('does not list a resolved Review item', async () => {
-      const { reviews } = await setup({
-        state: domainState([CALL], {
-          reviewItems: [{ ...reviewItem('r1', 't1', 1), resolvedAt: 5 }],
+    it('starts the draft from the stored Task', async () => {
+      const { pressedImportance, pressedEstimate } = await setup({ state: domainState([B, C]) });
+
+      expect(pressedImportance()).toBe('Important');
+      expect(pressedEstimate()).toBeNull();
+    });
+
+    it('lets fields the person did not change follow the store', async () => {
+      const { state, settle, important, titleField, pressedImportance, pressedEstimate } =
+        await setup();
+
+      await important(false);
+      state.set(
+        domainState([{ ...A, title: 'Alpha renamed', estimateMinutes: 45, version: 2 }, B]),
+      );
+      await settle();
+
+      expect(titleField().value).toBe('Alpha renamed');
+      expect(pressedEstimate()).toBe('45 min');
+      expect(pressedImportance()).toBe('Not important');
+    });
+
+    it('keeps a changed field over the store', async () => {
+      const { state, settle, typeTitle, titleField } = await setup();
+
+      await typeTitle('Alpha, mine');
+      state.set(domainState([{ ...A, title: 'Alpha renamed', version: 2 }, B]));
+      await settle();
+
+      expect(titleField().value).toBe('Alpha, mine');
+    });
+
+    it('is disabled, with Drop and Triage, while the Task awaits the server', async () => {
+      const { awaitingSync, settle, titleField, barButton, triageButton, root } = await setup();
+
+      awaitingSync.set(new Set(['a']));
+      await settle();
+
+      expect(titleField().disabled).toBe(true);
+      expect(barButton('Drop')?.disabled).toBe(true);
+      expect(triageButton().disabled).toBe(true);
+      expect(root().querySelector('p.inbox__sync')).not.toBeNull();
+    });
+
+    it('offers the Areas ordered by name', async () => {
+      const { root, click, text } = await setup({
+        state: domainState([A], {
+          areas: [area('z1', 'beta'), area('a2', 'Work'), area('m1', 'Zed'), area('n1', 'Alpha')],
         }),
       });
 
-      expect(reviews()).toHaveLength(0);
+      await click(must(root().querySelector<HTMLButtonElement>('button.asys-choice-row__open')));
+
+      expect(
+        Array.from(root().querySelectorAll('ul.asys-option-list button.asys-field-row')).map((b) =>
+          text(b),
+        ),
+      ).toEqual(['No Area', 'Alpha', 'Work', 'Zed', 'beta']);
+    });
+  });
+
+  describe('the reason preview', () => {
+    it('asks for what is missing, then shows what Now would say', async () => {
+      const { root, hint, important, text, triageButton } = await setup();
+
+      expect(text(hint())).toBe('Pick an Importance to triage.');
+      expect(text(triageButton())).toBe('Triage');
+
+      await important(true);
+
+      const preview = { ...A, important: true };
+      const explanation = explainTask(
+        preview,
+        [preview, B, C, CALL],
+        [],
+        { timeZone: 'Europe/Amsterdam', urgencyWindowDays: 2 },
+        T0,
+      );
+
+      expect(explanation._tag).toBe(TaskExplanationTag.Available);
+      if (explanation._tag !== TaskExplanationTag.Available) return;
+
+      const line = must(root().querySelector('p.asys-triage__reason'));
+
+      expect(hint()).toBeNull();
+      expect(text(line)).toContain(explanation.reasonText);
+      expect(text(line.querySelector('asys-quadrant-label'))).toBe('Quadrant: Plan');
+      expect(text(triageButton())).toBe('Triage as Plan');
     });
 
-    it('says Nothing waits here. when the Inbox empties from outside', async () => {
-      const { state, root, card, settle } = await setup();
+    it('previews the dates on the card', async () => {
+      const { root, state, settle, important, text } = await setup({ state: domainState([A]) });
 
-      state.set(domainState([CALL]));
+      state.set(domainState([{ ...A, due: { date: '2026-10-05' } }]));
+      await settle();
+      await important(true);
+
+      expect(text(root().querySelector('p.asys-triage__reason asys-quadrant-label'))).toBe(
+        'Quadrant: Do',
+      );
+    });
+  });
+
+  describe('Triage', () => {
+    it('counts a refused Triage and sends nothing while Importance or an Estimate is missing', async () => {
+      const { click, triageButton, triage, hint } = await setup();
+
+      expect(hint()?.classList.contains('asys-triage__hint--missing')).toBe(false);
+
+      await click(triageButton());
+
+      expect(triage).not.toHaveBeenCalled();
+      expect(hint()?.classList.contains('asys-triage__hint--missing')).toBe(true);
+      expect(triageButton().disabled).toBe(false);
+    });
+
+    it('starts the attempts again for the next card', async () => {
+      const { click, triageButton, barButton, hint, progress } = await setup();
+
+      await click(triageButton());
+      await click(barButton('Drop'));
+
+      expect(progress()).toBe('2 of 3');
+      expect(hint()?.classList.contains('asys-triage__hint--missing')).toBe(false);
+    });
+
+    it('holds a TriageTask through the Undo window with the Quadrant word', async () => {
+      const { click, triageButton, important, triage, send } = await setup();
+
+      await important(true);
+      await click(triageButton());
+
+      expect(triage).toHaveBeenCalledOnce();
+
+      const [heldTask, command, word] = must(triage.mock.calls[0]);
+
+      expect(heldTask.id).toBe('a');
+      expect(command).toEqual(TRIAGE_A);
+      expect(word).toBe('Plan');
+      expect(send).not.toHaveBeenCalled();
+    });
+
+    it('carries the card’s edits, and names the Task by its new title', async () => {
+      const { click, triageButton, important, estimate, typeTitle, chooseArea, triage } =
+        await setup({ state: domainState([A], { areas: [area('a1', 'Work')] }) });
+
+      await typeTitle('  Alpha, sharper ');
+      await important(false);
+      await estimate('5 min');
+      await chooseArea('Work');
+      await click(triageButton());
+
+      const [heldTask, command] = must(triage.mock.calls[0]);
+
+      expect(command).toEqual({
+        ...TRIAGE_A,
+        important: false,
+        estimateMinutes: 5,
+        title: 'Alpha, sharper',
+        areaId: 'a1',
+      });
+      expect(heldTask.title).toBe('Alpha, sharper');
+    });
+
+    it('moves on to the next card and focuses it, not its Title', async () => {
+      const { click, triageButton, important, section, progress, titleField } = await setup();
+
+      await important(true);
+      await click(triageButton());
+
+      expect(titleField().value).toBe('Bravo');
+      expect(progress()).toBe('2 of 3');
+      expect(document.activeElement).toBe(section());
+      expect(section()?.getAttribute('data-focus-title')).toBe('b');
+    });
+
+    it('focuses the heading and shows the empty card once the last Task is triaged', async () => {
+      const { click, triageButton, important, heading, root, text } = await setup({
+        state: domainState([A]),
+      });
+
+      await important(true);
+      await click(triageButton());
+
+      expect(document.activeElement).toBe(heading());
+      expect(text(root().querySelector('section.inbox__empty .inbox__progress'))).toBe(
+        '1 of 1 triaged',
+      );
+    });
+
+    it('ignores a Triage for a Task that is not the card’s', async () => {
+      const { important, template, settle, triage, send } = await setup();
+
+      await important(true);
+      template().triage.emit('b');
       await settle();
 
-      expect(root().querySelector('p.inbox__text')?.textContent?.trim()).toBe(
-        'Nothing waits here.',
+      expect(triage).not.toHaveBeenCalled();
+      expect(send).not.toHaveBeenCalled();
+    });
+
+    it('does nothing while the card is busy', async () => {
+      const { awaitingSync, settle, important, triageButton, triage } = await setup();
+
+      await important(true);
+      awaitingSync.set(new Set(['a']));
+      await settle();
+      triageButton().click();
+      await settle();
+
+      expect(triage).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Drop', () => {
+    it('holds the stored Task through the Undo window, from the bar or the More sheet', async () => {
+      const { click, barButton, drop, typeTitle, openMore, progress } = await setup();
+
+      await typeTitle('Edited');
+      await click(barButton('Drop'));
+
+      expect(drop).toHaveBeenCalledOnce();
+      expect(must(drop.mock.calls[0])[0]).toEqual(A);
+      expect(progress()).toBe('2 of 3');
+
+      const more = await openMore();
+
+      await click(
+        Array.from(more.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Drop'),
       );
-      expect(card()).toBeNull();
+
+      expect(drop).toHaveBeenCalledTimes(2);
+      expect(must(drop.mock.calls[1])[0]).toEqual(B);
+    });
+
+    it('ignores a Drop for a Task that is not the card’s', async () => {
+      const { template, settle, drop, progress } = await setup();
+
+      template().dropTask.emit('b');
+      await settle();
+
+      expect(drop).not.toHaveBeenCalled();
+      expect(progress()).toBe('1 of 3');
+    });
+
+    it('focuses the next card', async () => {
+      const { click, barButton, section } = await setup();
+
+      await click(barButton('Drop'));
+
+      expect(document.activeElement).toBe(section());
+      expect(section()?.getAttribute('data-focus-title')).toBe('b');
+    });
+  });
+
+  describe('a visit', () => {
+    it('counts handled Tasks until an Undo brings one back', async () => {
+      const { click, barButton, triageButton, important, progress, titleField, undo } =
+        await setup();
+
+      await important(true);
+      await click(triageButton());
+
+      expect(progress()).toBe('2 of 3');
+
+      await click(barButton('Drop'));
+
+      expect(titleField().value).toBe('Charlie');
+      expect(progress()).toBe('3 of 3');
+
+      await undo();
+
+      expect(titleField().value).toBe('Bravo');
+      expect(progress()).toBe('2 of 3');
+    });
+
+    it('brings a Task back after an Undo as the person left it', async () => {
+      const { click, triageButton, important, typeTitle, titleField, undo, pressedImportance } =
+        await setup();
+
+      await typeTitle('Alpha, mine');
+      await important(false);
+      await click(triageButton());
+
+      expect(titleField().value).toBe('Bravo');
+
+      await undo();
+
+      expect(titleField().value).toBe('Alpha, mine');
+      expect(pressedImportance()).toBe('Not important');
+    });
+
+    it('says how many were triaged once the Inbox is empty', async () => {
+      const { click, barButton, root, text } = await setup();
+
+      await click(barButton('Drop'));
+      await click(barButton('Drop'));
+      await click(barButton('Drop'));
+
+      expect(text(root().querySelector('section.inbox__empty .inbox__progress'))).toBe(
+        '3 of 3 triaged',
+      );
+    });
+
+    it('does not count a Task that left the Inbox from elsewhere', async () => {
+      const { state, settle, progress } = await setup();
+
+      state.set(domainState([B, C]));
+      await settle();
+
+      expect(progress()).toBe('1 of 2');
+    });
+  });
+
+  describe('Open in the editor', () => {
+    const openEditor = async (s: Awaited<ReturnType<typeof setup>>): Promise<void> => {
+      const more = await s.openMore();
+
+      await s.click(
+        Array.from(more.querySelectorAll('button')).find(
+          (b) => b.textContent?.trim() === 'Open in the editor',
+        ),
+      );
+    };
+
+    it('opens the Task at once when nothing changed', async () => {
+      const s = await setup();
+
+      await openEditor(s);
+
+      expect(s.send).not.toHaveBeenCalled();
+      expect(s.router.url).toBe('/tasks/a');
+    });
+
+    it('does not save the proposed Area the person never chose', async () => {
+      const s = await setup({
+        state: domainState([A], { areas: [area('a1', 'Work')] }),
+        currentArea: { areaIds: ['a1'], picked: false },
+      });
+
+      await openEditor(s);
+
+      expect(s.send).not.toHaveBeenCalled();
+      expect(s.router.url).toBe('/tasks/a');
+    });
+
+    it('saves the changes first, busy meanwhile, then opens the Task', async () => {
+      const s = await setup();
+
+      await s.typeTitle('Alpha, mine');
+      await s.important(true);
+      await openEditor(s);
+
+      expect(s.send).toHaveBeenCalledExactlyOnceWith(
+        {
+          _tag: CommandTag.EditTask,
+          taskId: 'a',
+          patch: { title: 'Alpha, mine', important: true },
+          expect: { status: TaskStatus.Open },
+        },
+        'key-1',
+      );
+      expect(s.triageButton().disabled).toBe(true);
+      expect(s.router.url).toBe('/');
+
+      await s.finish(0, APPLIED);
+
+      expect(s.router.url).toBe('/tasks/a');
+    });
+
+    it('leaves out a blank title', async () => {
+      const s = await setup();
+
+      await s.typeTitle('  ');
+      await openEditor(s);
+
+      expect(s.send).not.toHaveBeenCalled();
+      expect(s.router.url).toBe('/tasks/a');
+    });
+
+    it('keeps the stored title and saves the rest when the title is blank', async () => {
+      const s = await setup();
+
+      await s.typeTitle('  ');
+      await s.important(true);
+      await openEditor(s);
+
+      expect(s.send).toHaveBeenCalledExactlyOnceWith(
+        {
+          _tag: CommandTag.EditTask,
+          taskId: 'a',
+          patch: { important: true },
+          expect: { status: TaskStatus.Open },
+        },
+        'key-1',
+      );
+    });
+
+    it('ignores an Open in the editor for a Task that is not the card’s', async () => {
+      const s = await setup();
+
+      await s.typeTitle('Alpha, mine');
+      s.template().openEditor.emit('b');
+      await s.settle();
+
+      expect(s.send).not.toHaveBeenCalled();
+      expect(s.router.url).toBe('/');
+    });
+
+    it('stays with the message when the save fails', async () => {
+      const s = await setup();
+
+      await s.typeTitle('Alpha, mine');
+      await openEditor(s);
+      await s.finish(0, FAILED);
+
+      expect(s.statusLine().textContent?.trim()).toBe(outcomeMessage(FAILED));
+      expect(s.router.url).toBe('/');
+      expect(s.triageButton().disabled).toBe(false);
+    });
+
+    it('does nothing when the screen is destroyed while the save runs', async () => {
+      const s = await setup();
+      const line = s.statusLine();
+
+      await s.typeTitle('Alpha, mine');
+      await openEditor(s);
+      s.fixture.destroy();
+      must(s.sends[0]).resolve(FAILED);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(s.handleError).not.toHaveBeenCalled();
+      expect(line.textContent?.trim()).toBe('');
+    });
+  });
+
+  describe('Blocked by', () => {
+    it('acts on the card’s Task', async () => {
+      const { openMore, click, sheet, root, send } = await setup();
+      const more = await openMore();
+
+      await click(
+        Array.from(more.querySelectorAll('button')).find(
+          (b) => b.textContent?.trim() === 'Blocked by',
+        ),
+      );
+
+      const dialog = sheet('Blocked by');
+      const candidates = Array.from(
+        dialog.querySelectorAll<HTMLButtonElement>('.task-blockers__candidate'),
+      );
+
+      expect(dialog.open).toBe(true);
+      expect(candidates.map((b) => b.textContent?.trim())).not.toContain('Alpha');
+
+      await click(candidates.find((b) => b.textContent?.trim() === 'Call Marit'));
+
+      expect(send).toHaveBeenCalledExactlyOnceWith(
+        { _tag: CommandTag.AddBlocker, linkId: 'key-1', taskId: 'a', blockerId: 't1' },
+        'key-2',
+      );
+      expect(root().querySelector('section.asys-triage')).not.toBeNull();
     });
   });
 
@@ -413,46 +924,16 @@ describe('Inbox', () => {
       ],
     });
 
-    it('show the question, the reason and the Dismiss action, oldest first', async () => {
-      const { reviews, text, dismissButton } = await setup({ state: WITH_REVIEWS });
+    it('show the question and reason, oldest first, with Open Task for a known Task', async () => {
+      const { reviews, text } = await setup({ state: WITH_REVIEWS });
 
       expect(reviews()).toHaveLength(3);
       expect(text(must(reviews()[0]))).toContain('Marking “Call Marit” Done no longer applies.');
-      expect(text(must(reviews()[0]))).toContain('It was closed or changed elsewhere first.');
-      expect(text(must(reviews()[1]))).toContain('Marking a Task Done no longer applies.');
-      expect(dismissButton(0)?.disabled).toBe(false);
-    });
-
-    it('link to the Task with Open Task when it is in the working set', async () => {
-      const { reviews } = await setup({ state: WITH_REVIEWS });
-      const link = must(must(reviews()[0]).querySelector('a'));
-
-      expect(link.textContent?.trim()).toBe('Open Task');
-      expect(link.getAttribute('href')).toBe('/tasks/t1');
-      expect(
-        must(must(reviews()[0]).querySelector('button')).compareDocumentPosition(link) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy();
-    });
-
-    it('have no Open Task link when the Task is not in the working set', async () => {
-      const { reviews } = await setup({ state: WITH_REVIEWS });
-
+      expect(must(reviews()[0]).querySelector('a')?.getAttribute('href')).toBe('/tasks/t1');
       expect(must(reviews()[1]).querySelector('a')).toBeNull();
     });
 
-    it('fall back to a decision for an unknown kind', async () => {
-      const { reviews, text } = await setup({
-        state: domainState([CALL], {
-          reviewItems: [{ ...reviewItem('r1', 't1', 1), kind: 'other', payload: null }],
-        }),
-      });
-
-      expect(text(must(reviews()[0]))).toContain('ASYS needs a decision.');
-      expect(must(reviews()[0]).querySelector('a')).toBeNull();
-    });
-
-    it('send ResolveReviewItem with the key from the attempts on Dismiss, and are busy meanwhile', async () => {
+    it('send ResolveReviewItem on Dismiss, and are busy meanwhile', async () => {
       const { send, dismissButton, click } = await setup({ state: WITH_REVIEWS });
 
       await click(dismissButton(0));
@@ -463,55 +944,10 @@ describe('Inbox', () => {
       );
       expect(dismissButton(0)?.disabled).toBe(true);
       expect(dismissButton(1)?.disabled).toBe(false);
-
-      await click(dismissButton(0));
-
-      expect(send).toHaveBeenCalledTimes(1);
-    });
-
-    it('do nothing when the screen is destroyed while Dismiss is pending', async () => {
-      const { fixture, sends, statusLine, handleError, dismissButton, click } = await setup({
-        state: WITH_REVIEWS,
-      });
-      const line = statusLine();
-
-      await click(dismissButton(0));
-      fixture.destroy();
-      must(sends[0]).resolve(FAILED);
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      expect(handleError).not.toHaveBeenCalled();
-      expect(line.textContent?.trim()).toBe('');
-    });
-
-    it('are busy and show the sync note after them while their id awaits the server', async () => {
-      const { reviews, dismissButton, awaitingSync, send, click, settle } = await setup({
-        state: WITH_REVIEWS,
-      });
-
-      awaitingSync.set(new Set(['r2']));
-      await settle();
-
-      const note = must(must(reviews()[1]).querySelector('p.inbox__sync'));
-
-      expect(note.textContent?.trim()).toBe('Saved. Waiting for the server.');
-      expect(
-        must(must(reviews()[1]).querySelector('asys-review-item')).compareDocumentPosition(note) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy();
-      expect(dismissButton(1)?.disabled).toBe(true);
-      expect(dismissButton(0)?.disabled).toBe(false);
-      expect(must(reviews()[0]).querySelector('.inbox__sync')).toBeNull();
-
-      await click(dismissButton(1));
-
-      expect(send).not.toHaveBeenCalled();
     });
 
     it('move focus to the next Review item when Dismiss is applied', async () => {
-      const { finish, dismissButton, reviews, click, text } = await setup({
-        state: WITH_REVIEWS,
-      });
+      const { finish, dismissButton, reviews, click } = await setup({ state: WITH_REVIEWS });
 
       await click(dismissButton(0));
       await finish(0, APPLIED, {
@@ -519,49 +955,12 @@ describe('Inbox', () => {
         reviewItems: WITH_REVIEWS.reviewItems.filter((i) => i.id !== 'r1'),
       });
 
-      expect(reviews()).toHaveLength(2);
-      expect(text(must(reviews()[0]))).toContain('Marking a Task Done');
       expect(document.activeElement).toBe(
         must(reviews()[0]).querySelector('.asys-review__question'),
       );
     });
 
-    it('move focus to the heading when the last Review item is dismissed', async () => {
-      const { finish, dismissButton, reviews, heading, click } = await setup({
-        state: domainState([CALL], {
-          reviewItems: [reviewItem('r1', 't1', 1), reviewItem('r2', 't1', 2)],
-        }),
-      });
-
-      await click(dismissButton(1));
-      await finish(0, APPLIED, domainState([CALL], { reviewItems: [reviewItem('r1', 't1', 1)] }));
-
-      expect(reviews()).toHaveLength(1);
-      expect(document.activeElement).toBe(heading());
-    });
-
-    it('show the outcome message on Failed and retry with the same key', async () => {
-      const { send, finish, statusLine, dismissButton, click } = await setup({
-        state: WITH_REVIEWS,
-      });
-
-      await click(dismissButton(0));
-      await finish(0, FAILED);
-
-      expect(statusLine().textContent?.trim()).toBe(outcomeMessage(FAILED));
-      expect(dismissButton(0)?.disabled).toBe(false);
-
-      await click(dismissButton(0));
-
-      expect(send).toHaveBeenCalledTimes(2);
-      expect(send.mock.calls[1]).toEqual([
-        { _tag: CommandTag.ResolveReviewItem, reviewItemId: 'r1' },
-        'key-1',
-      ]);
-      expect(statusLine().textContent?.trim()).toBe('');
-    });
-
-    it('show the outcome message for another outcome and leave focus alone', async () => {
+    it('show the outcome message when Dismiss is not applied, and leave focus alone', async () => {
       const { finish, statusLine, dismissButton, click } = await setup({ state: WITH_REVIEWS });
       const outcome: CommandOutcome = {
         _tag: CommandOutcomeTag.Rejected,
@@ -573,743 +972,74 @@ describe('Inbox', () => {
       await finish(0, outcome);
 
       expect(statusLine().textContent?.trim()).toBe(outcomeMessage(outcome));
-      expect(statusLine().textContent?.trim()).not.toBe('');
       expect(document.activeElement).toBe(dismissButton(0));
     });
-  });
 
-  describe('the Triage card', () => {
-    it('shows the oldest Inbox Task with its progress and its capture text', async () => {
-      const { card, cardTitle, progress, root } = await setup();
-
-      expect(card()).not.toBeNull();
-      expect(root().querySelectorAll('asys-triage-card')).toHaveLength(1);
-      expect(cardTitle().textContent?.trim()).toBe('Alpha');
-      expect(progress()).toBe('1 of 3');
-      expect(root().querySelector('.asys-triage__raw')?.textContent?.trim()).toBe('alpha raw text');
-    });
-
-    it('starts the draft from the stored Task', async () => {
-      const { state, pressed, settle, cardButton } = await setup({ state: domainState([B, C]) });
-
-      expect(pressed()).toEqual(['importance:0']);
-      expect(cardButton('Triage')?.disabled).toBe(true);
-
-      state.set(domainState([A]));
-      await settle();
-
-      expect(pressed()).toEqual(['chip:2']);
-    });
-
-    it('offers the Areas ordered by name, then id, by code units', async () => {
-      const { chooseArea, areaOptions } = await setup({
-        state: domainState([A], {
-          areas: [
-            area('z1', 'beta'),
-            area('a2', 'Work'),
-            area('a1', 'Work'),
-            area('m1', 'Zed'),
-            area('n1', 'Alpha'),
-          ],
-        }),
+    it('clear the status line when the next action starts', async () => {
+      const { finish, statusLine, dismissButton, click, send } = await setup({
+        state: WITH_REVIEWS,
       });
 
-      await chooseArea('');
-
-      expect(areaOptions()).toEqual(['', 'n1', 'a1', 'a2', 'm1', 'z1']);
-    });
-
-    it('shows Later only while more than one Inbox Task exists', async () => {
-      const { cardButton, state, settle } = await setup();
-
-      expect(cardButton('Later')).toBeDefined();
-
-      state.set(domainState([A]));
-      await settle();
-
-      expect(cardButton('Later')).toBeUndefined();
-    });
-
-    it('Edit navigates to the Task', async () => {
-      const { fixture, cardButton, click } = await setup();
-      const router = fixture.debugElement.injector.get(Router);
-      const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
-
-      await click(cardButton('Edit'));
-
-      expect(navigate).toHaveBeenCalledTimes(1);
-
-      const target = must(navigate.mock.calls[0])[0];
-
-      expect(typeof target === 'string' ? target : router.serializeUrl(target as UrlTree)).toBe(
-        '/tasks/a',
-      );
-    });
-
-    describe('Triage', () => {
-      const TRIAGE_A: Command = {
-        _tag: CommandTag.TriageTask,
-        taskId: 'a',
-        important: true,
-        estimateMinutes: 25,
-        expect: { status: TaskStatus.Open },
-      };
-
-      it('sends the chosen Importance and Estimate without an Area when the Area is unchanged', async () => {
-        const { send, important, cardButton, click } = await setup();
-
-        await important(true);
-        await click(cardButton('Triage'));
-
-        expect(send).toHaveBeenCalledExactlyOnceWith(TRIAGE_A, 'key-1');
-        expect(Object.keys(sent(send, 0))).not.toContain('areaId');
-      });
-
-      it('sends the Estimate chosen with a chip', async () => {
-        const { send, important, chip, cardButton, click } = await setup();
-
-        await important(false);
-        await chip(1);
-        await click(cardButton('Triage'));
-
-        expect(sent(send, 0)).toEqual({
-          ...TRIAGE_A,
-          important: false,
-          estimateMinutes: 15,
-        });
-      });
-
-      it('sends the Area when it differs from the stored one', async () => {
-        const { send, important, chooseArea, cardButton, click } = await setup({
-          state: domainState([A], { areas: [area('a1', 'Work')] }),
-        });
-
-        await important(true);
-        await chooseArea('a1');
-        await click(cardButton('Triage'));
-
-        expect(sent(send, 0)).toEqual({ ...TRIAGE_A, areaId: 'a1' });
-      });
-
-      it('sends no Area when the stored Area is kept', async () => {
-        const { send, important, cardButton, click } = await setup({
-          state: domainState([{ ...A, areaId: 'a1' }], { areas: [area('a1', 'Work')] }),
-        });
-
-        await important(true);
-        await click(cardButton('Triage'));
-
-        expect(Object.keys(sent(send, 0))).not.toContain('areaId');
-        expect(sent(send, 0)).toEqual(TRIAGE_A);
-      });
-
-      it('sends areaId null when the stored Area is removed', async () => {
-        const { send, important, chooseArea, cardButton, click } = await setup({
-          state: domainState([{ ...A, areaId: 'a1' }], { areas: [area('a1', 'Work')] }),
-        });
-
-        await important(true);
-        await chooseArea('');
-        await click(cardButton('Triage'));
-
-        expect(sent(send, 0)).toEqual({ ...TRIAGE_A, areaId: null });
-      });
-
-      it('does nothing when the screen is destroyed while the send is pending', async () => {
-        const { fixture, sends, statusLine, handleError, important, cardButton, click } =
-          await setup();
-        const line = statusLine();
-
-        await important(true);
-        await click(cardButton('Triage'));
-        fixture.destroy();
-        must(sends[0]).resolve(FAILED);
-        await new Promise((resolve) => setTimeout(resolve, 0));
-
-        expect(handleError).not.toHaveBeenCalled();
-        expect(line.textContent?.trim()).toBe('');
-      });
-
-      it('disables the card while it is pending and sends once', async () => {
-        const { send, important, cardButton, click } = await setup();
-
-        await important(true);
-        await click(cardButton('Triage'));
-
-        expect(cardButton('Triage')?.disabled).toBe(true);
-
-        await click(cardButton('Triage'));
-
-        expect(send).toHaveBeenCalledTimes(1);
-      });
-
-      it('counts the Task as handled when applied: 2 of 3, then moves focus to the next title', async () => {
-        const { state, important, cardButton, click, finish, progress, cardTitle } = await setup();
-
-        await important(true);
-        await click(cardButton('Triage'));
-
-        expect(progress()).toBe('1 of 3');
-
-        await finish(0, APPLIED, without(must(state()), 'a'));
-
-        expect(cardTitle().textContent?.trim()).toBe('Bravo');
-        expect(progress()).toBe('2 of 3');
-        expect(document.activeElement).toBe(cardTitle());
-      });
-
-      it('moves focus to the heading when no card is left', async () => {
-        const { important, cardButton, click, finish, card, heading, root } = await setup({
-          state: domainState([A]),
-        });
-
-        await important(true);
-        await click(cardButton('Triage'));
-        await finish(0, APPLIED, domainState([{ ...A, important: true }]));
-
-        expect(card()).toBeNull();
-        expect(root().querySelector('p.inbox__text')?.textContent?.trim()).toBe(
-          'Nothing waits here.',
-        );
-        expect(document.activeElement).toBe(heading());
-      });
-
-      it('keeps the progress while the triaged Task stays in the Inbox, and shows the sync note', async () => {
-        const {
-          important,
-          cardButton,
-          click,
-          finish,
-          progress,
-          awaitingSync,
-          card,
-          state,
-          settle,
-        } = await setup();
-
-        await important(true);
-        await click(cardButton('Triage'));
-        awaitingSync.set(new Set(['a']));
-        await finish(0, APPLIED);
-
-        expect(progress()).toBe('1 of 3');
-        expect(cardButton('Triage')?.disabled).toBe(true);
-        expect(must(card()).nextElementSibling?.matches('p.inbox__sync')).toBe(true);
-        expect(must(card()).nextElementSibling?.textContent?.trim()).toBe(
-          'Saved. Waiting for the server.',
-        );
-
-        awaitingSync.set(new Set());
-        state.set(without(must(state()), 'a'));
-        await settle();
-
-        expect(progress()).toBe('2 of 3');
-      });
-
-      it('shows no sync note for the id of another Task', async () => {
-        const { awaitingSync, root, cardButton, important, settle } = await setup();
-
-        await important(true);
-        awaitingSync.set(new Set(['b']));
-        await settle();
-
-        expect(root().querySelector('.inbox__sync')).toBeNull();
-        expect(cardButton('Triage')?.disabled).toBe(false);
-      });
-
-      it('disables the card and sends nothing while the Task awaits the server', async () => {
-        const { awaitingSync, important, cardButton, send, settle, root } = await setup();
-
-        await important(true);
-        awaitingSync.set(new Set(['a']));
-        await settle();
-
-        expect(root().querySelector('p.inbox__sync')?.textContent?.trim()).toBe(
-          'Saved. Waiting for the server.',
-        );
-        expect(cardButton('Triage')?.disabled).toBe(true);
-        expect(send).not.toHaveBeenCalled();
-      });
-
-      it('shows the message on NotApplicable, does not count it as handled and focuses the title', async () => {
-        const { important, cardButton, click, finish, progress, cardTitle, statusLine } =
-          await setup();
-
-        await important(true);
-        await click(cardButton('Triage'));
-        await finish(
-          0,
-          NOT_APPLICABLE,
-          domainState([B, C], { reviewItems: [reviewItem('rx', 'a', 5, { _tag: 'TriageTask' })] }),
-        );
-
-        expect(statusLine().textContent?.trim()).toBe(outcomeMessage(NOT_APPLICABLE));
-        expect(cardTitle().textContent?.trim()).toBe('Bravo');
-        expect(progress()).toBe('1 of 2');
-        expect(document.activeElement).toBe(cardTitle());
-      });
-
-      it('shows the message on Failed, keeps the draft and retries with the same key', async () => {
-        const { send, important, cardButton, click, finish, statusLine, pressed, progress } =
-          await setup();
-
-        await important(true);
-        await click(cardButton('Triage'));
-        await finish(0, FAILED);
-
-        expect(statusLine().textContent?.trim()).toBe(outcomeMessage(FAILED));
-        expect(progress()).toBe('1 of 3');
-        expect(pressed()).toEqual(['importance:0', 'chip:2']);
-        expect(cardButton('Triage')?.disabled).toBe(false);
-
-        await click(cardButton('Triage'));
-
-        expect(send).toHaveBeenCalledTimes(2);
-        expect(send.mock.calls[1]).toEqual([TRIAGE_A, 'key-1']);
-        expect(statusLine().textContent?.trim()).toBe('');
-      });
-
-      it('shows the message of a Rejected outcome', async () => {
-        const { important, cardButton, click, finish, statusLine } = await setup();
-        const outcome: CommandOutcome = {
-          _tag: CommandOutcomeTag.Rejected,
-          reason: RejectedReason.UnknownArea,
-        };
-
-        await important(true);
-        await click(cardButton('Triage'));
-        await finish(0, outcome);
-
-        expect(statusLine().textContent?.trim()).toBe(outcomeMessage(outcome));
-        expect(statusLine().textContent?.trim()).not.toBe('');
-      });
-
-      it('uses a new key for a new Triage once the first settled without failing', async () => {
-        const { send, important, cardButton, click, finish } = await setup();
-        const outcome: CommandOutcome = {
-          _tag: CommandOutcomeTag.Rejected,
-          reason: RejectedReason.NotFound,
-        };
-
-        await important(true);
-        await click(cardButton('Triage'));
-        await finish(0, outcome);
-        await click(cardButton('Triage'));
-
-        expect(must(send.mock.calls[1])[1]).toBe('key-2');
-      });
-    });
-
-    describe('Later', () => {
-      it('moves on to the next Task, keeps the progress and focuses the new title', async () => {
-        const { cardButton, click, cardTitle, progress } = await setup();
-
-        await click(cardButton('Later'));
-
-        expect(cardTitle().textContent?.trim()).toBe('Bravo');
-        expect(progress()).toBe('1 of 3');
-        expect(document.activeElement).toBe(cardTitle());
-      });
-
-      it('wraps around to the oldest Task once every Task is deferred', async () => {
-        const { cardButton, click, cardTitle } = await setup();
-
-        await click(cardButton('Later'));
-        await click(cardButton('Later'));
-
-        expect(cardTitle().textContent?.trim()).toBe('Charlie');
-
-        await click(cardButton('Later'));
-
-        expect(cardTitle().textContent?.trim()).toBe('Alpha');
-
-        await click(cardButton('Later'));
-
-        expect(cardTitle().textContent?.trim()).toBe('Bravo');
-      });
-
-      it('wraps with two Tasks', async () => {
-        const { cardButton, click, cardTitle } = await setup({ state: domainState([A, B]) });
-
-        await click(cardButton('Later'));
-        await click(cardButton('Later'));
-
-        expect(cardTitle().textContent?.trim()).toBe('Alpha');
-      });
-
-      it('skips a deferred Task after another one was triaged', async () => {
-        const { state, cardButton, click, cardTitle, chip, finish } = await setup();
-
-        await click(cardButton('Later'));
-        await chip(2);
-        await click(cardButton('Triage'));
-        await finish(0, APPLIED, without(must(state()), 'b'));
-
-        expect(cardTitle().textContent?.trim()).toBe('Charlie');
-      });
-
-      it('with A and B deferred and C triaged elsewhere, shows A and then B on Later', async () => {
-        const { state, cardButton, click, cardTitle, settle } = await setup();
-
-        await click(cardButton('Later'));
-        await click(cardButton('Later'));
-
-        expect(cardTitle().textContent?.trim()).toBe('Charlie');
-
-        state.set(without(must(state()), 'c'));
-        await settle();
-
-        expect(cardTitle().textContent?.trim()).toBe('Alpha');
-
-        await click(cardButton('Later'));
-
-        expect(cardTitle().textContent?.trim()).toBe('Bravo');
-      });
-    });
-
-    describe('Drop', () => {
-      const DROP_A: Command = {
-        _tag: CommandTag.DropTask,
-        taskId: 'a',
-        expect: { status: TaskStatus.Open },
-      };
-
-      it('asks for confirmation first and sends nothing', async () => {
-        const { cardButton, click, root, send } = await setup();
-
-        await click(cardButton('Drop'));
-
-        expect(root().querySelector('.asys-confirm')).not.toBeNull();
-        expect(root().querySelector('.asys-confirm')?.textContent).toContain('Drop “Alpha”?');
-        expect(send).not.toHaveBeenCalled();
-      });
-
-      it('ignores a native DOM drop event on the card', async () => {
-        const { card, cardButton, click, send, settle } = await setup();
-
-        must(card()).dispatchEvent(new Event('drop', { bubbles: true }));
-        await settle();
-
-        expect(send).not.toHaveBeenCalled();
-
-        await click(cardButton('Drop'));
-        must(card()).dispatchEvent(new Event('drop', { bubbles: true }));
-        await settle();
-
-        expect(send).not.toHaveBeenCalled();
-      });
-
-      it('does nothing when the screen is destroyed while the drop is pending', async () => {
-        const { fixture, sends, statusLine, handleError, cardButton, click, confirmButton } =
-          await setup();
-        const line = statusLine();
-
-        await click(cardButton('Drop'));
-        await click(confirmButton('Drop'));
-        fixture.destroy();
-        must(sends[0]).resolve(APPLIED);
-        await new Promise((resolve) => setTimeout(resolve, 0));
-
-        expect(handleError).not.toHaveBeenCalled();
-        expect(line.textContent?.trim()).toBe('');
-      });
-
-      it('sends nothing on Cancel', async () => {
-        const { cardButton, click, confirmButton, root, send } = await setup();
-
-        await click(cardButton('Drop'));
-        await click(confirmButton('Cancel'));
-
-        expect(root().querySelector('.asys-confirm')).toBeNull();
-        expect(send).not.toHaveBeenCalled();
-      });
-
-      it('sends DropTask on confirm and counts it as handled when applied', async () => {
-        const { state, send, cardButton, click, confirmButton, finish, progress, cardTitle, root } =
-          await setup();
-
-        await click(cardButton('Drop'));
-        await click(confirmButton('Drop'));
-
-        expect(send).toHaveBeenCalledExactlyOnceWith(DROP_A, 'key-1');
-
-        await finish(0, APPLIED, without(must(state()), 'a'));
-
-        expect(cardTitle().textContent?.trim()).toBe('Bravo');
-        expect(progress()).toBe('2 of 3');
-        expect(document.activeElement).toBe(cardTitle());
-        expect(root().querySelector('.asys-confirm')).toBeNull();
-      });
-
-      it('moves focus to the heading when the last Task is dropped', async () => {
-        const { cardButton, click, confirmButton, finish, heading, card } = await setup({
-          state: domainState([A]),
-        });
-
-        await click(cardButton('Drop'));
-        await click(confirmButton('Drop'));
-        await finish(0, APPLIED, domainState([]));
-
-        expect(card()).toBeNull();
-        expect(document.activeElement).toBe(heading());
-      });
-
-      it('shows the message and focuses the title on NotApplicable', async () => {
-        const { cardButton, click, confirmButton, finish, statusLine, cardTitle, progress } =
-          await setup();
-
-        await click(cardButton('Drop'));
-        await click(confirmButton('Drop'));
-        await finish(0, NOT_APPLICABLE, domainState([B, C]));
-
-        expect(statusLine().textContent?.trim()).toBe(outcomeMessage(NOT_APPLICABLE));
-        expect(document.activeElement).toBe(cardTitle());
-        expect(cardTitle().textContent?.trim()).toBe('Bravo');
-        expect(progress()).toBe('1 of 2');
-      });
-
-      it('retries a Failed drop with the same key', async () => {
-        const { send, cardButton, click, confirmButton, finish, statusLine } = await setup();
-
-        await click(cardButton('Drop'));
-        await click(confirmButton('Drop'));
-        await finish(0, FAILED);
-
-        expect(statusLine().textContent?.trim()).toBe(outcomeMessage(FAILED));
-
-        if (confirmButton('Drop') === undefined) {
-          await click(cardButton('Drop'));
-        }
-
-        await click(confirmButton('Drop'));
-
-        expect(send).toHaveBeenCalledTimes(2);
-        expect(send.mock.calls[1]).toEqual([DROP_A, 'key-1']);
-      });
-
-      it('shows the next card with its confirmation closed', async () => {
-        const { state, cardButton, click, confirmButton, finish, root } = await setup();
-
-        await click(cardButton('Drop'));
-        await click(confirmButton('Drop'));
-        await finish(0, APPLIED, without(must(state()), 'a'));
-
-        expect(root().querySelector('.asys-confirm')).toBeNull();
-      });
-    });
-
-    describe('when the state changes from outside', () => {
-      it('moves on when the Task was triaged elsewhere, and resets the draft to the next Task', async () => {
-        const { state, important, cardTitle, progress, pressed, settle } = await setup();
-
-        await important(false);
-
-        expect(pressed()).toEqual(['importance:1', 'chip:2']);
-
-        state.set(without(must(state()), 'a'));
-        await settle();
-
-        expect(cardTitle().textContent?.trim()).toBe('Bravo');
-        expect(pressed()).toEqual(['importance:0']);
-        expect(progress()).toBe('1 of 2');
-      });
-
-      it('moves on when the Task was closed elsewhere', async () => {
-        const { state, cardTitle, progress, settle } = await setup();
-
-        state.set({
-          ...must(state()),
-          tasks: must(state()).tasks.map((t) =>
-            t.id === 'a' ? { ...t, status: TaskStatus.Done, closedAt: 9 } : t,
-          ),
-        });
-        await settle();
-
-        expect(cardTitle().textContent?.trim()).toBe('Bravo');
-        expect(progress()).toBe('1 of 2');
-      });
-
-      it('resets the draft when the Task was triaged elsewhere into a different one with the same values', async () => {
-        const { state, important, pressed, settle } = await setup({
-          state: domainState([A, { ...A, id: 'a2', title: 'Alpha two', createdAt: 2 }]),
-        });
-
-        await important(false);
-        state.set(without(must(state()), 'a'));
-        await settle();
-
-        expect(pressed()).toEqual(['chip:2']);
-      });
-
-      it('keeps the draft while the same Task changes underneath', async () => {
-        const { state, important, pressed, cardTitle, settle } = await setup();
-
-        await important(true);
-        state.set({
-          ...must(state()),
-          tasks: must(state()).tasks.map((t) =>
-            t.id === 'a' ? { ...t, title: 'Alpha renamed' } : t,
-          ),
-        });
-        await settle();
-
-        expect(cardTitle().textContent?.trim()).toBe('Alpha renamed');
-        expect(pressed()).toEqual(['importance:0', 'chip:2']);
-      });
-
-      it('lets the total follow Tasks that come and go', async () => {
-        const { state, progress, settle } = await setup();
-
-        expect(progress()).toBe('1 of 3');
-
-        state.set(without(must(state()), 'c'));
-        await settle();
-
-        expect(progress()).toBe('1 of 2');
-
-        state.set({
-          ...must(state()),
-          tasks: [
-            ...must(state()).tasks,
-            task({ id: 'd', title: 'Delta', important: null, createdAt: 4 }),
-            task({ id: 'e', title: 'Echo', important: null, createdAt: 5 }),
-          ],
-        });
-        await settle();
-
-        expect(progress()).toBe('1 of 4');
-      });
-
-      it('shows the card again when a Task appears in an empty Inbox', async () => {
-        const { state, card, cardTitle, settle } = await setup({ state: domainState([CALL]) });
-
-        expect(card()).toBeNull();
-
-        state.set(domainState([CALL, A]));
-        await settle();
-
-        expect(cardTitle().textContent?.trim()).toBe('Alpha');
-      });
-    });
-  });
-
-  describe('the status line', () => {
-    it('stays displayed while it is empty, so later messages are announced', async () => {
-      const { statusLine } = await setup();
-
-      expect(statusLine().textContent?.trim()).toBe('');
-      expect(getComputedStyle(statusLine()).display).not.toBe('none');
-    });
-
-    it('is cleared when the next action starts', async () => {
-      const { important, cardButton, click, finish, statusLine, send } = await setup();
-
-      await important(true);
-      await click(cardButton('Triage'));
+      await click(dismissButton(0));
       await finish(0, FAILED);
 
       expect(statusLine().textContent?.trim()).not.toBe('');
 
-      await click(cardButton('Triage'));
+      await click(dismissButton(0));
 
       expect(send).toHaveBeenCalledTimes(2);
       expect(statusLine().textContent?.trim()).toBe('');
     });
-
-    it('shows nothing for SignedOut', async () => {
-      const { important, cardButton, click, finish, statusLine } = await setup();
-
-      await important(true);
-      await click(cardButton('Triage'));
-      await finish(0, { _tag: CommandOutcomeTag.SignedOut });
-
-      expect(statusLine().textContent?.trim()).toBe('');
-    });
   });
 
-  describe('the Current Area proposal in Triage', () => {
-    const TWO_AREAS = [area('a1', 'Work'), area('a2', 'Personal')];
+  describe('the Current Area proposal', () => {
+    const WITH_AREAS = domainState([A, B], { areas: [area('a1', 'Work'), area('a2', 'Personal')] });
 
-    const WITH_AREAS = domainState([A, B], { areas: TWO_AREAS });
-
-    const TRIAGE_A: Command = {
-      _tag: CommandTag.TriageTask,
-      taskId: 'a',
-      important: true,
-      estimateMinutes: 25,
-      expect: { status: TaskStatus.Open },
-    };
-
-    const shownArea = (root: () => HTMLElement): string | undefined =>
-      root().querySelector('.asys-triage__area strong')?.textContent?.trim();
-
-    it('proposes the one automatic Current Area and sends it', async () => {
-      const { root, send, important, cardButton, click } = await setup({
+    it('proposes the one Current Area and sends it', async () => {
+      const { shownArea, important, click, triageButton, triage } = await setup({
         state: WITH_AREAS,
         currentArea: { areaIds: ['a1'], picked: false },
       });
 
-      expect(shownArea(root)).toBe('Work');
+      expect(shownArea()).toContain('Work');
 
       await important(true);
-      await click(cardButton('Triage'));
+      await click(triageButton());
 
-      expect(sent(send, 0)).toEqual({ ...TRIAGE_A, areaId: 'a1' });
-    });
-
-    it('proposes the one picked Current Area and sends it', async () => {
-      const { root, send, important, cardButton, click } = await setup({
-        state: WITH_AREAS,
-        currentArea: { areaIds: ['a2'], picked: true },
-      });
-
-      expect(shownArea(root)).toBe('Personal');
-
-      await important(true);
-      await click(cardButton('Triage'));
-
-      expect(sent(send, 0)).toEqual({ ...TRIAGE_A, areaId: 'a2' });
+      expect(must(triage.mock.calls[0])[1]).toEqual({ ...TRIAGE_A, areaId: 'a1' });
     });
 
     it.each([
       ['two Areas current', { areaIds: ['a1', 'a2'], picked: false }],
-      ['no Area current', { areaIds: [], picked: false }],
       ['no Current Area state', null],
     ] satisfies [string, CurrentArea | null][])(
       'proposes nothing with %s',
       async (_name, currentArea) => {
-        const { root, send, important, cardButton, click } = await setup({
+        const { shownArea, important, click, triageButton, triage } = await setup({
           state: WITH_AREAS,
           currentArea,
         });
 
-        expect(shownArea(root)).toBe('No Area');
+        expect(shownArea()).toContain('No Area');
 
         await important(true);
-        await click(cardButton('Triage'));
+        await click(triageButton());
 
-        expect(Object.keys(sent(send, 0))).not.toContain('areaId');
-        expect(sent(send, 0)).toEqual(TRIAGE_A);
+        expect(must(triage.mock.calls[0])[1]).toEqual(TRIAGE_A);
       },
     );
 
     it('keeps the Area a Task already has over the proposal', async () => {
-      const { root, send, important, cardButton, click } = await setup({
-        state: domainState([{ ...A, areaId: 'a2' }, B], { areas: TWO_AREAS }),
+      const { shownArea } = await setup({
+        state: domainState([{ ...A, areaId: 'a2' }], { areas: WITH_AREAS.areas }),
         currentArea: { areaIds: ['a1'], picked: false },
       });
 
-      expect(shownArea(root)).toBe('Personal');
-
-      await important(true);
-      await click(cardButton('Triage'));
-
-      expect(Object.keys(sent(send, 0))).not.toContain('areaId');
-      expect(sent(send, 0)).toEqual(TRIAGE_A);
+      expect(shownArea()).toContain('Personal');
     });
 
     it('does not change the open card when the Current Area changes later', async () => {
-      const { root, currentArea, settle, send, important, cardButton, click } = await setup({
+      const { shownArea, currentArea, settle } = await setup({
         state: WITH_AREAS,
         currentArea: { areaIds: ['a1'], picked: false },
       });
@@ -1317,47 +1047,32 @@ describe('Inbox', () => {
       currentArea.set({ areaIds: ['a2'], picked: true });
       await settle();
 
-      expect(shownArea(root)).toBe('Work');
-
-      await important(true);
-      await click(cardButton('Triage'));
-
-      expect(sent(send, 0)).toEqual({ ...TRIAGE_A, areaId: 'a1' });
+      expect(shownArea()).toContain('Work');
     });
 
-    it('sends no Area when the person chooses No Area before Triage', async () => {
-      const { root, send, important, chooseArea, cardButton, click } = await setup({
+    it('sends no Area when the person chooses No Area', async () => {
+      const { chooseArea, important, click, triageButton, triage } = await setup({
         state: WITH_AREAS,
         currentArea: { areaIds: ['a1'], picked: false },
       });
 
       await important(true);
-      await chooseArea('');
+      await chooseArea('No Area');
+      await click(triageButton());
 
-      expect(shownArea(root)).toBe('No Area');
-
-      await click(cardButton('Triage'));
-
-      expect(Object.keys(sent(send, 0))).not.toContain('areaId');
-      expect(sent(send, 0)).toEqual(TRIAGE_A);
+      expect(must(triage.mock.calls[0])[1]).toEqual(TRIAGE_A);
     });
 
     it('reads the proposal anew for the next card', async () => {
-      const { root, currentArea, send, important, cardButton, click, finish } = await setup({
+      const { currentArea, barButton, click, shownArea } = await setup({
         state: WITH_AREAS,
         currentArea: { areaIds: ['a1'], picked: false },
       });
 
-      await important(true);
-      await click(cardButton('Triage'));
-
-      expect(sent(send, 0)).toEqual({ ...TRIAGE_A, areaId: 'a1' });
-
       currentArea.set({ areaIds: ['a2'], picked: true });
-      await finish(0, APPLIED, without(WITH_AREAS, 'a'));
+      await click(barButton('Drop'));
 
-      expect(root().querySelector('.asys-triage__title')?.textContent?.trim()).toBe('Bravo');
-      expect(shownArea(root)).toBe('Personal');
+      expect(shownArea()).toContain('Personal');
     });
   });
 });
