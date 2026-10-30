@@ -14,9 +14,9 @@ import { JobOutcome, runDueJobs } from './worker';
 
 // These tests run against the real database (docker compose), on the real
 // clock. A command (scheduleJob under the owner's counter lock) and the worker
-// take the counter first and the jobs rows second, so neither order deadlocks
-// (decision 8 of the slice 1 plan). Both sides are forked from the test body: a
-// fiber forked inside a transaction would inherit its connection.
+// take the counter first and the jobs rows second, so neither order deadlocks.
+// Both sides are forked from the test body: a fiber forked inside a
+// transaction would inherit its connection.
 
 const HOUR_MS = 60 * 60 * 1000;
 

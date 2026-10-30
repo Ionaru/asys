@@ -5,7 +5,7 @@ Users sign in with one of several registered passkeys, with one-time recovery co
 
 ## Consequences
 
-Slice 1 builds the passkeys and recovery codes ([slice 1 plan, piece 4](../slice-1-plan.md#piece-4-http-api-and-sign-in)) and accepts four known limits:
+Slice 1 builds the passkeys and recovery codes (`libs/effect-passkeys` and `apps/server`) and accepts four known limits, also listed in [the known limits](../known-limits.md#sign-in):
 - a session slides, 30 days from its last renewal, with no absolute lifetime;
 - adding or removing a passkey and regenerating the recovery codes need only a valid session, with no fresh passkey check (step-up authentication);
 - a flood of anonymous sign-in requests can push real sign-in challenges out of the in-memory store and delay sign-ins;
