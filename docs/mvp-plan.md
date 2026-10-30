@@ -15,7 +15,7 @@ ASYS writes nothing to Google in the MVP. That keeps Privacy, Guests and sent In
 
 ## What the MVP contains
 
-The MVP is built in four slices, each usable on its own. Slice 1 is built in seven pieces, each verified and committed on its own; [slice-1-plan.md](slice-1-plan.md) holds their order, the rule defaults they settle and the facts checked for them.
+The MVP is built in four slices, each usable on its own. Slice 1 was built in seven pieces, each verified and committed on its own. Its plan, with their order and the facts checked for them, is in git history ([Built plans](known-limits.md#built-plans)), and the rule defaults it settled are in `libs/domain/CHANGELOG.md` under 0.1.0.
 
 ### Slice 1: foundations and the Task loop
 
@@ -135,7 +135,7 @@ It needs Privacy from Stage 2 and has the hardest sync (Google Tasks has no chan
 
 ### Stage 6: planning aids and polish
 
-Subtasks (one level, sharing their parent's Anchor, not inheriting its Voice); Floating recurrence; Time blocks; the rest of the Weekly review (untouched Time blocks, coming Occasions, acting on Delegate and Drop suggestions); parsing a captured line for its dates, Area, Place, Person, Importance and Estimate; Triage of several Tasks at once; the list of Tasks whose Due moved several times; Undo of queued commands (a narrow Undo for Done, held in memory for 5 seconds, was pulled ahead on 2026-10-05; see [the slice 1 plan](slice-1-plan.md#pulled-ahead-before-slice-2)); a form-based Playbook editor; a manual "plan my day" (ADR 0002). No scenario criterion needs any of these, and each is additive, so each can be pulled ahead of Stage 1 on the evidence of real use. Subtasks are the likeliest candidate.
+Subtasks (one level, sharing their parent's Anchor, not inheriting its Voice); Floating recurrence; Time blocks; the rest of the Weekly review (untouched Time blocks, coming Occasions, acting on Delegate and Drop suggestions); parsing a captured line for its dates, Area, Place, Person, Importance and Estimate; Triage of several Tasks at once; the list of Tasks whose Due moved several times; Undo of queued commands (a narrow Undo for Done, held in memory for 5 seconds, was pulled ahead on 2026-10-05; see [its known limits](known-limits.md#undo-capture-and-motion)); a form-based Playbook editor; a manual "plan my day" (ADR 0002). No scenario criterion needs any of these, and each is additive, so each can be pulled ahead of Stage 1 on the evidence of real use. Subtasks are the likeliest candidate.
 
 *Already in the MVP*: the Due-move counter, the raw capture text, the series `mode` column, and Weekly review sections as named queries.
 

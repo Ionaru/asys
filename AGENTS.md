@@ -9,7 +9,7 @@ ASYS (Assisting System) is a personal task manager that answers "what should I d
 - `CONTEXT.md` is the domain language. Use its terms exactly and capitalised (Task, Estimate, Available from, Due, Picker, Now, Inbox, Review item, Area, Voice) in code, tests, UI copy and docs. Never use the words on its _Avoid_ lines, such as "to-do", "event", "deadline" or "project".
 - `docs/adr/` holds the decisions that bind the code. Read the ADR before changing what it governs.
 - `docs/mvp-plan.md` says what each slice and stage holds. `docs/scenarios.md` holds the acceptance examples, mirrored one-to-one by `libs/domain/src/scenarios/s<N>.spec.ts`.
-- `docs/slice-1-plan.md` records how slice 1 was built: its decisions, known limits and dated "Facts checked" notes. Its "Pulled ahead before slice 2" section holds what the motion, Undo, swipe, Current Area, Task editor and Triage card work left open, phone checks included; `docs/triage-plan.md` records the Triage card. Counts and versions in it are historical, so check the code.
+- `docs/known-limits.md` holds what the built work leaves open: known limits, open checks on the phone, items waiting on the maintainer and later work. A plan in `docs/` is removed once its work is built; the file's Built plans section says how to read each one from git history. Counts and versions in those plans are historical, so check the code.
 - `README.md` covers running the stack, the end-to-end tests, CI and the deploy runbook.
 
 ## Projects
@@ -114,7 +114,7 @@ These fail lint, a test or a CI check when broken.
   - An ADR is `docs/adr/NNNN-kebab-title.md`, numbered from 0014.
   - It has the SPDX line, an H1 that states the decision as a sentence, a short body, and optionally `## Considered Options` and `## Consequences`.
   - ADRs are amended in place.
-- **Docs travel with the change.** Update `README.md` for running, CI and deploy, `CONTEXT.md` for terms, `docs/scenarios.md` and its spec for criteria, the slice plan's known limits, and the domain CHANGELOG, all in the same commit.
+- **Docs travel with the change.** Update `README.md` for running, CI and deploy, `CONTEXT.md` for terms, `docs/scenarios.md` and its spec for criteria, `docs/known-limits.md`, and the domain CHANGELOG, all in the same commit.
 
 ## Commits and releases
 

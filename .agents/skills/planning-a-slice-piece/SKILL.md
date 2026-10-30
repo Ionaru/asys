@@ -8,7 +8,7 @@ description: Use when starting, re-planning, building or closing a slice or a pi
 
 ## Overview
 
-ASYS is built in slices (`docs/mvp-plan.md`). Each slice is cut into pieces that are built and committed one at a time. `docs/slice-1-plan.md` is the worked example, so copy its shape. A plan in `docs/` is the as-built record. Scratch working plans stay out of `docs/`.
+ASYS is built in slices (`docs/mvp-plan.md`). Each slice is cut into pieces that are built and committed one at a time. A slice plan lives in `docs/` while its slice is built, and goes once the slice is closed (see _Closing a slice_). Slice 1's plan is the worked example, so copy its shape: read it with `git show a25be28:docs/slice-1-plan.md`. Scratch working plans stay out of `docs/`.
 
 ## Shape of a slice plan (`docs/slice-<N>-plan.md`)
 
@@ -18,7 +18,7 @@ ASYS is built in slices (`docs/mvp-plan.md`). Each slice is cut into pieces that
 4. One `## Piece N: <name>` section per piece, holding:
    - its units, written as contracts: inputs, expected results, boundaries, and where each rule is enforced;
    - its tests and verification commands.
-   - After building, add "Re-planned and built on <date>", **Departures from the plan**, **Verification (<date>)** and **Known limits**.
+   - After building, add "Re-planned and built on <date>", **Departures from the plan** and **Verification (<date>)**. Its known limits go in `docs/known-limits.md`.
 5. **Facts checked on <date> (piece N)**: the library and tool facts the piece relied on, verified against the installed versions or primary sources. These are dated snapshots, so recheck them after an upgrade.
 
 ## Per piece
@@ -44,8 +44,12 @@ ASYS is built in slices (`docs/mvp-plan.md`). Each slice is cut into pieces that
 
    The test and e2e runs need the database up and `nx serve server` stopped.
 
-6. Record the as-built notes, known limits and verification in the plan. Update the README, `CONTEXT.md`, scenarios and the domain CHANGELOG if they changed.
+6. Record the as-built notes and verification in the plan, and the known limits and open phone checks in `docs/known-limits.md`. Update the README, `CONTEXT.md`, scenarios and the domain CHANGELOG if they changed.
 7. Commit once per piece, only when asked. Later outcomes, such as a phone check after a deploy, go in a docs-only follow-up commit.
+
+## Closing a slice
+
+Once every piece is built, check that each rule the code follows is written in `CONTEXT.md`, the domain CHANGELOG, an ADR, `apps/pwa/src/app/components/README.md` or a skill, and that every open item (known limits, phone checks, items waiting on the maintainer, later work) is in `docs/known-limits.md`. Then remove the plan in a docs-only commit, add it to the Built plans table in `docs/known-limits.md` with a `git show` of a commit that still holds it, and repoint every reference to it. Work built outside a slice from a plan of its own closes the same way.
 
 ## Common mistakes
 

@@ -12,7 +12,7 @@ description: Use when changing how ASYS derives a value (Available, Blocked, Ove
 
 ## Steps
 
-1. Read the term in `CONTEXT.md`, the default in `docs/slice-1-plan.md` Decision 4, and the newest sections of `libs/domain/CHANGELOG.md`. If the change alters what a term means, update `CONTEXT.md` first and agree on the wording.
+1. Read the term in `CONTEXT.md` and its rule in `libs/domain/CHANGELOG.md`: 0.1.0 holds the first defaults, and the newer sections change them. If the change alters what a term means, update `CONTEXT.md` first and agree on the wording.
 2. Write the failing spec next to the rule (`*.spec.ts`). Use the builders from `src/test/builders.ts` (`aTask`, `aLink`, `anArea`, `aState`, `aReviewItem`), the zone `AMS`, and fixed 2026 instants via `Date.parse('2026-10-14T08:00:00.000Z')`. Add a `fast-check` property when the rule ranges over time or zones (see `picker.spec.ts` and `zoned.spec.ts`).
 3. Change the rule while keeping the library pure:
    - `now`, the zone and Settings come in as arguments.

@@ -26,7 +26,7 @@ Each test signs up a fresh Owner with a WebAuthn virtual authenticator, so tests
 5. Select by role and label first, then by component BEM classes. For phone width, use `test.use({ viewport: { width: 375, height: 812 } })`. To simulate a stale tab, block `**/v1/changes**` with `page.route`.
    - **Touch** (a swipe, a drag-scroll, a pinch): per file, `test.use({ viewport: { width: 412, height: 839 }, hasTouch: true, isMobile: true })`, then `const touch = await touchscreen(page)` from `support/touch.ts` (`down`, `move`, `up`, `cancel`, `drag`, `pinch`). It sends CDP `Input.dispatchTouchEvent`, so the page gets trusted touch input as Pointer Events with `pointerType: 'touch'`, and `touch-action` applies. Open the session after the seeding reload. A swipe starts at least 24px from the viewport edge, or the swipe ignores it (`swipe.spec.ts` starts 40px inside the target).
 6. A Done is held for 5 seconds before CompleteTask is sent, and the shell announces it in `.shell__status`. To see a Done reach the server, install the clock before the page loads its timers, `await page.clock.install(); await page.reload();`, then after the Done run `const sent = page.waitForResponse('**/v1/commands'); await page.clock.fastForward(5_000); await sent;`. The clock covers the whole browser context, so a second page in it shares it, and one jump never reaches the 15 s poll.
-7. To pin a known UX limit, add it to `known-limits.spec.ts` and note it in the slice plan's Known limits. A fix then flips both.
+7. To pin a known UX limit, add it to `known-limits.spec.ts` and note it in `docs/known-limits.md`. A fix then flips both.
 
 There is no need to edit `project.json` or `playwright.config.mts` for either target; per-file targets are inferred.
 

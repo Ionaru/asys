@@ -16,7 +16,7 @@ The goal for this is to make the components more modular and reusable. This way,
 
 Changes to common elements of the UI can be done in a single place, and it will reflect in all the components that use it.
 
-The level of each component comes from the design system's level table (its README, section Atomic design). `docs/atomic-design-plan.md` says which components have moved so far and which pull request moves the rest. `node scripts/check-architecture.mts` checks the import rules below and runs in the `lint` CI job.
+The level of each component comes from the design system's level table (its README, section Atomic design). `node scripts/check-architecture.mts` checks the import rules below and runs in the `lint` CI job.
 
 ![Atomic Design example](https://atomicdesign.bradfrost.com/images/content/instagram-atomic.png)
 
@@ -80,10 +80,15 @@ Pages are specific instances of templates that inject data and content into the 
 
 ## Every level
 
-- **Inputs and outputs.** Besides its input and output bindings, a component may take projected content and may expose public `focus…()` methods that move focus inside itself. It has no other imperative API.
+- **Inputs and outputs.** Besides its input and output bindings, a component may take projected content and may expose public `focus…()` methods that move focus inside itself. It has no other imperative API, with one exception: a template may hand its page an element that the page animates or measures, because only a page may use `Motion` and `observeBlockSize` from `core/`. NowTemplate's `cardElement()` gives Now its card for the Done exit and rise, and TaskEditorTemplate's `barElement` and `footerElement` signals give the Task editor its sticky bar and footer.
 - **Support code.** Helpers that several levels share, such as `activation.ts` and `field-control.ts`, live in `./support`. Every level may import them, and they import nothing from `components/`. A helper that one component owns stays in that component's folder.
 - **Services.** No component injects a service from `core/`. The one exception is `organisms/swipe-actions`, which uses the `core/platform` seams `Motion`, `Haptics` and `theme`.
 - **Upwards and sideways.** Nothing in `components/` imports from `pages/` or `layout/`.
+
+## Departures from the design system
+
+- **A template for every page.** Every page has a template of its own, also where the design system draws none (Recovered, the Areas list and editor, the auth screens, Capture, Settings and Account). Those templates follow what the screen shows, and the design system is left as it is (decided 2026-10-22).
+- **SyncNote keeps its name.** It is the "Saved. Waiting for the server." note, which the design system's SaveStatus leaves to `reason` text; the Task editor's inline Saved status is the SaveStatus (decided 2026-10-25).
 
 ## The shell
 
